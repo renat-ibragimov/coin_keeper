@@ -21,6 +21,22 @@
 
 Всё в одном `docker-compose.yml`. Kubernetes на этом масштабе — лишняя сложность.
 
+Рядом лежит `docker-compose.dev.yml` — только для локальной разработки: публикует порты
+Postgres, Redis и MinIO наружу и включает hot-reload.
+
+```
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+Он **намеренно не назван** `docker-compose.override.yml`: файл с таким именем compose
+подхватывает сам, а на сервере лежит тот же репозиторий — автоподхват открыл бы порты базы
+наружу. Имя `docker-compose.override.yml` остаётся в `.gitignore`: кому удобнее короткая
+команда, копирует туда dev-файл у себя на машине.
+
+`docker-compose.yml` собирает образ со стадией `target: production` явно. Без этого Docker
+берёт последнюю стадию Dockerfile — это стадия разработки, с dev-зависимостями и
+процессом от root.
+
 ## Конфигурация
 
 Только через переменные окружения. Файл `.env` на сервере, в репозитории — `.env.example`

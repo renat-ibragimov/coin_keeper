@@ -1,0 +1,51 @@
+# Local development only: published ports and hot reload.
+#
+# Deliberately NOT named docker-compose.override.yml. Compose loads an override
+# file automatically, and the server checks out this same repository — an
+# auto-loaded override would publish Postgres, Redis and MinIO on the host
+# there. So it is opt-in:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# For the shorter form, copy it to the ignored override name on your machine:
+#
+#   cp docker-compose.dev.yml docker-compose.override.yml
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coinkeeper}
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  minio:
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:-minioadmin}
+
+  minio-init:
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-minioadmin}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-minioadmin}
+
+  api:
+    build:
+      context: ./backend
+      target: development
+    image: coinkeeper-api:dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  caddy:
+    profiles: ["proxy"]
