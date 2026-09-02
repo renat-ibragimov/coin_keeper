@@ -238,3 +238,8 @@ frontend/.vite/
 
 # Инфраструктура
 docker-compose.override.yml
+
+# Редакторы и IDE
+.idea/
+.vscode/
+*.swp
