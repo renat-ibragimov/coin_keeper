@@ -2,6 +2,11 @@
 
 Everything goes through the SQLAlchemy session that the test client shares, so
 seeded rows are visible to API calls and disappear with the per-test rollback.
+
+Each helper commits (a savepoint on the outer test transaction) and detaches
+what it created: a failing API request rolls the session back, which would
+both discard un-committed seeds and expire attribute access on anything still
+attached — turning a plain `item.id` in a test into a MissingGreenlet error.
 """
 
 from __future__ import annotations
@@ -74,8 +79,10 @@ async def seed_reference(session: AsyncSession) -> ReferenceData:
     fauna = CoinSeries(country_id=ukraine.id, name_original="Флора і фауна")
     cities = CoinSeries(country_id=ukraine.id, name_original="Міста України")
     session.add_all([fauna, cities])
-    await session.flush()
+    await session.commit()
 
+    for obj in (ukraine, usa, uah_2, uah_5, cent_1, fauna, cities):
+        session.expunge(obj)
     return ReferenceData(
         ukraine=ukraine,
         usa=usa,
@@ -115,7 +122,8 @@ async def make_catalog_item(
         **fields,
     )
     session.add(item)
-    await session.flush()
+    await session.commit()
+    session.expunge(item)
     return item
 
 
@@ -142,7 +150,8 @@ async def add_snapshot(
         is_suspect=is_suspect,
     )
     session.add(snapshot)
-    await session.flush()
+    await session.commit()
+    session.expunge(snapshot)
     return snapshot
 
 
@@ -156,7 +165,8 @@ async def add_rate(
         fetched_at=datetime.now(UTC),
     )
     session.add(row)
-    await session.flush()
+    await session.commit()
+    session.expunge(row)
     return row
 
 
@@ -197,13 +207,14 @@ async def add_collection_item(
                 collection_item_id=row.id,
             )
         )
-        await session.flush()
+    await session.commit()
+    session.expunge(row)
     return row
 
 
 async def promote_to_admin(session: AsyncSession, email: str) -> None:
     await session.execute(update(User).where(User.email == email).values(role=UserRole.ADMIN))
-    await session.flush()
+    await session.commit()
 
 
 async def user_id_by_email(session: AsyncSession, email: str) -> int:

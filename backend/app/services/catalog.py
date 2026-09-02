@@ -251,6 +251,9 @@ class CatalogService:
             if expense is not None:
                 await self._session.delete(expense)
             await self._session.delete(instance)
+        # Without ORM relationships the unit of work cannot order these deletes
+        # by foreign keys itself: flush the children before deleting the item.
+        await self._session.flush()
         self._audit(
             "catalog_item.delete",
             item.id,

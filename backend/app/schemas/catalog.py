@@ -126,7 +126,8 @@ class CatalogItemUpdate(CamelModel):
 
 
 class ArchiveRequest(CamelModel):
-    reason: str = Field(min_length=1, max_length=1000)
+    # Emptiness is checked in the route: the contract answers 400, not 422.
+    reason: str = Field(max_length=1000)
 
 
 class ArchiveStateOut(CamelModel):

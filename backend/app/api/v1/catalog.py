@@ -188,8 +188,17 @@ async def delete_item(session: DbSession, user: CurrentUser, item_id: int) -> No
 async def archive_item(
     session: DbSession, user: CurrentUser, item_id: int, payload: ArchiveRequest
 ) -> ArchiveStateOut:
+    reason = payload.reason.strip()
+    if not reason:
+        # The contract promises 400, not a validation 422, for an empty reason.
+        raise ProblemError(
+            status.HTTP_400_BAD_REQUEST,
+            "archive-reason-required",
+            "Bad request",
+            "An archive reason is required.",
+        )
     try:
-        return await CatalogService(session, user).archive_item(item_id, payload.reason)
+        return await CatalogService(session, user).archive_item(item_id, reason)
     except ItemNotFoundError as exc:
         raise _not_found() from exc
     except NotApplicableToPersonalError as exc:

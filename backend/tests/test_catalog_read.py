@@ -54,9 +54,7 @@ async def test_listing_shape_and_pagination(
 ) -> None:
     refs = ctx.refs
     for year in range(2000, 2005):
-        await make_catalog_item(
-            db_session, country=refs.ukraine, title=f"Монета {year}", year=year
-        )
+        await make_catalog_item(db_session, country=refs.ukraine, title=f"Монета {year}", year=year)
 
     response = await client.get(
         "/api/v1/catalog?page=2&pageSize=2&sort=year", headers=auth(ctx.token_a)
@@ -96,9 +94,7 @@ async def test_personal_items_are_isolated(
     assert direct.status_code == 404
 
     listing_b = await client.get("/api/v1/catalog", headers=auth(ctx.token_b))
-    own_row = next(
-        item for item in listing_b.json()["items"] if item["id"] == personal_b.id
-    )
+    own_row = next(item for item in listing_b.json()["items"] if item["id"] == personal_b.id)
     assert own_row["isOwn"] is True
 
 
@@ -138,17 +134,13 @@ async def test_filters(client: AsyncClient, db_session: AsyncSession, ctx: Simpl
 
     headers = auth(ctx.token_a)
 
-    by_country = await client.get(
-        f"/api/v1/catalog?countryId={refs.ukraine.id}", headers=headers
-    )
+    by_country = await client.get(f"/api/v1/catalog?countryId={refs.ukraine.id}", headers=headers)
     assert by_country.json()["total"] == 2
 
     by_series = await client.get(f"/api/v1/catalog?seriesId={refs.fauna.id}", headers=headers)
     assert [i["id"] for i in by_series.json()["items"]] == [ua.id]
 
-    by_year_range = await client.get(
-        "/api/v1/catalog?yearFrom=2010&yearTo=2019", headers=headers
-    )
+    by_year_range = await client.get("/api/v1/catalog?yearFrom=2010&yearTo=2019", headers=headers)
     assert [i["id"] for i in by_year_range.json()["items"]] == [ua.id]
 
     by_denomination = await client.get(
@@ -249,9 +241,7 @@ async def test_market_price_visibility_and_suspect(
 ) -> None:
     refs = ctx.refs
     item = await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
-    await add_snapshot(
-        db_session, item, "100.00", observed_at=datetime(2026, 1, 1, tzinfo=UTC)
-    )
+    await add_snapshot(db_session, item, "100.00", observed_at=datetime(2026, 1, 1, tzinfo=UTC))
     # B's own snapshot is newer, but only B sees it.
     await add_snapshot(
         db_session,
@@ -350,9 +340,7 @@ async def test_card_and_own_instances(
         db_session, owner_id=ctx.id_a, item=item, quantity=1, price="666", rate_uah="1"
     )
 
-    card = (
-        await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))
-    ).json()
+    card = (await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))).json()
     assert card["title"] == "Дельфін"
     assert card["countryId"] == refs.ukraine.id
     assert card["seriesName"] == "Флора і фауна"
@@ -362,9 +350,7 @@ async def test_card_and_own_instances(
     assert card["purchaseTotalUah"] == "666.00"
 
     instances = (
-        await client.get(
-            f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a)
-        )
+        await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a))
     ).json()
     assert len(instances) == 1
     assert instances[0]["purchasePrice"] == "666.00"
@@ -372,9 +358,7 @@ async def test_card_and_own_instances(
 
     # B has no instances of it.
     instances_b = (
-        await client.get(
-            f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_b)
-        )
+        await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_b))
     ).json()
     assert instances_b == []
 
