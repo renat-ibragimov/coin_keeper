@@ -216,3 +216,25 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ---- CoinKeeper ----
+# Личные данные коллекции. Репозиторий публичный — сюда ничего не коммитим.
+legacy/data/
+media-archive/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+
+# Локальные окружения
+.env
+.env.*
+!.env.example
+
+# Фронтенд
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Инфраструктура
+docker-compose.override.yml
