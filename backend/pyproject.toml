@@ -48,7 +48,10 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF", "ASYNC", "S"]
 ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S105", "S106"]
+# RUF001 is allowed in tests: assertions quote Ukrainian coin, country and
+# series names — data, which the language policy in CLAUDE.md exempts.
+# Comments and docstrings (RUF002/RUF003) still must be plain English.
+"tests/*" = ["S105", "S106", "RUF001"]
 # The legacy fixture carries Ukrainian and Russian coin titles on purpose: the
 # migration has to survive non-ASCII data, and Cyrillic letters that look like
 # Latin ones are exactly what the real database contains. This is data, not
