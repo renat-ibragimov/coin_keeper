@@ -297,6 +297,8 @@ docker compose build && docker compose up -d     # если нужно собр�
 □ .env на сервере разложен из SERVER_ENV, JWT_SECRET сгенерирован случайно
 □ MAIL_BACKEND=smtp на сервере, console — локально и в тестах
 □ docker compose up -d, все контейнеры healthy
+□ docker compose up minio-init — однократно, создать бакет. Сервис одноразовый
+  и за `up -d api` не подтягивается: вскрылось на реальном деплое
 □ HTTPS работает, сертификат выдан
 □ alembic upgrade head прошёл
 □ Пуш в main проходит пайплайн целиком и выкатывается на домен

@@ -96,6 +96,104 @@ promote an account whose address has not been confirmed.
 No email address or password is ever hardcoded, in code, tests or examples:
 the repository is public.
 
+## Legacy data migration
+
+Moves the desktop SQLite database into PostgreSQL. Specification:
+`../docs/09-data-migration.md`. Runs on the server, inside the api container.
+
+The owner's database is not in this repository and never will be. The script is
+developed against the synthetic fixture in `tests/fixtures/build_legacy_db.py`.
+
+### 1. Put the data on the server
+
+```bash
+# from the machine holding the database, into the project directory
+scp coinkeeper-2026-08-06.db <user>@<host>:<project-path>/legacy-data/
+scp -r media <user>@<host>:<project-path>/legacy-data/
+```
+
+`legacy-data/` is covered by `.gitignore`. It holds personal data: purchases,
+amounts, dates. It must never be committed and should be removed from the
+server once the migration is done and verified.
+
+### 2. Dry run first
+
+Reports everything and writes nothing — not a single row:
+
+```bash
+docker compose run --rm -v "$PWD/legacy-data:/legacy-data:ro" api \
+  python scripts/migrate_legacy.py \
+    --sqlite /legacy-data/coinkeeper-2026-08-06.db \
+    --media  /legacy-data/media \
+    --owner-email <owner-email> \
+    --expect scripts/expected_legacy_2026-08-06.json \
+    --dry-run --report /legacy-data/dry-run.json
+```
+
+Read the report before going further: row counts, how many price snapshots were
+flagged and by which rule, how many photo files are missing, and the checks at
+the bottom. Every check must say `ok`.
+
+`--expect` turns on the numbers from the migration document (3063 catalog
+items, 620 coins, 42 765,66 spent). Without it the script still reconciles the
+result against the source; with it, it also holds the source to the documented
+profile.
+
+### 3. The real run
+
+```bash
+docker compose run --rm -v "$PWD/legacy-data:/legacy-data:ro" api \
+  python scripts/migrate_legacy.py \
+    --sqlite /legacy-data/coinkeeper-2026-08-06.db \
+    --media  /legacy-data/media \
+    --owner-email <owner-email> \
+    --owner-password \
+    --expect scripts/expected_legacy_2026-08-06.json \
+    --report /legacy-data/migration.json
+```
+
+`--owner-password` without a value prompts for it, so the password stays out of
+the shell history and out of `ps`. It has to pass the same rule as an ordinary
+registration: at least 10 characters, no exception for seeding.
+
+Images take the longest; progress is printed as they upload. If MinIO has no
+bucket yet, run `docker compose up minio-init` once.
+
+Exit codes: `0` fine, `2` bad arguments or a rejected password, `3` the source
+database cannot be read, `4` the checks did not reconcile, `5` the migration
+stopped (for example a non-empty target without `--resume`).
+
+**A non-zero exit means the data is not to be trusted.** The script is meant to
+catch that, so do not work around it.
+
+### 4. After it
+
+```bash
+# the owner can sign in, and is an admin
+docker compose exec api python -c "print('sign in at https://<domain>')"
+
+# the second administrator registers through the form, then:
+docker compose exec api python scripts/promote_admin.py --email <admin-email>
+```
+
+Then the manual checks from `../docs/09-data-migration.md`: open ten or fifteen
+coins and look at the characteristics, photos, price and purchase.
+
+### Useful flags
+
+| Flag | What it is for |
+|---|---|
+| `--dry-run` | report only, writes nothing |
+| `--skip-media` | defers the media step entirely — a fast structural pass |
+| `--resume` | continue on a database that already holds data |
+| `--expect <file>` | enforce a documented profile of counts |
+| `--report <file>` | where the JSON report goes |
+
+`--skip-media` writes no `media_files` rows at all rather than half of one: a
+row written without processing would carry a `storage_key` pointing at an
+object that was never uploaded. Re-running later without the flag fills the
+table in — the migration is idempotent by primary key.
+
 ## Layout
 
 ```
