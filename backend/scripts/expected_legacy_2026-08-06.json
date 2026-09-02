@@ -1,0 +1,18 @@
+{
+  "_comment": "Documented profile of the owner's database snapshot from docs/09-data-migration.md. Pass with --expect to have the script enforce the checklist numbers. Counts only, no personal data.",
+  "counts": {
+    "catalog_items": 3063,
+    "collection_items": 620,
+    "market_price_snapshots": 3938,
+    "media_files": 5066,
+    "price_source_links": 3662,
+    "expenses": 620,
+    "exchange_rates": 282,
+    "coin_series": 49,
+    "denominations": 52,
+    "countries": 3,
+    "ucoin_catalog_sources": 8,
+    "currencies": 3
+  },
+  "expenseSum": "42765.66"
+}
