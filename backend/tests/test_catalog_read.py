@@ -380,3 +380,54 @@ async def test_snapshot_in_foreign_currency_converted(
     row = next(r for r in listing.json()["items"] if r["id"] == item.id)
     # Converted by the latest rate: 100 x 41.50.
     assert row["marketPriceUah"] == "4150.00"
+
+
+async def test_image_visibility_by_provenance(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """uCoin images are only shown to their importer; nbu ones to everyone."""
+    from app.models import MediaFile
+    from app.models.enums import MediaRole, MediaSource
+
+    refs = ctx.refs
+    ucoin_item = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018
+    )
+    nbu_item = await make_catalog_item(db_session, country=refs.ukraine, title="Київ", year=2020)
+    db_session.add(
+        MediaFile(
+            catalog_item_id=ucoin_item.id,
+            owner_id=ctx.id_a,
+            role=MediaRole.OBVERSE,
+            source=MediaSource.UCOIN,
+            external_url="https://i.ucoin.net/coin/dolphin-obverse.jpg",
+        )
+    )
+    db_session.add(
+        MediaFile(
+            catalog_item_id=nbu_item.id,
+            role=MediaRole.OBVERSE,
+            source=MediaSource.NBU,
+            storage_key="catalog/1/obverse/official.webp",
+        )
+    )
+    await db_session.commit()
+    ucoin_id, nbu_id = ucoin_item.id, nbu_item.id
+
+    rows_a = {
+        row["id"]: row
+        for row in (await client.get("/api/v1/catalog", headers=auth(ctx.token_a))).json()["items"]
+    }
+    # The importer sees the hotlink as it is.
+    assert rows_a[ucoin_id]["obverseImageUrl"] == "https://i.ucoin.net/coin/dolphin-obverse.jpg"
+    # A stored official photo comes back as a presigned URL.
+    assert "catalog/1/obverse/official.webp" in rows_a[nbu_id]["obverseImageUrl"]
+    assert "Signature=" in rows_a[nbu_id]["obverseImageUrl"]
+
+    rows_b = {
+        row["id"]: row
+        for row in (await client.get("/api/v1/catalog", headers=auth(ctx.token_b))).json()["items"]
+    }
+    # For anyone else the uCoin image is a placeholder, the NBU one is public.
+    assert rows_b[ucoin_id]["obverseImageUrl"] is None
+    assert rows_b[nbu_id]["obverseImageUrl"] is not None
