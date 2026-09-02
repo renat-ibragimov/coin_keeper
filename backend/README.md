@@ -1,8 +1,9 @@
 # CoinKeeper backend
 
-FastAPI + PostgreSQL + Redis. Stage 1 of `docs/11-roadmap.md`: the schema,
-authentication, health, and the deployment contour. No catalog or collection
-API yet — that is stage 3.
+FastAPI + PostgreSQL + Redis. Stages 1–3 of `docs/11-roadmap.md`: the schema,
+authentication, the deployment contour, the legacy data migration, and the
+catalog / collection / expenses / series / bootstrap API. Background jobs and
+external price sources arrive in stage 5.
 
 Specifications live in `../docs/`. When code and documentation disagree, the
 documentation is wrong only if it is fixed in the same change.
