@@ -10,7 +10,8 @@ Rows are chosen to cover the edge cases the migration has to survive:
 * a timestamp without a zone next to one with a zone,
 * invalid JSON in raw_payload_json,
 * media as an external URL, as a local file that exists, and as a local file
-  that is gone,
+  that is gone -- local paths are full Windows paths, the way the desktop
+  application actually stored them, plus one with forward slashes,
 * a catalog row with a NULL metal_kind, which is NOT NULL in the new schema,
 * a price snapshot whose currency_code is not in `currencies` — SQLite leaves
   foreign keys unenforced by default, so the real database may hold one,
@@ -39,7 +40,7 @@ EXPECTED_COUNTS = {
     "expenses": 3,
     "exchange_rates": 2,
     "price_source_links": 2,
-    "media_files": 5,
+    "media_files": 6,
     "ucoin_catalog_sources": 1,
     "countries": 2,
     "currencies": 2,
@@ -58,7 +59,7 @@ EXPECTED_COUNTS = {
 EXPECTED_MIGRATED = {
     **EXPECTED_COUNTS,
     "market_price_snapshots": 7,
-    "media_files": 4,
+    "media_files": 5,
 }
 # --skip-media defers the media step entirely, so no rows are written.
 EXPECTED_MIGRATED_SKIP_MEDIA = {
@@ -69,6 +70,24 @@ EXPECTED_MIGRATED_SKIP_MEDIA = {
 MISSING_MEDIA_FILENAME = "404_obverse_ffffffffffffffffffffffffffffffff.jpg"
 PRESENT_MEDIA_FILENAME = "1023_obverse_eb5c6f1c1ed041d9bbf86fe77855243b.jpg"
 COLLECTION_MEDIA_FILENAME = "2001_reverse_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
+POSIX_MEDIA_FILENAME = "3005_obverse_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.jpg"
+
+# The desktop application ran on Windows and stored absolute paths, not bare
+# file names: drive letter, backslashes, and a space in "CoinKeeper Data". The
+# fixture uses that shape because the first real dry run found not a single
+# file when it did not.
+WINDOWS_MEDIA_ROOT = r"C:\Users\<user>\AppData\Roaming\CoinKeeper Data\media"
+# One row with forward slashes, in case the collection is ever exported from a
+# machine that writes them.
+POSIX_MEDIA_ROOT = "/home/<user>/.config/CoinKeeper Data/media"
+
+
+def windows_path(file_name: str) -> str:
+    return f"{WINDOWS_MEDIA_ROOT}\\{file_name}"
+
+
+def posix_path(file_name: str) -> str:
+    return f"{POSIX_MEDIA_ROOT}/{file_name}"
 
 
 def _schema_statements() -> list[str]:
@@ -332,7 +351,7 @@ def _insert_rows(connection: sqlite3.Connection) -> None:
                 1,
                 None,
                 "reverse",
-                PRESENT_MEDIA_FILENAME,
+                windows_path(PRESENT_MEDIA_FILENAME),
                 None,
                 "image/jpeg",
                 300,
@@ -346,7 +365,7 @@ def _insert_rows(connection: sqlite3.Connection) -> None:
                 3,
                 None,
                 "obverse",
-                COLLECTION_MEDIA_FILENAME,
+                windows_path(COLLECTION_MEDIA_FILENAME),
                 None,
                 "image/jpeg",
                 300,
@@ -360,7 +379,7 @@ def _insert_rows(connection: sqlite3.Connection) -> None:
                 4,
                 None,
                 "obverse",
-                MISSING_MEDIA_FILENAME,
+                windows_path(MISSING_MEDIA_FILENAME),
                 None,
                 "image/jpeg",
                 300,
@@ -379,6 +398,21 @@ def _insert_rows(connection: sqlite3.Connection) -> None:
                 "image/jpeg",
                 100,
                 100,
+                None,
+                "2024-03-01 09:00:00",
+            ),
+            # Forward slashes with a space in the directory: the same file name
+            # has to come out of either convention.
+            (
+                6,
+                6,
+                None,
+                "obverse",
+                posix_path(POSIX_MEDIA_FILENAME),
+                None,
+                "image/jpeg",
+                300,
+                300,
                 None,
                 "2024-03-01 09:00:00",
             ),

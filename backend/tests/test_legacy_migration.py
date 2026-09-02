@@ -37,6 +37,7 @@ from tests.fixtures.build_legacy_db import (
     EXPECTED_EXPENSE_SUM,
     EXPECTED_MIGRATED,
     EXPECTED_MIGRATED_SKIP_MEDIA,
+    POSIX_MEDIA_FILENAME,
     PRESENT_MEDIA_FILENAME,
     build,
 )
@@ -75,6 +76,7 @@ def media_root(tmp_path: Path) -> Path:
     root.mkdir()
     _write_jpeg(root / PRESENT_MEDIA_FILENAME)
     _write_jpeg(root / COLLECTION_MEDIA_FILENAME)
+    _write_jpeg(root / POSIX_MEDIA_FILENAME)
     # The file for MISSING_MEDIA_FILENAME is deliberately absent.
     return root
 
@@ -289,7 +291,8 @@ async def test_media_split_and_provenance(
     stored = list(
         await db_session.scalars(select(MediaFile).where(MediaFile.storage_key.is_not(None)))
     )
-    assert len(stored) == 2
+    # Every local row whose file is present, whichever way its path was written.
+    assert len(stored) == 3
     assert all(row.external_url is None for row in stored)
     assert all(row.mime_type == "image/webp" for row in stored)
     assert all(row.sha256 and row.width and row.size_bytes for row in stored)
@@ -304,7 +307,7 @@ async def test_media_split_and_provenance(
     assert report.skipped.get("media_files_without_file_or_url") == 1
 
     # Both the original and the thumbnail reached storage.
-    assert len(storage.objects) == 4
+    assert len(storage.objects) == 6
     assert any(key.endswith("_thumb.webp") for key in storage.objects)
 
 

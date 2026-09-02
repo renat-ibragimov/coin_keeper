@@ -6,6 +6,7 @@ docs/06-media-storage.md.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,6 +17,11 @@ from app.models.enums import MediaSource
 
 UCOIN_MARKERS = ("ucoin.net", "ucoin.")
 EXTERNAL_PREFIXES = ("http://", "https://")
+
+_SEPARATORS = re.compile(r"[\\/]")
+# "C:name.jpg" is drive-relative on Windows; the drive letter is not part of
+# the file name.
+_DRIVE_PREFIX = re.compile(r"^[A-Za-z]:")
 
 
 @dataclass(slots=True)
@@ -47,6 +53,26 @@ class MediaOutcome:
 
 def is_external(original_path: str) -> bool:
     return original_path.strip().lower().startswith(EXTERNAL_PREFIXES)
+
+
+def file_name_from(original_path: str) -> str:
+    r"""Last component of a path written by either platform.
+
+    The desktop application ran on Windows and stored absolute paths: a drive
+    letter, backslashes and spaces in the directory names, for example
+
+        C:\Users\<user>\AppData\Roaming\CoinKeeper Data\media\5_obverse_<uuid>.jpg
+
+    pathlib.Path on POSIX does not treat a backslash as a separator, so .name
+    on such a value returns the whole string and every file lookup misses --
+    which is what the first real dry run showed: 2270 local rows, zero found.
+
+    Splitting on both separators works wherever the path was written and
+    leaves a bare file name untouched. The name is returned as stored,
+    including the case of its extension.
+    """
+    tail = _SEPARATORS.split(original_path.strip())[-1]
+    return _DRIVE_PREFIX.sub("", tail)
 
 
 def looks_like_ucoin(value: str | None) -> bool:
@@ -143,7 +169,7 @@ def prepare(
     if not process or media_root is None:
         return MediaOutcome(prepared=prepared)
 
-    file_path = media_root / Path(original_path).name
+    file_path = media_root / file_name_from(original_path)
     if not file_path.is_file():
         # The row is dropped only when it has neither a file nor a link.
         return MediaOutcome(missing_path=original_path)
