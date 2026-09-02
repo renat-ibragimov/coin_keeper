@@ -96,6 +96,9 @@
   (`04-business-rules.md`, п. 10)
 - CRUD коллекции с автосозданием расхода и подстановкой курса НБУ; удаление экземпляра
   удаляет расход `coin_purchase` в сервисном слое
+- Расходы: `GET/POST/PATCH/DELETE /expenses` и `GET /expenses/summary` (`03-api-contract.md`) —
+  без них не собрать экран «Деньги» и не проверить сопутствующие траты. Ручной CRUD
+  не касается `coin_purchase`: эти записи живут только вместе с экземплярами коллекции
 - Сортировки-агрегаты `owned | purchase | price` через `LATERAL`, а не постобработкой
 - `GET /series`, `GET /series/{id}/summary`
 - `GET /bootstrap` со всеми показателями дашборда
