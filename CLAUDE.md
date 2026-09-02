@@ -20,6 +20,7 @@
 | Хранилище файлов | S3-совместимое (MinIO локально) |
 | Фронт | React 19 + TypeScript + Vite + TanStack Query |
 | Деплой | Docker Compose на Hetzner, Caddy как reverse proxy |
+| CI/CD | GitHub Actions (reusable workflow), образы в GHCR, деплой по SSH |
 | Python | 3.12+ |
 
 ## Языки в проекте
