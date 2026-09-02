@@ -28,7 +28,7 @@ def build_s3_client(settings: Settings) -> S3Client:
 
 
 class ObjectStorage:
-    """Thin wrapper: the migration only ever needs to put objects."""
+    """Thin wrapper over the S3 client."""
 
     def __init__(self, client: S3Client, bucket: str) -> None:
         self._client = client
@@ -37,6 +37,14 @@ class ObjectStorage:
     def put(self, key: str, payload: bytes, content_type: str) -> None:
         self._client.put_object(
             Bucket=self._bucket, Key=key, Body=payload, ContentType=content_type
+        )
+
+    def presigned_get_url(self, key: str, expires_seconds: int = 3600) -> str:
+        """Signing is local computation — no round trip to the storage."""
+        return self._client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": self._bucket, "Key": key},
+            ExpiresIn=expires_seconds,
         )
 
     def ensure_bucket(self) -> None:

@@ -55,6 +55,8 @@ ignore = ["S101"]
 # code, and the language policy in CLAUDE.md exempts coin, country and series
 # names for that reason.
 "tests/fixtures/build_legacy_db.py" = ["RUF001", "RUF002", "RUF003"]
+# Same exemption for the API test seed: Ukrainian coin and series names are data.
+"tests/seed.py" = ["RUF001", "RUF002", "RUF003"]
 "alembic/versions/*" = ["E501"]
 
 [tool.mypy]
