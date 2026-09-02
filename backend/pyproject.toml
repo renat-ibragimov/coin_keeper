@@ -17,6 +17,7 @@ dependencies = [
     "redis>=5.2",
     "aiosmtplib>=3.0",
     "boto3>=1.35",
+    "pillow>=11.0",
 ]
 
 [project.optional-dependencies]
@@ -27,6 +28,7 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "types-boto3>=1.35",
+    "mypy-boto3-s3>=1.43",
 ]
 
 [build-system]
@@ -47,6 +49,12 @@ ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S105", "S106"]
+# The legacy fixture carries Ukrainian and Russian coin titles on purpose: the
+# migration has to survive non-ASCII data, and Cyrillic letters that look like
+# Latin ones are exactly what the real database contains. This is data, not
+# code, and the language policy in CLAUDE.md exempts coin, country and series
+# names for that reason.
+"tests/fixtures/build_legacy_db.py" = ["RUF001", "RUF002", "RUF003"]
 "alembic/versions/*" = ["E501"]
 
 [tool.mypy]
