@@ -6,6 +6,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -14,6 +15,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     desc,
+    text,
 )
 from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -43,6 +45,12 @@ class MarketPriceSnapshot(Base):
     source_url: Mapped[str | None] = mapped_column(Text)
     raw_payload: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    # Set by the legacy migration for snapshots that fail the price checks.
+    # They stay in the history but are excluded from collection value.
+    # See docs/09-data-migration.md and docs/05-integrations.md.
+    is_suspect: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
     __table_args__ = (
         CheckConstraint("price >= 0", name="price_non_negative"),
@@ -59,6 +67,11 @@ class MarketPriceSnapshot(Base):
             desc("observed_at"),
         ),
         Index("ix_market_price_snapshots_created_by", "created_by"),
+        Index(
+            "ix_market_price_snapshots_suspect",
+            "catalog_item_id",
+            postgresql_where=text("is_suspect"),
+        ),
     )
 
 

@@ -392,6 +392,7 @@ observed_at      timestamptz NOT NULL
 source_url       text
 raw_payload      jsonb                -- сырой ответ источника, для разбора багов
 created_by       bigint FK users ON DELETE SET NULL   -- NULL = снимок центральной задачи
+is_suspect       boolean NOT NULL DEFAULT false
 UNIQUE (catalog_item_id, source, grade, observed_at)
 ```
 
@@ -409,6 +410,14 @@ WHERE created_by IS NULL OR created_by = :user_id
 
 `raw_payload` был `TEXT` с JSON — переводим в `jsonb`. Это важно: в legacy цены ломались,
 и без сырых данных разобраться было нечем.
+
+`is_suspect` — снимок не прошёл проверки из `05-integrations.md`. Такие строки **остаются
+в истории и видны в карточке монеты**, но исключаются из расчёта стоимости коллекции.
+Флаг проставляет миграция legacy-данных (`09-data-migration.md`); при обычной работе цена,
+не прошедшая проверку, в базу вообще не пишется — она отклоняется со статусом `rejected`.
+То есть `is_suspect` существует только для унаследованных данных, которые уже в базе.
+
+Индекс частичный, по `is_suspect`: подозрительных меньшинство, и спрашивают именно их.
 
 ### price_source_links
 
