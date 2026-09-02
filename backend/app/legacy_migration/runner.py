@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
@@ -82,6 +82,14 @@ SEQUENCED_MODELS: tuple[tuple[str, Any], ...] = (
 )
 
 MEDIA_UPLOAD_BATCH = 50
+
+# PostgreSQL takes at most 32767 bind parameters in one statement, and a
+# multi-row INSERT spends one per column per row. Inserting a whole table in a
+# single statement blows past that: catalog_items is 3063 rows of 32 columns,
+# roughly 98k parameters, which is what the first real migration run died on.
+# The budget is deliberately below the limit so no column count lands exactly
+# on the edge.
+MAX_BIND_PARAMETERS = 30000
 
 # Foreign keys that must be checked before inserting, per table. SQLite does
 # not enforce foreign keys unless PRAGMA foreign_keys is on, and the desktop
@@ -720,11 +728,15 @@ class MigrationRunner:
         self._report.migrated[table_name] = len(prepared)
         if not prepared or self._options.dry_run:
             return
-        # Idempotent by primary key: a second run inserts nothing new.
-        statement = pg_insert(model).values(list(prepared))
-        statement = statement.on_conflict_do_nothing(index_elements=conflict_index or ["id"])
-        await self._session.execute(statement)
-        # One commit per step: a later failure keeps what already landed.
+
+        for chunk in chunk_rows(prepared):
+            # Idempotent by primary key: a second run inserts nothing new, and
+            # a run interrupted partway through resumes without duplicating the
+            # chunks that already landed.
+            statement = pg_insert(model).values(list(chunk))
+            statement = statement.on_conflict_do_nothing(index_elements=conflict_index or ["id"])
+            await self._session.execute(statement)
+        # Still one commit per table: a later failure keeps what already landed.
         await self._session.commit()
 
     async def _reset_sequences(self) -> None:
@@ -830,6 +842,24 @@ class MigrationRunner:
                 )
 
 
+def chunk_size_for(columns: int) -> int:
+    """Rows per statement that keep the bind parameters under the limit."""
+    return max(1, MAX_BIND_PARAMETERS // max(columns, 1))
+
+
+def chunk_rows(rows: Sequence[dict[str, Any]]) -> Iterator[Sequence[dict[str, Any]]]:
+    """Split rows into statement-sized batches, order preserved.
+
+    The size comes from the width of the rows themselves, so a table gaining a
+    column cannot quietly push a statement over the limit again.
+    """
+    if not rows:
+        return
+    size = chunk_size_for(len(rows[0]))
+    for start in range(0, len(rows), size):
+        yield rows[start : start + size]
+
+
 def _sqlite_expense_sum(connection: sqlite3.Connection) -> Decimal:
     """Sum the source amounts the same way the target rounds them."""
     total = Decimal(0)
@@ -845,4 +875,10 @@ def _unwrap_json(raw: Any) -> Any:
     return payload
 
 
-__all__ = ["MigrationError", "MigrationOptions", "MigrationRunner"]
+__all__ = [
+    "MigrationError",
+    "MigrationOptions",
+    "MigrationRunner",
+    "chunk_rows",
+    "chunk_size_for",
+]

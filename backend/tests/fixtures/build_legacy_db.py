@@ -67,6 +67,9 @@ EXPECTED_MIGRATED_SKIP_MEDIA = {
     "media_files": 0,
 }
 
+# Ids used by the handwritten catalog rows; filler starts after them.
+FIXTURE_CATALOG_IDS = (1, 2, 3, 4, 5, 6)
+
 MISSING_MEDIA_FILENAME = "404_obverse_ffffffffffffffffffffffffffffffff.jpg"
 PRESENT_MEDIA_FILENAME = "1023_obverse_eb5c6f1c1ed041d9bbf86fe77855243b.jpg"
 COLLECTION_MEDIA_FILENAME = "2001_reverse_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.jpg"
@@ -102,8 +105,16 @@ def _schema_statements() -> list[str]:
     ]
 
 
-def build(path: Path) -> Path:
-    """Create the fixture database at `path` and return it."""
+def build(path: Path, *, extra_catalog_items: int = 0) -> Path:
+    """Create the fixture database at `path` and return it.
+
+    `extra_catalog_items` pads catalog_items with filler rows. It exists for one
+    reason: a multi-row INSERT spends a bind parameter per column per row, and
+    PostgreSQL caps a statement at 32767 of them. catalog_items is 32 columns
+    wide, so anything past roughly a thousand rows has to be split across
+    statements. Padding lets a test reach that size without carrying a real
+    database around.
+    """
     if path.exists():
         path.unlink()
     connection = sqlite3.connect(path)
@@ -111,10 +122,42 @@ def build(path: Path) -> Path:
         for statement in _schema_statements():
             connection.execute(statement)
         _insert_rows(connection)
+        if extra_catalog_items:
+            _insert_filler_catalog_items(connection, extra_catalog_items)
         connection.commit()
     finally:
         connection.close()
     return path
+
+
+def _insert_filler_catalog_items(connection: sqlite3.Connection, count: int) -> None:
+    """Plain, valid catalog rows whose only job is to make the table large.
+
+    Ids start above the handwritten ones so nothing collides, and every row is
+    complete enough to migrate: the point is the row count, not new edge cases.
+    """
+    first_id = max(FIXTURE_CATALOG_IDS) + 1
+    connection.executemany(
+        "INSERT INTO catalog_items (id, country_id, series_id, denomination_id, "
+        "collection_group, title_original, issue_year, source_key, metal_kind, "
+        "created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        [
+            (
+                first_id + offset,
+                1,
+                None,
+                1,
+                "circulation",
+                f"Filler coin {offset}",
+                2000 + offset % 25,
+                f"fixture:filler:{offset}",
+                "base",
+                "2024-02-01 09:00:00",
+                "2024-02-01 09:00:00",
+            )
+            for offset in range(count)
+        ],
+    )
 
 
 def _insert_rows(connection: sqlite3.Connection) -> None:
