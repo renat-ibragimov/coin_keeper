@@ -1,0 +1,205 @@
+# Reusable pipeline: build -> lint -> test -> image -> GHCR -> deploy.
+#
+# Kept generic on purpose. It will be reused by other projects with the same
+# shape (FastAPI + Postgres + Docker Compose on an own server), so everything
+# project-specific arrives through inputs. See docs/10-infra.md.
+name: build-deploy
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version used for lint and tests.
+        type: string
+        default: "3.12"
+      backend-path:
+        description: Directory holding pyproject.toml and the Dockerfile.
+        type: string
+        default: backend
+      image-name:
+        description: Image name inside the GHCR registry.
+        type: string
+        required: true
+      deploy:
+        description: Whether to deploy after a successful build.
+        type: boolean
+        default: false
+      compose-services:
+        description: Services to pull and restart on the server.
+        type: string
+        default: api
+    secrets:
+      DEPLOY_SSH_KEY:
+        required: false
+      DEPLOY_HOST:
+        required: false
+      DEPLOY_USER:
+        required: false
+      DEPLOY_PATH:
+        required: false
+      SSH_KNOWN_HOSTS:
+        required: false
+      SERVER_ENV:
+        required: false
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ---------------------------------------------------------------- quality
+  # Lint and tests gate everything: if this job fails, no image is built and
+  # nothing reaches the server.
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.backend-path }}
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: coinkeeper
+          POSTGRES_PASSWORD: coinkeeper
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U coinkeeper"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: ${{ inputs.backend-path }}/uv.lock
+
+      - name: Install dependencies
+        env:
+          UV_PYTHON: ${{ inputs.python-version }}
+        run: uv sync --frozen --extra dev
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: mypy
+        run: uv run mypy app scripts
+
+      - name: pytest
+        env:
+          TEST_POSTGRES_ADMIN_URL: postgresql+asyncpg://coinkeeper:coinkeeper@localhost:5432/postgres
+          TEST_REDIS_URL: redis://localhost:6379/15
+          # No object storage in CI: the health test tolerates it being down.
+          S3_ENDPOINT: http://127.0.0.1:9
+          S3_ACCESS_KEY: ci
+          S3_SECRET_KEY: ci
+        run: uv run pytest -q
+
+  # ------------------------------------------------------------------ image
+  build:
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image reference
+        id: meta
+        run: |
+          image="${REGISTRY}/${{ github.repository_owner }}/${{ inputs.image-name }}"
+          echo "image=${image,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.backend-path }}
+          target: production
+          push: true
+          # Tagged by commit SHA as well as latest: rolling back is a matter of
+          # pointing compose at the previous tag, with no rebuild.
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ github.sha }}
+            ${{ steps.meta.outputs.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ----------------------------------------------------------------- deploy
+  deploy:
+    needs: build
+    if: inputs.deploy
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          # Pinned host key: without it the host check is off and the deploy
+          # could be pointed at someone else's server.
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Ship .env and restart
+        env:
+          IMAGE: ${{ needs.build.outputs.image }}
+          SHA: ${{ github.sha }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PATH_ON_SERVER: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          # SERVER_ENV is the single source of truth for the server .env.
+          printf '%s\n' "${{ secrets.SERVER_ENV }}" > server.env
+          printf 'API_IMAGE=%s:%s\n' "$IMAGE" "$SHA" >> server.env
+          scp -o BatchMode=yes server.env "$USER@$HOST:$PATH_ON_SERVER/.env"
+          rm -f server.env
+          ssh -o BatchMode=yes "$USER@$HOST" \
+            "cd $PATH_ON_SERVER && docker compose pull ${{ inputs.compose-services }} && docker compose up -d ${{ inputs.compose-services }} && docker image prune -f"
+
+      - name: Smoke check
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PATH_ON_SERVER: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          # Migrations run at container start, so give it a moment to come up.
+          ssh -o BatchMode=yes "$USER@$HOST" \
+            "cd $PATH_ON_SERVER && for i in \$(seq 1 30); do
+               if docker compose exec -T api python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health', timeout=5).status == 200 else 1)\"; then
+                 echo 'health ok'; exit 0
+               fi
+               sleep 5
+             done
+             echo 'health check failed'; docker compose logs --tail 50 api; exit 1"

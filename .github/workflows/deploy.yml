@@ -1,0 +1,25 @@
+# Project workflow: triggers and parameters only. The logic lives in the
+# reusable workflow, which will move to its own repository once a second
+# project needs it (docs/10-infra.md).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  pipeline:
+    uses: ./.github/workflows/build-deploy.yml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      image-name: coinkeeper-api
+      backend-path: backend
+      python-version: "3.12"
+      # Only main reaches the server; pull requests stop after build.
+      deploy: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    secrets: inherit
