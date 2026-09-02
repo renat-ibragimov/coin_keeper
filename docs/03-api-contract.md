@@ -124,6 +124,7 @@ GET /catalog
   &metalKind       — precious | base | unknown
   &owned           — true (есть в коллекции) | false (не хватает)
   &scope           — all (по умолчанию) | shared (только общий каталог) | own (только личные)
+  &archived        — false (по умолчанию) | true (только архивные)
   &sort            — title | country | series | year | denomination | owned | purchase | price
   &order           — asc | desc
 ```
@@ -131,6 +132,18 @@ GET /catalog
 Выдача всегда ограничена видимыми позициями: общий каталог плюс личные позиции текущего
 пользователя (`created_by IS NULL OR created_by = :userId`). Фильтр ставит репозиторий, а не
 роут — `07-auth.md`.
+
+**`archived`** по умолчанию `false` — витрина показывает только активные позиции
+(`NOT is_archived` в запросе, `04-business-rules.md`, п. 10). При `archived=true`:
+
+| Кто спрашивает | Что видит |
+|---|---|
+| admin | все архивные записи |
+| обычный пользователь | только те архивные, где у него есть экземпляр |
+
+Второе — не декорация: пользователь должен иметь возможность найти свою монету, даже если
+позицию убрали из каталога. Архивных позиций, к которым он не имеет отношения, он не видит
+вовсе.
 
 **Сортировки `owned`, `purchase`, `price` — это агрегаты per-user**, а не колонки
 `catalog_items`: количество экземпляров пользователя, сумма его покупок, последняя видимая ему
@@ -165,6 +178,8 @@ GET /catalog
   "reverseImageUrl": "https://cdn.../reverse.webp",
   "thumbnailUrl": "https://cdn.../thumb.webp",
   "isOwn": false,
+  "isArchived": false,
+  "archiveReason": null,
   "sourceUrl": "https://ru.ucoin.net/coin/ua-2uah-2018-dolphin"
 }
 ```
@@ -177,11 +192,17 @@ GET /catalog
 `isOwn` — `true` у личной позиции (`created_by` = текущий пользователь), `false` у общей;
 фронт по нему решает, показывать ли кнопки правки.
 
+`isArchived` и `archiveReason` есть и в элементе списка, и в карточке. По ним фронт рисует
+плашку «Позиция архивирована: <причина>» (`08-ui-map.md`). У активной позиции
+`archiveReason` — `null`.
+
 ```
 GET    /catalog/{id}                    → карточка с полными характеристиками
 POST   /catalog                         → создать личную позицию (created_by = текущий)
 PATCH  /catalog/{id}
-DELETE /catalog/{id}                    → 409, если есть экземпляры у любого пользователя
+POST   /catalog/{id}/archive    {reason} → архивировать общую позицию (admin)
+POST   /catalog/{id}/unarchive           → вернуть в витрину (admin)
+DELETE /catalog/{id}                     → см. таблицу ниже
 GET    /catalog/{id}/prices             → история цен, видимая пользователю
 GET    /catalog/{id}/collection-items   → экземпляры текущего пользователя
 ```
@@ -192,10 +213,49 @@ GET    /catalog/{id}/collection-items   → экземпляры текущег�
 |---|---|---|---|
 | `GET` | 200 | 200 | 404 |
 | `POST /catalog` | всегда создаёт личную; общую — только admin | — | — |
-| `PATCH`, `DELETE` | 403 (admin — 200) | 200 | 404 |
+| `PATCH` | 403 (admin — 200) | 200 | 404 |
+| `POST .../archive`, `.../unarchive` | 403 (admin — 200) | 400 — к личным неприменимо | 404 |
+| `DELETE` | 403 (admin — см. ниже) | 200 | 404 |
 
 `POST /catalog` создаёт запись с `created_by` = текущий пользователь. Общую запись
 (`created_by = NULL`) может создать только администратор — тем же эндпоинтом, по своей роли.
+
+### Архивация
+
+```
+POST /catalog/{id}/archive    {reason}   → 200, {isArchived: true, archivedAt, archiveReason}
+     400 — reason пустой
+     400 — позиция личная: архивация только для общих записей
+     403 — не admin
+     409 — уже архивирована
+
+POST /catalog/{id}/unarchive             → 200, {isArchived: false}
+     403 — не admin
+     409 — не была архивирована
+```
+
+`reason` обязателен и непустой — иначе через полгода никто не вспомнит, почему позиции нет
+в каталоге. Эндпоинты переключают `is_archived` и заполняют либо обнуляют `archived_at`
+и `archive_reason` (`02-data-model.md`). Обе операции пишутся в `audit_log`. Экземпляры, покупки, расходы, фотографии и
+история цен при архивации **не трогаются** — семантика в `04-business-rules.md`, п. 10.
+
+### Удаление
+
+```
+DELETE /catalog/{id}
+```
+
+**Личная позиция:** удаляется автором физически. `409`, если на ней висит его собственный
+экземпляр.
+
+**Общая позиция:** только admin и только «прибраться за опечаткой». `409` с указанием
+причины, если не выполнено хотя бы одно условие:
+
+- позиция **не архивирована** — сначала `POST /catalog/{id}/archive`;
+- на неё есть ссылки из `collection_items` или `expenses` у любого пользователя.
+
+`media_files` и `market_price_snapshots` удалению не мешают — уходят каскадом.
+Штатный способ убрать позицию из каталога — архивация, а не это.
 
 `GET /catalog/{id}/prices` отдаёт снимки с `created_by IS NULL OR created_by = :userId`;
 у каждого снимка в ответе есть `isOwn`, чтобы в графике было видно, где своя цена, а где

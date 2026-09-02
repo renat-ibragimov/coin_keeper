@@ -192,6 +192,9 @@ catalog_km, catalog_uc, catalog_numista  text
 notes              text
 source_key         text              -- ключ дедупликации импорта, см. 04-business-rules
 created_by         bigint FK users ON DELETE CASCADE    -- NULL = общая (системная) запись
+is_archived        boolean NOT NULL DEFAULT false
+archived_at        timestamptz
+archive_reason     text              -- 'снята с выпуска НБУ', 'дубликат', 'ошибочная запись'
 created_at, updated_at timestamptz
 ```
 
@@ -199,6 +202,21 @@ created_at, updated_at timestamptz
 Здесь именно `ON DELETE CASCADE`, а не `SET NULL`: иначе удаление пользователя молча
 превратило бы все его личные позиции в записи общего каталога. Общих записей каскад не
 касается — у них `created_by IS NULL`.
+
+### Архивация вместо удаления
+
+`is_archived` — мягкое удаление записи общего каталога. Физический `DELETE` общей позиции
+перестал быть штатной операцией: на позицию могут ссылаться экземпляры, покупки, расходы,
+фотографии и история цен **чужих** пользователей, и удаление записи разрушило бы их данные
+ради чистоты справочника.
+
+Архивная позиция исчезает из витрины каталога, из поиска и из знаменателя комплектности,
+но остаётся в базе, и всё, что на неё ссылается, продолжает работать. Семантика целиком —
+`04-business-rules.md`, п. 10.
+
+`archived_at` и `archive_reason` заполняются вместе с флагом; снятие флага их обнуляет.
+Причина обязательна — без неё через полгода никто не вспомнит, почему позиции нет в
+каталоге.
 
 ### Отображение названия
 
@@ -214,29 +232,52 @@ title_uk → title_original → title_en → title_ru
 Индексы:
 
 ```sql
-CREATE INDEX ON catalog_items (country_id, issue_year);
-CREATE INDEX ON catalog_items (series_id);
+-- основные выборки каталога идут по активным записям: индексы частичные
+CREATE INDEX ON catalog_items (country_id, issue_year) WHERE NOT is_archived;
+CREATE INDEX ON catalog_items (series_id)              WHERE NOT is_archived;
 CREATE INDEX ON catalog_items (created_by);
 
 -- три отдельных индекса, а не один составной: поиск идёт по любому одному
 -- каталожному номеру, составной индекс работал бы только по первой колонке
-CREATE INDEX ON catalog_items (catalog_km);
-CREATE INDEX ON catalog_items (catalog_uc);
-CREATE INDEX ON catalog_items (catalog_numista);
+CREATE INDEX ON catalog_items (catalog_km)       WHERE NOT is_archived;
+CREATE INDEX ON catalog_items (catalog_uc)       WHERE NOT is_archived;
+CREATE INDEX ON catalog_items (catalog_numista)  WHERE NOT is_archived;
+
+-- админский разбор архива и отчёты задачи НБУ
+CREATE INDEX ON catalog_items (archived_at DESC) WHERE is_archived;
 
 -- уникальность source_key: глобальная для общих записей,
--- в пределах владельца — для личных
+-- в пределах владельца — для личных.
+-- Архивные записи из уникальности НЕ исключаются, см. ниже
 CREATE UNIQUE INDEX catalog_items_source_key_shared_idx ON catalog_items (source_key)
   WHERE source_key IS NOT NULL AND created_by IS NULL;
 CREATE UNIQUE INDEX catalog_items_source_key_own_idx ON catalog_items (created_by, source_key)
   WHERE source_key IS NOT NULL AND created_by IS NOT NULL;
 
--- полнотекстовый поиск по всем вариантам названия
+-- полнотекстовый поиск по всем вариантам названия, только по активным
 CREATE INDEX catalog_items_search_idx ON catalog_items
   USING gin (to_tsvector('simple',
     coalesce(title_original,'') || ' ' || coalesce(title_uk,'') || ' ' ||
-    coalesce(title_ru,'')       || ' ' || coalesce(title_en,'')));
+    coalesce(title_ru,'')       || ' ' || coalesce(title_en,'')))
+  WHERE NOT is_archived;
 ```
+
+**Почему индексы частичные.** Практически каждый запрос к каталогу — витрина, поиск,
+фильтры, подсчёт комплектности, суточная задача цен — работает только по активным записям
+и несёт в себе `WHERE NOT is_archived`. Частичный индекс планировщик применит именно к таким
+запросам, а сам индекс будет меньше полного ровно на объём архива. Запросы «покажи архив»
+редкие и админские — для них отдельный индекс по `archived_at`.
+
+Условие `WHERE NOT is_archived` работает как частичный индекс только при дословном
+совпадении с предикатом запроса: писать в репозитории надо `NOT is_archived`, а не
+`is_archived = false` или `is_archived IS NOT TRUE`. Проще всего зафиксировать это одним
+методом репозитория и не собирать условие в каждом месте руками.
+
+**Уникальность `source_key` архив не исключает.** Соблазн добавить `AND NOT is_archived`
+есть — тогда можно было бы завести новую позицию с тем же ключом взамен архивной. Но именно
+это и порождает молчаливые дубликаты: импорт нашёл бы новую запись, а экземпляры чужих
+коллекций остались бы висеть на архивной. Если позицию надо «переоткрыть» — снимается флаг
+архива, а не создаётся вторая запись.
 
 Два частичных индекса выбраны вместо одного по `(source_key, coalesce(created_by, 0))`:
 условие читается прямо в определении, и общие записи защищены отдельно от личных. Один и тот же
@@ -266,7 +307,7 @@ UNIQUE (catalog_item_id, name, mint_mark)
 ```
 id                bigserial PK
 owner_id          bigint NOT NULL FK users ON DELETE CASCADE
-catalog_item_id   bigint NOT NULL FK catalog_items ON DELETE RESTRICT
+catalog_item_id   bigint NOT NULL FK catalog_items ON DELETE NO ACTION
 variant_id        bigint FK catalog_variants ON DELETE SET NULL
 quantity          int NOT NULL DEFAULT 1 CHECK (quantity > 0)
 grade             text
@@ -291,8 +332,38 @@ CREATE INDEX ON collection_items (owner_id, catalog_item_id);
 CREATE INDEX ON collection_items (owner_id, acquisition_date DESC);
 ```
 
-`ON DELETE RESTRICT` на каталог — нельзя удалить позицию, если у кого-то есть экземпляр.
-Это правило было в legacy («Нельзя удалить монету с покупками») и его сохраняем.
+### Почему `NO ACTION`, а не `RESTRICT`
+
+Правило «нельзя удалить позицию, на которую есть экземпляры» сохраняется — оно было в legacy
+(«Нельзя удалить монету с покупками»). Но обеспечивается оно **на уровне API**, а не этим
+внешним ключом.
+
+Причина — каскадный ромб при удалении пользователя. Один `DELETE FROM users` запускает два
+каскада, которые сходятся в одной точке:
+
+```
+users ──CASCADE──> collection_items ──┐
+  │                                   ├──> catalog_items (личные)
+  └──CASCADE──> catalog_items ────────┘        created_by
+                  (created_by)
+```
+
+Экземпляр пользователя ссылается на его же личную позицию каталога. Оба пути каскада
+удаляют строки, но **порядок между разными путями не гарантирован**. Если Postgres дойдёт
+до личных `catalog_items` раньше, чем до `collection_items`, то `RESTRICT` — проверка
+немедленная — сработает и удаление пользователя упадёт на внешнем ключе.
+
+`NO ACTION` отличается от `RESTRICT` ровно этим: проверка откладывается на конец
+стейтмента, когда оба каскада уже отработали и осиротевших экземпляров не осталось.
+Удаление пользователя проходит одним стейтментом.
+
+Ограничение целостности при этом никуда не девается: `NO ACTION` так же не даст оставить
+экземпляр без позиции каталога. Оно лишь перестаёт срабатывать раньше времени на
+промежуточном состоянии внутри одного стейтмента.
+
+Запрет на удаление позиции с экземплярами живёт в сервисном слое и после введения архивации
+относится к двум случаям: удаление **личной** позиции её автором и физическое удаление уже
+архивированной общей записи администратором (`04-business-rules.md`, п. 10).
 
 Сумма в гривне не хранится, а считается: `purchase_price * purchase_rate_uah`. Исходная сумма
 и валюта не теряются — требование ТЗ (раздел 6).
@@ -531,6 +602,9 @@ currencies ──< exchange_rates
 - `updated_at` обновлять триггером, а не в приложении
 - Все `numeric` для денег, ни одного `float`
 - Каскады: удаление пользователя чистит его коллекцию и личные позиции каталога,
-  но не трогает общий каталог
+  но не трогает общий каталог. Проверить отдельным тестом — там каскадный ромб,
+  см. `collection_items`
+- Все выборки витрины каталога несут `NOT is_archived` дословно, иначе частичные индексы
+  не применятся
 - Фильтр видимости каталога (`created_by IS NULL OR created_by = :user_id`) и снимков цен —
   в репозиторийном слое, рядом с `owner_id`, а не в роутах
