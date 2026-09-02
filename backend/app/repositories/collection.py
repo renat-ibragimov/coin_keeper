@@ -7,18 +7,131 @@ rule lives here, not in the routes (docs/07-auth.md).
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import CollectionItem, Expense
+from app.models import CatalogItem, CoinSeries, CollectionItem, Country, Denomination, Expense
 from app.models.enums import ExpenseCategory
+from app.repositories.catalog import catalog_search_condition
+
+
+@dataclass
+class CollectionFilters:
+    q: str | None = None
+    country_id: int | None = None
+    series_id: int | None = None
+    sort: str = "date"  # date | title | total
+    order: str = "desc"
+
+
+@dataclass
+class CollectionRow:
+    instance: CollectionItem
+    catalog_item: CatalogItem
+    country: str
+    series_name: str | None
+    denomination: str | None
+
+
+def _total_uah() -> ColumnElement[Any]:
+    return (
+        func.coalesce(CollectionItem.purchase_price, 0)
+        * func.coalesce(CollectionItem.purchase_rate_uah, 1)
+        * CollectionItem.quantity
+    )
 
 
 class CollectionRepository:
     def __init__(self, session: AsyncSession, *, owner_id: int) -> None:
         self._session = session
         self._owner_id = owner_id
+
+    async def list_page(
+        self, filters: CollectionFilters, *, limit: int, offset: int
+    ) -> tuple[list[CollectionRow], int]:
+        conditions: list[ColumnElement[bool]] = [CollectionItem.owner_id == self._owner_id]
+        if filters.country_id is not None:
+            conditions.append(CatalogItem.country_id == filters.country_id)
+        if filters.series_id is not None:
+            conditions.append(CatalogItem.series_id == filters.series_id)
+        if filters.q:
+            conditions.append(catalog_search_condition(filters.q))
+
+        base_joins = (
+            select(func.count(CollectionItem.id))
+            .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+            .join(Country, Country.id == CatalogItem.country_id)
+            .where(*conditions)
+        )
+        total = (await self._session.execute(base_joins)).scalar_one()
+
+        descending = filters.order == "desc"
+        sort_columns: dict[str, Any] = {
+            "date": CollectionItem.acquisition_date,
+            "title": func.coalesce(CatalogItem.title_uk, CatalogItem.title_original),
+            "total": _total_uah(),
+        }
+        column = sort_columns.get(filters.sort, sort_columns["date"])
+        ordering = column.desc().nulls_last() if descending else column.asc().nulls_last()
+
+        query = (
+            select(
+                CollectionItem,
+                CatalogItem,
+                Country.name_original.label("country"),
+                CoinSeries.name_original.label("series_name"),
+                Denomination.label_original.label("denomination"),
+            )
+            .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+            .join(Country, Country.id == CatalogItem.country_id)
+            .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
+            .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
+            .where(*conditions)
+            .order_by(ordering, CollectionItem.id)
+            .limit(limit)
+            .offset(offset)
+        )
+        result = await self._session.execute(query)
+        rows = [
+            CollectionRow(
+                instance=row.CollectionItem,
+                catalog_item=row.CatalogItem,
+                country=row.country,
+                series_name=row.series_name,
+                denomination=row.denomination,
+            )
+            for row in result
+        ]
+        return rows, total
+
+    async def get_row(self, item_id: int) -> CollectionRow | None:
+        query = (
+            select(
+                CollectionItem,
+                CatalogItem,
+                Country.name_original.label("country"),
+                CoinSeries.name_original.label("series_name"),
+                Denomination.label_original.label("denomination"),
+            )
+            .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+            .join(Country, Country.id == CatalogItem.country_id)
+            .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
+            .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
+            .where(CollectionItem.id == item_id, CollectionItem.owner_id == self._owner_id)
+        )
+        row = (await self._session.execute(query)).first()
+        if row is None:
+            return None
+        return CollectionRow(
+            instance=row.CollectionItem,
+            catalog_item=row.CatalogItem,
+            country=row.country,
+            series_name=row.series_name,
+            denomination=row.denomination,
+        )
 
     async def list_for_item(self, catalog_item_id: int) -> Sequence[CollectionItem]:
         result = await self._session.execute(

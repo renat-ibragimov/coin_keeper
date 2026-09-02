@@ -99,6 +99,26 @@ def _search_vector() -> ColumnElement[Any]:
     return func.to_tsvector("simple", joined)
 
 
+def catalog_search_condition(q: str) -> ColumnElement[bool]:
+    """Full text over titles, plus catalog numbers, country and year.
+
+    Requires Country joined into the query. Shared with the collection listing,
+    which searches by the same catalog fields.
+    """
+    term = q.strip()
+    pattern = f"%{term}%"
+    alternatives: list[ColumnElement[bool]] = [
+        _search_vector().op("@@")(func.plainto_tsquery("simple", term)),
+        CatalogItem.catalog_km.ilike(pattern),
+        CatalogItem.catalog_uc.ilike(pattern),
+        CatalogItem.catalog_numista.ilike(pattern),
+        Country.name_original.ilike(pattern),
+    ]
+    if term.isdigit() and len(term) == 4:
+        alternatives.append(CatalogItem.issue_year == int(term))
+    return or_(*alternatives)
+
+
 class CatalogRepository:
     def __init__(self, session: AsyncSession, *, user_id: int, is_admin: bool) -> None:
         self._session = session
@@ -164,23 +184,8 @@ class CatalogRepository:
         elif filters.owned is False:
             conditions.append(not_(self._own_instance_exists()))
         if filters.q:
-            conditions.append(self._search_condition(filters.q))
+            conditions.append(catalog_search_condition(filters.q))
         return conditions
-
-    def _search_condition(self, q: str) -> ColumnElement[bool]:
-        """Full text over titles, plus catalog numbers, country and year."""
-        term = q.strip()
-        pattern = f"%{term}%"
-        alternatives: list[ColumnElement[bool]] = [
-            _search_vector().op("@@")(func.plainto_tsquery("simple", term)),
-            CatalogItem.catalog_km.ilike(pattern),
-            CatalogItem.catalog_uc.ilike(pattern),
-            CatalogItem.catalog_numista.ilike(pattern),
-            Country.name_original.ilike(pattern),
-        ]
-        if term.isdigit() and len(term) == 4:
-            alternatives.append(CatalogItem.issue_year == int(term))
-        return or_(*alternatives)
 
     def _owned_lateral(self) -> Any:
         return (
