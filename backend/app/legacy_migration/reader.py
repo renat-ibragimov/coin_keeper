@@ -1,4 +1,24 @@
-"""Read-only access to the legacy SQLite database."""
+"""Read-only access to the legacy SQLite database.
+
+The source of a migration is immutable by definition: it is a snapshot that has
+already stopped changing, and nothing here may write to it. That is stated to
+SQLite explicitly rather than merely intended, with both `mode=ro` and
+`immutable=1`.
+
+`immutable=1` is the part that matters in practice. The desktop application left
+the database in WAL mode, and a plain read-only open still wants to create the
+`-wal` and `-shm` sidecar files next to it. Copying just the `.db` file onto a
+server and mounting the directory read-only — which is exactly what the runbook
+in backend/README.md tells you to do — then fails. Depending on the permissions
+it reports either "unable to open database file" or "attempt to write a readonly
+database"; both are the same missing sidecar. Declaring the file immutable tells
+SQLite the contents cannot change underneath it, so it skips journal and
+shared-memory handling altogether.
+
+The flag is a promise: if the file did change while open, the reader could see
+corrupt data. For a migration source that promise holds — and the read-only
+mount enforces it.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +27,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 # Tables the migration reads. Order is irrelevant here; the write order is in
 # runner.py and follows docs/09-data-migration.md.
@@ -31,6 +52,15 @@ class LegacyDatabaseError(RuntimeError):
     """The source database is missing or unusable."""
 
 
+def _read_only_uri(path: Path) -> str:
+    """Build the SQLite URI for an immutable, read-only source.
+
+    The path is percent-encoded: a space or a `?` in it would otherwise end the
+    path or start another query parameter.
+    """
+    return f"file:{quote(str(path.resolve()))}?mode=ro&immutable=1"
+
+
 @contextmanager
 def open_legacy(path: Path) -> Iterator[sqlite3.Connection]:
     """Open the SQLite file read-only and check it before reading."""
@@ -38,7 +68,7 @@ def open_legacy(path: Path) -> Iterator[sqlite3.Connection]:
         msg = f"legacy database not found: {path}"
         raise LegacyDatabaseError(msg)
 
-    connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    connection = sqlite3.connect(_read_only_uri(path), uri=True)
     connection.row_factory = sqlite3.Row
     try:
         result = connection.execute("PRAGMA integrity_check").fetchone()
