@@ -13,33 +13,66 @@
 | `CHECK (x IN (...))` | `ENUM` | валидация на уровне типа, видно в схеме |
 | Нет пользователей | `users` + `owner_id` | сервис многопользовательский |
 | `original_path` — путь или URL вперемешку | раздельные `storage_key` и `external_url` | см. `06-media-storage.md` |
-| Единая база на человека | Общий каталог + личные коллекции | см. ниже |
-| `title_original / title_ru / title_en` колонками | остаётся колонками | переводов всего два, отдельная таблица избыточна |
+| Единая база на человека | Общий каталог + личные позиции + личные коллекции | см. ниже |
+| `title_original / title_ru / title_en` колонками | остаётся колонками, добавляется `title_uk` | переводов немного, отдельная таблица избыточна |
 
 ## Разделение общего и личного
 
-Ключевое архитектурное решение:
+Ключевое архитектурное решение. Данные делятся на **три слоя**: общий каталог, личные позиции
+каталога, личная коллекция.
 
 **Общее (одно на всех):** `countries`, `currencies`, `denominations`, `coin_series`,
-`catalog_items`, `catalog_variants`, `media_files` для каталожных фото, `exchange_rates`.
+`catalog_items` с `created_by IS NULL`, `catalog_variants`, `media_files` для каталожных фото,
+`exchange_rates`.
 
 Каталог монет — это объективный справочник: тираж, металл, диаметр не зависят от того, кто
 смотрит. Держать копию на каждого пользователя бессмысленно и дорого.
 
-**Личное (привязано к `owner_id`):** `collection_items`, `expenses`, `sales`, `purchase_offers`,
+**Личное (привязано к `owner_id` или `created_by`):** `catalog_items` с
+`created_by = <пользователь>`, `collection_items`, `expenses`, `sales`, `purchase_offers`,
 `collection_goals`, `media_files` для фото собственных монет, `settings`.
 
-**Цены (`market_price_snapshots`)** — общие, привязаны к позиции каталога, а не к пользователю.
-Цена монеты на рынке одинакова для всех. Но обновление цены инициирует конкретный пользователь
-для своих монет — централизованного обхода каталога не делаем, см. `05-integrations.md`.
+### Кто наполняет общий каталог
 
-### Кто может править каталог
-
-На старте: любой зарегистрированный пользователь может добавить позицию, но править и удалять —
-только свои (`created_by`). Позиции, импортированные из uCoin, помечаются `created_by = NULL`
-(системные) и правятся только администратором.
+Общий каталог (`created_by IS NULL`) наполняет и правит **только администратор** — вручную и
+через системные фоновые задачи (каталог НБУ, см. `05-integrations.md`). Обычный пользователь
+общий каталог **не создаёт, не меняет и не удаляет** — только читает.
 
 Поле `users.role` (`user` / `admin`) закладываем сразу.
+
+### Личная позиция каталога
+
+Если нужного выпуска в общем каталоге нет, пользователь заводит **личную позицию**:
+`catalog_items.created_by = <его id>`. Она видна только автору, у неё полный CRUD и свои фото.
+Во всех выборках, фильтрах, сериях, комплектности и статистике владельца личные позиции
+участвуют наравне с общими.
+
+Фильтр видимости каталога — **в репозиторийном слое**, рядом с фильтром `owner_id`
+(см. `07-auth.md`):
+
+```sql
+WHERE catalog_items.created_by IS NULL OR catalog_items.created_by = :user_id
+```
+
+Импорт (Excel-выгрузка, uCoin по URL) создаёт **только личные позиции**; общий каталог
+импортом не пополняется — правило дедупликации в `04-business-rules.md`, п. 3.
+
+`collection_items` может ссылаться и на общую, и на личную позицию — разницы для экземпляра нет.
+
+«Повышение» удачной личной позиции в общий каталог администратором — после MVP
+(`01-scope-mvp.md`).
+
+### Цены (`market_price_snapshots`)
+
+Снимок цены принадлежит позиции каталога, но его **видимость определяется полем `created_by`**:
+
+| `created_by` | Откуда | Кто видит |
+|---|---|---|
+| `NULL` | центральная суточная задача обновления цен | все |
+| `<пользователь>` | ручной ввод, обновление своей личной позиции, Excel-импорт | только автор |
+
+В расчёте стоимости коллекции у пользователя участвуют общие снимки **плюс его собственные**.
+Правила обновления — `04-business-rules.md`, п. 7, и `05-integrations.md`.
 
 ## Перечисления
 
@@ -47,6 +80,7 @@
 CREATE TYPE collection_group AS ENUM ('circulation', 'commemorative', 'collector', 'other');
 CREATE TYPE metal_kind       AS ENUM ('precious', 'base', 'unknown');
 CREATE TYPE media_role       AS ENUM ('obverse', 'reverse', 'edge', 'additional');
+CREATE TYPE media_source     AS ENUM ('user_upload', 'ucoin', 'nbu', 'manual');
 CREATE TYPE match_status     AS ENUM ('suggested', 'confirmed', 'rejected');
 CREATE TYPE offer_status     AS ENUM ('considering', 'ordered', 'purchased', 'rejected', 'unavailable');
 CREATE TYPE user_role        AS ENUM ('user', 'admin');
@@ -71,7 +105,7 @@ display_name    text
 role            user_role NOT NULL DEFAULT 'user'
 is_active       boolean NOT NULL DEFAULT true
 email_verified  boolean NOT NULL DEFAULT false
-locale          text NOT NULL DEFAULT 'ru'   -- 'ru' | 'en'
+locale          text NOT NULL DEFAULT 'uk'   -- 'uk' | 'en'
 created_at      timestamptz NOT NULL DEFAULT now()
 updated_at      timestamptz NOT NULL DEFAULT now()
 ```
@@ -143,7 +177,7 @@ denomination_id    bigint FK denominations ON DELETE SET NULL
 collection_group   collection_group NOT NULL
 subtype            text
 title_original     text NOT NULL
-title_ru, title_en text
+title_uk, title_ru, title_en  text
 issue_year         int NOT NULL
 issue_date         date
 mintage_announced  bigint
@@ -156,24 +190,58 @@ thickness_mm       numeric(8,2)
 shape, edge, orientation  text
 catalog_km, catalog_uc, catalog_numista  text
 notes              text
-source_key         text UNIQUE       -- ключ дедупликации импорта, см. 04-business-rules
-created_by         bigint FK users ON DELETE SET NULL   -- NULL = системная запись
+source_key         text              -- ключ дедупликации импорта, см. 04-business-rules
+created_by         bigint FK users ON DELETE CASCADE    -- NULL = общая (системная) запись
 created_at, updated_at timestamptz
 ```
+
+`created_by` определяет слой: `NULL` — общая запись, значение — личная позиция автора.
+Здесь именно `ON DELETE CASCADE`, а не `SET NULL`: иначе удаление пользователя молча
+превратило бы все его личные позиции в записи общего каталога. Общих записей каскад не
+касается — у них `created_by IS NULL`.
+
+### Отображение названия
+
+Первое заполненное из:
+
+```
+title_uk → title_original → title_en → title_ru
+```
+
+`title_ru` не удаляем: в мигрированных данных лежат русские названия из uCoin, и для части
+позиций это единственное название кроме оригинала.
 
 Индексы:
 
 ```sql
 CREATE INDEX ON catalog_items (country_id, issue_year);
 CREATE INDEX ON catalog_items (series_id);
-CREATE INDEX ON catalog_items (catalog_km, catalog_uc, catalog_numista);
-CREATE UNIQUE INDEX ON catalog_items (source_key) WHERE source_key IS NOT NULL;
+CREATE INDEX ON catalog_items (created_by);
+
+-- три отдельных индекса, а не один составной: поиск идёт по любому одному
+-- каталожному номеру, составной индекс работал бы только по первой колонке
+CREATE INDEX ON catalog_items (catalog_km);
+CREATE INDEX ON catalog_items (catalog_uc);
+CREATE INDEX ON catalog_items (catalog_numista);
+
+-- уникальность source_key: глобальная для общих записей,
+-- в пределах владельца — для личных
+CREATE UNIQUE INDEX catalog_items_source_key_shared_idx ON catalog_items (source_key)
+  WHERE source_key IS NOT NULL AND created_by IS NULL;
+CREATE UNIQUE INDEX catalog_items_source_key_own_idx ON catalog_items (created_by, source_key)
+  WHERE source_key IS NOT NULL AND created_by IS NOT NULL;
 
 -- полнотекстовый поиск по всем вариантам названия
 CREATE INDEX catalog_items_search_idx ON catalog_items
   USING gin (to_tsvector('simple',
-    coalesce(title_original,'') || ' ' || coalesce(title_ru,'') || ' ' || coalesce(title_en,'')));
+    coalesce(title_original,'') || ' ' || coalesce(title_uk,'') || ' ' ||
+    coalesce(title_ru,'')       || ' ' || coalesce(title_en,'')));
 ```
+
+Два частичных индекса выбраны вместо одного по `(source_key, coalesce(created_by, 0))`:
+условие читается прямо в определении, и общие записи защищены отдельно от личных. Один и тот же
+`source_key` может существовать один раз в общем каталоге и по одному разу у каждого
+пользователя — это и есть правило дедупликации импорта из `04-business-rules.md`, п. 3.
 
 Поиск делаем через `simple`-конфигурацию, а не `russian`: в каталоге украинские, русские и
 английские названия вперемешку, стемминг по одному языку испортит остальные. Дополнительно
@@ -243,12 +311,20 @@ currency_code    text NOT NULL FK currencies
 observed_at      timestamptz NOT NULL
 source_url       text
 raw_payload      jsonb                -- сырой ответ источника, для разбора багов
-created_by       bigint FK users ON DELETE SET NULL
+created_by       bigint FK users ON DELETE SET NULL   -- NULL = снимок центральной задачи
 UNIQUE (catalog_item_id, source, grade, observed_at)
 ```
 
 ```sql
 CREATE INDEX ON market_price_snapshots (catalog_item_id, observed_at DESC);
+CREATE INDEX ON market_price_snapshots (created_by);
+```
+
+`created_by` задаёт видимость снимка (см. «Разделение общего и личного»). Выборка цен для
+пользователя всегда сужается условием:
+
+```sql
+WHERE created_by IS NULL OR created_by = :user_id
 ```
 
 `raw_payload` был `TEXT` с JSON — переводим в `jsonb`. Это важно: в legacy цены ломались,
@@ -276,6 +352,9 @@ catalog_item_id   bigint FK catalog_items ON DELETE CASCADE
 collection_item_id bigint FK collection_items ON DELETE CASCADE
 owner_id          bigint FK users ON DELETE CASCADE   -- NULL для каталожных
 role              media_role NOT NULL
+source            media_source NOT NULL DEFAULT 'user_upload'
+license           text            -- условия использования, если известны
+attribution       text            -- обязательная подпись к изображению, если требуется
 storage_key       text            -- ключ в S3, если файл наш
 external_url      text            -- если изображение с чужого сервера
 thumbnail_key     text
@@ -290,6 +369,18 @@ CHECK (storage_key IS NOT NULL OR external_url IS NOT NULL)
 
 Разделение `storage_key` / `external_url` — исправление legacy, где в одном поле лежали
 и локальные пути, и ссылки на `i.ucoin.net`. Подробности в `06-media-storage.md`.
+
+`source` — происхождение изображения, от него зависит видимость:
+
+| `source` | Что это | Кто видит |
+|---|---|---|
+| `user_upload` | фото пользователя | владелец (`owner_id`) |
+| `nbu` | официальное каталожное фото НБУ | все |
+| `ucoin` | взято с uCoin — своё или скачанное | только импортировавший пользователь |
+| `manual` | добавлено администратором вручную | все |
+
+Права на изображения uCoin нам не принадлежат, поэтому в публичных карточках вместо них
+показывается плейсхолдер. Правила целиком — `06-media-storage.md`.
 
 ### exchange_rates
 
@@ -325,7 +416,13 @@ created_at         timestamptz
 
 В legacy покупка монеты автоматически создавала расход категории `coin_purchase` — все 620
 записей именно такие. Поведение сохраняем: расход создаётся в той же транзакции, что и
-`collection_items`, и удаляется вместе с ней.
+`collection_items`.
+
+**Удаление — в сервисном слое, не каскадом.** При удалении экземпляра сервис той же
+транзакцией удаляет связанный расход категории `coin_purchase`. FK остаётся
+`ON DELETE SET NULL` как страховка от висячей ссылки, если запись всё-таки удалят в обход
+сервиса, — но полагаться на него нельзя: `SET NULL` оставит расход в базе и завысит сумму
+трат. См. `04-business-rules.md`, п. 10.
 
 ### sales, purchase_offers, collection_goals
 
@@ -358,7 +455,7 @@ UNIQUE (owner_id, url)
 
 ```
 user_id     bigint PK FK users ON DELETE CASCADE
-locale      text NOT NULL DEFAULT 'ru'
+locale      text NOT NULL DEFAULT 'uk'   -- 'uk' | 'en'
 display_currency text NOT NULL DEFAULT 'UAH'
 default_grade_commemorative text NOT NULL DEFAULT 'UNC'
 default_grade_circulation   text NOT NULL DEFAULT 'VF'
@@ -367,6 +464,31 @@ updated_at  timestamptz
 
 Значения по умолчанию — из ТЗ (раздел 6): памятные и коллекционные считаются в UNC,
 обиходные в VF.
+
+### auth_tokens
+
+Одноразовые токены подтверждения email и восстановления пароля. Устроены по образцу
+`refresh_tokens` (`07-auth.md`): в базе лежит хеш, а не сам токен.
+
+```
+id          bigserial PK
+user_id     bigint NOT NULL FK users ON DELETE CASCADE
+kind        auth_token_kind NOT NULL      -- 'email_verify' | 'password_reset'
+token_hash  text NOT NULL UNIQUE          -- sha256 от токена
+expires_at  timestamptz NOT NULL
+used_at     timestamptz
+created_at  timestamptz NOT NULL DEFAULT now()
+```
+
+```sql
+CREATE TYPE auth_token_kind AS ENUM ('email_verify', 'password_reset');
+CREATE INDEX ON auth_tokens (user_id, kind);
+```
+
+Токен считается годным, если `used_at IS NULL` и `expires_at > now()`. Срок жизни: 24 часа
+для подтверждения email, 1 час для сброса пароля. Выдача нового токена того же типа гасит
+предыдущие невыполненные. Регистрация и восстановление пароля — обязательная часть MVP,
+см. `07-auth.md`.
 
 ### audit_log
 
@@ -391,8 +513,11 @@ users ──< collection_items >── catalog_items ──< market_price_snapsh
   │              │                   │       └─< media_files (каталожные)
   │              └─< media_files (свои фото)
   │              └─< expenses
+  ├──< catalog_items (личные позиции, created_by)
+  ├──< market_price_snapshots (свои снимки цен, created_by)
   └─< user_settings
   └─< ucoin_catalog_sources
+  └─< refresh_tokens, auth_tokens
 
 countries ──< coin_series ──< catalog_items
     └─────< denominations ──< catalog_items
@@ -405,4 +530,7 @@ currencies ──< exchange_rates
 - Расширения: `citext`, `pg_trgm`
 - `updated_at` обновлять триггером, а не в приложении
 - Все `numeric` для денег, ни одного `float`
-- Каскады: удаление пользователя чистит его коллекцию, но не трогает каталог
+- Каскады: удаление пользователя чистит его коллекцию и личные позиции каталога,
+  но не трогает общий каталог
+- Фильтр видимости каталога (`created_by IS NULL OR created_by = :user_id`) и снимков цен —
+  в репозиторийном слое, рядом с `owner_id`, а не в роутах

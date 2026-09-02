@@ -22,12 +22,12 @@ REST + JSON. Префикс `/api/v1`. Аутентификация — Bearer-�
 |---|---|
 | `getBootstrap` | `GET /bootstrap` |
 | `listCatalog` | `GET /catalog` |
-| `createCoin` | `POST /catalog` |
-| `updateCoin` | `PATCH /catalog/{id}` |
-| `deleteCoin` | `DELETE /catalog/{id}` |
-| `refreshCoinPrice` | `POST /catalog/{id}/price-refresh` |
+| `createCoin` | `POST /catalog` — создаёт **личную** позицию |
+| `updateCoin` | `PATCH /catalog/{id}` — своя позиция; общая только для admin |
+| `deleteCoin` | `DELETE /catalog/{id}` — своя позиция; общая только для admin |
+| `refreshCoinPrice` | `POST /catalog/{id}/price-refresh` — только по **личным** позициям |
 | `listPriceHistory` | `GET /catalog/{id}/prices` |
-| `refreshCoinImage` | `POST /catalog/{id}/image-refresh` |
+| `refreshCoinImage` | `POST /catalog/{id}/image-refresh` — только по **личным** позициям |
 | `deleteCatalogImage` | `DELETE /catalog/{id}/images/{role}` |
 | `addPurchase` | `POST /collection` |
 | `updatePurchase` | `PATCH /collection/{id}` |
@@ -43,7 +43,7 @@ REST + JSON. Префикс `/api/v1`. Аутентификация — Bearer-�
 | `listUcoinCatalogSources` | `GET /imports/ucoin/sources` |
 | `saveUcoinCatalogSource` | `POST /imports/ucoin/sources` |
 | `cancelUcoinPriceRefresh` | `POST /jobs/{jobId}/cancel` |
-| `openUcoinSession`, `openUcoinUnblock`, `resetUcoinSession` | `/imports/ucoin/session` — см. `05-integrations.md` |
+| `openUcoinSession`, `openUcoinUnblock`, `resetUcoinSession` | в MVP не переносим: ручное прохождение Cloudflare на сервере невозможно, см. `05-integrations.md` |
 | `exportCatalog` | `POST /exports/excel` |
 | `createBackup`, `listBackups` | не нужны — бэкапы на уровне сервера, см. `10-infra.md` |
 | `openExternalUrl` | не нужен — в вебе это обычная ссылка |
@@ -54,16 +54,32 @@ REST + JSON. Префикс `/api/v1`. Аутентификация — Bearer-�
 ## Аутентификация
 
 ```
-POST   /auth/register        {email, password, displayName?}  → {user, tokens}
+POST   /auth/register        {email, password, displayName?, website?}  → 202
+POST   /auth/verify-email    {token}                          → {user, tokens}
+POST   /auth/resend-verification {email}                      → 202
 POST   /auth/login           {email, password}                → {user, tokens}
-POST   /auth/refresh         {refreshToken}                   → {tokens}
-POST   /auth/logout          {refreshToken}                   → 204
+POST   /auth/refresh         —                                → {tokens}
+POST   /auth/logout          —                                → 204
+POST   /auth/forgot-password {email}                          → 202
+POST   /auth/reset-password  {token, newPassword}             → 204
 GET    /auth/me                                               → {user}
 PATCH  /auth/me              {displayName?, locale?}          → {user}
 POST   /auth/change-password {currentPassword, newPassword}   → 204
 ```
 
-`tokens` — `{accessToken, refreshToken, expiresIn}`. Подробности в `07-auth.md`.
+`tokens` — `{accessToken, expiresIn}`. **Refresh-токен в теле не передаётся ни в запросе,
+ни в ответе**: он живёт только в httpOnly Secure SameSite=Lax cookie, которую сервер
+выставляет сам и сам же читает в `/auth/refresh` и `/auth/logout`. Поэтому у этих двух
+эндпоинтов тела запроса нет. Решение и обоснование — `07-auth.md`.
+
+Регистрация возвращает `202`, а не токены: аккаунт неактивен до подтверждения адреса.
+Токены выдаёт `/auth/verify-email`. `website` — honeypot-поле формы регистрации
+(`07-auth.md`): заполнено — ответ тот же `202`, пользователь не создаётся.
+
+`/auth/resend-verification` и `/auth/forgot-password` всегда отвечают `202`, существует
+адрес или нет. Ограничения частоты по всем этим эндпоинтам — в `07-auth.md`.
+
+`locale` в `PATCH /auth/me` — `'uk' | 'en'`, по умолчанию `'uk'`.
 
 ## Bootstrap
 
@@ -107,9 +123,21 @@ GET /catalog
   &group           — circulation | commemorative | collector | other
   &metalKind       — precious | base | unknown
   &owned           — true (есть в коллекции) | false (не хватает)
+  &scope           — all (по умолчанию) | shared (только общий каталог) | own (только личные)
   &sort            — title | country | series | year | denomination | owned | purchase | price
   &order           — asc | desc
 ```
+
+Выдача всегда ограничена видимыми позициями: общий каталог плюс личные позиции текущего
+пользователя (`created_by IS NULL OR created_by = :userId`). Фильтр ставит репозиторий, а не
+роут — `07-auth.md`.
+
+**Сортировки `owned`, `purchase`, `price` — это агрегаты per-user**, а не колонки
+`catalog_items`: количество экземпляров пользователя, сумма его покупок, последняя видимая ему
+цена. Запрос проектируется под них сразу — `LATERAL`-подзапросы или предагрегированные CTE,
+подключаемые к основному запросу, а не постобработка страницы в Python. Иначе сортировка
+будет верна в пределах страницы и неверна по всей выборке. Видимость цен при этом та же:
+`created_by IS NULL OR created_by = :userId`.
 
 Элемент списка:
 
@@ -120,7 +148,8 @@ GET /catalog
   "seriesName": "Флора и фауна",
   "denomination": "2 гривны",
   "year": 2018,
-  "title": "Дельфин",
+  "title": "Дельфін",
+  "titleUk": "Дельфін",
   "titleRu": "Дельфин",
   "variety": null,
   "catalogNumber": "KM# 123",
@@ -128,27 +157,49 @@ GET /catalog
   "metalKind": "base",
   "material": "нейзильбер",
   "marketPriceUah": "666.00",
-  "priceSource": "uCoin",
+  "priceSource": "UA-Coins",
   "priceObservedAt": "2026-08-06T12:20:27Z",
   "quantityOwned": 1,
   "purchaseTotalUah": "666.00",
   "obverseImageUrl": "https://cdn.../obverse.webp",
   "reverseImageUrl": "https://cdn.../reverse.webp",
   "thumbnailUrl": "https://cdn.../thumb.webp",
+  "isOwn": false,
   "sourceUrl": "https://ru.ucoin.net/coin/ua-2uah-2018-dolphin"
 }
 ```
 
-`quantityOwned` и `purchaseTotalUah` считаются для текущего пользователя.
+`title` — готовое к показу название по правилу
+`title_uk → title_original → title_en → title_ru` (`02-data-model.md`). Отдельные поля
+переводов отдаются как есть, для карточки редактирования.
+
+`quantityOwned`, `purchaseTotalUah` и `marketPriceUah` считаются для текущего пользователя.
+`isOwn` — `true` у личной позиции (`created_by` = текущий пользователь), `false` у общей;
+фронт по нему решает, показывать ли кнопки правки.
 
 ```
 GET    /catalog/{id}                    → карточка с полными характеристиками
-POST   /catalog                         → создать позицию вручную
+POST   /catalog                         → создать личную позицию (created_by = текущий)
 PATCH  /catalog/{id}
 DELETE /catalog/{id}                    → 409, если есть экземпляры у любого пользователя
-GET    /catalog/{id}/prices             → история цен
+GET    /catalog/{id}/prices             → история цен, видимая пользователю
 GET    /catalog/{id}/collection-items   → экземпляры текущего пользователя
 ```
+
+Права (`07-auth.md`):
+
+| Запрос | Общая позиция | Своя личная | Чужая личная |
+|---|---|---|---|
+| `GET` | 200 | 200 | 404 |
+| `POST /catalog` | всегда создаёт личную; общую — только admin | — | — |
+| `PATCH`, `DELETE` | 403 (admin — 200) | 200 | 404 |
+
+`POST /catalog` создаёт запись с `created_by` = текущий пользователь. Общую запись
+(`created_by = NULL`) может создать только администратор — тем же эндпоинтом, по своей роли.
+
+`GET /catalog/{id}/prices` отдаёт снимки с `created_by IS NULL OR created_by = :userId`;
+у каждого снимка в ответе есть `isOwn`, чтобы в графике было видно, где своя цена, а где
+общая.
 
 ## Коллекция
 
@@ -183,27 +234,48 @@ GET    /expenses/summary  → по категориям и итого
 
 ## Цены и курсы
 
+Цены общего каталога обновляет системная суточная задача — пользовательского запуска для них
+нет (`04-business-rules.md`, п. 7). Эндпоинты ниже работают **только по личным позициям**.
+
 ```
 POST /catalog/{id}/price-refresh  → {source, status, previousPriceUah, priceUah, observedAt, message}
      status: updated | not-found | rejected | needs-api-key
+     403 — позиция общая: её цены обновляет системная задача
+     404 — позиция чужая
 
 POST /prices/refresh-batch  {filter: {...те же параметры, что у GET /catalog}}
      → {jobId}
+     обходит только личные позиции пользователя: к фильтру принудительно
+     добавляется created_by = :userId, независимо от переданного scope
+
+POST /prices/manual  {catalogItemId, price, currency, grade?, observedAt?}
+     → снимок с created_by = текущий пользователь; работает и по общей позиции
 
 GET  /rates                → текущие курсы
 GET  /rates?date=2018-03-24 → курс на дату
 POST /rates/refresh        → принудительное обновление (только admin)
 ```
 
+Снимки, созданные этими эндпоинтами, пишутся с `created_by` = текущий пользователь и видны
+только ему. Ручной ввод (`/prices/manual`) — единственный способ поставить свою цену общей
+позиции: сама общая запись при этом не меняется.
+
 `status: rejected` — новое по сравнению с legacy: цена получена, но не прошла валидацию.
-Обязательно логируем в `raw_payload`. См. `05-integrations.md`.
+Валидация одинакова для всех путей, включая ручной ввод. Обязательно логируем в
+`raw_payload`. См. `05-integrations.md`.
 
 ## Импорт
+
+Импорт **создаёт только личные позиции** (`created_by` = текущий пользователь). Если
+совпадение нашлось в общем каталоге, новая запись не создаётся — экземпляры привязываются
+к общей. Правила дедупликации — `04-business-rules.md`, п. 3.
 
 ```
 POST /imports/excel            multipart, файл .xlsx
      → {jobId}
-GET  /imports/excel/{jobId}    → {status, scanned, inserted, updated, skipped, countries, warnings[]}
+GET  /imports/excel/{jobId}    → {status, scanned, matchedShared, inserted, updated,
+                                  skipped, countries, warnings[]}
+     matchedShared — сколько строк совпало с общим каталогом и не создало личной позиции
 
 POST /imports/ucoin/preview    {url}   → черновик позиции, без записи в БД
 POST /imports/ucoin            {url}   → {jobId}   (одна монета или раздел каталога)
@@ -225,13 +297,17 @@ GET  /exports/{jobId}                 → {status, downloadUrl}
 ## Фото
 
 ```
-POST   /catalog/{id}/images       multipart: file, role  → {mediaId, url, thumbnailUrl}
+POST   /catalog/{id}/images       multipart: file, role  → {mediaId, url, thumbnailUrl, source}
 DELETE /catalog/{id}/images/{role}
 POST   /collection/{id}/images    multipart: file, role
 DELETE /collection/{id}/images/{role}
 ```
 
-Ограничения и обработка — `06-media-storage.md`.
+`/catalog/{id}/images` работает только по **личным** позициям пользователя (403 на общую,
+404 на чужую); фото общего каталога загружает администратор или задача по каталогу НБУ.
+Загруженное пользователем получает `source = 'user_upload'`.
+
+Ограничения, обработка и правила видимости по происхождению — `06-media-storage.md`.
 
 ## Фоновые задачи
 
@@ -250,6 +326,10 @@ POST /jobs/{jobId}/cancel  → 202
 
 Типы задач: `excel-import`, `ucoin-import`, `price-refresh-batch`, `excel-export`,
 `rates-sync`.
+
+Системные задачи — `prices-daily-sync` (суточное обновление цен общего каталога по UA-Coins)
+и `nbu-catalog-sync` (еженедельная пересборка украинской части каталога) — запускаются по
+расписанию, а не из API. Их статус виден администратору тем же `GET /jobs/{jobId}`.
 
 Отмена нужна обязательно: в legacy массовое обновление цен было длинным и имело кнопку
 «Остановить» — соответствующие строки интерфейса сохранились
