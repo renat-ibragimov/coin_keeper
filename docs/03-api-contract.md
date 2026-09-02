@@ -290,6 +290,12 @@ GET  /series/{id}/summary
   → {total, owned, missing, completionPercent, purchaseTotalUah, currentValueUah, unpricedMissing}
 ```
 
+Серии — общий справочник, личных серий нет: серия описывает выпуск, а не коллекцию.
+`POST /series` доступен только администратору (`403` обычному пользователю), дубль имени
+в пределах страны — `409`. В `summary` обе части дроби комплектности считаются по активным
+видимым пользователю позициям; деньги (`purchaseTotalUah`, `currentValueUah`) — по его
+экземплярам, включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10).
+
 ## Расходы
 
 ```

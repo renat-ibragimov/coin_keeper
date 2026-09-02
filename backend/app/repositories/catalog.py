@@ -99,6 +99,56 @@ def _search_vector() -> ColumnElement[Any]:
     return func.to_tsvector("simple", joined)
 
 
+def snapshot_visible_to(user_id: int) -> ColumnElement[bool]:
+    """Price snapshot visibility (docs/04-business-rules.md, rule 7)."""
+    return or_(
+        MarketPriceSnapshot.created_by.is_(None),
+        MarketPriceSnapshot.created_by == user_id,
+    )
+
+
+def latest_price_uah_for(item_id_col: Any, user_id: int) -> Any:
+    """Correlated scalar subquery: the latest visible non-suspect snapshot of
+    the given catalog item column, converted to UAH by the newest rate.
+
+    Shared by the series summary and the dashboard, which aggregate it over
+    collection items and over missing catalog items.
+    """
+    latest_rate = (
+        select(ExchangeRate.rate_uah)
+        .where(ExchangeRate.currency_code == MarketPriceSnapshot.currency_code)
+        .order_by(ExchangeRate.effective_date.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    price_uah = case(
+        (MarketPriceSnapshot.currency_code == "UAH", MarketPriceSnapshot.price),
+        else_=MarketPriceSnapshot.price * func.coalesce(latest_rate, 0),
+    )
+    return (
+        select(price_uah)
+        .where(
+            MarketPriceSnapshot.catalog_item_id == item_id_col,
+            not_(MarketPriceSnapshot.is_suspect),
+            snapshot_visible_to(user_id),
+        )
+        .order_by(MarketPriceSnapshot.observed_at.desc(), MarketPriceSnapshot.id.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+
+
+def has_visible_price(item_id_col: Any, user_id: int) -> ColumnElement[bool]:
+    """Whether any usable (non-suspect, visible) snapshot exists at all."""
+    return exists(
+        select(MarketPriceSnapshot.id).where(
+            MarketPriceSnapshot.catalog_item_id == item_id_col,
+            not_(MarketPriceSnapshot.is_suspect),
+            snapshot_visible_to(user_id),
+        )
+    )
+
+
 def catalog_search_condition(q: str) -> ColumnElement[bool]:
     """Full text over titles, plus catalog numbers, country and year.
 
