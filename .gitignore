@@ -222,6 +222,8 @@ __marimo__/
 legacy/data/
 # Каталог, куда данные кладутся на сервере перед миграцией
 legacy-data/
+# Отчёты миграции: содержат счётчики и примеры из реальной базы
+migration-reports/
 media-archive/
 *.db
 *.db-wal

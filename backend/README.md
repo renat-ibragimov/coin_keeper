@@ -116,23 +116,48 @@ scp -r media <user>@<host>:<project-path>/legacy-data/
 amounts, dates. It must never be committed and should be removed from the
 server once the migration is done and verified.
 
+### 1b. A writable directory for the reports
+
+The data mount is read-only, so the report cannot go there — the first real dry
+run tried and lost its report at the very end. Make a separate directory, owned
+by the user the container runs as:
+
+```bash
+mkdir -p migration-reports
+# The image runs as uid 1001, not as root, so the directory has to be its own.
+sudo chown 1001:1001 migration-reports
+```
+
+`migration-reports/` is in `.gitignore` too: the reports carry counts and sample
+rows from the real database.
+
+The script checks this before it starts and refuses with a usage error rather
+than working for twenty minutes and then failing to write.
+
 ### 2. Dry run first
 
 Reports everything and writes nothing — not a single row:
 
 ```bash
-docker compose run --rm -v "$PWD/legacy-data:/legacy-data:ro" api \
-  python scripts/migrate_legacy.py \
+docker compose run --rm \
+  -v "$PWD/legacy-data:/legacy-data:ro" \
+  -v "$PWD/migration-reports:/reports" \
+  api python scripts/migrate_legacy.py \
     --sqlite /legacy-data/coinkeeper-2026-08-06.db \
     --media  /legacy-data/media \
     --owner-email <owner-email> \
     --expect scripts/expected_legacy_2026-08-06.json \
-    --dry-run --report /legacy-data/dry-run.json
+    --dry-run --report /reports/dry-run.json
 ```
 
 Read the report before going further: row counts, how many price snapshots were
 flagged and by which rule, how many photo files are missing, and the checks at
 the bottom. Every check must say `ok`.
+
+Look at `media.stored` in particular. It should be close to the number of files
+actually sitting in `legacy-data/media`; `stored: 0` with a large
+`missingFiles` means the file names are not matching, which is what the first
+dry run hit.
 
 `--expect` turns on the numbers from the migration document (3063 catalog
 items, 620 coins, 42 765,66 spent). Without it the script still reconciles the
@@ -142,14 +167,16 @@ profile.
 ### 3. The real run
 
 ```bash
-docker compose run --rm -v "$PWD/legacy-data:/legacy-data:ro" api \
-  python scripts/migrate_legacy.py \
+docker compose run --rm \
+  -v "$PWD/legacy-data:/legacy-data:ro" \
+  -v "$PWD/migration-reports:/reports" \
+  api python scripts/migrate_legacy.py \
     --sqlite /legacy-data/coinkeeper-2026-08-06.db \
     --media  /legacy-data/media \
     --owner-email <owner-email> \
     --owner-password \
     --expect scripts/expected_legacy_2026-08-06.json \
-    --report /legacy-data/migration.json
+    --report /reports/migration.json
 ```
 
 `--owner-password` without a value prompts for it, so the password stays out of

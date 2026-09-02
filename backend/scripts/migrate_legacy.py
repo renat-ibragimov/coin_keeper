@@ -19,7 +19,9 @@ import argparse
 import asyncio
 import getpass
 import json
+import os
 import sys
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -79,6 +81,49 @@ def _resolve_password(args: argparse.Namespace) -> str:
     return getpass.getpass("Owner password: ")
 
 
+class ReportPathError(Exception):
+    """The report cannot be written where it was asked to go."""
+
+
+def check_report_path(path: Path) -> None:
+    """Fail now rather than after the migration has run.
+
+    The report is written last, so an unwritable destination costs the whole
+    run before it is noticed. That is not hypothetical: the first real dry run
+    pointed --report at the read-only mount holding the data and lost its report
+    to EROFS at the very end.
+
+    Permission bits are not consulted, a probe file is actually written: a
+    read-only bind mount can look writable and refuse the write anyway, and the
+    container runs as an unprivileged user whose access does not follow from the
+    owner bits.
+    """
+    directory = path.parent if path.parent != Path() else Path.cwd()
+    if not directory.exists():
+        msg = f"report directory does not exist: {directory}"
+        raise ReportPathError(msg)
+    if not directory.is_dir():
+        msg = f"report path is not inside a directory: {directory}"
+        raise ReportPathError(msg)
+
+    probe = directory / f".migrate-legacy-probe-{os.getpid()}"
+    try:
+        probe.write_bytes(b"")
+    except OSError as exc:
+        msg = (
+            f"cannot write into {directory}: {exc.strerror}. "
+            "Point --report at a writable directory; the data mount is read-only. "
+            f"On the host: mkdir -p migration-reports && chown {os.getuid()} migration-reports"
+        )
+        raise ReportPathError(msg) from exc
+    finally:
+        # On a read-only filesystem the unlink fails too, and missing_ok only
+        # covers FileNotFoundError — without this the guard would raise EROFS
+        # instead of reporting it.
+        with suppress(OSError):
+            probe.unlink(missing_ok=True)
+
+
 def _load_expectations(path: Path | None) -> dict[str, Any] | None:
     if path is None:
         return None
@@ -87,6 +132,9 @@ def _load_expectations(path: Path | None) -> dict[str, Any] | None:
 
 
 async def _run(args: argparse.Namespace) -> int:
+    # Before anything else: a report we cannot write is a run we cannot judge.
+    check_report_path(args.report)
+
     settings = get_settings()
     report = MigrationReport()
     options = MigrationOptions(
@@ -145,6 +193,9 @@ async def main(argv: list[str] | None = None) -> int:
     except LegacyDatabaseError as exc:
         print(f"Cannot read the legacy database: {exc}", file=sys.stderr)
         return EXIT_SOURCE
+    except ReportPathError as exc:
+        print(f"Report destination unusable: {exc}", file=sys.stderr)
+        return EXIT_USAGE
     except MigrationError as exc:
         print(f"Migration stopped: {exc}", file=sys.stderr)
         return EXIT_FAILED
