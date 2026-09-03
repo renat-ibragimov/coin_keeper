@@ -1,7 +1,6 @@
 {
   "brand": {
-    "name": "CoinKeeper",
-    "by": "by Bakost"
+    "name": "Bakost Numismatics"
   },
   "nav": {
     "label": "Головна навігація",
@@ -42,7 +41,7 @@
     "rateLimited": "Забагато спроб. Спробуйте пізніше."
   },
   "auth": {
-    "welcomeTitle": "Ласкаво просимо до CoinKeeper",
+    "welcomeTitle": "Ласкаво просимо до Bakost Numismatics",
     "welcomeText": "Ваш надійний каталог монет і колекцій. Зберігайте, відстежуйте та оцінюйте свої скарби в одному місці.",
     "featureCatalogTitle": "Спільний каталог",
     "featureCatalogText": "Доступ до тисяч монет з детальними описами та актуальними цінами.",

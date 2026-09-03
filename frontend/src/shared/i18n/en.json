@@ -1,7 +1,6 @@
 {
   "brand": {
-    "name": "CoinKeeper",
-    "by": "by Bakost"
+    "name": "Bakost Numismatics"
   },
   "nav": {
     "label": "Main navigation",
@@ -42,7 +41,7 @@
     "rateLimited": "Too many attempts. Try again later."
   },
   "auth": {
-    "welcomeTitle": "Welcome to CoinKeeper",
+    "welcomeTitle": "Welcome to Bakost Numismatics",
     "welcomeText": "Your reliable catalog of coins and collections. Store, track and value your treasures in one place.",
     "featureCatalogTitle": "Shared catalog",
     "featureCatalogText": "Access thousands of coins with detailed descriptions and current prices.",

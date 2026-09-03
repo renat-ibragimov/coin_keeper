@@ -17,7 +17,7 @@ export function AuthLayout() {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Brand />
+        <Brand variant="full" to="/login" />
         <div className={styles.controls}>
           <LocaleSwitcher />
           <ThemeToggle />
