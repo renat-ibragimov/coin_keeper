@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { CatalogListItem } from '@/shared/api/types';
 import { formatUah } from '@/shared/lib/format';
-import { Badge } from '@/shared/ui';
+import { Badge, CoinImage } from '@/shared/ui';
 
 import type { CatalogFilters, SortField } from './useCatalogFilters';
 import styles from './CatalogTable.module.css';
@@ -74,13 +74,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
               <tr key={item.id} className={item.isArchived ? styles.archivedRow : undefined}>
                 <td>
                   <div className={styles.coinCell}>
-                    {item.thumbnailUrl ? (
-                      <img src={item.thumbnailUrl} alt="" loading="lazy" className={styles.thumb} />
-                    ) : (
-                      <span className={styles.thumbPlaceholder} aria-hidden="true">
-                        ◎
-                      </span>
-                    )}
+                    <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
                     <span>
                       <span className={styles.coinTitle}>{item.title}</span>
                       <span className={styles.coinBadges}>

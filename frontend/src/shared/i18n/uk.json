@@ -152,6 +152,7 @@
     "badgeMissing": "Не вистачає",
     "noPrice": "Ціни немає",
     "priceSource": "Джерело: {{source}}",
+    "sourceLink": "Джерело",
     "emptyTitle": "Нічого не знайдено",
     "emptyText": "Спробуйте змінити фільтри або пошуковий запит.",
     "notFoundTitle": "Не знайшли монету в каталозі?",

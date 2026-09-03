@@ -152,6 +152,7 @@
     "badgeMissing": "Missing",
     "noPrice": "No price",
     "priceSource": "Source: {{source}}",
+    "sourceLink": "Source",
     "emptyTitle": "Nothing found",
     "emptyText": "Try changing the filters or the search query.",
     "notFoundTitle": "Can't find a coin in the catalog?",

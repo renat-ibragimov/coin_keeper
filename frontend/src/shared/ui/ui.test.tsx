@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +6,7 @@ import '@/shared/i18n';
 
 import { Badge } from './Badge';
 import { Button } from './Button';
+import { CoinImage } from './CoinImage';
 import { pageItems } from './pageItems';
 import { Pagination } from './Pagination';
 import { Toggle } from './Toggle';
@@ -37,6 +38,31 @@ describe('Toggle', () => {
     render(<Toggle checked={false} onChange={onChange} label="Show archived" />);
     await userEvent.click(screen.getByRole('switch'));
     expect(onChange).toHaveBeenCalledWith(true);
+  });
+});
+
+describe('CoinImage', () => {
+  it('draws the placeholder instead of an empty image', () => {
+    const { container } = render(<CoinImage src={null} alt="" />);
+    expect(screen.getByTestId('coin-placeholder')).toBeInTheDocument();
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('falls back to the placeholder once and does not ask for the file again', () => {
+    const { container, rerender } = render(<CoinImage src="https://ucoin.net/a.jpg" alt="" />);
+    fireEvent.error(container.querySelector('img')!);
+    expect(screen.getByTestId('coin-placeholder')).toBeInTheDocument();
+
+    rerender(<CoinImage src="https://ucoin.net/a.jpg" alt="" />);
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('gives a different url its own attempt', () => {
+    const { container, rerender } = render(<CoinImage src="https://ucoin.net/a.jpg" alt="" />);
+    fireEvent.error(container.querySelector('img')!);
+
+    rerender(<CoinImage src="/media/b.jpg" alt="" />);
+    expect(container.querySelector('img')).toHaveAttribute('src', '/media/b.jpg');
   });
 });
 

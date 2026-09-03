@@ -2,30 +2,21 @@ import { useTranslation } from 'react-i18next';
 
 import type { CatalogListItem } from '@/shared/api/types';
 import { formatUah } from '@/shared/lib/format';
-import { Badge } from '@/shared/ui';
+import { Badge, CoinImage } from '@/shared/ui';
 
 import styles from './CoinCard.module.css';
 
 function CoinImages({ item }: { item: CatalogListItem }) {
-  const images = [item.obverseImageUrl, item.reverseImageUrl].filter((url): url is string => !!url);
-  if (images.length === 0) {
-    return (
-      <div className={styles.placeholder} aria-hidden="true">
-        ◎
-      </div>
-    );
+  const sides = [item.obverseImageUrl, item.reverseImageUrl].filter(Boolean);
+  // With one side stored, or none at all, a single frame spans the media area;
+  // CoinImage decides on its own whether it shows a photo or the placeholder.
+  if (sides.length < 2) {
+    return <CoinImage src={sides[0]} alt="" className={styles.imageSingle} />;
   }
   return (
     <>
-      {images.map((url, index) => (
-        <img
-          key={index}
-          src={url}
-          alt=""
-          loading="lazy"
-          className={images.length === 1 ? styles.imageSingle : styles.image}
-        />
-      ))}
+      <CoinImage src={item.obverseImageUrl} alt="" className={styles.image} />
+      <CoinImage src={item.reverseImageUrl} alt="" className={styles.image} />
     </>
   );
 }
@@ -61,6 +52,12 @@ export function CoinCard({ item }: { item: CatalogListItem }) {
             <Badge tone="danger">✕ {t('catalog.badgeMissing')}</Badge>
           )}
         </div>
+        {/* sourceUrl points at the uCoin page, not at a file: a link, never an image. */}
+        {item.sourceUrl ? (
+          <a className={styles.source} href={item.sourceUrl} target="_blank" rel="noreferrer">
+            {t('catalog.sourceLink')} ↗
+          </a>
+        ) : null}
       </div>
       <div className={styles.footer}>
         {price ? (

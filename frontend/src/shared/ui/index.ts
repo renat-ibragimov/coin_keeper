@@ -1,6 +1,7 @@
 export { Badge } from './Badge';
 export { Button } from './Button';
 export { Card } from './Card';
+export { CoinImage } from './CoinImage';
 export { Input } from './Input';
 export { pageItems } from './pageItems';
 export { Pagination } from './Pagination';
