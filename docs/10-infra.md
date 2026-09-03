@@ -139,16 +139,25 @@ API-адрес в сборку не зашит: клиент ходит на о�
 `vite dev` тот же путь проксируется на боевой API (`vite.config.ts`), и refresh-cookie
 ходит как same-origin.
 
-**Выкладка статики — пока руками**, пайплайн её только собирает и проверяет:
+**Выкладка статики — пока руками** (фактическое состояние на 2026-09-03). Пайплайн
+собирает и проверяет фронтенд (format, lint, typecheck, tests, build) в job `frontend`,
+но на сервер ничего не копирует. Выкладка идёт в три шага:
 
 ```
+# 1. на машине разработчика
 cd frontend && npm ci && npm run build
-rsync -a --delete frontend/dist/ <user>@<host>:/srv/coinkeeper/frontend/
+rsync -a --delete frontend/dist/ deploy@<host>:/home/deploy/frontend-dist/
+
+# 2. на сервере, от root (пользователь deploy не пишет в /srv)
+rsync -a --delete /home/deploy/frontend-dist/ /srv/coinkeeper/frontend/
 ```
 
-Каталог `/srv/coinkeeper/frontend` должен читаться пользователем, от которого запущен
-центральный Caddy. Перенос выкладки в CI (артефакт `dist` → `rsync` тем же деплой-ключом,
-что и compose) — задача следующих частей этапа 4.
+Центральный Caddy отдаёт `/srv/coinkeeper/frontend` через `file_server` с SPA-fallback
+(`try_files {path} /index.html`), блок сайта — выше в разделе «Caddy». Каталог должен
+читаться пользователем, от которого запущен Caddy.
+
+Перенос выкладки в CI (артефакт `dist` → `rsync` тем же деплой-ключом, что и compose,
+плюс копирование в `/srv` без участия root) — **часть 3 этапа 4** (`11-roadmap.md`).
 
 ## Бэкапы
 
