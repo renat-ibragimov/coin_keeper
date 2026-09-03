@@ -12,6 +12,7 @@ import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
 import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { CollectionPage } from '@/features/collection/CollectionPage';
+import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 import { ToastProvider } from '@/shared/ui';
@@ -59,10 +60,8 @@ export function App() {
                     <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
                     <Route path="/series" element={<ComingSoon titleKey="nav.series" />} />
                     <Route path="/collection" element={<CollectionPage />} />
-                    <Route
-                      path="/collection/new"
-                      element={<ComingSoon titleKey="card.addPurchase" />}
-                    />
+                    <Route path="/collection/new" element={<PurchaseFormPage />} />
+                    <Route path="/collection/:id/edit" element={<PurchaseFormPage />} />
                     <Route path="/missing" element={<ComingSoon titleKey="nav.missing" />} />
                     <Route path="/settings" element={<ComingSoon titleKey="nav.settings" />} />
                   </Route>

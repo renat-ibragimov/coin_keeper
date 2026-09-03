@@ -210,7 +210,11 @@ function CardBody({ card }: { card: CatalogCard }) {
           <Card>
             <h2 className={styles.sideTitle}>{t('card.actions')}</h2>
             <div className={styles.actions}>
-              <Link to={`/collection/new?catalogItemId=${card.id}`} className={styles.actionLink}>
+              <Link
+                to={`/collection/new?catalogItemId=${card.id}`}
+                state={{ from: `/catalog/${card.id}` }}
+                className={styles.actionLink}
+              >
                 <Button block>+ {t('card.addPurchase')}</Button>
               </Link>
               <Button block variant="secondary" disabled title={t('card.ownPriceSoon')}>

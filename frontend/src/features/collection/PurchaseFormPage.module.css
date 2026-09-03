@@ -1,0 +1,96 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-areas: 'form item';
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.item {
+  grid-area: item;
+}
+
+.form {
+  grid-area: form;
+}
+
+.itemBody {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.itemImage {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: var(--color-surface-sunken);
+  flex: none;
+}
+
+.itemBadges {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.itemBadges:empty {
+  display: none;
+}
+
+.itemTitle {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.itemTitle:hover {
+  color: var(--color-accent);
+}
+
+.itemMeta {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.itemSeries {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.changeItem {
+  margin-top: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.formSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      'item'
+      'form';
+    gap: var(--space-4);
+  }
+}

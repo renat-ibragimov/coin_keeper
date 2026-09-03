@@ -69,3 +69,8 @@ export function fetchCurrencies(): Promise<CurrencyOut[]> {
 export function createCatalogItem(body: CatalogItemCreate): Promise<CatalogCard> {
   return api<CatalogCard>('/catalog', { method: 'POST', body });
 }
+
+/** Quick lookup for pickers: a handful of active items matching the text. */
+export function searchCatalog(q: string, limit = 8): Promise<CatalogPage> {
+  return api<CatalogPage>(`/catalog${toQuery({ q, page: 1, pageSize: limit })}`);
+}

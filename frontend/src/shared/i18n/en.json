@@ -321,5 +321,32 @@
     "deleteTitle": "Delete the instance?",
     "deleteText": "“{{title}}” will be deleted together with its purchase expense ({{total}}). This cannot be undone.",
     "deleted": "The instance and its purchase expense were deleted."
+  },
+  "purchase": {
+    "subtitle": "The instance and its purchase expense are created together.",
+    "editTitle": "Edit the purchase",
+    "editSubtitle": "Changing the amount or the date recalculates the purchase expense.",
+    "pickTitle": "Which coin did you buy?",
+    "pickHint": "Type a title, country, year or catalog number — the shared catalog and your own items.",
+    "changeItem": "Pick another coin",
+    "quantity": "Quantity",
+    "quantityInvalid": "Quantity is a whole number from 1.",
+    "date": "Purchase date",
+    "price": "Price per unit, {{symbol}}",
+    "priceInvalid": "Enter the price as a number, 0 or more.",
+    "currency": "Currency",
+    "rateHint": "The server fills in the NBU rate for the purchase date.",
+    "rateMissing": "No NBU rate for {{currency}} on this date. Pick another date or currency.",
+    "unknownCurrency": "Unknown currency.",
+    "seller": "Seller",
+    "sellerPlaceholder": "Auction, shop or a name",
+    "grade": "Grade",
+    "gradeNone": "Not specified",
+    "notes": "Note",
+    "notesPlaceholder": "Condition, delivery, bargaining…",
+    "submit": "Add the purchase",
+    "created": "Purchase added: the instance and the expense are saved.",
+    "updated": "Purchase updated.",
+    "instanceNotFound": "Instance not found"
   }
 }
