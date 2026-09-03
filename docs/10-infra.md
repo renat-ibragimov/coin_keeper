@@ -94,16 +94,24 @@ LOG_LEVEL=INFO
 
 Автоматический HTTPS без ручной возни с сертификатами.
 
+**Как оно на самом деле на сервере.** Caddy там **один, центральный**, обслуживает несколько
+сайтов и живёт вне нашего `docker-compose.yml`. Сервис `caddy` в compose и `Caddyfile` в
+репозитории — эталон конфигурации и вариант для локального прогона с профилем `proxy`; на
+сервере блок для `coins.renat-ibragimov.com` живёт в Caddyfile центрального Caddy и правится
+руками. Апстримы `/api/*` и `/media/*` там уже настроены — их не трогаем.
+
+Целевой блок сайта:
+
 ```
-<домен> {
+coins.renat-ibragimov.com {
     handle /api/* {
-        reverse_proxy api:8000
+        reverse_proxy <существующий апстрим api>
     }
     handle /media/* {
-        reverse_proxy minio:9000
+        reverse_proxy <существующий апстрим minio>
     }
     handle {
-        root * /srv/frontend
+        root * /srv/coinkeeper/frontend
         try_files {path} /index.html
         file_server
     }
@@ -116,8 +124,31 @@ LOG_LEVEL=INFO
 }
 ```
 
-Фронтенд собирается в статику (`vite build`) и отдаётся Caddy напрямую — отдельный
-Node-процесс не нужен.
+Порядок `handle` важен: без `handle` для `/api/*` и `/media/*` SPA-fallback отдал бы
+`index.html` вместо ответа API. `try_files {path} /index.html` — это и есть fallback для
+клиентского роутера: `/catalog?page=3` и `/reset-password?token=…` открываются по прямой
+ссылке.
+
+## Фронтенд
+
+Фронтенд — статика: `vite build` в `frontend/dist`, отдаёт её Caddy, отдельный Node-процесс
+не нужен. В `dist` уже лежат шрифты (самохостинг через `@fontsource`), внешних CDN нет.
+
+API-адрес в сборку не зашит: клиент ходит на относительный `/api/v1` (`VITE_API_BASE`,
+если понадобится другой), поэтому один и тот же `dist` работает за любым доменом. В
+`vite dev` тот же путь проксируется на боевой API (`vite.config.ts`), и refresh-cookie
+ходит как same-origin.
+
+**Выкладка статики — пока руками**, пайплайн её только собирает и проверяет:
+
+```
+cd frontend && npm ci && npm run build
+rsync -a --delete frontend/dist/ <user>@<host>:/srv/coinkeeper/frontend/
+```
+
+Каталог `/srv/coinkeeper/frontend` должен читаться пользователем, от которого запущен
+центральный Caddy. Перенос выкладки в CI (артефакт `dist` → `rsync` тем же деплой-ключом,
+что и compose) — задача следующих частей этапа 4.
 
 ## Бэкапы
 
@@ -184,13 +215,16 @@ Chromium в Playwright запускать с `--no-sandbox --disable-dev-shm-usa
 ### Пайплайн
 
 ```
-build  → сборка фронтенда (vite build) и бэкенда
-lint   → ruff + mypy для Python, eslint + tsc для фронтенда
-test   → pytest c поднятыми postgres и redis (MAIL_BACKEND=console)
-images → сборка Docker-образов api, worker, frontend
-push   → публикация образов в GHCR (ghcr.io/<owner>/coinkeeper-*)
-deploy → SSH на Hetzner: docker compose pull && docker compose up -d
+check          → бэкенд: ruff + mypy + pytest с поднятыми postgres и redis (MAIL_BACKEND=console)
+frontend-check → фронтенд: prettier + eslint + tsc + vitest + vite build
+images         → сборка Docker-образа api (worker — тот же образ, другая команда)
+push           → публикация образа в GHCR (ghcr.io/<owner>/coinkeeper-api)
+deploy         → SSH на Hetzner: docker compose pull && docker compose up -d
 ```
+
+Статика фронтенда образом не оформляется — её отдаёт центральный Caddy с диска, см.
+«Фронтенд». Пайплайн её собирает, чтобы сломанная сборка не доехала до `main`, но на сервер
+пока не выкладывает.
 
 Порядок жёсткий: не прошёл lint или test — до сборки образов дело не доходит, на сервер
 ничего не уезжает.
@@ -198,8 +232,8 @@ deploy → SSH на Hetzner: docker compose pull && docker compose up -d
 Образы тегируются SHA коммита и `latest`. Тег по SHA нужен для отката: `docker compose`
 на сервере переключается на предыдущий тег без пересборки.
 
-Сборка фронтенда — **в образе, в CI**, не на сервере: `node_modules` на слабой машине
-собирается долго и съедает память, которая нужна Chromium.
+Сборка фронтенда — **в CI, не на сервере**: `node_modules` на слабой машине собирается
+долго и съедает память, которая нужна Chromium. На сервер едет только `dist`.
 
 Миграции применяются при старте контейнера `api` (см. «Миграции схемы»), отдельным шагом
 пайплайна их не гоняем — иначе схема поедет раньше, чем встанет код.

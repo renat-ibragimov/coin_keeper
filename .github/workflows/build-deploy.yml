@@ -16,6 +16,14 @@ on:
         description: Directory holding pyproject.toml and the Dockerfile.
         type: string
         default: backend
+      frontend-path:
+        description: Directory holding the Vite app; empty string skips the frontend job.
+        type: string
+        default: frontend
+      node-version:
+        description: Node version used to check and build the frontend.
+        type: string
+        default: "22"
       image-name:
         description: Image name inside the GHCR registry.
         type: string
@@ -112,9 +120,54 @@ jobs:
           S3_SECRET_KEY: ci
         run: uv run pytest -q
 
+  # --------------------------------------------------------------- frontend
+  # The static bundle is served by Caddy from disk, so no image is built for
+  # it; this job keeps a broken build from reaching main (docs/10-infra.md,
+  # "Фронтенд"). The dist artifact is what a manual deploy ships.
+  frontend-check:
+    if: inputs.frontend-path != ''
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.frontend-path }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.frontend-path }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prettier check
+        run: npm run format:check
+
+      - name: ESLint
+        run: npm run lint -- --max-warnings=0
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Vitest
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: ${{ inputs.frontend-path }}/dist
+          retention-days: 7
+
   # ------------------------------------------------------------------ image
   build:
-    needs: check
+    needs: [check, frontend-check]
+    # frontend-check may be skipped by input; a skipped job must not block.
+    if: always() && needs.check.result == 'success' && (needs.frontend-check.result == 'success' || needs.frontend-check.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -19,7 +19,9 @@ jobs:
     with:
       image-name: coinkeeper-api
       backend-path: backend
+      frontend-path: frontend
       python-version: "3.12"
+      node-version: "22"
       # Only main reaches the server; pull requests stop after build.
       deploy: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     secrets: inherit
