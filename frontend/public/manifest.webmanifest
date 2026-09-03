@@ -1,0 +1,23 @@
+{
+  "name": "Bakost Numismatics",
+  "short_name": "Numismatics",
+  "description": "Catalog, collection, purchases and market prices for a coin collector.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "lang": "uk",
+  "background_color": "#f2ecdf",
+  "theme_color": "#faf6ec",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "/brand/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
