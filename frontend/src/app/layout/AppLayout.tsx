@@ -10,7 +10,7 @@ import { LocaleSwitcher, ThemeToggle } from './HeaderControls';
 import styles from './AppLayout.module.css';
 
 const SECTIONS = [
-  { to: '/dashboard', key: 'nav.dashboard' },
+  { to: '/', key: 'nav.dashboard' },
   { to: '/catalog', key: 'nav.catalog' },
   { to: '/series', key: 'nav.series' },
   { to: '/collection', key: 'nav.collection' },
@@ -19,7 +19,7 @@ const SECTIONS = [
 ] as const;
 
 /** The first tabs live in the mobile bottom bar; the rest go into "More". */
-const MOBILE_PRIMARY = ['/dashboard', '/catalog', '/collection'];
+const MOBILE_PRIMARY = ['/', '/catalog', '/collection'];
 
 function navClass(base = '', active = '') {
   return ({ isActive }: { isActive: boolean }) => (isActive ? `${base} ${active}` : base);
@@ -39,6 +39,7 @@ export function AppLayout() {
             <NavLink
               key={section.to}
               to={section.to}
+              end={section.to === '/'}
               className={navClass(styles.navLink, styles.navLinkActive)}
             >
               {t(section.key)}
@@ -66,6 +67,7 @@ export function AppLayout() {
           <NavLink
             key={section.to}
             to={section.to}
+            end={section.to === '/'}
             className={navClass(styles.bottomLink, styles.bottomLinkActive)}
             onClick={() => setMoreOpen(false)}
           >

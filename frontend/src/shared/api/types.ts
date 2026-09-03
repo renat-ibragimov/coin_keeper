@@ -17,3 +17,12 @@ export type SeriesOut = components['schemas']['SeriesOut'];
 
 export type CollectionGroup = components['schemas']['CollectionGroup'];
 export type MetalKind = components['schemas']['MetalKind'];
+
+export type BootstrapOut = components['schemas']['BootstrapOut'];
+export type DashboardOut = components['schemas']['DashboardOut'];
+export type BreakdownEntry = components['schemas']['BreakdownEntry'];
+export type SeriesBreakdownEntry = components['schemas']['SeriesBreakdownEntry'];
+export type ExchangeRateOut = components['schemas']['ExchangeRateOut'];
+
+export type PriceHistoryItem = components['schemas']['PriceHistoryItem'];
+export type CatalogCollectionItem = components['schemas']['CatalogCollectionItemOut'];

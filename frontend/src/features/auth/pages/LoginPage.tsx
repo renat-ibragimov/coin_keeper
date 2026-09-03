@@ -22,7 +22,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/catalog';
+  const from = (location.state as { from?: string } | null)?.from ?? '/';
 
   async function submit(event: FormEvent) {
     event.preventDefault();

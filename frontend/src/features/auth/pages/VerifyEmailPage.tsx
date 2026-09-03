@@ -52,9 +52,7 @@ export function VerifyEmailPage() {
       {state === 'success' ? (
         <>
           <div className={styles.formInfo}>{t('auth.verifySuccess')}</div>
-          <Button onClick={() => navigate('/catalog', { replace: true })}>
-            {t('auth.goToApp')}
-          </Button>
+          <Button onClick={() => navigate('/', { replace: true })}>{t('auth.goToApp')}</Button>
         </>
       ) : null}
       {state === 'error' ? (

@@ -10,6 +10,7 @@ import { RegisterPage } from '@/features/auth/pages/RegisterPage';
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
 import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
+import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 
 import { ComingSoon } from './ComingSoon';
@@ -43,8 +44,8 @@ export function App() {
               </Route>
               <Route element={<ProtectedRoute />}>
                 <Route element={<AppLayout />}>
-                  <Route path="/" element={<Navigate to="/catalog" replace />} />
-                  <Route path="/dashboard" element={<ComingSoon titleKey="nav.dashboard" />} />
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/dashboard" element={<Navigate to="/" replace />} />
                   <Route path="/catalog" element={<CatalogPage />} />
                   <Route
                     path="/catalog/new"
@@ -57,7 +58,7 @@ export function App() {
                   <Route path="/settings" element={<ComingSoon titleKey="nav.settings" />} />
                 </Route>
               </Route>
-              <Route path="*" element={<Navigate to="/catalog" replace />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
         </AuthProvider>
