@@ -1,0 +1,151 @@
+/* Design tokens extracted from docs/references mocks.
+ *
+ * Two equal themes. Light — the warm "paper" catalog look (canonical for
+ * coin photos, docs/08-ui-map.md); dark — deep near-black with warm gold.
+ * Every screen is built from these variables only: components never hardcode
+ * a colour. The theme is switched by data-theme on <html>.
+ */
+
+:root {
+  /* Typography */
+  --font-display: 'Playfair Display', 'Georgia', 'Times New Roman', serif;
+  --font-body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
+
+  /* Shape */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --header-height: 64px;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --color-bg: #f2ecdf;
+  --color-surface: #faf6ec;
+  --color-surface-raised: #fdfaf3;
+  --color-surface-sunken: #ece5d4;
+
+  --color-text: #2e261a;
+  --color-text-secondary: #6f6353;
+  --color-text-muted: #998d79;
+
+  --color-border: #ddd2bc;
+  --color-border-strong: #c8bba0;
+
+  --color-accent: #8a6a35;
+  --color-accent-strong: #6f5427;
+  --color-accent-soft: #f0e6d2;
+  --color-on-accent: #fdf9ef;
+
+  --color-success: #3e7d4f;
+  --color-success-soft: #e4efe4;
+  --color-danger: #a8453a;
+  --color-danger-soft: #f5e4e0;
+  --color-warning: #8a6d3b;
+  --color-warning-soft: #f2e9d4;
+
+  --gradient-accent: linear-gradient(180deg, #9a7a42 0%, #7d5f2e 100%);
+
+  --shadow-sm: 0 1px 2px rgba(66, 52, 30, 0.08);
+  --shadow-md: 0 4px 16px rgba(66, 52, 30, 0.1);
+  --shadow-lg: 0 12px 32px rgba(66, 52, 30, 0.14);
+
+  --overlay: rgba(46, 38, 26, 0.45);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-bg: #0b0a08;
+  --color-surface: #14110c;
+  --color-surface-raised: #1b1712;
+  --color-surface-sunken: #080706;
+
+  --color-text: #ece3d1;
+  --color-text-secondary: #a89a82;
+  --color-text-muted: #7a6f5d;
+
+  --color-border: #2b251c;
+  --color-border-strong: #40372a;
+
+  --color-accent: #c9a35c;
+  --color-accent-strong: #dcb872;
+  --color-accent-soft: #241e14;
+  --color-on-accent: #1a1408;
+
+  --color-success: #79b98a;
+  --color-success-soft: #14211a;
+  --color-danger: #de8578;
+  --color-danger-soft: #2a1713;
+  --color-warning: #c9a35c;
+  --color-warning-soft: #241e14;
+
+  --gradient-accent: linear-gradient(180deg, #d3ab60 0%, #a9822f 100%);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+
+  --overlay: rgba(0, 0, 0, 0.65);
+}
+
+/* ------------------------------------------------------------------ base */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+button {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Sums and years sit in columns and must not wiggle (docs/08-ui-map.md). */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
