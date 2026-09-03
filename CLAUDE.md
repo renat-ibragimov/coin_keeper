@@ -1,4 +1,4 @@
-# CoinKeeper Web — правила проекта
+# Bakost Numismatics (техническое имя CoinKeeper) — правила проекта
 
 ## Что это
 

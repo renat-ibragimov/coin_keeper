@@ -61,7 +61,7 @@ SMTP_HOST=smtp.resend.com
 SMTP_PORT=587
 SMTP_USER=***
 SMTP_PASSWORD=***
-SMTP_FROM="CoinKeeper <noreply@<домен>>"
+SMTP_FROM="Bakost Numismatics <noreply@<домен>>"
 LOG_LEVEL=INFO
 ```
 

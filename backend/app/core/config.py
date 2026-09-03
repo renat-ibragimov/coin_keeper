@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
     smtp_user: str = Field(default="", alias="SMTP_USER")
     smtp_password: str = Field(default="", alias="SMTP_PASSWORD")
-    smtp_from: str = Field(default="CoinKeeper <noreply@localhost>", alias="SMTP_FROM")
+    smtp_from: str = Field(default="Bakost Numismatics <noreply@localhost>", alias="SMTP_FROM")
     smtp_starttls: bool = Field(default=True, alias="SMTP_STARTTLS")
 
     # --- external sources, wired up in stages 5 and 6 ---
