@@ -138,11 +138,13 @@ async def add_snapshot(
     is_suspect: bool = False,
     source: str = "UA-Coins",
     grade: str | None = None,
+    source_url: str | None = None,
 ) -> MarketPriceSnapshot:
     snapshot = MarketPriceSnapshot(
         catalog_item_id=item.id,
         source=source,
         grade=grade,
+        source_url=source_url,
         price=Decimal(price),
         currency_code=currency,
         observed_at=observed_at or datetime.now(UTC),

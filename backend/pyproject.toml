@@ -18,6 +18,9 @@ dependencies = [
     "aiosmtplib>=3.0",
     "boto3>=1.35",
     "pillow>=11.0",
+    "httpx>=0.28",
+    "selectolax>=0.3.21",
+    "rapidfuzz>=3.9",
 ]
 
 [project.optional-dependencies]
@@ -61,6 +64,10 @@ ignore = ["S101"]
 # Same exemption for the API test seed: Ukrainian coin and series names are data.
 "tests/seed.py" = ["RUF001", "RUF002", "RUF003"]
 "alembic/versions/*" = ["E501"]
+# The reconnaissance parsers select cells by the Ukrainian labels the sites
+# print ("Назва", "Тираж"); those literals are the sites' data, not prose.
+"app/ukraine_recon/*" = ["RUF001", "RUF002", "RUF003"]
+"scripts/recon_ukraine.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]
 python_version = "3.12"

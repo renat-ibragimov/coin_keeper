@@ -248,3 +248,7 @@ docker-compose.override.yml
 .idea/
 .vscode/
 *.swp
+
+# Reconnaissance of the Ukrainian sources: report and source indexes
+backend/scripts/recon-report.json
+backend/scripts/recon-indexes/
