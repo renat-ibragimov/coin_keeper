@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -24,7 +25,13 @@ function CoinImages({ item }: { item: CatalogListItem }) {
   );
 }
 
-export function CoinCard({ item }: { item: CatalogListItem }) {
+interface CoinCardProps {
+  item: CatalogListItem;
+  /** Optional call to action under the price, e.g. "Add a purchase". */
+  action?: ReactNode;
+}
+
+export function CoinCard({ item, action }: CoinCardProps) {
   const { t, i18n } = useTranslation();
   const price = formatUah(item.marketPriceUah, i18n.language);
   const owned = item.quantityOwned > 0;
@@ -87,6 +94,7 @@ export function CoinCard({ item }: { item: CatalogListItem }) {
           </span>
         ) : null}
       </div>
+      {action ? <div className={styles.action}>{action}</div> : null}
     </article>
   );
 }

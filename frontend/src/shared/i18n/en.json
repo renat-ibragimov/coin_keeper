@@ -373,5 +373,21 @@
     "created": "Item created.",
     "adminRequired": "Only an administrator can create shared catalog records.",
     "invalidReference": "The country, series or denomination does not exist. Reload and try again."
+  },
+  "series": {
+    "title": "Series",
+    "subtitle": "Completeness by series: what is collected, what is left and what it costs.",
+    "sortCompletion": "By completeness",
+    "sortName": "By name",
+    "collected": "Collected",
+    "spent": "Spent",
+    "value": "Current valuation",
+    "missing": "Missing",
+    "emptyTitle": "No series yet",
+    "emptyText": "The catalog has no series for this country yet.",
+    "notFound": "Series not found",
+    "openInCatalog": "Open in the catalog",
+    "noItemsTitle": "No items in this series yet",
+    "noItemsText": "Items appear once the catalog is filled in."
   }
 }

@@ -15,6 +15,8 @@ import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
+import { SeriesDetailPage } from '@/features/series/SeriesDetailPage';
+import { SeriesListPage } from '@/features/series/SeriesListPage';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 import { ToastProvider } from '@/shared/ui';
 
@@ -56,7 +58,8 @@ export function App() {
                     <Route path="/catalog/new" element={<CreateItemPage />} />
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
                     <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
-                    <Route path="/series" element={<ComingSoon titleKey="nav.series" />} />
+                    <Route path="/series" element={<SeriesListPage />} />
+                    <Route path="/series/:id" element={<SeriesDetailPage />} />
                     <Route path="/collection" element={<CollectionPage />} />
                     <Route path="/collection/new" element={<PurchaseFormPage />} />
                     <Route path="/collection/:id/edit" element={<PurchaseFormPage />} />

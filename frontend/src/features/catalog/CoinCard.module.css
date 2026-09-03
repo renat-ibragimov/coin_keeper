@@ -133,3 +133,11 @@
   color: var(--color-text-muted);
   text-align: right;
 }
+
+.action {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+.action > * {
+  width: 100%;
+}
