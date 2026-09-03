@@ -10,6 +10,7 @@ import { RegisterPage } from '@/features/auth/pages/RegisterPage';
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
 import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
 import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
+import { CreateItemPage } from '@/features/catalog/create/CreateItemPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
@@ -52,10 +53,7 @@ export function App() {
                     <Route path="/" element={<DashboardPage />} />
                     <Route path="/dashboard" element={<Navigate to="/" replace />} />
                     <Route path="/catalog" element={<CatalogPage />} />
-                    <Route
-                      path="/catalog/new"
-                      element={<ComingSoon titleKey="catalog.createOwn" />}
-                    />
+                    <Route path="/catalog/new" element={<CreateItemPage />} />
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
                     <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
                     <Route path="/series" element={<ComingSoon titleKey="nav.series" />} />

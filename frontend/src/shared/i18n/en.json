@@ -348,5 +348,30 @@
     "created": "Purchase added: the instance and the expense are saved.",
     "updated": "Purchase updated.",
     "instanceNotFound": "Instance not found"
+  },
+  "createItem": {
+    "subtitle": "An item the shared catalog lacks. Only you can see it.",
+    "sectionBasics": "Basic information",
+    "sectionDetails": "Additional information",
+    "title": "Title",
+    "titleHint": "In the original language — as on the coin or in the catalog.",
+    "titleUk": "Ukrainian title",
+    "titleUkHint": "If it differs from the original.",
+    "titleEn": "English title",
+    "pickCountry": "Pick a country",
+    "noSeries": "No series",
+    "year": "Year of issue",
+    "yearInvalid": "Enter a year from 1 to 2200.",
+    "noDenomination": "Not specified",
+    "materialPlaceholder": "nickel silver, silver 925…",
+    "notes": "Description",
+    "notesPlaceholder": "Anything else worth knowing about the coin…",
+    "shared": "Into the shared catalog",
+    "sharedHint": "Every user will see the record; only an administrator can change it.",
+    "personalNote": "Photos can be added later — image upload arrives in the next stages.",
+    "submit": "Create the item",
+    "created": "Item created.",
+    "adminRequired": "Only an administrator can create shared catalog records.",
+    "invalidReference": "The country, series or denomination does not exist. Reload and try again."
   }
 }
