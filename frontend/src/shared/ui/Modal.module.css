@@ -72,6 +72,7 @@
   .dialog {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     max-width: none;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .footer {

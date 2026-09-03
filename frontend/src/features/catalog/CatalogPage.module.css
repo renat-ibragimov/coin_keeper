@@ -145,6 +145,7 @@
     top: 0;
     right: 0;
     bottom: 0;
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
     width: min(400px, 100%);
     background: var(--color-surface);
     padding: var(--space-4);

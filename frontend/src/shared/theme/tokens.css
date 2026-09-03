@@ -26,6 +26,10 @@
   --space-7: 48px;
 
   --header-height: 68px;
+  /* Mobile bottom navigation: its own height plus the phone's home-indicator
+     inset (viewport-fit=cover in index.html makes env() non-zero on iOS). */
+  --bottom-nav-height: 56px;
+  --bottom-nav-inset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
 }
 
 :root[data-theme='light'] {
