@@ -19,42 +19,14 @@
 }
 
 /* Auth screens have room for a larger wordmark. */
-.brand.full .fullImage {
+.brand.hero .fullImage {
   height: 64px;
 }
 
-.compact {
-  display: none;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.mark {
-  display: block;
-  width: 36px;
-  height: 36px;
-}
-
-.name {
-  font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  color: var(--color-text);
-  white-space: nowrap;
-}
-
 @media (max-width: 900px) {
-  .auto .full {
-    display: none;
-  }
-
-  .auto .compact {
-    display: inline-flex;
-  }
-
+  /* The same full logo, scaled to the slimmer mobile header. */
   .fullImage,
-  .brand.full .fullImage {
-    height: 46px;
+  .brand.hero .fullImage {
+    height: 44px;
   }
 }
