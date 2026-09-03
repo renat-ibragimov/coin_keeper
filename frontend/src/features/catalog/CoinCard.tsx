@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { CatalogListItem } from '@/shared/api/types';
 import { coinTitle } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
+import { priceSourceLabel } from '@/shared/lib/priceSource';
 import { Badge, CoinImage } from '@/shared/ui';
 
 import styles from './CoinCard.module.css';
@@ -71,7 +72,10 @@ export function CoinCard({ item }: { item: CatalogListItem }) {
       </div>
       <div className={styles.footer}>
         {price ? (
-          <span className={`${styles.price} tabular`} title={item.priceSource ?? undefined}>
+          <span
+            className={`${styles.price} tabular`}
+            title={priceSourceLabel(item.priceSource, t) || undefined}
+          >
             {price}
           </span>
         ) : (
@@ -79,7 +83,7 @@ export function CoinCard({ item }: { item: CatalogListItem }) {
         )}
         {item.priceSource ? (
           <span className={styles.priceSource}>
-            {t('catalog.priceSource', { source: item.priceSource })}
+            {t('catalog.priceSource', { source: priceSourceLabel(item.priceSource, t) })}
           </span>
         ) : null}
       </div>

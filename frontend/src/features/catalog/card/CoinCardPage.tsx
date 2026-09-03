@@ -7,6 +7,7 @@ import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
 import { coinTitle } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
+import { priceSourceLabel } from '@/shared/lib/priceSource';
 import {
   Badge,
   Breadcrumbs,
@@ -241,7 +242,7 @@ function CardBody({ card }: { card: CatalogCard }) {
             <h2 className={styles.sectionTitle}>{t('card.priceHistory')}</h2>
             {latestPrice ? (
               <span className={styles.priceCaption}>
-                {t('card.priceSource', { source: latestPrice.source })} ·{' '}
+                {t('card.priceSource', { source: priceSourceLabel(latestPrice.source, t) })} ·{' '}
                 {t('card.priceUpdated', { date: formatDate(latestPrice.observedAt, locale) })}
               </span>
             ) : null}

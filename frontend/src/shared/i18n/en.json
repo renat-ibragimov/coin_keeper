@@ -272,5 +272,13 @@
   "units": {
     "mm": "mm",
     "g": "g"
+  },
+  "sources": {
+    "ua-coins": "UA-Coins",
+    "nbu": "NBU",
+    "manual": "own price",
+    "ucoin": "uCoin",
+    "legacy": "legacy records",
+    "excel": "Excel import"
   }
 }

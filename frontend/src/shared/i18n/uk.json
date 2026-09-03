@@ -274,5 +274,13 @@
   "units": {
     "mm": "мм",
     "g": "г"
+  },
+  "sources": {
+    "ua-coins": "UA-Coins",
+    "nbu": "НБУ",
+    "manual": "власна ціна",
+    "ucoin": "uCoin",
+    "legacy": "старий облік",
+    "excel": "імпорт Excel"
   }
 }

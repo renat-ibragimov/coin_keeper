@@ -2,14 +2,24 @@ import { useTranslation } from 'react-i18next';
 
 import type { PriceHistoryItem } from '@/shared/api/types';
 import { formatDate, formatMonthYear, formatNumber } from '@/shared/lib/format';
+import { priceSourceLabel } from '@/shared/lib/priceSource';
+import { useMediaQuery } from '@/shared/lib/useMediaQuery';
 
 import { toChartPoints } from './chartData';
 
 import styles from './PriceHistoryChart.module.css';
 
-const WIDTH = 640;
-const HEIGHT = 220;
-const PAD = { top: 14, right: 18, bottom: 30, left: 56 };
+/* Two drawing boxes: a wide one for desktop and a narrow one for phones, so
+   the labels keep a readable size instead of being scaled down with the SVG. */
+const LAYOUTS = {
+  wide: { width: 640, height: 220, pad: { top: 14, right: 18, bottom: 30, left: 56 }, xLabels: 5 },
+  narrow: {
+    width: 340,
+    height: 220,
+    pad: { top: 12, right: 12, bottom: 28, left: 46 },
+    xLabels: 3,
+  },
+};
 const Y_TICKS = 4;
 
 /** A round upper bound so the grid lands on readable numbers. */
@@ -33,6 +43,13 @@ export function PriceHistoryChart({ items }: { items: PriceHistoryItem[] }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const points = toChartPoints(items);
+  const narrow = useMediaQuery('(max-width: 700px)');
+  const {
+    width: WIDTH,
+    height: HEIGHT,
+    pad: PAD,
+    xLabels,
+  } = narrow ? LAYOUTS.narrow : LAYOUTS.wide;
 
   if (points.length === 0) {
     return <p className={styles.empty}>{t('card.pricesEmpty')}</p>;
@@ -60,7 +77,7 @@ export function PriceHistoryChart({ items }: { items: PriceHistoryItem[] }) {
     trend.length > 1 ? `${trendPath} L${x(last.time)},${y(0)} L${x(trend[0]!.time)},${y(0)} Z` : '';
 
   const yTicks = Array.from({ length: Y_TICKS + 1 }, (_, index) => (yMax / Y_TICKS) * index);
-  const xLabelCount = Math.min(5, Math.max(2, points.length));
+  const xLabelCount = Math.min(xLabels, Math.max(2, points.length));
   const xTicks =
     timeMax === timeMin
       ? [timeMin]
@@ -98,13 +115,21 @@ export function PriceHistoryChart({ items }: { items: PriceHistoryItem[] }) {
             </text>
           </g>
         ))}
-        {xTicks.map((tick) => (
+        {xTicks.map((tick, index) => (
           <text
             key={tick}
             className={styles.axisLabel}
             x={x(tick)}
             y={HEIGHT - 8}
-            textAnchor="middle"
+            textAnchor={
+              xTicks.length === 1
+                ? 'middle'
+                : index === 0
+                  ? 'start'
+                  : index === xTicks.length - 1
+                    ? 'end'
+                    : 'middle'
+            }
           >
             {formatMonthYear(new Date(tick), locale)}
           </text>
@@ -119,7 +144,7 @@ export function PriceHistoryChart({ items }: { items: PriceHistoryItem[] }) {
           const label = [
             formatDate(point.source.observedAt, locale),
             `${formatNumber(point.value, locale)} ₴`,
-            point.source.source,
+            priceSourceLabel(point.source.source, t),
             point.source.grade,
             point.source.isOwn ? t('card.legendOwn') : null,
             point.source.isSuspect ? t('card.legendSuspect') : null,
