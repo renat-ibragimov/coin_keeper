@@ -15,8 +15,11 @@ import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
+import { ExpensesPage } from '@/features/expenses/ExpensesPage';
+import { MissingPage } from '@/features/missing/MissingPage';
 import { SeriesDetailPage } from '@/features/series/SeriesDetailPage';
 import { SeriesListPage } from '@/features/series/SeriesListPage';
+import { SettingsPage } from '@/features/settings/SettingsPage';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 import { ToastProvider } from '@/shared/ui';
 
@@ -63,8 +66,10 @@ export function App() {
                     <Route path="/collection" element={<CollectionPage />} />
                     <Route path="/collection/new" element={<PurchaseFormPage />} />
                     <Route path="/collection/:id/edit" element={<PurchaseFormPage />} />
-                    <Route path="/missing" element={<ComingSoon titleKey="nav.missing" />} />
-                    <Route path="/settings" element={<ComingSoon titleKey="nav.settings" />} />
+                    <Route path="/missing" element={<MissingPage />} />
+                    <Route path="/expenses" element={<ExpensesPage />} />
+                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route path="/admin" element={<ComingSoon titleKey="settings.adminTitle" />} />
                   </Route>
                 </Route>
                 <Route path="*" element={<Navigate to="/" replace />} />

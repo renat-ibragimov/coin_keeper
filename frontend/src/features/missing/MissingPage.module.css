@@ -1,0 +1,58 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.toolbar {
+  display: grid;
+  grid-template-columns: minmax(160px, 1fr) minmax(180px, 1.2fr) auto auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.years {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.years > * {
+  width: 110px;
+}
+
+.dash {
+  color: var(--color-text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .tiles {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .years {
+    grid-column: 1 / -1;
+  }
+
+  .years > * {
+    flex: 1;
+    width: auto;
+  }
+}

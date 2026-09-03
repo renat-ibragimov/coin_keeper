@@ -15,6 +15,7 @@ const SECTIONS = [
   { to: '/series', key: 'nav.series' },
   { to: '/collection', key: 'nav.collection' },
   { to: '/missing', key: 'nav.missing' },
+  { to: '/expenses', key: 'nav.expenses' },
   { to: '/settings', key: 'nav.settings' },
 ] as const;
 

@@ -8,6 +8,8 @@ export interface AuthContextValue {
   ready: boolean;
   signIn: (email: string, password: string, remember: boolean) => Promise<void>;
   acceptSession: (session: SessionOut) => void;
+  /** Replace the cached profile after PATCH /auth/me. */
+  updateUser: (user: UserOut) => void;
   signOut: () => Promise<void>;
 }
 
