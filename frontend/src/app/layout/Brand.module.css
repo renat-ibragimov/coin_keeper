@@ -10,20 +10,12 @@
 .full {
   display: inline-flex;
   align-items: center;
-  padding: 3px 8px;
-  border-radius: var(--radius-md);
 }
 
 .fullImage {
   display: block;
   height: 52px;
   width: auto;
-}
-
-/* The wordmark is dark brown: on the dark theme it sits on a soft paper
-   backdrop instead of vanishing into the near-black surface. */
-:root[data-theme='dark'] .full {
-  background: color-mix(in srgb, #f2ecdf 92%, transparent);
 }
 
 /* Auth screens have room for a larger wordmark. */
