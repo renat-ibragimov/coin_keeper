@@ -3,27 +3,43 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { render, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import '@/shared/i18n';
 import en from '@/shared/i18n/en.json';
 import uk from '@/shared/i18n/uk.json';
+import { ThemeContext } from '@/shared/theme/themeContext';
+import type { Theme } from '@/shared/theme/themeContext';
 
 import { Brand } from './Brand';
 
+// jsdom has no matchMedia, so the theme is provided directly instead of via ThemeProvider.
+function renderWithTheme(ui: ReactElement, theme: Theme = 'light') {
+  return render(
+    <ThemeContext.Provider value={{ theme, toggleTheme: () => {} }}>
+      <MemoryRouter>{ui}</MemoryRouter>
+    </ThemeContext.Provider>,
+  );
+}
+
 describe('Brand', () => {
   it('renders the full logo with the brand name as alt text, linking to the overview', () => {
-    render(
-      <MemoryRouter>
-        <Brand />
-      </MemoryRouter>,
-    );
+    renderWithTheme(<Brand />);
     expect(screen.getByRole('img', { name: 'Bakost Numismatics' })).toHaveAttribute(
       'src',
       '/brand/logo-full-800.png',
     );
     expect(screen.getByRole('link', { name: 'Bakost Numismatics' })).toHaveAttribute('href', '/');
+  });
+
+  it('switches to the dark-theme wordmark file on the dark theme', () => {
+    renderWithTheme(<Brand />, 'dark');
+    expect(screen.getByRole('img', { name: 'Bakost Numismatics' })).toHaveAttribute(
+      'src',
+      '/brand/logo-full-dark-800.png',
+    );
   });
 
   it('keeps the old product name out of the interface strings', () => {

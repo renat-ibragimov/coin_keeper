@@ -7,6 +7,7 @@ Sources (the single source of truth, kept in git):
 
 Outputs (also committed: they are site statics, regenerate with `npm run brand`):
   public/brand/logo-full-{400,800,1600}.{webp,png}
+  public/brand/logo-full-dark-{400,800,1600}.{webp,png}  — the dark-theme variant
   public/brand/logo-mark-{128,256,512}.{webp,png}
   public/brand/favicon-32.png, apple-touch-icon.png (180, opaque),
   public/brand/icon-192.png, icon-512.png, icon-512-maskable.png (opaque, safe zone)
@@ -39,7 +40,18 @@ WEBP_FULL = {"quality": 72, "method": 6}
 WEBP_MARK = {"quality": 82, "method": 6}
 PNG = {"optimize": True}
 
-BUDGETS = {"logo-full-800.webp": 60 * 1024, "logo-mark-256.webp": 20 * 1024}
+BUDGETS = {
+    "logo-full-800.webp": 60 * 1024,
+    "logo-full-dark-800.webp": 60 * 1024,
+    "logo-mark-256.webp": 20 * 1024,
+}
+
+# Dark-theme wordmark: the source letters are dark brown and vanish on the
+# near-black surface. Pixels below this luminance band become cream (with a
+# little of their own tint kept), the gold bevels and the coin stay as drawn.
+DARK_BAND = (0.12, 0.42)
+DARK_TINT = 0.15
+CREAM = (237, 227, 204)
 
 
 def load_trimmed(name: str) -> Image.Image:
@@ -56,6 +68,23 @@ def squared(image: Image.Image) -> Image.Image:
     canvas = Image.new("RGBA", (side, side), (0, 0, 0, 0))
     canvas.paste(image, ((side - image.width) // 2, (side - image.height) // 2))
     return canvas
+
+
+def dark_variant(image: Image.Image) -> Image.Image:
+    """Lift the dark tones of the logo to cream so it reads on the dark theme."""
+    rgb = image.convert("RGB")
+    alpha = image.getchannel("A")
+    lo, hi = DARK_BAND
+
+    def keep(value: int) -> int:
+        t = min(1.0, max(0.0, (value / 255 - lo) / (hi - lo)))
+        return round(255 * t * t * (3 - 2 * t))  # smoothstep
+
+    mask = rgb.convert("L").point([keep(v) for v in range(256)])
+    light = Image.blend(Image.new("RGB", rgb.size, CREAM), rgb, DARK_TINT)
+    out = Image.composite(rgb, light, mask)
+    out.putalpha(alpha)
+    return out
 
 
 def fit_width(image: Image.Image, width: int) -> Image.Image:
@@ -81,8 +110,10 @@ def main() -> int:
     full = load_trimmed("logo-full.src.png")
     mark = squared(load_trimmed("logo-mark.src.png"))
 
+    full_dark = dark_variant(full)
     for width in FULL_WIDTHS:
         save_pair(fit_width(full, width), f"logo-full-{width}", WEBP_FULL)
+        save_pair(fit_width(full_dark, width), f"logo-full-dark-{width}", WEBP_FULL)
     for size in MARK_SIZES:
         save_pair(mark.resize((size, size), Image.Resampling.LANCZOS), f"logo-mark-{size}", WEBP_MARK)
 
