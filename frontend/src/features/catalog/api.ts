@@ -2,10 +2,13 @@ import { api, toQuery } from '@/shared/api/client';
 import type {
   CatalogCard,
   CatalogCollectionItem,
+  CatalogItemCreate,
   CatalogPage,
   CountryOut,
+  CurrencyOut,
   DenominationOut,
   PriceHistoryItem,
+  SeriesOut,
 } from '@/shared/api/types';
 
 import type { CatalogFilters } from './useCatalogFilters';
@@ -53,4 +56,16 @@ export function fetchPrices(itemId: number): Promise<PriceHistoryItem[]> {
 /** The current user's instances of one catalog item. */
 export function fetchOwnInstances(itemId: number): Promise<CatalogCollectionItem[]> {
   return api<CatalogCollectionItem[]>(`/catalog/${itemId}/collection-items`);
+}
+
+export function fetchSeries(countryId?: number): Promise<SeriesOut[]> {
+  return api<SeriesOut[]>(`/series${toQuery({ countryId })}`);
+}
+
+export function fetchCurrencies(): Promise<CurrencyOut[]> {
+  return api<CurrencyOut[]>('/currencies');
+}
+
+export function createCatalogItem(body: CatalogItemCreate): Promise<CatalogCard> {
+  return api<CatalogCard>('/catalog', { method: 'POST', body });
 }

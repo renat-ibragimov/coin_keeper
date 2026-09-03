@@ -11,6 +11,7 @@ import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
 import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
 import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
+import { CollectionPage } from '@/features/collection/CollectionPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 import { ToastProvider } from '@/shared/ui';
@@ -57,7 +58,7 @@ export function App() {
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
                     <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
                     <Route path="/series" element={<ComingSoon titleKey="nav.series" />} />
-                    <Route path="/collection" element={<ComingSoon titleKey="nav.collection" />} />
+                    <Route path="/collection" element={<CollectionPage />} />
                     <Route
                       path="/collection/new"
                       element={<ComingSoon titleKey="card.addPurchase" />}

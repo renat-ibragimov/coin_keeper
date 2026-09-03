@@ -26,3 +26,21 @@ export type ExchangeRateOut = components['schemas']['ExchangeRateOut'];
 
 export type PriceHistoryItem = components['schemas']['PriceHistoryItem'];
 export type CatalogCollectionItem = components['schemas']['CatalogCollectionItemOut'];
+
+export type CollectionItem = components['schemas']['CollectionItemOut'];
+export type CollectionItemCreate = components['schemas']['CollectionItemCreate'];
+export type CollectionItemUpdate = components['schemas']['CollectionItemUpdate'];
+export type CollectionPage = components['schemas']['Page_CollectionItemOut_'];
+
+export type CatalogItemCreate = components['schemas']['CatalogItemCreate'];
+
+export type SeriesProgress = components['schemas']['SeriesProgressOut'];
+export type SeriesSummary = components['schemas']['SeriesSummaryOut'];
+
+export type ExpenseOut = components['schemas']['ExpenseOut'];
+export type ExpenseCreate = components['schemas']['ExpenseCreate'];
+export type ExpenseUpdate = components['schemas']['ExpenseUpdate'];
+export type ExpenseCategory = components['schemas']['ExpenseCategory'];
+export type ExpensePage = components['schemas']['Page_ExpenseOut_'];
+export type ExpensesSummary = components['schemas']['ExpensesSummaryOut'];
+export type ExpenseCategorySummary = components['schemas']['ExpenseCategorySummary'];
