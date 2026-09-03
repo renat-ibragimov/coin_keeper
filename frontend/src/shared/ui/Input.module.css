@@ -36,6 +36,39 @@
   border-color: var(--color-danger);
 }
 
+/* The trailing control sits over the input only — never over the hint. */
+.control {
+  position: relative;
+}
+
+.withTrailing {
+  padding-right: 40px;
+}
+
+.trailing {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  padding-right: 6px;
+}
+
+.trailing button {
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 2px 6px;
+  font-family: inherit;
+}
+
+.trailing button:hover {
+  color: var(--color-text);
+}
+
 .error {
   font-size: 13px;
   color: var(--color-danger);

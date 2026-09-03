@@ -7,6 +7,7 @@ import '@/shared/i18n';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { CoinImage } from './CoinImage';
+import { Input } from './Input';
 import { pageItems } from './pageItems';
 import { Pagination } from './Pagination';
 import { Toggle } from './Toggle';
@@ -86,5 +87,27 @@ describe('Pagination', () => {
   it('renders nothing for a single page', () => {
     const { container } = render(<Pagination page={1} pageCount={1} onChange={() => {}} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('Input with a trailing control', () => {
+  it('anchors the control to the input, not to the hint or error below it', () => {
+    render(
+      <Input
+        label="New password"
+        hint="At least 10 characters"
+        trailing={<button type="button">reveal</button>}
+      />,
+    );
+    const control = screen.getByTestId('input-control');
+    expect(control).toContainElement(screen.getByLabelText('New password'));
+    expect(control).toContainElement(screen.getByRole('button', { name: 'reveal' }));
+    expect(control).not.toHaveTextContent('At least 10 characters');
+    expect(screen.getByText('At least 10 characters')).toBeInTheDocument();
+  });
+
+  it('renders no extra wrapper without a trailing control', () => {
+    render(<Input label="Email" hint="hint" />);
+    expect(screen.queryByTestId('input-control')).toBeNull();
   });
 });

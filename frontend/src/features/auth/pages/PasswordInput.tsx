@@ -4,24 +4,25 @@ import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/shared/ui';
 
-import styles from './authForms.module.css';
+type PasswordInputProps = Omit<ComponentProps<typeof Input>, 'type' | 'trailing'>;
 
-type PasswordInputProps = Omit<ComponentProps<typeof Input>, 'type'>;
-
+/** A password field with a reveal toggle anchored to the input itself. */
 export function PasswordInput(props: PasswordInputProps) {
   const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   return (
-    <div className={styles.passwordField}>
-      <Input {...props} type={visible ? 'text' : 'password'} />
-      <button
-        type="button"
-        className={styles.passwordReveal}
-        onClick={() => setVisible((v) => !v)}
-        aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}
-      >
-        {visible ? '◡' : '👁'}
-      </button>
-    </div>
+    <Input
+      {...props}
+      type={visible ? 'text' : 'password'}
+      trailing={
+        <button
+          type="button"
+          onClick={() => setVisible((v) => !v)}
+          aria-label={visible ? t('auth.hidePassword') : t('auth.showPassword')}
+        >
+          {visible ? '◡' : '👁'}
+        </button>
+      }
+    />
   );
 }

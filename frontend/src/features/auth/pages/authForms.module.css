@@ -73,26 +73,6 @@
   font-size: 14.5px;
 }
 
-.passwordField {
-  position: relative;
-}
-
-.passwordReveal {
-  position: absolute;
-  right: 10px;
-  bottom: 9px;
-  border: none;
-  background: none;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 2px 6px;
-}
-
-.passwordReveal:hover {
-  color: var(--color-text);
-}
-
 /* Honeypot: invisible to people, present in the DOM for bots (docs/07-auth). */
 .honeypot {
   position: absolute;
