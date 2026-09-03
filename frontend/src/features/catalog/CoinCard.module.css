@@ -33,6 +33,16 @@
   justify-content: center;
 }
 
+/* The whole media area opens the card; the badges stay on top of it. */
+.mediaLink {
+  display: flex;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Frames for CoinImage: it fills them with a photo or with the placeholder. */
 .image {
   width: 50%;
@@ -68,6 +78,15 @@
 .title {
   font-size: 18px;
   line-height: 1.3;
+}
+
+.titleLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.titleLink:hover {
+  color: var(--color-accent);
 }
 
 .meta {

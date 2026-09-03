@@ -1,10 +1,16 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render as renderBare, screen, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import '@/shared/i18n';
 import type { CatalogListItem } from '@/shared/api/types';
 
 import { CoinCard } from './CoinCard';
+
+function render(ui: ReactElement) {
+  return renderBare(<MemoryRouter>{ui}</MemoryRouter>);
+}
 
 function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
   return {
@@ -38,6 +44,14 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
     ...overrides,
   };
 }
+
+describe('CoinCard', () => {
+  it('links the title to the coin page and applies the title rule', () => {
+    render(<CoinCard item={makeItem({ titleUk: 'Сікорський', title: 'Sikorsky' })} />);
+    const heading = screen.getByRole('heading', { name: 'Сікорський' });
+    expect(within(heading).getByRole('link')).toHaveAttribute('href', '/catalog/1');
+  });
+});
 
 describe('CoinCard images', () => {
   it('shows the placeholder when the item has no photo', () => {
@@ -84,7 +98,7 @@ describe('CoinCard images', () => {
       <CoinCard item={makeItem({ sourceUrl: 'https://ucoin.net/coin/ua-5uah-2021' })} />,
     );
 
-    const link = screen.getByRole('link');
+    const link = screen.getByRole('link', { name: /Джерело/ });
     expect(link).toHaveAttribute('href', 'https://ucoin.net/coin/ua-5uah-2021');
     expect(container.querySelector('img')).toBeNull();
   });

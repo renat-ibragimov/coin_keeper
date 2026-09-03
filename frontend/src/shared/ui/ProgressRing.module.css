@@ -1,0 +1,30 @@
+.ring {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.track {
+  fill: none;
+  stroke: var(--color-border);
+}
+
+.value {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 400ms ease;
+}
+
+.label {
+  position: relative;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+}

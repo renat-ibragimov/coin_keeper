@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
+import { coinTitle } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { Badge, CoinImage } from '@/shared/ui';
 
@@ -25,11 +27,15 @@ export function CoinCard({ item }: { item: CatalogListItem }) {
   const { t, i18n } = useTranslation();
   const price = formatUah(item.marketPriceUah, i18n.language);
   const owned = item.quantityOwned > 0;
+  const title = coinTitle(item);
+  const cardUrl = `/catalog/${item.id}`;
 
   return (
     <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
       <div className={styles.media}>
-        <CoinImages item={item} />
+        <Link to={cardUrl} className={styles.mediaLink} aria-label={title} tabIndex={-1}>
+          <CoinImages item={item} />
+        </Link>
         <span className={styles.mediaBadges}>
           {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
           {item.isArchived ? <Badge tone="warning">{t('catalog.badgeArchived')}</Badge> : null}
@@ -37,7 +43,11 @@ export function CoinCard({ item }: { item: CatalogListItem }) {
       </div>
       <div className={styles.body}>
         {item.denomination ? <div className={styles.denomination}>{item.denomination}</div> : null}
-        <h3 className={styles.title}>{item.title}</h3>
+        <h3 className={styles.title}>
+          <Link to={cardUrl} className={styles.titleLink}>
+            {title}
+          </Link>
+        </h3>
         <div className={styles.meta}>
           {item.country} · <span className="tabular">{item.year}</span>
         </div>

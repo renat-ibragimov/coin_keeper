@@ -23,7 +23,10 @@
     "comingSoon": "Цей розділ з'явиться в наступній частині.",
     "comingSoonTitle": "Скоро",
     "backToCatalog": "Перейти до каталогу",
-    "or": "або"
+    "or": "або",
+    "breadcrumbs": "Навігаційний шлях",
+    "close": "Закрити",
+    "back": "Назад"
   },
   "pagination": {
     "label": "Сторінки",

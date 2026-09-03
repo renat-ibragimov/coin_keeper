@@ -1,6 +1,8 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
+import { coinTitle } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { Badge, CoinImage } from '@/shared/ui';
 
@@ -76,7 +78,9 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                   <div className={styles.coinCell}>
                     <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
                     <span>
-                      <span className={styles.coinTitle}>{item.title}</span>
+                      <Link to={`/catalog/${item.id}`} className={styles.coinTitle}>
+                        {coinTitle(item)}
+                      </Link>
                       <span className={styles.coinBadges}>
                         {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
                         {item.isArchived ? (

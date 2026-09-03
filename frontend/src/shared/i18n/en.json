@@ -23,7 +23,10 @@
     "comingSoon": "This section arrives in the next part.",
     "comingSoonTitle": "Coming soon",
     "backToCatalog": "Go to the catalog",
-    "or": "or"
+    "or": "or",
+    "breadcrumbs": "Breadcrumbs",
+    "close": "Close",
+    "back": "Back"
   },
   "pagination": {
     "label": "Pages",

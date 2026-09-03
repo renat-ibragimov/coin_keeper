@@ -12,6 +12,8 @@ interface CoinImageProps {
   alt: string;
   /** Sizing and shape of the frame — the image and the placeholder fill it. */
   className?: string;
+  /** `cover` crops to fill the frame (lists); `contain` shows the whole photo (the card). */
+  fit?: 'cover' | 'contain';
 }
 
 /**
@@ -23,7 +25,7 @@ interface CoinImageProps {
  * come from the NBU in stage 6); a missing and an unreachable photo simply look
  * the same, and neither shows a broken <img>.
  */
-export function CoinImage({ src, alt, className }: CoinImageProps) {
+export function CoinImage({ src, alt, className, fit = 'cover' }: CoinImageProps) {
   // Remembering the URL that failed rather than a plain flag gives the reset
   // for free when the item changes, and keeps one failure final: the error
   // handler never rewrites src, so a dead URL is requested once, not in a loop.
@@ -45,7 +47,7 @@ export function CoinImage({ src, alt, className }: CoinImageProps) {
         alt={alt}
         loading="lazy"
         decoding="async"
-        className={styles.image}
+        className={fit === 'contain' ? `${styles.image} ${styles.contain}` : styles.image}
         onError={() => setFailedSrc(src)}
       />
     </span>

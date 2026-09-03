@@ -24,20 +24,31 @@ export function EmptyState({ title, description, actions, icon = '◎' }: StateP
   );
 }
 
-export function ErrorState({ detail, onRetry }: { detail?: string; onRetry?: () => void }) {
+interface ErrorStateProps {
+  /** Overrides the generic "something went wrong" heading, e.g. "Item not found". */
+  title?: ReactNode;
+  detail?: ReactNode;
+  onRetry?: () => void;
+  actions?: ReactNode;
+}
+
+export function ErrorState({ title, detail, onRetry, actions }: ErrorStateProps) {
   const { t } = useTranslation();
   return (
     <div className={styles.state} role="alert">
       <div className={styles.icon} aria-hidden="true">
         ⚠
       </div>
-      <div className={styles.title}>{t('errors.title')}</div>
+      <div className={styles.title}>{title ?? t('errors.title')}</div>
       <p className={styles.description}>{detail ?? t('errors.generic')}</p>
-      {onRetry ? (
+      {onRetry || actions ? (
         <div className={styles.actions}>
-          <Button variant="secondary" onClick={onRetry}>
-            {t('errors.retry')}
-          </Button>
+          {onRetry ? (
+            <Button variant="secondary" onClick={onRetry}>
+              {t('errors.retry')}
+            </Button>
+          ) : null}
+          {actions}
         </div>
       ) : null}
     </div>
