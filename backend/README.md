@@ -97,6 +97,65 @@ promote an account whose address has not been confirmed.
 No email address or password is ever hardcoded, in code, tests or examples:
 the repository is public.
 
+## Ukrainian sources reconnaissance (stage 4.5, part A)
+
+Read-only survey of the three sources on Ukrainian coins (the NBU catalogue,
+ua-coins.info, the Ukrainian Wikipedia lists) against the shared catalogue.
+Findings and the page structures it established: `../docs/05-integrations.md`,
+section 8. Nothing is written to the database or to MinIO; the outputs are the
+report, three source indexes next to it, and the page cache.
+
+The parsers live in `app/ukraine_recon/`; `scripts/recon_ukraine.py` is the
+command line. It reads the database through the same `DATABASE_URL` as the API,
+so it runs inside the api container, the way the migration does.
+
+### Run it on the server
+
+`/reports` (the `migration-reports` directory, uid 1001) already exists from
+the migration runbook; the cache goes next to the report so a second run does
+not hit the sites again.
+
+```bash
+docker compose run --rm \
+  -v "$PWD/migration-reports:/reports" \
+  api python scripts/recon_ukraine.py \
+    --report /reports/recon.json \
+    --cache-dir /reports/ukraine-cache \
+    --catalog-export /reports/recon-catalog.json
+```
+
+Budget of a cold run: 2 pages of ua-coins (the all-years table in Ukrainian
+and in Russian) plus its series and plan pages, 12 POSTs to the NBU search,
+3 Wikipedia pages, robots and terms, and up to ~150 HEAD requests for images;
+with the 450 ms pause per host that is a few minutes. Progress goes to stderr,
+the summary to stdout.
+
+Flags:
+
+- `--ua-coins auto|live|wayback` — ua-coins.info does not answer from outside
+  Ukraine. `auto` (default) tries the site and falls back to the Wayback
+  Machine copy; the report says which one it used (`sources.ua_coins.access`).
+  **Whether the site answers from Hetzner is the first thing to read in the
+  report.**
+- `--catalog-export FILE` writes the catalogue side (shared Ukrainian items and
+  series, no personal data) so the triangulation can be re-run locally with
+  `--catalog-from FILE` and without a database; `--skip-catalog` runs the
+  three-source comparison alone.
+- `--limit-years N` — a trial on the N most recent years (NBU is asked with a
+  date filter, the others are cut after parsing).
+- `--skip-images`, `--image-sample N` (default 50), `--pause SECONDS`.
+
+Exit codes: `0` fine, `2` bad arguments, `3` no source could be read.
+
+### What to read in the report
+
+`recon.json` and the stdout summary: the three index sizes and how each was
+reached; the year × source table with its flags; series × source with the
+unmapped series to add to `app/ukraine_recon/series_map.json`; matches by
+strategy A/B/C/C1 with conflicts; our items without a match; candidates to add
+(coins in two or more sources that we lack); image availability and sizes; the
+price ratio ua-coins/ours; title differences; the quoted terms of use.
+
 ## Legacy data migration
 
 Moves the desktop SQLite database into PostgreSQL. Specification:
