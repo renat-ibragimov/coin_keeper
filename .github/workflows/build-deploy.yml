@@ -36,6 +36,13 @@ on:
         description: Services to pull and restart on the server.
         type: string
         default: api
+      frontend-deploy-path:
+        description: >-
+          Directory on the server the reverse proxy serves the static bundle
+          from; empty string skips the static deploy. Must be writable by
+          DEPLOY_USER (docs/10-infra.md, "Фронтенд").
+        type: string
+        default: ""
     secrets:
       DEPLOY_SSH_KEY:
         required: false
@@ -122,9 +129,9 @@ jobs:
 
   # --------------------------------------------------------------- frontend
   # The static bundle is served by Caddy from disk, so no image is built for
-  # it; this job keeps a broken build from reaching main (docs/10-infra.md,
-  # "Фронтенд"). The dist artifact is what a manual deploy ships.
-  frontend-check:
+  # it; this job keeps a broken build from reaching main and produces the
+  # dist artifact the deploy-frontend job ships (docs/10-infra.md, "Фронтенд").
+  frontend-build:
     if: inputs.frontend-path != ''
     runs-on: ubuntu-latest
     defaults:
@@ -165,9 +172,9 @@ jobs:
 
   # ------------------------------------------------------------------ image
   build:
-    needs: [check, frontend-check]
-    # frontend-check may be skipped by input; a skipped job must not block.
-    if: always() && needs.check.result == 'success' && (needs.frontend-check.result == 'success' || needs.frontend-check.result == 'skipped')
+    needs: [check, frontend-build]
+    # frontend-build may be skipped by input; a skipped job must not block.
+    if: always() && needs.check.result == 'success' && (needs.frontend-build.result == 'success' || needs.frontend-build.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -256,3 +263,50 @@ jobs:
                sleep 5
              done
              echo 'health check failed'; docker compose logs --tail 50 api; exit 1"
+
+  # -------------------------------------------------------- static frontend
+  # Runs after the API is up so a bundle never lands ahead of the schema it
+  # talks to. The artifact goes to a staging directory under the deploy user
+  # first, then into the directory Caddy serves — rsync with --delay-updates
+  # writes every changed file in one final pass, so a visitor never sees a
+  # half-copied bundle. The target directory stays in place (the proxy binds
+  # it), only its contents change.
+  deploy-frontend:
+    needs: deploy
+    if: inputs.deploy && inputs.frontend-path != '' && inputs.frontend-deploy-path != ''
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-frontend-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: dist
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Upload to the staging directory
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          test -f dist/index.html
+          rsync -az --delete -e "ssh -o BatchMode=yes" dist/ "$USER@$HOST:frontend-dist/"
+
+      - name: Publish
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          TARGET: ${{ inputs.frontend-deploy-path }}
+        run: |
+          ssh -o BatchMode=yes "$USER@$HOST" \
+            "test -w '$TARGET' || { echo '$TARGET is not writable by $USER'; exit 1; } &&
+             rsync -a --delete --delay-updates ~/frontend-dist/ '$TARGET/' &&
+             test -f '$TARGET/index.html' && echo 'frontend published'"

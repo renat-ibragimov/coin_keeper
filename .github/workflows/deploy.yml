@@ -24,4 +24,6 @@ jobs:
       node-version: "22"
       # Only main reaches the server; pull requests stop after build.
       deploy: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+      # The central Caddy serves the bundle from here (docs/10-infra.md).
+      frontend-deploy-path: /srv/coinkeeper/frontend
     secrets: inherit
