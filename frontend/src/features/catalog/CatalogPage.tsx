@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
+import { useDismissable } from '@/shared/lib/useDismissable';
 import { Button, EmptyState, ErrorState, Pagination, Select, Skeleton, Tabs } from '@/shared/ui';
 
 import { fetchCatalog, fetchCountries, fetchDenominations, PAGE_SIZE } from './api';
@@ -29,6 +30,8 @@ export function CatalogPage() {
   const { t } = useTranslation();
   const { filters, update, reset } = useCatalogFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // The overlay handles the outside press itself; Escape and navigation come from the hook.
+  useDismissable(drawerOpen, () => setDrawerOpen(false));
 
   const catalogQuery = useQuery({
     queryKey: ['catalog', filters],

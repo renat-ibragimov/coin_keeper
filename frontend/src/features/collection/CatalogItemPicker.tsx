@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { searchCatalog } from '@/features/catalog/api';
 import type { CatalogListItem } from '@/shared/api/types';
 import { coinTitle } from '@/shared/lib/coinTitle';
+import { useDismissable } from '@/shared/lib/useDismissable';
 import { Badge, CoinImage, Input, Spinner } from '@/shared/ui';
 
 import styles from './CatalogItemPicker.module.css';
@@ -18,6 +19,9 @@ export function CatalogItemPicker({ onSelect }: CatalogItemPickerProps) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
+  const [listOpen, setListOpen] = useState(true);
+  const root = useRef<HTMLDivElement>(null);
+  useDismissable(listOpen, () => setListOpen(false), { inside: [root], routeChange: false });
 
   useEffect(() => {
     const timer = setTimeout(() => setQuery(text.trim()), 300);
@@ -31,18 +35,23 @@ export function CatalogItemPicker({ onSelect }: CatalogItemPickerProps) {
   });
 
   return (
-    <div className={styles.picker}>
+    <div className={styles.picker} ref={root}>
       <Input
         type="search"
         autoFocus
+        onFocus={() => setListOpen(true)}
         label={t('purchase.pickTitle')}
         hint={t('purchase.pickHint')}
         placeholder={t('catalog.searchPlaceholder')}
         value={text}
-        onChange={(event) => setText(event.target.value)}
+        onChange={(event) => {
+          setText(event.target.value);
+          setListOpen(true);
+        }}
         aria-controls="catalog-picker-results"
+        aria-expanded={listOpen && query.length >= 2}
       />
-      {query.length >= 2 ? (
+      {listOpen && query.length >= 2 ? (
         <div id="catalog-picker-results" className={styles.results} role="listbox">
           {results.isPending ? (
             <div className={styles.status}>

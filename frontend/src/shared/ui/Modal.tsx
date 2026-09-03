@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { useDismissable } from '@/shared/lib/useDismissable';
+
 import { Button } from './Button';
 import styles from './Modal.module.css';
 
@@ -19,19 +21,16 @@ interface ModalProps {
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
   const { t } = useTranslation();
 
+  useDismissable(open, onClose);
+
   useEffect(() => {
     if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = previousOverflow;
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return (

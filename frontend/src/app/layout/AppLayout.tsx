@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
+import { useDismissable } from '@/shared/lib/useDismissable';
 import { Button } from '@/shared/ui';
 
 import { Brand } from './Brand';
@@ -30,6 +31,9 @@ export function AppLayout() {
   const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
+  const moreSheet = useRef<HTMLDivElement>(null);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  useDismissable(moreOpen, () => setMoreOpen(false), { inside: [moreSheet, moreButton] });
 
   return (
     <div className={styles.shell}>
@@ -76,6 +80,7 @@ export function AppLayout() {
           </NavLink>
         ))}
         <button
+          ref={moreButton}
           type="button"
           className={[styles.bottomLink, moreOpen ? styles.bottomLinkActive : ''].join(' ')}
           onClick={() => setMoreOpen((open) => !open)}
@@ -86,7 +91,7 @@ export function AppLayout() {
       </nav>
 
       {moreOpen ? (
-        <div className={styles.moreSheet}>
+        <div ref={moreSheet} className={styles.moreSheet}>
           {SECTIONS.filter((section) => !MOBILE_PRIMARY.includes(section.to)).map((section) => (
             <NavLink
               key={section.to}
