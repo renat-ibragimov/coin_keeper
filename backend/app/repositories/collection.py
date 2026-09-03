@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import ColumnElement, func, select
@@ -15,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import CatalogItem, CoinSeries, CollectionItem, Country, Denomination, Expense
 from app.models.enums import ExpenseCategory
-from app.repositories.catalog import catalog_search_condition
+from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
 
 
 @dataclass
@@ -34,6 +35,7 @@ class CollectionRow:
     country: str
     series_name: str | None
     denomination: str | None
+    market_price_uah: Decimal | None = None
 
 
 def _total_uah() -> ColumnElement[Any]:
@@ -78,60 +80,48 @@ class CollectionRepository:
         ordering = column.desc().nulls_last() if descending else column.asc().nulls_last()
 
         query = (
-            select(
-                CollectionItem,
-                CatalogItem,
-                Country.name_original.label("country"),
-                CoinSeries.name_original.label("series_name"),
-                Denomination.label_original.label("denomination"),
-            )
-            .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
-            .join(Country, Country.id == CatalogItem.country_id)
-            .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
-            .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
+            self._row_query()
             .where(*conditions)
             .order_by(ordering, CollectionItem.id)
             .limit(limit)
             .offset(offset)
         )
         result = await self._session.execute(query)
-        rows = [
-            CollectionRow(
-                instance=row.CollectionItem,
-                catalog_item=row.CatalogItem,
-                country=row.country,
-                series_name=row.series_name,
-                denomination=row.denomination,
-            )
-            for row in result
-        ]
-        return rows, total
+        return [self._to_row(row) for row in result], total
 
-    async def get_row(self, item_id: int) -> CollectionRow | None:
-        query = (
+    def _row_query(self) -> Any:
+        return (
             select(
                 CollectionItem,
                 CatalogItem,
                 Country.name_original.label("country"),
                 CoinSeries.name_original.label("series_name"),
                 Denomination.label_original.label("denomination"),
+                latest_price_uah_for(CatalogItem.id, self._owner_id).label("market_price_uah"),
             )
             .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
             .join(Country, Country.id == CatalogItem.country_id)
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
-            .where(CollectionItem.id == item_id, CollectionItem.owner_id == self._owner_id)
         )
-        row = (await self._session.execute(query)).first()
-        if row is None:
-            return None
+
+    @staticmethod
+    def _to_row(row: Any) -> CollectionRow:
         return CollectionRow(
             instance=row.CollectionItem,
             catalog_item=row.CatalogItem,
             country=row.country,
             series_name=row.series_name,
             denomination=row.denomination,
+            market_price_uah=row.market_price_uah,
         )
+
+    async def get_row(self, item_id: int) -> CollectionRow | None:
+        query = self._row_query().where(
+            CollectionItem.id == item_id, CollectionItem.owner_id == self._owner_id
+        )
+        row = (await self._session.execute(query)).first()
+        return None if row is None else self._to_row(row)
 
     async def list_for_item(self, catalog_item_id: int) -> Sequence[CollectionItem]:
         result = await self._session.execute(

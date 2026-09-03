@@ -35,3 +35,10 @@ class SeriesSummaryOut(CamelModel):
     purchase_total_uah: Money
     current_value_uah: Money
     unpriced_missing: int
+
+
+class SeriesProgressOut(CamelModel):
+    """A series with its summary — one request for the whole series screen."""
+
+    series: SeriesOut
+    summary: SeriesSummaryOut

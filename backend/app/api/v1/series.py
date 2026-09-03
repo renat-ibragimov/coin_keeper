@@ -8,7 +8,7 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, DbSession
 from app.api.errors import ProblemError
-from app.schemas.series import SeriesCreate, SeriesOut, SeriesSummaryOut
+from app.schemas.series import SeriesCreate, SeriesOut, SeriesProgressOut, SeriesSummaryOut
 from app.services.series import (
     DuplicateSeriesError,
     SeriesForbiddenError,
@@ -51,6 +51,15 @@ async def create_series(session: DbSession, user: CurrentUser, payload: SeriesCr
         raise ProblemError(
             status.HTTP_409_CONFLICT, "series-exists", "Conflict", exc.detail
         ) from exc
+
+
+@router.get("/summary")
+async def series_progress(
+    session: DbSession,
+    user: CurrentUser,
+    country_id: Annotated[int | None, Query(alias="countryId")] = None,
+) -> list[SeriesProgressOut]:
+    return await SeriesService(session, user).list_progress(country_id)
 
 
 @router.get("/{series_id}/summary")

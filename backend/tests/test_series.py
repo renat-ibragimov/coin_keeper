@@ -175,6 +175,50 @@ async def test_summary_percent_never_exceeds_100(
     assert summary["completionPercent"] == 100.0
 
 
+async def test_progress_lists_every_series_with_its_summary(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    refs = ctx.refs
+    owned = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018, series=refs.fauna
+    )
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Сова", year=2017, series=refs.fauna
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned, price="100.00")
+
+    progress = (
+        await client.get(
+            f"/api/v1/series/summary?countryId={refs.ukraine.id}", headers=auth(ctx.token_a)
+        )
+    ).json()
+    by_name = {row["series"]["name"]: row["summary"] for row in progress}
+    assert by_name[refs.fauna.name_original] == {
+        "total": 2,
+        "owned": 1,
+        "missing": 1,
+        "completionPercent": 50.0,
+        "purchaseTotalUah": "100.00",
+        "currentValueUah": "0.00",
+        "unpricedMissing": 1,
+    }
+    # Every series of the country is listed, even the ones without items.
+    assert len(progress) == len(
+        (
+            await client.get(
+                f"/api/v1/series?countryId={refs.ukraine.id}", headers=auth(ctx.token_a)
+            )
+        ).json()
+    )
+
+    other_country = (
+        await client.get(
+            f"/api/v1/series/summary?countryId={refs.usa.id}", headers=auth(ctx.token_a)
+        )
+    ).json()
+    assert refs.fauna.name_original not in {row["series"]["name"] for row in other_country}
+
+
 async def test_summary_unknown_series_404(client: AsyncClient, ctx: SimpleNamespace) -> None:
     response = await client.get("/api/v1/series/999999/summary", headers=auth(ctx.token_a))
     assert response.status_code == 404

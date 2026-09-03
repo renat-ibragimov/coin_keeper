@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import CoinSeries, Country, User
 from app.models.enums import UserRole
 from app.repositories.series import SeriesRepository
-from app.schemas.series import SeriesCreate, SeriesOut, SeriesSummaryOut
+from app.schemas.series import SeriesCreate, SeriesOut, SeriesProgressOut, SeriesSummaryOut
 
 
 class SeriesError(Exception):
@@ -79,6 +79,17 @@ class SeriesService:
     async def summary(self, series_id: int) -> SeriesSummaryOut:
         if await self._repo.get(series_id) is None:
             raise SeriesNotFoundError
+        return await self._summary_of(series_id)
+
+    async def list_progress(self, country_id: int | None) -> list[SeriesProgressOut]:
+        """Every series (of a country) with its summary; the list is small,
+        so the per-series aggregate is simply run for each of them."""
+        return [
+            SeriesProgressOut(series=_out(series), summary=await self._summary_of(series.id))
+            for series in await self._repo.list_series(country_id)
+        ]
+
+    async def _summary_of(self, series_id: int) -> SeriesSummaryOut:
         data = await self._repo.summary(series_id)
         percent = 0.0 if data.total == 0 else round(data.owned / data.total * 100, 1)
         return SeriesSummaryOut(

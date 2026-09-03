@@ -13,7 +13,7 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import CollectionItem, Currency, Expense, User
+from app.models import CollectionItem, Currency, Expense, MediaFile, User
 from app.models.enums import ExpenseCategory, UserRole
 from app.repositories.catalog import CatalogRepository
 from app.repositories.collection import (
@@ -21,6 +21,7 @@ from app.repositories.collection import (
     CollectionRepository,
     CollectionRow,
 )
+from app.repositories.media import MediaRepository
 from app.repositories.rates import RateRepository
 from app.schemas.collection import (
     CollectionItemCreate,
@@ -28,6 +29,7 @@ from app.schemas.collection import (
     CollectionItemUpdate,
 )
 from app.services.catalog import display_title
+from app.services.media_urls import CatalogImages, MediaUrlBuilder
 
 
 class CollectionError(Exception):
@@ -68,12 +70,17 @@ class CollectionService:
             session, user_id=user.id, is_admin=user.role == UserRole.ADMIN
         )
         self._rates = RateRepository(session)
+        self._media = MediaRepository(session, user_id=user.id)
+        self._urls = MediaUrlBuilder()
 
     async def list_collection(
         self, filters: CollectionFilters, *, limit: int, offset: int
     ) -> tuple[list[CollectionItemOut], int]:
         rows, total = await self._repo.list_page(filters, limit=limit, offset=offset)
-        return [self._row_out(row) for row in rows], total
+        images = await self._images_for([row.catalog_item.id for row in rows])
+        return [
+            self._row_out(row, images.get(row.catalog_item.id, CatalogImages())) for row in rows
+        ], total
 
     async def create(self, payload: CollectionItemCreate) -> CollectionItemOut:
         item = await self._catalog.get_visible(payload.catalog_item_id)
@@ -150,7 +157,19 @@ class CollectionService:
     async def _get_out(self, item_id: int) -> CollectionItemOut:
         row = await self._repo.get_row(item_id)
         assert row is not None
-        return self._row_out(row)
+        images = await self._images_for([row.catalog_item.id])
+        return self._row_out(row, images.get(row.catalog_item.id, CatalogImages()))
+
+    async def _images_for(self, item_ids: list[int]) -> dict[int, CatalogImages]:
+        """Same visibility rules as the catalog listing (docs/06-media-storage.md)."""
+        files = await self._media.visible_for_catalog_items(item_ids)
+        by_item: dict[int, list[MediaFile]] = {}
+        for media in files:
+            if media.catalog_item_id is not None:
+                by_item.setdefault(media.catalog_item_id, []).append(media)
+        return {
+            item_id: self._urls.pick_catalog_images(items) for item_id, items in by_item.items()
+        }
 
     async def _resolve_rate(self, currency: str, on_date: date) -> Decimal:
         if await self._session.get(Currency, currency) is None:
@@ -189,7 +208,7 @@ class CollectionService:
         expense.expense_date = instance.acquisition_date
         expense.vendor = instance.seller
 
-    def _row_out(self, row: CollectionRow) -> CollectionItemOut:
+    def _row_out(self, row: CollectionRow, images: CatalogImages) -> CollectionItemOut:
         instance = row.instance
         item = row.catalog_item
         return CollectionItemOut(
@@ -213,4 +232,6 @@ class CollectionService:
             * (instance.purchase_rate_uah or Decimal(1))
             * instance.quantity,
             notes=instance.notes,
+            thumbnail_url=images.thumbnail_url,
+            market_price_uah=row.market_price_uah,
         )

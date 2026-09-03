@@ -12,11 +12,12 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
-from app.models import CollectionItem, Expense
+from app.models import CatalogItem, CollectionItem, Expense
 from app.models.enums import ExpenseCategory
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_rate,
+    add_snapshot,
     make_catalog_item,
     seed_reference,
     user_id_by_email,
@@ -356,3 +357,35 @@ async def test_listing_filters_and_sorting(
 
     by_total = await client.get("/api/v1/collection?sort=total&order=desc", headers=headers)
     assert [row["totalUah"] for row in by_total.json()["items"]] == ["300.00", "20.00"]
+
+
+async def test_listing_carries_catalog_context(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The collection screen shows a photo and the current valuation per
+    instance without asking the catalog again: the latest visible price and
+    the visible thumbnail travel with each row."""
+    headers = auth(ctx.token_a)
+    created = await client.post(
+        "/api/v1/collection",
+        json={
+            "catalogItemId": ctx.item_id,
+            "quantity": 2,
+            "price": "300.00",
+            "currency": "UAH",
+            "purchaseDate": "2024-01-10",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201
+    assert created.json()["marketPriceUah"] is None
+    assert created.json()["thumbnailUrl"] is None
+
+    item = await db_session.get(CatalogItem, ctx.item_id)
+    assert item is not None
+    await add_snapshot(db_session, item, "77777.00", is_suspect=True)
+    await add_snapshot(db_session, item, "450.00")
+
+    listed = (await client.get("/api/v1/collection", headers=headers)).json()
+    assert listed["items"][0]["marketPriceUah"] == "450.00"
+    assert "thumbnailUrl" in listed["items"][0]

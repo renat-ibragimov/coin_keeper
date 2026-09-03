@@ -433,6 +433,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/series/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Series Progress */
+        get: operations["series_progress_api_v1_series_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/series/{series_id}/summary": {
         parameters: {
             query?: never;
@@ -915,6 +932,10 @@ export interface components {
             totalUah: string;
             /** Notes */
             notes: string | null;
+            /** Thumbnailurl */
+            thumbnailUrl?: string | null;
+            /** Marketpriceuah */
+            marketPriceUah?: string | null;
         };
         /** CollectionItemUpdate */
         CollectionItemUpdate: {
@@ -1296,6 +1317,14 @@ export interface components {
             startYear: number | null;
             /** Endyear */
             endYear: number | null;
+        };
+        /**
+         * SeriesProgressOut
+         * @description A series with its summary — one request for the whole series screen.
+         */
+        SeriesProgressOut: {
+            series: components["schemas"]["SeriesOut"];
+            summary: components["schemas"]["SeriesSummaryOut"];
         };
         /** SeriesSummaryOut */
         SeriesSummaryOut: {
@@ -2386,6 +2415,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeriesOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    series_progress_api_v1_series_summary_get: {
+        parameters: {
+            query?: {
+                countryId?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesProgressOut"][];
                 };
             };
             /** @description Validation Error */

@@ -30,6 +30,10 @@ class CollectionItemOut(CamelModel):
     rate_uah: Rate | None
     total_uah: Money
     notes: str | None
+    # Catalog context the collection screen needs without a second request:
+    # the visible thumbnail and the latest visible market price of the item.
+    thumbnail_url: str | None = None
+    market_price_uah: Money | None = None
 
 
 class CollectionItemCreate(CamelModel):
