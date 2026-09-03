@@ -359,6 +359,28 @@ async def test_listing_filters_and_sorting(
     assert [row["totalUah"] for row in by_total.json()["items"]] == ["300.00", "20.00"]
 
 
+async def test_get_single_instance_is_owner_only(client: AsyncClient, ctx: SimpleNamespace) -> None:
+    created = await client.post(
+        "/api/v1/collection",
+        json={
+            "catalogItemId": ctx.item_id,
+            "quantity": 1,
+            "price": "300.00",
+            "currency": "UAH",
+            "purchaseDate": "2024-01-10",
+        },
+        headers=auth(ctx.token_a),
+    )
+    item_id = created.json()["id"]
+
+    own = await client.get(f"/api/v1/collection/{item_id}", headers=auth(ctx.token_a))
+    assert own.status_code == 200
+    assert own.json()["title"] == "Дельфін"
+
+    foreign = await client.get(f"/api/v1/collection/{item_id}", headers=auth(ctx.token_b))
+    assert foreign.status_code == 404
+
+
 async def test_listing_carries_catalog_context(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:

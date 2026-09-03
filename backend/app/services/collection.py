@@ -82,6 +82,11 @@ class CollectionService:
             self._row_out(row, images.get(row.catalog_item.id, CatalogImages())) for row in rows
         ], total
 
+    async def get(self, item_id: int) -> CollectionItemOut:
+        if await self._repo.get_row(item_id) is None:
+            raise CollectionItemNotFoundError
+        return await self._get_out(item_id)
+
     async def create(self, payload: CollectionItemCreate) -> CollectionItemOut:
         item = await self._catalog.get_visible(payload.catalog_item_id)
         if item is None:

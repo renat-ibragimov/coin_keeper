@@ -70,6 +70,14 @@ async def create_item(
         raise _unprocessable("exchange-rate-missing", exc.detail) from exc
 
 
+@router.get("/{item_id}")
+async def get_item(session: DbSession, user: CurrentUser, item_id: int) -> CollectionItemOut:
+    try:
+        return await CollectionService(session, user).get(item_id)
+    except CollectionItemNotFoundError as exc:
+        raise _not_found("collection-item") from exc
+
+
 @router.patch("/{item_id}")
 async def update_item(
     session: DbSession, user: CurrentUser, item_id: int, payload: CollectionItemUpdate
