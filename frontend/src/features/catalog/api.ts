@@ -1,5 +1,12 @@
 import { api, toQuery } from '@/shared/api/client';
-import type { CatalogPage, CountryOut, DenominationOut } from '@/shared/api/types';
+import type {
+  CatalogCard,
+  CatalogCollectionItem,
+  CatalogPage,
+  CountryOut,
+  DenominationOut,
+  PriceHistoryItem,
+} from '@/shared/api/types';
 
 import type { CatalogFilters } from './useCatalogFilters';
 
@@ -32,4 +39,18 @@ export function fetchCountries(): Promise<CountryOut[]> {
 
 export function fetchDenominations(countryId: number | undefined): Promise<DenominationOut[]> {
   return api<DenominationOut[]>(`/denominations${toQuery({ countryId })}`);
+}
+
+export function fetchCard(itemId: number): Promise<CatalogCard> {
+  return api<CatalogCard>(`/catalog/${itemId}`);
+}
+
+/** Snapshots visible to the user, newest first (shared ones plus their own). */
+export function fetchPrices(itemId: number): Promise<PriceHistoryItem[]> {
+  return api<PriceHistoryItem[]>(`/catalog/${itemId}/prices`);
+}
+
+/** The current user's instances of one catalog item. */
+export function fetchOwnInstances(itemId: number): Promise<CatalogCollectionItem[]> {
+  return api<CatalogCollectionItem[]>(`/catalog/${itemId}/collection-items`);
 }
