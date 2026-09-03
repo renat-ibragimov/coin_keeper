@@ -44,7 +44,13 @@
     width: 100%;
   }
 
+  /* A bare button and a button wrapped in a link stretch the same way. */
   .actions > * {
     flex: 1;
+    display: inline-flex;
+  }
+
+  .actions > * > * {
+    width: 100%;
   }
 }
