@@ -96,3 +96,19 @@ export function formatMonthYear(value: string | Date, locale: string): string {
     date,
   );
 }
+
+/** Today's calendar date as "YYYY-MM-DD" in the local time zone. */
+export function todayIso(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** Parse a decimal typed by a person: "1 250,50" → 1250.5; null when not a number. */
+export function parseDecimal(raw: string): number | null {
+  const cleaned = raw.replace(/\s/g, '').replace(',', '.');
+  if (cleaned === '') return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? value : null;
+}

@@ -13,6 +13,7 @@ import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
+import { ToastProvider } from '@/shared/ui';
 
 import { ComingSoon } from './ComingSoon';
 import { AppLayout } from './layout/AppLayout';
@@ -32,42 +33,44 @@ export function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route element={<AuthLayout />}>
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/check-email" element={<CheckEmailPage />} />
-                <Route path="/verify-email" element={<VerifyEmailPage />} />
-                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                <Route path="/reset-password" element={<ResetPasswordPage />} />
-              </Route>
-              <Route element={<ProtectedRoute />}>
-                <Route element={<AppLayout />}>
-                  <Route path="/" element={<DashboardPage />} />
-                  <Route path="/dashboard" element={<Navigate to="/" replace />} />
-                  <Route path="/catalog" element={<CatalogPage />} />
-                  <Route
-                    path="/catalog/new"
-                    element={<ComingSoon titleKey="catalog.createOwn" />}
-                  />
-                  <Route path="/catalog/:id" element={<CoinCardPage />} />
-                  <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
-                  <Route path="/series" element={<ComingSoon titleKey="nav.series" />} />
-                  <Route path="/collection" element={<ComingSoon titleKey="nav.collection" />} />
-                  <Route
-                    path="/collection/new"
-                    element={<ComingSoon titleKey="card.addPurchase" />}
-                  />
-                  <Route path="/missing" element={<ComingSoon titleKey="nav.missing" />} />
-                  <Route path="/settings" element={<ComingSoon titleKey="nav.settings" />} />
+        <ToastProvider>
+          <AuthProvider>
+            <BrowserRouter>
+              <Routes>
+                <Route element={<AuthLayout />}>
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/check-email" element={<CheckEmailPage />} />
+                  <Route path="/verify-email" element={<VerifyEmailPage />} />
+                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                  <Route path="/reset-password" element={<ResetPasswordPage />} />
                 </Route>
-              </Route>
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </BrowserRouter>
-        </AuthProvider>
+                <Route element={<ProtectedRoute />}>
+                  <Route element={<AppLayout />}>
+                    <Route path="/" element={<DashboardPage />} />
+                    <Route path="/dashboard" element={<Navigate to="/" replace />} />
+                    <Route path="/catalog" element={<CatalogPage />} />
+                    <Route
+                      path="/catalog/new"
+                      element={<ComingSoon titleKey="catalog.createOwn" />}
+                    />
+                    <Route path="/catalog/:id" element={<CoinCardPage />} />
+                    <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
+                    <Route path="/series" element={<ComingSoon titleKey="nav.series" />} />
+                    <Route path="/collection" element={<ComingSoon titleKey="nav.collection" />} />
+                    <Route
+                      path="/collection/new"
+                      element={<ComingSoon titleKey="card.addPurchase" />}
+                    />
+                    <Route path="/missing" element={<ComingSoon titleKey="nav.missing" />} />
+                    <Route path="/settings" element={<ComingSoon titleKey="nav.settings" />} />
+                  </Route>
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </BrowserRouter>
+          </AuthProvider>
+        </ToastProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

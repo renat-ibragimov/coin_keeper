@@ -1,0 +1,51 @@
+.stack {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  z-index: 60;
+  pointer-events: none;
+  width: min(92vw, 420px);
+}
+
+.toast {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-text);
+  color: var(--color-bg);
+  box-shadow: var(--shadow-lg);
+  font-size: 14.5px;
+  text-align: center;
+  animation: rise 200ms ease-out;
+}
+
+.success {
+  background: var(--color-success);
+  color: #fff;
+}
+
+.error {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.info {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (max-width: 900px) {
+  .stack {
+    bottom: calc(64px + var(--space-3) + env(safe-area-inset-bottom));
+  }
+}

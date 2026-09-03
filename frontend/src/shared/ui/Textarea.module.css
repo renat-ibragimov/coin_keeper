@@ -1,0 +1,5 @@
+.textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.45;
+}

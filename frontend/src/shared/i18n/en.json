@@ -25,7 +25,21 @@
     "or": "or",
     "breadcrumbs": "Breadcrumbs",
     "close": "Close",
-    "back": "Back"
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "required": "This field is required",
+    "invalidNumber": "Enter a number",
+    "saved": "Saved",
+    "deleted": "Deleted",
+    "actions": "Actions",
+    "all": "All",
+    "none": "—",
+    "optional": "optional"
   },
   "pagination": {
     "label": "Pages",
