@@ -6,7 +6,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
 import { coinTitle } from '@/shared/lib/coinTitle';
-import { formatDate, formatNumber, formatUah } from '@/shared/lib/format';
+import { formatDate, formatUah } from '@/shared/lib/format';
 import {
   Badge,
   Breadcrumbs,
@@ -21,6 +21,7 @@ import {
 
 import { fetchCard, fetchOwnInstances, fetchPrices } from '../api';
 import { InstancesList } from './InstancesList';
+import { PriceHistoryChart } from './PriceHistoryChart';
 import { specRows } from './specs';
 import styles from './CoinCardPage.module.css';
 
@@ -86,7 +87,6 @@ function CardBody({ card }: { card: CatalogCard }) {
   const title = coinTitle(card);
   const subtitle = [card.denomination, card.country, String(card.year)].filter(Boolean).join(' · ');
   const owned = card.quantityOwned > 0;
-  const price = formatUah(card.marketPriceUah, locale);
   const valuation =
     owned && card.marketPriceUah !== null
       ? formatUah(Number(card.marketPriceUah) * card.quantityOwned, locale)
@@ -248,21 +248,7 @@ function CardBody({ card }: { card: CatalogCard }) {
           </div>
           {pricesQuery.isPending ? <Skeleton height={180} /> : null}
           {pricesQuery.isError ? <ErrorState onRetry={() => void pricesQuery.refetch()} /> : null}
-          {pricesQuery.data ? (
-            pricesQuery.data.length === 0 ? (
-              <p className={styles.muted}>{t('card.pricesEmpty')}</p>
-            ) : (
-              <p className={styles.currentPrice}>
-                <span className={`${styles.currentValue} tabular`}>{price ?? '—'}</span>
-                <span className={styles.muted}>
-                  {t('card.snapshots', { count: pricesQuery.data.length })}
-                  {latestPrice?.priceUah
-                    ? ` · ${formatNumber(latestPrice.priceUah, locale)} ₴`
-                    : ''}
-                </span>
-              </p>
-            )
-          ) : null}
+          {pricesQuery.data ? <PriceHistoryChart items={pricesQuery.data} /> : null}
         </Card>
 
         <Card className={styles.instances}>

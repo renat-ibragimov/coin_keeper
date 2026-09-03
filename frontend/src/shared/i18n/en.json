@@ -255,8 +255,6 @@
     "priceSource": "Source: {{source}}",
     "priceUpdated": "last updated: {{date}}",
     "pricesEmpty": "No prices yet.",
-    "snapshots_one": "{{count}} price snapshot",
-    "snapshots_other": "{{count}} price snapshots",
     "instances": "My instances and purchases",
     "instancesEmpty": "None yet.",
     "instanceQuantity": "Quantity",
@@ -265,7 +263,11 @@
     "instanceRate": "Rate",
     "instanceGrade": "Grade",
     "instanceNotes": "Note",
-    "rateFormat": "{{rate}} ₴ per 1 {{symbol}}"
+    "rateFormat": "{{rate}} ₴ per 1 {{symbol}}",
+    "legendTrend": "source price",
+    "legendOwn": "my price",
+    "legendSuspect": "suspect price",
+    "chartLabel": "Price chart: {{count}} points from {{from}} to {{to}}"
   },
   "units": {
     "mm": "mm",

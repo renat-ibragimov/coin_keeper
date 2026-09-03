@@ -257,10 +257,6 @@
     "priceSource": "Джерело: {{source}}",
     "priceUpdated": "останнє оновлення: {{date}}",
     "pricesEmpty": "Цін ще немає.",
-    "snapshots_one": "{{count}} знімок ціни",
-    "snapshots_few": "{{count}} знімки ціни",
-    "snapshots_many": "{{count}} знімків ціни",
-    "snapshots_other": "{{count}} знімка ціни",
     "instances": "Мої екземпляри та покупки",
     "instancesEmpty": "Ще немає.",
     "instanceQuantity": "Кількість",
@@ -269,7 +265,11 @@
     "instanceRate": "Курс",
     "instanceGrade": "Стан",
     "instanceNotes": "Нотатка",
-    "rateFormat": "{{rate}} ₴ за 1 {{symbol}}"
+    "rateFormat": "{{rate}} ₴ за 1 {{symbol}}",
+    "legendTrend": "ціна за джерелом",
+    "legendOwn": "моя ціна",
+    "legendSuspect": "підозріла ціна",
+    "chartLabel": "Графік цін: {{count}} точок з {{from}} по {{to}}"
   },
   "units": {
     "mm": "мм",
