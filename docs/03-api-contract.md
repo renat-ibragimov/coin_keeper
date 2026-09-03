@@ -274,11 +274,16 @@ DELETE /catalog/{id}
 ## Коллекция
 
 ```
-GET    /collection?page&pageSize&countryId&seriesId&q&sort
+GET    /collection?page&pageSize&countryId&seriesId&q&sort&order
+GET    /collection/{id}
 POST   /collection    {catalogItemId, quantity, price, currency, purchaseDate, seller?, notes?, grade?}
 PATCH  /collection/{id}
 DELETE /collection/{id}
 ```
+
+Строка коллекции несёт контекст позиции каталога, чтобы экран «Моя колекція» не ходил за
+каждой монетой отдельно: `thumbnailUrl` (по тем же правилам видимости, что в каталоге)
+и `marketPriceUah` — последний видимый пользователю неподозрительный снимок цены.
 
 При создании: сервер подтягивает курс НБУ на `purchaseDate`, пишет `purchase_rate_uah`
 и в той же транзакции создаёт расход категории `coin_purchase`. См. `04-business-rules.md`.
@@ -293,6 +298,8 @@ GET  /series?countryId
 POST /series  {countryId, name, description?, startYear?, endYear?}
 GET  /series/{id}/summary
   → {total, owned, missing, completionPercent, purchaseTotalUah, currentValueUah, unpricedMissing}
+GET  /series/summary?countryId
+  → [{series: {...}, summary: {...}}]   — все серии (страны) со сводкой одним запросом
 ```
 
 Серии — общий справочник, личных серий нет: серия описывает выпуск, а не коллекцию.

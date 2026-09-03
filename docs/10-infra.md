@@ -139,25 +139,58 @@ API-адрес в сборку не зашит: клиент ходит на о�
 `vite dev` тот же путь проксируется на боевой API (`vite.config.ts`), и refresh-cookie
 ходит как same-origin.
 
-**Выкладка статики — пока руками** (фактическое состояние на 2026-09-03). Пайплайн
-собирает и проверяет фронтенд (format, lint, typecheck, tests, build) в job `frontend`,
-но на сервер ничего не копирует. Выкладка идёт в три шага:
+**Выкладка статики — из CI, вместе с бэкендом.** Job `frontend-build` собирает и
+проверяет фронтенд (format, lint, typecheck, tests, build) и публикует артефакт `dist`;
+после успешного `deploy` API job `deploy-frontend` доставляет его на сервер:
 
 ```
-# 1. на машине разработчика
-cd frontend && npm ci && npm run build
-rsync -a --delete frontend/dist/ deploy@<host>:/home/deploy/frontend-dist/
-
-# 2. на сервере, от root (пользователь deploy не пишет в /srv)
-rsync -a --delete /home/deploy/frontend-dist/ /srv/coinkeeper/frontend/
+1. actions/download-artifact  → dist/
+2. rsync dist/ → deploy@<host>:~/frontend-dist/        (staging-каталог деплой-пользователя)
+3. ssh: rsync -a --delete --delay-updates ~/frontend-dist/ /srv/coinkeeper/frontend/
 ```
 
-Центральный Caddy отдаёт `/srv/coinkeeper/frontend` через `file_server` с SPA-fallback
-(`try_files {path} /index.html`), блок сайта — выше в разделе «Caddy». Каталог должен
-читаться пользователем, от которого запущен Caddy.
+Каталог назначения задаётся входом `frontend-deploy-path` reusable workflow
+(`deploy.yml` передаёт `/srv/coinkeeper/frontend`); пустое значение отключает шаг.
+Порядок важен: статика едет **после** API, чтобы новый бандл не встретил старую схему.
 
-Перенос выкладки в CI (артефакт `dist` → `rsync` тем же деплой-ключом, что и compose,
-плюс копирование в `/srv` без участия root) — **часть 3 этапа 4** (`11-roadmap.md`).
+**Почему rsync в тот же каталог, а не подмена каталога.** Центральный Caddy монтирует
+`/srv/coinkeeper/frontend` внутрь контейнера (`:ro`), то есть держит inode каталога.
+`mv frontend.new frontend` оставил бы контейнеру старый inode. Поэтому каталог остаётся на
+месте, меняется только содержимое: `--delay-updates` копирует все изменённые файлы во
+временные имена и переименовывает их одним проходом в конце, `--delete` убирает старые
+хешированные бандлы. Окно, в котором `index.html` ссылается на ещё не существующий
+`assets/*.js`, сводится к миллисекундам; сами `assets/*` имеют хеш в имени, поэтому старая
+вкладка продолжает работать со своими файлами до перезагрузки.
+
+**Права.** Deploy-пользователь не sudoer, а `/srv/coinkeeper/frontend` изначально
+принадлежал root. Выбран вариант с передачей каталога деплой-пользователю — Caddy читает
+его как угодно, ему владелец безразличен. Один раз на сервере, от root:
+
+```
+chown -R deploy:deploy /srv/coinkeeper/frontend
+```
+
+Job `deploy-frontend` проверяет, что каталог доступен на запись, и падает с понятным
+сообщением, если команда выше не выполнена.
+
+**Кэширование.** Vite кладёт хеш в имена файлов `assets/*`, поэтому их можно кэшировать
+надолго; `index.html` должен всегда браться заново, иначе после выкладки старая страница
+попросит удалённые бандлы. Блок для центрального Caddyfile (внутри `handle` статики):
+
+```
+handle {
+    root * /srv/coinkeeper/frontend
+    @assets path /assets/* /brand/*
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+    @entry path / /index.html /manifest.webmanifest
+    header @entry Cache-Control "no-cache"
+    try_files {path} /index.html
+    file_server
+}
+```
+
+Аварийный путь без GitHub — тот же rsync с машины разработчика после `npm run build`:
+`rsync -a --delete --delay-updates frontend/dist/ deploy@<host>:/srv/coinkeeper/frontend/`.
 
 ## Бэкапы
 
@@ -225,15 +258,15 @@ Chromium в Playwright запускать с `--no-sandbox --disable-dev-shm-usa
 
 ```
 check          → бэкенд: ruff + mypy + pytest с поднятыми postgres и redis (MAIL_BACKEND=console)
-frontend-check → фронтенд: prettier + eslint + tsc + vitest + vite build
-images         → сборка Docker-образа api (worker — тот же образ, другая команда)
-push           → публикация образа в GHCR (ghcr.io/<owner>/coinkeeper-api)
-deploy         → SSH на Hetzner: docker compose pull && docker compose up -d
+frontend-build  → фронтенд: prettier + eslint + tsc + vitest + vite build, артефакт dist
+images          → сборка Docker-образа api (worker — тот же образ, другая команда)
+push            → публикация образа в GHCR (ghcr.io/<owner>/coinkeeper-api)
+deploy          → SSH на Hetzner: docker compose pull && docker compose up -d
+deploy-frontend → rsync артефакта dist в каталог, который отдаёт центральный Caddy
 ```
 
-Статика фронтенда образом не оформляется — её отдаёт центральный Caddy с диска, см.
-«Фронтенд». Пайплайн её собирает, чтобы сломанная сборка не доехала до `main`, но на сервер
-пока не выкладывает.
+Статика фронтенда образом не оформляется — её отдаёт центральный Caddy с диска; пайплайн
+собирает её и после выкладки API доставляет на сервер по rsync, см. «Фронтенд».
 
 Порядок жёсткий: не прошёл lint или test — до сборки образов дело не доходит, на сервер
 ничего не уезжает.
