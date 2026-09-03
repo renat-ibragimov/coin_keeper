@@ -1,0 +1,64 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.heading {
+  font-size: 21px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.groupTitle {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.chipActive {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent-strong);
+  font-weight: 600;
+}
+
+:root[data-theme='dark'] .chipActive {
+  color: var(--color-accent);
+}
+
+.yearRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.yearDash {
+  color: var(--color-text-muted);
+}
