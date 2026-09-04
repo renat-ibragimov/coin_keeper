@@ -372,9 +372,99 @@ stored flagged, not dropped, and stay out of the collection value.
   the Wayback Machine copy.
 - `--since-year N` — only coins issued in or after that year, for a trial.
 - `--pause SECONDS` (default 0.45), `--cache-dir DIR`.
+- `--steps circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos` — the
+  circulation steps below, same rule: any subset, always in this order.
+- `--circ-review-out FILE`, `--apply-circ-review FILE` — `circ-bridge`'s own
+  review CSV and its reviewed answer, kept apart from `--review-out` /
+  `--apply-review` so running both bridges together cannot have one overwrite
+  the other's file.
 
 Exit codes: `0` fine, `2` bad arguments, `3` the NBU could not be read,
 `5` the run stopped on a condition it cannot continue past.
+
+## Circulation coins (stage 4.5, part A, item 1)
+
+Ukraine's ~197 unlinked circulation records — kopecks 1/2/5/10/25/50 and
+hryvnias 1/2/5/10 — go through a separate group of steps in the same script:
+`circ-bridge, circ-gaps, circ-titles, circ-mintage, circ-photos`. They share
+the runner, the report and `app/ukraine_pipeline/catalog.py` with the steps
+above, but read different sources — the Wikipedia mintage table instead of
+the three commemorative ones — and the bridge here needs no fuzzy score: a
+(face value, unit, year) key is either held by one of our records or it is
+not. What each step does and why: `../docs/05-integrations.md`, section 10.
+
+Nothing is fetched unless the step needs it: `--steps circ-photos` alone
+touches neither the commemorative catalogue nor the Wikipedia mintage table,
+since `circ-titles` and `circ-photos` do not read the table at all.
+
+### 1. Dry run
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py \
+    --steps circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos \
+    --report /reports/circ.json --cache-dir /reports/ukraine-cache
+```
+
+Read `circ-gaps.skippedNoType` — a (denomination, year) the mintage table
+names but the type map (`app/ukraine_pipeline/circ_types.py`) has no range
+for is not created, and is worth a look before `--apply`.
+
+### 2. Link what is certain
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-bridge \
+    --circ-review-out /reports/circ-bridge-review.csv \
+    --report /reports/circ-bridge.json --cache-dir /reports/ukraine-cache
+```
+
+`circ-bridge-review.csv` holds one row per record that shares a (denomination,
+year) with another of ours — two quality variants of the same coin imported
+from uCoin, most likely. Put `yes` in the first column of the one that stays;
+apply the same way `bridge-review.csv` is applied:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-bridge \
+    --apply-circ-review /reports/circ-bridge-review.csv \
+    --report /reports/circ-bridge-2.json --cache-dir /reports/ukraine-cache
+```
+
+### 3. Gaps, titles, mintage
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply \
+    --steps circ-gaps,circ-titles,circ-mintage \
+    --report /reports/circ-gaps.json --cache-dir /reports/ukraine-cache
+```
+
+`circ-mintage.ambiguous` is worth reading once: it is only ever the 2018
+hryvnia changeover, and only for a record with no `subtype` set to say which
+of the two 2018 figures is its own.
+
+### 4. Photos, in portions
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-photos --limit 5 \
+    --report /reports/circ-photos.json --cache-dir /reports/ukraine-cache
+```
+
+`--limit` here counts *types*, not records — there are only eleven, so one
+run with no limit is normally enough; `typesLeft` says whether to repeat it.
+
+### Rehearsal against a live source, 2026-09-04
+
+Run against an empty local database (no legacy data seeded), live network:
+the Wikipedia table parsed to 350 cells, `circ-gaps` created 168 records and
+skipped one with reason (1 kopiika 2019, a coin the table's own legend marks
+"issued unofficially" and the type map has no range for), `circ-titles` and
+`circ-mintage` found nothing left to do on records `circ-gaps` had just
+written correctly, `circ-photos` stored 336 files (168 records × 2 sides)
+across all eleven types with zero failures. Real numbers against the owner's
+migrated database are for the real run.
 
 ## Legacy data migration
 

@@ -30,7 +30,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ObjectStorage
 from app.models import Currency
-from app.ukraine_pipeline import bridge, gaps, merge, photos, prices, repair, series, titles
+from app.ukraine_pipeline import (
+    bridge,
+    circ_bridge,
+    circ_gaps,
+    circ_mintage,
+    circ_photos,
+    circ_titles,
+    gaps,
+    merge,
+    photos,
+    prices,
+    repair,
+    series,
+    titles,
+)
 from app.ukraine_pipeline.catalog import OurItem, load_items, ukraine_country_id
 from app.ukraine_pipeline.lexicon import Lexicon, load_lexicon
 from app.ukraine_pipeline.report import PipelineReport
@@ -38,10 +52,11 @@ from app.ukraine_pipeline.sources import Sources, cluster_key
 from app.ukraine_recon.http import PoliteClient
 from app.ukraine_recon.models import SOURCES
 from app.ukraine_recon.triangulate import Cluster
+from app.ukraine_recon.wikipedia import MintageCell
 
 # series before gaps on purpose: gaps creates records under the NBU series
 # names, and renaming ours afterwards would collide with what it just made.
-STEPS = (
+COMMEMORATIVE_STEPS = (
     "bridge",
     "series",
     "gaps",
@@ -51,6 +66,19 @@ STEPS = (
     "photos",
     "prices",
 )
+# The circulation mini-pipeline (docs/05-integrations.md, "обиходные монеты").
+# Independent of the steps above — a different bridge, a different source
+# (the Wikipedia mintage table, not the three commemorative sources) — but
+# ordered the same way: link first, fill what is missing, then names, numbers
+# and photographs.
+CIRCULATION_STEPS = (
+    "circ-bridge",
+    "circ-gaps",
+    "circ-titles",
+    "circ-mintage",
+    "circ-photos",
+)
+STEPS = COMMEMORATIVE_STEPS + CIRCULATION_STEPS
 
 
 class PipelineError(Exception):
@@ -67,6 +95,11 @@ class Options:
     duplicates_out: Path | None = None
     merge_out: Path | None = None
     merge_in: Path | None = None
+    # Separate from review_out/review_in: circ-bridge's ambiguous rows are a
+    # different shape (docs/05-integrations.md), and running bridge and
+    # circ-bridge together must not have one overwrite the other's file.
+    circ_review_out: Path | None = None
+    circ_review_in: Path | None = None
     report_path: Path | None = None
 
 
@@ -80,6 +113,10 @@ class Runner:
     log: Callable[[str], None]
     storage: ObjectStorage | None = None
     lexicon: Lexicon = field(default_factory=load_lexicon)
+    # The Wikipedia mintage table, fetched separately from `sources` above —
+    # a different page, needed only by the circ-* steps. Empty unless one of
+    # them was requested (scripts/ukraine_pipeline.py fetches it lazily).
+    mintage: list[MintageCell] = field(default_factory=list)
 
     _country_id: int | None = None
     _items: list[OurItem] = field(default_factory=list)
@@ -303,6 +340,102 @@ class Runner:
             self.session, pairs=pairs, currencies=currencies, dry_run=self.options.dry_run
         )
         self.report.step("prices", outcome.summary(), examples=outcome.examples)
+        await self._commit()
+
+    # ---------------------------------------------------------- circulation
+    async def _step_circ_bridge(self) -> None:
+        assert self._country_id is not None
+        outcome = await circ_bridge.run_bridge(
+            self.session,
+            country_id=self._country_id,
+            items=self._items,
+            mintage=self.mintage,
+            dry_run=self.options.dry_run,
+        )
+        if self.options.circ_review_in is not None:
+            path = self.options.circ_review_in
+            decisions = circ_bridge.read_review_csv(path)
+            outcome = circ_bridge.apply_review(outcome, decisions)
+            self.log(f"circ-bridge review: {len(decisions)} decisions read from {path}")
+        rows = 0
+        if not self.options.dry_run:
+            rows = await circ_bridge.write_links(self.session, outcome.linked)
+        review_rows = 0
+        if self.options.circ_review_out is not None and outcome.review:
+            review_rows = circ_bridge.write_review_csv(self.options.circ_review_out, outcome)
+            self.log(
+                f"circ-bridge: {review_rows} review rows written to {self.options.circ_review_out}"
+            )
+        self.report.step(
+            "circ-bridge",
+            {**outcome.summary(), "linkRowsWritten": rows, "reviewRowsWritten": review_rows},
+            denominationsUnparsed=outcome.repaired.unparsed[:50],
+            withoutWikipediaEntry=[
+                {"itemId": item.id, "title": item.title_original, "year": item.issue_year}
+                for item in outcome.without_wikipedia_entry[:50]
+            ],
+        )
+        await self._commit()
+        await self._load_catalog()
+
+    async def _step_circ_gaps(self) -> None:
+        assert self._country_id is not None
+        outcome = await circ_gaps.create_missing(
+            self.session,
+            country_id=self._country_id,
+            items=self._items,
+            mintage=self.mintage,
+            dry_run=self.options.dry_run,
+        )
+        self.report.step(
+            "circ-gaps",
+            outcome.summary(),
+            created=outcome.created[:50],
+            skippedNoType=outcome.skipped_no_type[:50],
+        )
+        await self._commit()
+        await self._load_catalog()
+
+    async def _step_circ_titles(self) -> None:
+        assert self._country_id is not None
+        outcome = await circ_titles.apply_titles(
+            self.session, country_id=self._country_id, dry_run=self.options.dry_run
+        )
+        self.report.step("circ-titles", outcome.summary(), examples=outcome.examples)
+        await self._commit()
+
+    async def _step_circ_mintage(self) -> None:
+        assert self._country_id is not None
+        outcome = await circ_mintage.apply_mintage(
+            self.session,
+            country_id=self._country_id,
+            mintage=self.mintage,
+            dry_run=self.options.dry_run,
+        )
+        self.report.step(
+            "circ-mintage",
+            outcome.summary(),
+            ambiguous=outcome.ambiguous[:50],
+            discrepancies=outcome.discrepancies[:50],
+        )
+        await self._commit()
+
+    async def _step_circ_photos(self) -> None:
+        assert self._country_id is not None
+        outcome = await circ_photos.download_photos(
+            self.session,
+            client=self.client,
+            storage=self.storage,
+            country_id=self._country_id,
+            dry_run=self.options.dry_run,
+            limit=self.options.limit,
+            log=self.log,
+        )
+        self.report.step(
+            "circ-photos",
+            outcome.summary(),
+            failed=outcome.failed[:50],
+        )
         await self._commit()
 
     # -------------------------------------------------------------- internals

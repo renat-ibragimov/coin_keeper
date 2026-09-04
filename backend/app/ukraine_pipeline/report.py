@@ -24,6 +24,11 @@ STEP_ORDER = (
     "titles",
     "photos",
     "prices",
+    "circ-bridge",
+    "circ-gaps",
+    "circ-titles",
+    "circ-mintage",
+    "circ-photos",
 )
 EXAMPLES_IN_SUMMARY = 10
 

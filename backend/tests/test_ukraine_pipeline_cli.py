@@ -42,6 +42,24 @@ def test_a_missing_merge_file_is_a_usage_error(tmp_path: Path) -> None:
     assert code == ukraine_pipeline.EXIT_USAGE
 
 
+def test_a_missing_circ_review_file_is_a_usage_error(tmp_path: Path) -> None:
+    code = ukraine_pipeline.main(["--apply-circ-review", str(tmp_path / "nope.csv")])
+    assert code == ukraine_pipeline.EXIT_USAGE
+
+
+def test_circulation_steps_run_after_the_commemorative_ones() -> None:
+    assert parse_steps("circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos") == (
+        "circ-bridge",
+        "circ-gaps",
+        "circ-titles",
+        "circ-mintage",
+        "circ-photos",
+    )
+    assert STEPS.index("prices") < STEPS.index("circ-bridge")
+    assert STEPS.index("circ-bridge") < STEPS.index("circ-gaps") < STEPS.index("circ-titles")
+    assert STEPS.index("circ-mintage") < STEPS.index("circ-photos")
+
+
 def test_the_report_prints_every_step() -> None:
     """A step the report does not know about runs and is never seen."""
     assert report.STEP_ORDER == STEPS

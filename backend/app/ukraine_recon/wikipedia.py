@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from selectolax.parser import HTMLParser, Node
 
@@ -208,6 +209,127 @@ def parse_list_page(html: str, page: str) -> list[SourceRecord]:
                 )
             )
     return records
+
+
+MINTAGE_HEADING = "Тиражі та хронологія випуску розмінних та обігових монет"
+
+# The table's own column headers -> our (value, unit). Matched by exact text
+# rather than by position: the table also carries a leading "Рік на монеті"
+# and a trailing "Загалом" this dict has no entry for, and a name lookup
+# survives the sources adding a column more gracefully than a fixed index
+# would.
+_HEADER_UNITS: dict[str, tuple[Decimal, str]] = {
+    "1 копійка": (Decimal(1), "kopiika"),
+    "2 копійки": (Decimal(2), "kopiika"),
+    "5 копійок": (Decimal(5), "kopiika"),
+    "10 копійок": (Decimal(10), "kopiika"),
+    "25 копійок": (Decimal(25), "kopiika"),
+    "50 копійок": (Decimal(50), "kopiika"),
+    "1 гривня": (Decimal(1), "hryvnia"),
+    "2 гривні": (Decimal(2), "hryvnia"),
+    "5 гривень": (Decimal(5), "hryvnia"),
+    "10 гривень": (Decimal(10), "hryvnia"),
+}
+
+# One entry inside a cell: "140 млн" (a plain count), "5 тис**" (a count made
+# only for collector sets), "Так***" (issued, no number given) or "Ні"
+# (nothing that year). A cell can hold two of these side by side — the 2018
+# row prints "140 млн***** 20 тис****" because both hryvnia patterns were
+# struck that year — which is exactly why this returns a tuple, not one value.
+_MULTIPLIER = {"млн": 1_000_000, "тис": 1_000, "шт": 1}
+_ENTRY_RE = re.compile(
+    r"(?:(?P<num>\d+(?:[.,]\d+)?)\s*(?P<unit>млн|тис|шт)\.?|(?P<word>Так|Ні)|(?P<unknown>\?))"
+    r"(?P<stars>\*{1,5})?"
+)
+# The table's own note legend: * trial, ** collector-set-only, *** issued but
+# not officially released, **** the 2001 hryvnia pattern, ***** the 2018 one.
+PATTERN_2001 = "2001"
+PATTERN_2018 = "2018"
+
+
+@dataclass(frozen=True, slots=True)
+class MintageEntry:
+    count: int | None
+    # "Так" with no number: the table says the coin exists but gives no
+    # figure. Kept apart from `unknown` — a "?" cell is not even sure of
+    # that much — so a consumer can tell "issued, count not given" from
+    # "the table itself does not know".
+    issued_no_count: bool
+    unknown: bool
+    trial: bool
+    collector_set: bool
+    unofficial: bool
+    # Which hryvnia pattern this number belongs to, when the cell names one;
+    # None everywhere except the double-valued cells of the 2018 changeover.
+    pattern: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class MintageCell:
+    year: int
+    value: Decimal
+    unit: str
+    entries: tuple[MintageEntry, ...]
+
+
+def _parse_entries(text: str) -> tuple[MintageEntry, ...]:
+    entries = []
+    for match in _ENTRY_RE.finditer(text):
+        stars = match.group("stars") or ""
+        pattern = PATTERN_2018 if len(stars) >= 5 else PATTERN_2001 if len(stars) == 4 else None
+        issued_no_count = False
+        unknown = False
+        count: int | None
+        if match.group("num"):
+            value = Decimal(match.group("num").replace(",", "."))
+            count = int(value * _MULTIPLIER[match.group("unit")])
+        elif match.group("word"):
+            issued_no_count = match.group("word") == "Так"
+            count = None if issued_no_count else 0
+        else:
+            unknown = True
+            count = None
+        entries.append(
+            MintageEntry(
+                count=count,
+                issued_no_count=issued_no_count,
+                unknown=unknown,
+                trial=len(stars) == 1,
+                collector_set=len(stars) == 2,
+                unofficial=len(stars) == 3,
+                pattern=pattern,
+            )
+        )
+    return tuple(entries)
+
+
+def parse_mintage_table(html: str) -> list[MintageCell]:
+    """The "Тиражі та хронологія" table: one cell per (denomination, year).
+
+    Rows are read through parse_tables, which already expands rowspan and
+    colspan — including the mint-name divider rows the table uses to group
+    years by where they were struck ("Італійський монетний двір", ...). Such
+    a row has no year in its first cell after expansion and is skipped along
+    with any row a cell carries no entry for.
+    """
+    cells: list[MintageCell] = []
+    for table in parse_tables(html):
+        if not table.headers or not table.headers[0].startswith("Рік"):
+            continue
+        columns = [_HEADER_UNITS.get(header.strip()) for header in table.headers]
+        for row in table.rows:
+            year = parse_int(row[0].text)
+            if year is None:
+                continue
+            for index, column in enumerate(columns):
+                if column is None or index >= len(row):
+                    continue
+                entries = _parse_entries(row[index].text)
+                if not entries:
+                    continue
+                value, unit = column
+                cells.append(MintageCell(year=year, value=value, unit=unit, entries=entries))
+    return cells
 
 
 @dataclass

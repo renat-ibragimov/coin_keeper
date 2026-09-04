@@ -62,6 +62,12 @@ class OurItem:
     series_name: str | None
     is_archived: bool
     source_key: str | None = None
+    # The unit the face value is in ("kopiika", "hryvnia", ...). Needed
+    # alongside `denomination` wherever a face value alone is ambiguous — 1
+    # kopiika and 1 hryvnia are both "1" (app/ukraine_pipeline/circ_bridge.py).
+    # Defaulted, not loaded, on a record load_items never populates it for —
+    # a test built by hand rather than by the query below.
+    denomination_unit: str | None = None
     # source -> external id, from price_source_links, the legacy source_key or
     # the URL of the newest shared price snapshot.
     links: dict[str, str] = field(default_factory=dict)
@@ -94,10 +100,17 @@ async def ukraine_country_id(session: AsyncSession) -> int | None:
 
 
 def face_value(unit: str | None, value: Decimal | None) -> Decimal | None:
-    """The face value the sources print: 5 for "5 гривень", 50 for "50 копійок"."""
+    """The face value the sources print: 5 for "5 гривень", 50 for "50 копійок".
+
+    Just `value`, gated on the unit being one this code knows — every
+    consumer compares this against a raw parsed face value (a Wikipedia or
+    NBU cell's own number, never converted to a common subunit), so scaling
+    it here would only make hryvnia records match by accident (its
+    denominations.UNITS minor_units happens to be 100) and kopiika ones not.
+    """
     if unit is None or value is None or unit not in UNITS:
         return None
-    return (value * UNITS[unit].minor_units) / Decimal(100)
+    return value
 
 
 async def load_items(session: AsyncSession, country_id: int) -> list[OurItem]:
@@ -122,6 +135,7 @@ async def load_items(session: AsyncSession, country_id: int) -> list[OurItem]:
             series_name=series_name,
             is_archived=item.is_archived,
             source_key=item.source_key,
+            denomination_unit=unit,
         )
         for item, series_name, unit, value in (await session.execute(query)).all()
     ]
