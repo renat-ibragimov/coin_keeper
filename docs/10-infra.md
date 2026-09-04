@@ -46,6 +46,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 DATABASE_URL=postgresql+asyncpg://coinkeeper:***@postgres:5432/coinkeeper
 REDIS_URL=redis://redis:6379/0
 S3_ENDPOINT=http://minio:9000
+S3_PUBLIC_ENDPOINT=https://<домен>/media
 S3_BUCKET=coinkeeper-media
 S3_ACCESS_KEY=***
 S3_SECRET_KEY=***
@@ -73,6 +74,14 @@ LOG_LEVEL=INFO
 `PUBLIC_BASE_URL` нужен, чтобы собирать ссылки в письмах подтверждения и восстановления
 пароля. Из заголовков запроса их брать нельзя — заголовок подделывается, и письмо уведёт
 пользователя на чужой домен.
+
+`S3_PUBLIC_ENDPOINT` — тот же приём для presigned-ссылок на изображения. `S3_ENDPOINT`
+(`http://minio:9000`) виден только внутри docker-сети; браузер этот хост не резолвит, и
+presigned-URL, подписанный на него, в браузере не открывается. Когда `S3_PUBLIC_ENDPOINT`
+задан, `presigned_get_url` подписывает ссылку отдельным клиентом с этим endpoint'ом
+(`docs/06-media-storage.md`); клиент для `put`/`get` внутри бэкенда остаётся на
+`S3_ENDPOINT`. Локально переменную не задают — там браузер и так открывает
+`http://localhost:9000` напрямую (`docker-compose.dev.yml` публикует порт MinIO).
 
 ### `MAIL_BACKEND` — как отправляется почта
 
@@ -107,7 +116,7 @@ coins.renat-ibragimov.com {
     handle /api/* {
         reverse_proxy <существующий апстрим api>
     }
-    handle /media/* {
+    handle_path /media/* {
         reverse_proxy <существующий апстрим minio>
     }
     handle {
@@ -128,6 +137,13 @@ coins.renat-ibragimov.com {
 `index.html` вместо ответа API. `try_files {path} /index.html` — это и есть fallback для
 клиентского роутера: `/catalog?page=3` и `/reset-password?token=…` открываются по прямой
 ссылке.
+
+`/media/*` — именно `handle_path`, не `handle`: MinIO обслуживает объекты по path-style
+адресу `/<bucket>/<key>`, а `S3_PUBLIC_ENDPOINT=https://<домен>/media` подписывает ссылки
+как `/media/<bucket>/<key>`. `handle_path` срезает совпавший префикс `/media` перед тем,
+как отдать запрос апстриму — до MinIO доходит `/<bucket>/<key>`, как он и ждёт. Заголовок
+`Host` при этом реверс-прокси не переписывает: presigned-подпись покрывает именно его, и
+подпись, посчитанная на публичный домен, должна дойти до MinIO с тем же значением `Host`.
 
 ## Фронтенд
 

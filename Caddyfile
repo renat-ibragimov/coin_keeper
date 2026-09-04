@@ -4,7 +4,11 @@
 		reverse_proxy api:8000
 	}
 
-	handle /media/* {
+	# S3_PUBLIC_ENDPOINT signs URLs as https://<domain>/media/<bucket>/<key>;
+	# handle_path strips /media so MinIO sees its own path-style /<bucket>/<key>
+	# (docs/06-media-storage.md). The Host header passes through unchanged,
+	# which is what the presigned signature was computed against.
+	handle_path /media/* {
 		reverse_proxy minio:9000
 	}
 

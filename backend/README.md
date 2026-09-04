@@ -83,6 +83,30 @@ counters cannot leak between cases.
 `MAIL_BACKEND` is forced to `console` in the test environment. A test that
 would send real mail is a broken test.
 
+## Verifying media URLs on the server
+
+`S3_ENDPOINT` (`http://minio:9000`) only resolves inside the docker network. On
+the server, `S3_PUBLIC_ENDPOINT` must be set to the public media path
+(`https://<domain>/media`, see `.env.example` and `docs/06-media-storage.md`) so
+that presigned URLs point somewhere a browser can reach. After a deploy that
+touches `S3_PUBLIC_ENDPOINT` or the Caddy `/media/*` block, confirm both legs
+by hand:
+
+```bash
+# 1. The API returns a presigned URL on the public host, not the internal one.
+url=$(curl -s https://<domain>/api/v1/catalog/<id> | grep -o 'https://[^"]*/media/[^"]*' | head -1)
+echo "$url"
+
+# 2. That URL actually serves the object through the proxy — expect HTTP/2 200.
+curl -sI "$url"
+```
+
+A `404`/`403` here usually means the Caddy `/media/*` block is still `handle`
+instead of `handle_path` — MinIO is being asked for `/media/<bucket>/<key>`
+instead of its own `/<bucket>/<key>`. A signature error (`SignatureDoesNotMatch`)
+means the `Host` reaching MinIO does not match the host `S3_PUBLIC_ENDPOINT`
+was signed for — check the reverse proxy is not rewriting `Host`.
+
 ## Scripts
 
 ```bash

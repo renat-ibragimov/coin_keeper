@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     # --- object storage ---
     s3_endpoint: str = Field(alias="S3_ENDPOINT")
+    # Signs presigned URLs against a browser-reachable host instead of the
+    # docker-network one, when the two differ (docs/06-media-storage.md).
+    s3_public_endpoint: str | None = Field(default=None, alias="S3_PUBLIC_ENDPOINT")
     s3_bucket: str = Field(default="coinkeeper-media", alias="S3_BUCKET")
     s3_access_key: str = Field(alias="S3_ACCESS_KEY")
     s3_secret_key: str = Field(alias="S3_SECRET_KEY")

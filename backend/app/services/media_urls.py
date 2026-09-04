@@ -54,7 +54,14 @@ class CatalogImages:
 @lru_cache
 def _storage() -> ObjectStorage:
     settings = get_settings()
-    return ObjectStorage(build_s3_client(settings), settings.s3_bucket)
+    presign_client = (
+        build_s3_client(settings, endpoint_url=settings.s3_public_endpoint)
+        if settings.s3_public_endpoint
+        else None
+    )
+    return ObjectStorage(
+        build_s3_client(settings), settings.s3_bucket, presign_client=presign_client
+    )
 
 
 class MediaUrlBuilder:
