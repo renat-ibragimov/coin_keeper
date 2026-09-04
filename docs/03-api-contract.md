@@ -162,36 +162,63 @@ GET /catalog
 ```json
 {
   "id": 1,
-  "country": "Украина",
-  "seriesName": "Флора и фауна",
-  "denomination": "2 гривны",
+  "country": "Україна",
+  "seriesName": "Флора і фауна України",
+  "denomination": {
+    "id": 4,
+    "value": "2.000",
+    "unit": "hryvnia",
+    "currencyCode": "UAH",
+    "label": "2 гривні"
+  },
   "year": 2018,
   "title": "Дельфін",
+  "titleOriginal": "Дельфін",
+  "originalLang": "uk",
   "titleUk": "Дельфін",
-  "titleRu": "Дельфин",
+  "titleUkSource": "official",
+  "titleEn": "Dolphin",
+  "titleEnSource": "official",
   "variety": null,
   "catalogNumber": "KM# 123",
   "collectionGroup": "commemorative",
   "metalKind": "base",
-  "material": "нейзильбер",
+  "composition": { "id": 13, "code": "nickel_silver", "name": "Нейзильбер" },
+  "material": null,
   "marketPriceUah": "666.00",
   "priceSource": "UA-Coins",
   "priceObservedAt": "2026-08-06T12:20:27Z",
   "quantityOwned": 1,
   "purchaseTotalUah": "666.00",
-  "obverseImageUrl": "https://cdn.../obverse.webp",
-  "reverseImageUrl": "https://cdn.../reverse.webp",
-  "thumbnailUrl": "https://cdn.../thumb.webp",
+  "obverseImage": {
+    "preview": "https://cdn.../obverse_300.webp",
+    "medium": "https://cdn.../obverse_600.webp",
+    "large": "https://cdn.../obverse_1200.webp",
+    "attribution": "Національний банк України"
+  },
+  "reverseImage": { "...": "то же для реверса" },
+  "thumbnailUrl": "https://cdn.../obverse_300.webp",
   "isOwn": false,
   "isArchived": false,
   "archiveReason": null,
-  "sourceUrl": "https://ru.ucoin.net/coin/ua-2uah-2018-dolphin"
+  "sourceUrl": "https://www.ua-coins.info/ua/list/512-delfin"
 }
 ```
 
-`title` — готовое к показу название по правилу
-`title_uk → title_original → title_en → title_ru` (`02-data-model.md`). Отдельные поля
-переводов отдаются как есть, для карточки редактирования.
+`title` — готовое к показу название по правилу `title_{локаль} → title_original`
+(`02-data-model.md`). Локаль ответа: `?locale=uk|en`, иначе `Accept-Language`, иначе `uk`.
+По той же локали приходят `country`, `seriesName`, `denomination.label` и
+`composition.name`. Слоты отдаются как есть — для формы редактирования и для строки
+«Оригінал: …» в карточке.
+
+`denomination` — структура плюс готовая подпись; `composition` — ряд справочника
+материалов, а `material` остаётся заполненным только там, где исходную строку разобрать
+не удалось.
+
+`obverseImage` / `reverseImage` — три хранимых размера одного снимка и подпись
+первоисточника. Страница берёт `preview` в списке, `medium` в карточке, `large` в
+лайтбоксе и предлагает следующий размер на 2x. У снимка, которого нет в большем размере,
+поля повторяют наибольший имеющийся (`06-media-storage.md`).
 
 `quantityOwned`, `purchaseTotalUah` и `marketPriceUah` считаются для текущего пользователя.
 `isOwn` — `true` у личной позиции (`created_by` = текущий пользователь), `false` у общей;

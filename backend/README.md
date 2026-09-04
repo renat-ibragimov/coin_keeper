@@ -156,6 +156,134 @@ strategy A/B/C/C1 with conflicts; our items without a match; candidates to add
 (coins in two or more sources that we lack); image availability and sizes; the
 price ratio ua-coins/ours; title differences; the quoted terms of use.
 
+## Ukrainian pipeline (stage 4.5, part B)
+
+The step that writes. It links our catalogue to the three sources, fills the
+gaps, takes the official names, series and photographs from the National Bank
+and records one price per coin. What each step does and why:
+`../docs/05-integrations.md`, section 9.
+
+`scripts/ukraine_pipeline.py` is the command line; the steps are in
+`app/ukraine_pipeline/`. It reads the database through the same `DATABASE_URL`
+as the API and uploads to the same MinIO, so it runs inside the api container.
+
+**Nothing is written without `--apply`.** The default is a dry run: it fetches,
+decides, reports, and changes nothing.
+
+### 0. Back up the database first
+
+Not optional. The pipeline rewrites the name of every Ukrainian coin, and
+`--apply` has no undo.
+
+```bash
+# The dump is written inside the container and copied out: never through
+# stdout of `docker compose exec`, which corrupts binary output.
+docker compose exec -T db pg_dump -U coinkeeper -Fc -f /tmp/before-ukraine.dump coinkeeper
+docker cp "$(docker compose ps -q db)":/tmp/before-ukraine.dump ./before-ukraine.dump
+
+# A dump nobody checked is not a backup.
+head -c 5 before-ukraine.dump          # must print PGDMP
+pg_restore --list before-ukraine.dump | head
+```
+
+### 1. Dry run, whole pipeline
+
+```bash
+docker compose run --rm \
+  -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py \
+    --report /reports/ukraine.json \
+    --cache-dir /reports/ukraine-cache \
+    --review-out /reports/bridge-review.csv
+```
+
+Read the summary before anything else:
+
+- `sources` — is `ua_coins` `live` or `wayback`? Live means the prices come
+  from the site itself.
+- `bridge` — `linked` / `toReview` / `withoutCandidates`. On the rehearsal
+  against a copy of the production data: 797 / 160 / 103.
+- `series.unmappedNames` — anything listed here needs a line in
+  `app/ukraine_recon/series_map.json` before the real run.
+- `gaps.created` — how many coins the issuer has and we do not (~237).
+- `titles.wikipediaDisagreements` — where Wikipedia tells a different story.
+
+### 2. Link what is certain
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps bridge \
+    --report /reports/ukraine-bridge.json --cache-dir /reports/ukraine-cache \
+    --review-out /reports/bridge-review.csv
+```
+
+### 3. Review the rest by hand
+
+`bridge-review.csv` has one row per candidate, ordered by score. Put `yes` in
+the first column of the row that is the coin, leave the others empty. The
+`claimedBy` column names the record that already took that coin — when it is
+filled, the two records are a duplicate in our catalogue and only one of them
+can win.
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps bridge \
+    --apply-review /reports/bridge-review.csv \
+    --report /reports/ukraine-bridge-2.json --cache-dir /reports/ukraine-cache
+```
+
+Only one row per item may say yes; two is an error, not a preference.
+
+### 4. Series, gaps, titles
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps series,gaps,titles \
+    --report /reports/ukraine-names.json --cache-dir /reports/ukraine-cache
+```
+
+Series before gaps: gaps creates records under the NBU series names, and
+renaming ours afterwards would collide with what it just made. The script
+enforces the order; `--steps` only chooses which of them run.
+
+### 5. Photos, in portions
+
+The NBU serves 1600 px PNGs of three to four megabytes each. Take them a few
+hundred at a time; the cache means an interrupted run costs nothing to repeat,
+and `alreadyStored` in the report says how far it got.
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps photos --limit 200 \
+    --report /reports/ukraine-photos.json --cache-dir /reports/ukraine-cache
+```
+
+Repeat until `itemsLeft` is 0. `totalMegabytes` in the report is what actually
+went into MinIO, and `itemsWithoutAnyImage` is what no source has a picture of.
+
+### 6. Prices
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps prices \
+    --report /reports/ukraine-prices.json --cache-dir /reports/ukraine-cache
+```
+
+`suspect` and `byRule` say what failed the price checks; those snapshots are
+stored flagged, not dropped, and stay out of the collection value.
+
+### Flags
+
+- `--steps bridge,series,gaps,titles,photos,prices` — any subset.
+- `--limit N` — stop `photos` and `gaps` after N items.
+- `--ua-coins auto|live|wayback|skip` — `auto` tries the site and falls back to
+  the Wayback Machine copy.
+- `--since-year N` — only coins issued in or after that year, for a trial.
+- `--pause SECONDS` (default 0.45), `--cache-dir DIR`.
+
+Exit codes: `0` fine, `2` bad arguments, `3` the NBU could not be read,
+`5` the run stopped on a condition it cannot continue past.
+
 ## Legacy data migration
 
 Moves the desktop SQLite database into PostgreSQL. Specification:
@@ -291,6 +419,10 @@ app/models/        SQLAlchemy models — the whole schema, including tables the
                    MVP does not use yet (docs/01-scope-mvp.md)
 app/schemas/       Pydantic v2, camelCase on the wire
 app/core/          settings, security, rate limiting, mail backends, logging
+app/reference_data/ countries, denomination units, materials — data and parsers
+app/legacy_migration/ the one-off import of the desktop database
+app/ukraine_recon/ read-only parsers for the three Ukrainian sources (part A)
+app/ukraine_pipeline/ the steps that write from them (part B)
 app/db/            engine and session
 alembic/           migrations
 scripts/           operational scripts

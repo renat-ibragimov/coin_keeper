@@ -14,7 +14,7 @@
 | Нет пользователей | `users` + `owner_id` | сервис многопользовательский |
 | `original_path` — путь или URL вперемешку | раздельные `storage_key` и `external_url` | см. `06-media-storage.md` |
 | Единая база на человека | Общий каталог + личные позиции + личные коллекции | см. ниже |
-| `title_original / title_ru / title_en` колонками | остаётся колонками, добавляется `title_uk` | переводов немного, отдельная таблица избыточна |
+| `title_original / title_ru / title_en` колонками | три слота колонками: `*_original` + `*_uk` + `*_en`, русского слота нет | переводов немного, отдельная таблица избыточна |
 
 ## Разделение общего и личного
 
@@ -112,18 +112,65 @@ updated_at      timestamptz NOT NULL DEFAULT now()
 
 Требуется расширение `citext` — email сравниваем без учёта регистра.
 
+## Три языковых слота
+
+Правило, общее для всех именованных сущностей — страны, серии, монеты:
+
+```
+<имя>_original    как называет эмитент; НИКОГДА не переводится
+original_lang     ISO 639-1: язык, на котором написан original
+<имя>_uk          украинский перевод
+<имя>_en          английский перевод
+<имя>_uk_source   official | llm | manual — откуда взят перевод
+<imя>_en_source   то же
+```
+
+Русский языком-исключением не является. У СССР русский — это `original`
+(`original_lang = 'ru'`), у США английский, у Украины украинский; отдельных колонок
+`title_ru` / `name_ru` / `label_ru` в схеме нет (миграция `0003`). Слот перевода,
+дословно повторяющий оригинал, — не перевод: такие значения обнулены.
+
+Эталон, к которому идём (польская монета):
+
+| Слот | Значение |
+|---|---|
+| `title_original` (`pl`) | `W Polskę wierzę – Pieśń „Rota”` |
+| `title_uk` | `Я вірю в Польщу — пісня „Рота“` |
+| `title_en` | `I Believe in Poland — the Song ‘Rota’` |
+
+`*_source` отвечает на вопрос «этому переводу можно верить?»: `official` — так написал сам
+эмитент (украинский и английский сайты НБУ), `llm` — машинный перевод (этап 4.5, часть C),
+`manual` — правка человека. У `*_original` источника нет: он не перевод.
+
 ### countries
 
 ```
 id                bigserial PK
-code              text UNIQUE           -- ISO, опционально: у СССР его нет
-name_original     text NOT NULL
-name_ru, name_en  text
+code              text UNIQUE     -- ISO 3166-1 alpha-2; alpha-4 из 3166-3 или X+3 у исторических
+name_original     text NOT NULL   -- эндоним: 'Україна', 'Polska', 'СССР'
+original_lang     text NOT NULL
+name_uk, name_en  text
 collect_variants  boolean NOT NULL DEFAULT false
 is_active         boolean NOT NULL DEFAULT true
+sort_order        int NOT NULL DEFAULT 100
 created_at, updated_at timestamptz
 UNIQUE (name_original)
 ```
+
+Таблица засеяна **всеми странами-эмитентами**: 249 стран ISO 3166-1 (эндоним, украинское и
+английское название — из CLDR) плюс исторические государства, у которых названий в ISO нет
+и которым CLDR подставляет преемника (`SU` отвечает «Росія»): СРСР, РСФРР, Російська
+імперія, УНР, Австро-Угорщина, Німецька імперія, НДР, Чехословаччина, Югославія, Сербія і
+Чорногорія, Нідерландські Антильські острови. Сид — `app/reference_data/countries.json`.
+
+`is_active` — витрина: чипы фильтра и общий каталог по умолчанию. Форма «створити свою
+позицію» предлагает **все** страны с поиском по любому из трёх имён и по коду: личная
+позиция может быть монетой какого угодно эмитента (`04-business-rules.md`, п. 2).
+Сид активирует только Украину; страна, которая уже была в базе, сохраняет своё состояние
+и, что важнее, свой `id`.
+
+`sort_order` — порядок на витрине: Украина `0`, остальные `100`, дальше по имени в локали
+читателя.
 
 `collect_variants` — режим учёта разновидностей для страны из ТЗ (раздел 5). В MVP не
 используется, но поле сохраняем.
@@ -139,17 +186,51 @@ decimal_places  smallint NOT NULL DEFAULT 2
 
 ### denominations
 
+Номинал — структура, а не строка: строку нельзя показать на другом языке и нельзя
+отсортировать.
+
 ```
 id                bigserial PK
 country_id        bigint NOT NULL FK countries
-currency_code     text FK currencies
-value_minor_units bigint          -- номинал в копейках/центах, для сортировки
-label_original    text NOT NULL   -- '5 гривен', '1 cent'
-label_ru, label_en text
-sort_order        int NOT NULL DEFAULT 0
+currency_code     text NOT NULL FK currencies
+value             numeric(14,3) NOT NULL  -- число в названной единице: 5 для «5 копійок»
+unit              text NOT NULL           -- hryvnia | kopiika | karbovanets | ruble |
+                                          -- kopeck | poltinnik | chervonets |
+                                          -- dollar | dime | cent
+sort_order        int NOT NULL DEFAULT 0  -- номинал в минимальной единице валюты
 is_active         boolean NOT NULL DEFAULT true
-UNIQUE (country_id, label_original)
+UNIQUE (country_id, currency_code, unit, value)
 ```
+
+Подпись рендерится по локали запроса с правилами множественного числа CLDR:
+«5 копійок» / «5 kopecks», «1 000 000 карбованців» / «1,000,000 karbovantsi», «¼ долара».
+Правила и единицы — `app/reference_data/denominations.py`.
+
+`sort_order` ставит 50 копійок перед 1 гривнею; `value` разводит единицы равной цены
+(25 центів и ¼ долара). Валюты сверх трёх мигрированных: `UAK` (карбованець 1992–1996)
+и `SUR` (радянський рубль).
+
+Миграция `0003` разобрала 52 легаси-подписи по шаблонам; шесть американских номиналов
+лежали дважды — русской и английской подписью, — и слились в один ряд с перепривязкой
+монет. Неразбираемая подпись останавливает миграцию со списком: угадать номинал значит
+показать владельцу неверное число.
+
+### materials
+
+Справочник составов, засеянный по факту встречающегося в каталоге, а не по общему списку
+сплавов: около тридцати значений покрывают все 3063 позиции.
+
+```
+id       bigserial PK
+code     text NOT NULL UNIQUE   -- 'silver_925', 'nickel_silver', 'copper_plated_zinc'
+name_uk  text NOT NULL
+name_en  text NOT NULL
+```
+
+`catalog_items.material` был свободным текстом импортёра uCoin —
+«Цинк с медным покрытием, 2.5g, ø 19mm», а в худшем случае с приклеенным впереди
+заголовком монеты. Миграция `0003` разобрала его на `composition_id`, `weight_grams` и
+`diameter_mm`; что разобрать не удалось, осталось текстом в `material` и попало в отчёт.
 
 ### coin_series
 
@@ -157,7 +238,9 @@ UNIQUE (country_id, label_original)
 id                bigserial PK
 country_id        bigint NOT NULL FK countries ON DELETE CASCADE
 name_original     text NOT NULL
-name_ru, name_en  text
+original_lang     text NOT NULL
+name_uk, name_en  text
+name_uk_source, name_en_source  translation_source
 description       text
 start_year, end_year int
 created_at, updated_at timestamptz
@@ -177,12 +260,15 @@ denomination_id    bigint FK denominations ON DELETE SET NULL
 collection_group   collection_group NOT NULL
 subtype            text
 title_original     text NOT NULL
-title_uk, title_ru, title_en  text
+original_lang      text NOT NULL DEFAULT 'uk'
+title_uk, title_en text
+title_uk_source, title_en_source  translation_source
 issue_year         int NOT NULL
 issue_date         date
 mintage_announced  bigint
 mintage_actual     bigint
-material           text
+composition_id     bigint FK materials ON DELETE SET NULL
+material           text              -- только то, что не разобралось в composition_id
 metal_kind         metal_kind NOT NULL DEFAULT 'unknown'
 weight_grams       numeric(10,3)
 diameter_mm        numeric(8,2)
@@ -220,14 +306,17 @@ created_at, updated_at timestamptz
 
 ### Отображение названия
 
-Первое заполненное из:
-
 ```
-title_uk → title_original → title_en → title_ru
+title_{локаль} → title_original
 ```
 
-`title_ru` не удаляем: в мигрированных данных лежат русские названия из uCoin, и для части
-позиций это единственное название кроме оригинала.
+И всё: за оригиналом ничего нет. Оригинал — `NOT NULL` и написан на языке эмитента, так что
+это всегда осмысленный ответ, а не пустая строка. Русского слота, в который можно было бы
+провалиться, больше нет — для советской части каталога русский **и есть** оригинал.
+
+Локаль ответа берётся из `?locale=`, иначе из `Accept-Language`, иначе украинская. По той же
+формуле идёт сортировка списков: каталог «по стране» упорядочен по имени, которое видит
+читатель, а не по оригиналу.
 
 Индексы:
 
@@ -254,11 +343,11 @@ CREATE UNIQUE INDEX catalog_items_source_key_shared_idx ON catalog_items (source
 CREATE UNIQUE INDEX catalog_items_source_key_own_idx ON catalog_items (created_by, source_key)
   WHERE source_key IS NOT NULL AND created_by IS NOT NULL;
 
--- полнотекстовый поиск по всем вариантам названия, только по активным
+-- полнотекстовый поиск по всем трём слотам названия, только по активным
 CREATE INDEX catalog_items_search_idx ON catalog_items
   USING gin (to_tsvector('simple',
     coalesce(title_original,'') || ' ' || coalesce(title_uk,'') || ' ' ||
-    coalesce(title_ru,'')       || ' ' || coalesce(title_en,'')))
+    coalesce(title_en,'')))
   WHERE NOT is_archived;
 ```
 
@@ -444,9 +533,10 @@ role              media_role NOT NULL
 source            media_source NOT NULL DEFAULT 'user_upload'
 license           text            -- условия использования, если известны
 attribution       text            -- обязательная подпись к изображению, если требуется
-storage_key       text            -- ключ в S3, если файл наш
+storage_key       text            -- ключ самого большого хранимого размера
 external_url      text            -- если изображение с чужого сервера
-thumbnail_key     text
+thumbnail_key     text            -- ключ превью (300 px)
+variants          jsonb           -- {"300": ключ, "600": ключ, "1200": ключ}
 mime_type         text
 width, height     int
 size_bytes        bigint
@@ -459,12 +549,18 @@ CHECK (storage_key IS NOT NULL OR external_url IS NOT NULL)
 Разделение `storage_key` / `external_url` — исправление legacy, где в одном поле лежали
 и локальные пути, и ссылки на `i.ucoin.net`. Подробности в `06-media-storage.md`.
 
+`variants` перечисляет **фактически** сохранённые размеры. Ничего не растягивается: у
+источника в 600 px варианта 1200 просто нет, и ряд об этом честно молчит вместо того, чтобы
+пообещать файл, которого нет. У записей, сделанных до миграции `0004`, `variants` пуст, и
+сборщик URL берёт `storage_key` с `thumbnail_key` — перезаливать ничего не нужно.
+
 `source` — происхождение изображения, от него зависит видимость:
 
 | `source` | Что это | Кто видит |
 |---|---|---|
 | `user_upload` | фото пользователя | владелец (`owner_id`) |
 | `nbu` | официальное каталожное фото НБУ | все |
+| `ua_coins` | взято с ua-coins.info там, где у НБУ фото нет | все, с подписью |
 | `ucoin` | взято с uCoin — своё или скачанное | только импортировавший пользователь |
 | `manual` | добавлено администратором вручную | все |
 
