@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from sqlalchemy import BigInteger, CheckConstraint, ForeignKey, Index, Integer, Text
-from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at_column
@@ -35,9 +35,12 @@ class MediaFile(Base):
     )
     license: Mapped[str | None] = mapped_column(Text)
     attribution: Mapped[str | None] = mapped_column(Text)
+    # The largest stored size and the preview; `variants` has all of them,
+    # keyed by the long side in pixels (docs/06-media-storage.md).
     storage_key: Mapped[str | None] = mapped_column(Text)
     external_url: Mapped[str | None] = mapped_column(Text)
     thumbnail_key: Mapped[str | None] = mapped_column(Text)
+    variants: Mapped[dict[str, str] | None] = mapped_column(JSONB)
     mime_type: Mapped[str | None] = mapped_column(Text)
     width: Mapped[int | None] = mapped_column(Integer)
     height: Mapped[int | None] = mapped_column(Integer)

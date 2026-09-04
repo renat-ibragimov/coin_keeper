@@ -306,9 +306,15 @@ async def test_media_split_and_provenance(
     assert len(report.media_missing_file) == 1
     assert report.skipped.get("media_files_without_file_or_url") == 1
 
-    # Both the original and the thumbnail reached storage.
+    # Every size the source was big enough for reached storage, and the row
+    # names exactly those (docs/06-media-storage.md).
     assert len(storage.objects) == 6
-    assert any(key.endswith("_thumb.webp") for key in storage.objects)
+    assert all(key.endswith(("_300.webp", "_600.webp", "_1200.webp")) for key in storage.objects)
+    for row in stored:
+        assert row.variants
+        assert set(row.variants.values()) <= set(storage.objects)
+        assert row.thumbnail_key == row.variants["300"]
+        assert row.storage_key == row.variants[max(row.variants, key=int)]
 
 
 async def test_stored_images_are_webp_within_the_size_limit(
@@ -320,7 +326,8 @@ async def test_stored_images_are_webp_within_the_size_limit(
     for key, payload in storage.objects.items():
         with Image.open(io.BytesIO(payload)) as image:
             assert image.format == "WEBP"
-            limit = 300 if key.endswith("_thumb.webp") else 1600
+            # The key names the size it holds; nothing is ever upscaled.
+            limit = int(key.rsplit("_", 1)[1].removesuffix(".webp"))
             assert max(image.size) <= limit
 
 

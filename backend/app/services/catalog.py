@@ -36,10 +36,11 @@ from app.schemas.catalog import (
     CatalogItemUpdate,
     CatalogListItem,
     CoinDenomination,
+    CoinImageOut,
     CoinMaterial,
     PriceHistoryItem,
 )
-from app.services.media_urls import CatalogImages, MediaUrlBuilder
+from app.services.media_urls import CatalogImages, CoinImage, MediaUrlBuilder
 
 
 class CatalogError(Exception):
@@ -85,6 +86,17 @@ class BadReferenceError(CatalogError):
 def display_title(item: CatalogItem, locale: str = DEFAULT_LOCALE) -> str:
     """title_{locale} → title_original (docs/04-business-rules.md)."""
     return pick_name(locale, uk=item.title_uk, en=item.title_en, original=item.title_original)
+
+
+def _image_out(image: CoinImage | None) -> CoinImageOut | None:
+    if image is None:
+        return None
+    return CoinImageOut(
+        preview=image.preview,
+        medium=image.medium,
+        large=image.large,
+        attribution=image.attribution,
+    )
 
 
 def denomination_out(denomination: Denomination | None, locale: str) -> CoinDenomination | None:
@@ -375,8 +387,8 @@ class CatalogService:
             "price_observed_at": row.price_observed_at,
             "quantity_owned": row.quantity_owned,
             "purchase_total_uah": row.purchase_total_uah,
-            "obverse_image_url": images.obverse_url,
-            "reverse_image_url": images.reverse_url,
+            "obverse_image": _image_out(images.obverse),
+            "reverse_image": _image_out(images.reverse),
             "thumbnail_url": images.thumbnail_url,
             "is_own": item.created_by == self._user.id,
             "is_archived": item.is_archived,

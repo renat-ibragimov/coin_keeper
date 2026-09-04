@@ -28,6 +28,15 @@ class CoinMaterial(CamelModel):
     name: str
 
 
+class CoinImageOut(CamelModel):
+    """One side of a coin at the sizes stored for it, plus who to credit."""
+
+    preview: str | None
+    medium: str | None
+    large: str | None
+    attribution: str | None
+
+
 class CatalogListItem(CamelModel):
     id: int
     country: str
@@ -53,8 +62,8 @@ class CatalogListItem(CamelModel):
     price_observed_at: datetime | None
     quantity_owned: int
     purchase_total_uah: Money
-    obverse_image_url: str | None
-    reverse_image_url: str | None
+    obverse_image: CoinImageOut | None
+    reverse_image: CoinImageOut | None
     thumbnail_url: str | None
     is_own: bool
     is_archived: bool

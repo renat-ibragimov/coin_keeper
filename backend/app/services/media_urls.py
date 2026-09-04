@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from app.core.config import get_settings
+from app.core.images import LARGE_SIDE, MEDIUM_SIDE, PREVIEW_SIDE
 from app.core.storage import ObjectStorage, build_s3_client
 from app.models import MediaFile
 from app.models.enums import MediaRole, MediaSource
@@ -23,14 +24,30 @@ _SOURCE_PRIORITY = {
     MediaSource.USER_UPLOAD: 0,
     MediaSource.NBU: 1,
     MediaSource.MANUAL: 1,
-    MediaSource.UCOIN: 2,
+    MediaSource.UA_COINS: 2,
+    MediaSource.UCOIN: 3,
 }
 
 
 @dataclass
+class CoinImage:
+    """One side of a coin at the sizes that are stored for it.
+
+    A page picks by where it shows the coin — a listing takes the preview, a
+    card the medium, the lightbox the large — and uses the next size up for a
+    dense screen (docs/06-media-storage.md).
+    """
+
+    preview: str | None = None
+    medium: str | None = None
+    large: str | None = None
+    attribution: str | None = None
+
+
+@dataclass
 class CatalogImages:
-    obverse_url: str | None = None
-    reverse_url: str | None = None
+    obverse: CoinImage | None = None
+    reverse: CoinImage | None = None
     thumbnail_url: str | None = None
 
 
@@ -54,6 +71,33 @@ class MediaUrlBuilder:
             return self._storage.presigned_get_url(media.thumbnail_key, PRESIGN_TTL_SECONDS)
         return self.file_url(media)
 
+    def image_of(self, media: MediaFile) -> CoinImage:
+        """The stored sizes of one image.
+
+        Rows written before the three-size layout have two keys and no
+        variants; they answer with what they have rather than with nothing.
+        """
+        variants = media.variants or {}
+        if not variants:
+            whole = self.file_url(media)
+            return CoinImage(
+                preview=self.thumbnail_url(media),
+                medium=whole,
+                large=whole,
+                attribution=media.attribution,
+            )
+
+        def at(side: int) -> str | None:
+            key = variants.get(str(side))
+            return self._storage.presigned_get_url(key, PRESIGN_TTL_SECONDS) if key else None
+
+        # A 600 px source has no larger form; the next size down stands in, so
+        # a lightbox never asks for a file that is not there.
+        preview = at(PREVIEW_SIDE)
+        medium = at(MEDIUM_SIDE) or preview
+        large = at(LARGE_SIDE) or medium
+        return CoinImage(preview=preview, medium=medium, large=large, attribution=media.attribution)
+
     def pick_catalog_images(self, files: list[MediaFile]) -> CatalogImages:
         """Files must already be filtered to what the viewer may see."""
         best: dict[MediaRole, MediaFile] = {}
@@ -66,8 +110,8 @@ class MediaUrlBuilder:
         reverse = best.get(MediaRole.REVERSE)
         thumbnail_source = obverse or reverse
         return CatalogImages(
-            obverse_url=self.file_url(obverse) if obverse else None,
-            reverse_url=self.file_url(reverse) if reverse else None,
+            obverse=self.image_of(obverse) if obverse else None,
+            reverse=self.image_of(reverse) if reverse else None,
             thumbnail_url=self.thumbnail_url(thumbnail_source) if thumbnail_source else None,
         )
 

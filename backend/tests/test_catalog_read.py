@@ -410,7 +410,14 @@ async def test_image_visibility_by_provenance(
             catalog_item_id=nbu_item.id,
             role=MediaRole.OBVERSE,
             source=MediaSource.NBU,
-            storage_key="catalog/1/obverse/official.webp",
+            storage_key="catalog/1/obverse/official_1200.webp",
+            thumbnail_key="catalog/1/obverse/official_300.webp",
+            variants={
+                "300": "catalog/1/obverse/official_300.webp",
+                "600": "catalog/1/obverse/official_600.webp",
+                "1200": "catalog/1/obverse/official_1200.webp",
+            },
+            attribution="Національний банк України",
         )
     )
     await db_session.commit()
@@ -420,16 +427,22 @@ async def test_image_visibility_by_provenance(
         row["id"]: row
         for row in (await client.get("/api/v1/catalog", headers=auth(ctx.token_a))).json()["items"]
     }
-    # The importer sees the hotlink as it is.
-    assert rows_a[ucoin_id]["obverseImageUrl"] == "https://i.ucoin.net/coin/dolphin-obverse.jpg"
-    # A stored official photo comes back as a presigned URL.
-    assert "catalog/1/obverse/official.webp" in rows_a[nbu_id]["obverseImageUrl"]
-    assert "Signature=" in rows_a[nbu_id]["obverseImageUrl"]
+    # The importer sees the hotlink as it is; a hotlink has only one size.
+    hotlink = rows_a[ucoin_id]["obverseImage"]
+    assert hotlink["medium"] == "https://i.ucoin.net/coin/dolphin-obverse.jpg"
+    assert hotlink["large"] == hotlink["medium"]
+    # A stored official photo comes back as a presigned URL per size.
+    official = rows_a[nbu_id]["obverseImage"]
+    assert "official_300.webp" in official["preview"]
+    assert "official_600.webp" in official["medium"]
+    assert "official_1200.webp" in official["large"]
+    assert all("Signature=" in url for url in (official["preview"], official["large"]))
+    assert official["attribution"] == "Національний банк України"
 
     rows_b = {
         row["id"]: row
         for row in (await client.get("/api/v1/catalog", headers=auth(ctx.token_b))).json()["items"]
     }
     # For anyone else the uCoin image is a placeholder, the NBU one is public.
-    assert rows_b[ucoin_id]["obverseImageUrl"] is None
-    assert rows_b[nbu_id]["obverseImageUrl"] is not None
+    assert rows_b[ucoin_id]["obverseImage"] is None
+    assert rows_b[nbu_id]["obverseImage"] is not None

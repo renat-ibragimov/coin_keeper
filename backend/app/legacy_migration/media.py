@@ -8,11 +8,19 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from app.core.images import ImageRejectedError, ProcessedImage, process_image
+from app.core.media_keys import (
+    catalog_base,
+    collection_base,
+    preview_key_of,
+    primary_key_of,
+    variant_key,
+    variant_keys,
+)
 from app.models.enums import MediaSource
 
 UCOIN_MARKERS = ("ucoin.net", "ucoin.")
@@ -34,6 +42,7 @@ class PreparedMedia:
     external_url: str | None = None
     storage_key: str | None = None
     thumbnail_key: str | None = None
+    variants: dict[int, str] = field(default_factory=dict)
     mime_type: str | None = None
     width: int | None = None
     height: int | None = None
@@ -102,16 +111,13 @@ def resolve_local_source(
     return MediaSource.USER_UPLOAD
 
 
-def storage_key_for(row: Mapping[str, Any], *, owner_id: int, suffix: str = ".webp") -> str:
-    """Layout from docs/06-media-storage.md."""
+def storage_base_for(row: Mapping[str, Any], *, owner_id: int) -> str:
+    """Layout from docs/06-media-storage.md, without the size and extension."""
     role = str(row["role"])
+    name = f"legacy-{row['id']}"
     if row.get("collection_item_id"):
-        return f"users/{owner_id}/{row['collection_item_id']}/{role}/legacy-{row['id']}{suffix}"
-    return f"catalog/{row['catalog_item_id']}/{role}/legacy-{row['id']}{suffix}"
-
-
-def thumbnail_key_for(storage_key: str) -> str:
-    return storage_key.replace(".webp", "_thumb.webp")
+        return collection_base(owner_id, int(row["collection_item_id"]), role, name)
+    return catalog_base(int(row["catalog_item_id"]), role, name)
 
 
 def prepare(
@@ -154,15 +160,16 @@ def prepare(
         return MediaOutcome(missing_path="")
 
     source = resolve_local_source(row.get("catalog_item_id"), ucoin_catalog_items)
-    key = storage_key_for(row, owner_id=owner_id)
+    keys = variant_keys(storage_base_for(row, owner_id=owner_id))
     prepared = PreparedMedia(
         legacy_id=legacy_id,
         catalog_item_id=row.get("catalog_item_id"),
         collection_item_id=row.get("collection_item_id"),
         role=role,
         source=source,
-        storage_key=key,
-        thumbnail_key=thumbnail_key_for(key),
+        storage_key=primary_key_of(keys),
+        thumbnail_key=preview_key_of(keys),
+        variants=keys,
         mime_type="image/webp",
     )
 
@@ -179,6 +186,14 @@ def prepare(
     except ImageRejectedError as exc:
         return MediaOutcome(rejected=(original_path, str(exc)))
 
+    # A legacy original is often smaller than 1200 px, so fewer sizes come
+    # out than were reserved; the row must name what was really stored.
+    prepared.variants = {
+        side: variant_key(storage_base_for(row, owner_id=owner_id), side)
+        for side in processed.processed_sides()
+    }
+    prepared.storage_key = primary_key_of(prepared.variants)
+    prepared.thumbnail_key = preview_key_of(prepared.variants)
     prepared.processed = processed
     prepared.width = processed.width
     prepared.height = processed.height

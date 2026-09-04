@@ -22,6 +22,7 @@ from sqlalchemy import func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.media_keys import stored_variants
 from app.core.security import hash_password
 from app.legacy_migration import convert, media, prices, reader
 from app.legacy_migration.report import MigrationReport
@@ -673,6 +674,7 @@ class MigrationRunner:
                     "storage_key": item.storage_key,
                     "external_url": item.external_url,
                     "thumbnail_key": item.thumbnail_key,
+                    "variants": stored_variants(item.variants) or None,
                     "mime_type": item.mime_type,
                     "width": item.width,
                     "height": item.height,
@@ -706,9 +708,8 @@ class MigrationRunner:
             processed = item.processed
             if processed is None or item.storage_key is None:
                 continue
-            self._storage.put(item.storage_key, processed.original, processed.mime_type)
-            if item.thumbnail_key:
-                self._storage.put(item.thumbnail_key, processed.thumbnail, processed.mime_type)
+            for side, key in item.variants.items():
+                self._storage.put(key, processed.variants[side], processed.mime_type)
             if index % MEDIA_UPLOAD_BATCH == 0 or index == total:
                 print(f"  uploaded {index}/{total} images", flush=True)
 

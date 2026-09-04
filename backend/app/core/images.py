@@ -1,7 +1,14 @@
 """Image processing rules from docs/06-media-storage.md.
 
-The original is not kept as uploaded: coins are round and small, 1600 px on the
-long side is plenty, and the saving is substantial.
+Three sizes, one format. A listing shows a coin at about 150 px, a card at
+about 300, and the lightbox as large as the screen allows; serving one file for
+all three either wastes bandwidth or blurs the lightbox. So every image is
+stored as 300, 600 and 1200 px WebP at quality 80, and the page picks with
+srcset.
+
+The source file is not kept. Coins are round and small, 1200 px is past the
+point where more resolution shows more coin, and the National Bank's 1600 px
+PNGs are about four megabytes each.
 """
 
 from __future__ import annotations
@@ -9,15 +16,17 @@ from __future__ import annotations
 import hashlib
 import io
 from dataclasses import dataclass
+from typing import Final
 
 from PIL import Image, UnidentifiedImageError
 
-MAX_SOURCE_BYTES = 10 * 1024 * 1024
+MAX_SOURCE_BYTES = 12 * 1024 * 1024
 MAX_SOURCE_SIDE = 4000
-ORIGINAL_MAX_SIDE = 1600
-ORIGINAL_QUALITY = 85
-THUMBNAIL_SIDE = 300
-THUMBNAIL_QUALITY = 80
+QUALITY = 80
+PREVIEW_SIDE: Final = 300
+MEDIUM_SIDE: Final = 600
+LARGE_SIDE: Final = 1200
+VARIANT_SIDES: Final = (PREVIEW_SIDE, MEDIUM_SIDE, LARGE_SIDE)
 ACCEPTED_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
 
 
@@ -27,17 +36,34 @@ class ImageRejectedError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class ProcessedImage:
-    original: bytes
-    thumbnail: bytes
+    """The same picture at every stored size, plus what the row records."""
+
+    variants: dict[int, bytes]
     width: int
     height: int
     size_bytes: int
     sha256: str
     mime_type: str = "image/webp"
 
+    @property
+    def largest(self) -> bytes:
+        return self.variants[max(self.variants)]
+
+    @property
+    def preview(self) -> bytes:
+        return self.variants[PREVIEW_SIDE]
+
+    @property
+    def total_bytes(self) -> int:
+        return sum(len(payload) for payload in self.variants.values())
+
+    def processed_sides(self) -> tuple[int, ...]:
+        """The sizes that came out — a small source yields fewer than three."""
+        return tuple(sorted(self.variants))
+
 
 def process_image(payload: bytes) -> ProcessedImage:
-    """Validate, normalise to WebP and build a thumbnail.
+    """Validate, strip metadata and encode every stored size.
 
     Raises ImageRejectedError for anything that is not an acceptable image;
     callers decide whether that is fatal or just a skipped row.
@@ -72,28 +98,34 @@ def process_image(payload: bytes) -> ProcessedImage:
         stripped = Image.new(converted.mode, converted.size)
         stripped.paste(converted)
 
-        original = stripped.copy()
-        original.thumbnail((ORIGINAL_MAX_SIDE, ORIGINAL_MAX_SIDE), Image.Resampling.LANCZOS)
-        original_bytes = _encode(original, ORIGINAL_QUALITY)
-
-        thumbnail = stripped.copy()
-        # Fits inside the box without cropping.
-        thumbnail.thumbnail((THUMBNAIL_SIDE, THUMBNAIL_SIDE), Image.Resampling.LANCZOS)
-        thumbnail_bytes = _encode(thumbnail, THUMBNAIL_QUALITY)
-
-        width, height = original.size
+        variants: dict[int, bytes] = {}
+        width = height = 0
+        seen: set[tuple[int, int]] = set()
+        for side in VARIANT_SIDES:
+            resized = stripped.copy()
+            # thumbnail() only ever shrinks: a source smaller than the box is
+            # stored at its own size rather than blown up.
+            resized.thumbnail((side, side), Image.Resampling.LANCZOS)
+            if resized.size in seen:
+                # A 600 px source would otherwise be stored twice, once as
+                # "600" and once as an identical "1200".
+                continue
+            seen.add(resized.size)
+            variants[side] = _encode(resized)
+            width, height = resized.size
 
     return ProcessedImage(
-        original=original_bytes,
-        thumbnail=thumbnail_bytes,
+        variants=variants,
         width=width,
         height=height,
-        size_bytes=len(original_bytes),
-        sha256=hashlib.sha256(original_bytes).hexdigest(),
+        size_bytes=len(variants[max(variants)]),
+        # Of the source, not of our encoding: it identifies the file upstream
+        # and is what tells a second run that nothing has changed.
+        sha256=hashlib.sha256(payload).hexdigest(),
     )
 
 
-def _encode(image: Image.Image, quality: int) -> bytes:
+def _encode(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
-    image.save(buffer, format="WEBP", quality=quality, method=4)
+    image.save(buffer, format="WEBP", quality=QUALITY, method=4)
     return buffer.getvalue()
