@@ -7,26 +7,46 @@ from decimal import Decimal
 
 from pydantic import Field
 
-from app.models.enums import CollectionGroup, MetalKind
+from app.models.enums import CollectionGroup, MetalKind, TranslationSource
 from app.schemas.base import CamelModel
 from app.schemas.common import Money, Rate
+
+
+class CoinDenomination(CamelModel):
+    """Face value as structure plus the label for the requested locale."""
+
+    id: int
+    value: Decimal
+    unit: str
+    currency_code: str
+    label: str
+
+
+class CoinMaterial(CamelModel):
+    id: int
+    code: str
+    name: str
 
 
 class CatalogListItem(CamelModel):
     id: int
     country: str
     series_name: str | None
-    denomination: str | None
+    denomination: CoinDenomination | None
     year: int
+    # The name in the requested locale, and the slots it was chosen from.
     title: str
     title_original: str
+    original_lang: str
     title_uk: str | None
-    title_ru: str | None
+    title_uk_source: TranslationSource | None
     title_en: str | None
+    title_en_source: TranslationSource | None
     variety: str | None
     catalog_number: str | None
     collection_group: CollectionGroup
     metal_kind: MetalKind
+    composition: CoinMaterial | None
     material: str | None
     market_price_uah: Money | None
     price_source: str | None
@@ -73,13 +93,14 @@ class CatalogItemCreate(CamelModel):
     collection_group: CollectionGroup
     subtype: str | None = None
     title_original: str = Field(min_length=1, max_length=500)
+    original_lang: str = Field(default="uk", min_length=2, max_length=8)
     title_uk: str | None = Field(default=None, max_length=500)
-    title_ru: str | None = Field(default=None, max_length=500)
     title_en: str | None = Field(default=None, max_length=500)
     issue_year: int = Field(ge=1, le=2200)
     issue_date: date | None = None
     mintage_announced: int | None = Field(default=None, ge=0)
     mintage_actual: int | None = Field(default=None, ge=0)
+    composition_id: int | None = None
     material: str | None = Field(default=None, max_length=200)
     metal_kind: MetalKind = MetalKind.UNKNOWN
     weight_grams: Decimal | None = Field(default=None, ge=0)
@@ -104,13 +125,14 @@ class CatalogItemUpdate(CamelModel):
     collection_group: CollectionGroup | None = None
     subtype: str | None = None
     title_original: str | None = Field(default=None, min_length=1, max_length=500)
+    original_lang: str | None = Field(default=None, min_length=2, max_length=8)
     title_uk: str | None = Field(default=None, max_length=500)
-    title_ru: str | None = Field(default=None, max_length=500)
     title_en: str | None = Field(default=None, max_length=500)
     issue_year: int | None = Field(default=None, ge=1, le=2200)
     issue_date: date | None = None
     mintage_announced: int | None = Field(default=None, ge=0)
     mintage_actual: int | None = Field(default=None, ge=0)
+    composition_id: int | None = None
     material: str | None = Field(default=None, max_length=200)
     metal_kind: MetalKind | None = None
     weight_grams: Decimal | None = Field(default=None, ge=0)

@@ -14,9 +14,11 @@ from typing import Any
 from sqlalchemy import ColumnElement, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE
 from app.models import CatalogItem, CoinSeries, CollectionItem, Country, Denomination, Expense
 from app.models.enums import ExpenseCategory
 from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
+from app.repositories.localization import localized
 
 
 @dataclass
@@ -34,7 +36,7 @@ class CollectionRow:
     catalog_item: CatalogItem
     country: str
     series_name: str | None
-    denomination: str | None
+    denomination: Denomination | None
     market_price_uah: Decimal | None = None
 
 
@@ -47,9 +49,12 @@ def _total_uah() -> ColumnElement[Any]:
 
 
 class CollectionRepository:
-    def __init__(self, session: AsyncSession, *, owner_id: int) -> None:
+    def __init__(
+        self, session: AsyncSession, *, owner_id: int, locale: str = DEFAULT_LOCALE
+    ) -> None:
         self._session = session
         self._owner_id = owner_id
+        self._locale = locale
 
     async def list_page(
         self, filters: CollectionFilters, *, limit: int, offset: int
@@ -73,7 +78,12 @@ class CollectionRepository:
         descending = filters.order == "desc"
         sort_columns: dict[str, Any] = {
             "date": CollectionItem.acquisition_date,
-            "title": func.coalesce(CatalogItem.title_uk, CatalogItem.title_original),
+            "title": localized(
+                self._locale,
+                uk=CatalogItem.title_uk,
+                en=CatalogItem.title_en,
+                original=CatalogItem.title_original,
+            ),
             "total": _total_uah(),
         }
         column = sort_columns.get(filters.sort, sort_columns["date"])
@@ -94,9 +104,19 @@ class CollectionRepository:
             select(
                 CollectionItem,
                 CatalogItem,
-                Country.name_original.label("country"),
-                CoinSeries.name_original.label("series_name"),
-                Denomination.label_original.label("denomination"),
+                localized(
+                    self._locale,
+                    uk=Country.name_uk,
+                    en=Country.name_en,
+                    original=Country.name_original,
+                ).label("country"),
+                localized(
+                    self._locale,
+                    uk=CoinSeries.name_uk,
+                    en=CoinSeries.name_en,
+                    original=CoinSeries.name_original,
+                ).label("series_name"),
+                Denomination,
                 latest_price_uah_for(CatalogItem.id, self._owner_id).label("market_price_uah"),
             )
             .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
@@ -112,7 +132,7 @@ class CollectionRepository:
             catalog_item=row.CatalogItem,
             country=row.country,
             series_name=row.series_name,
-            denomination=row.denomination,
+            denomination=row.Denomination,
             market_price_uah=row.market_price_uah,
         )
 

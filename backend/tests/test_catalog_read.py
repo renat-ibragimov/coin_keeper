@@ -181,7 +181,7 @@ async def test_search(client: AsyncClient, db_session: AsyncSession, ctx: Simple
     by_number = await client.get("/api/v1/catalog?q=KM%23%20123", headers=headers)
     assert [i["id"] for i in by_number.json()["items"]] == [dolphin.id]
 
-    by_country = await client.get("/api/v1/catalog?q=США", headers=headers)
+    by_country = await client.get("/api/v1/catalog?q=Сполучені", headers=headers)
     assert [i["id"] for i in by_country.json()["items"]] == [cent.id]
 
     by_year = await client.get("/api/v1/catalog?q=1914", headers=headers)
@@ -344,7 +344,9 @@ async def test_card_and_own_instances(
     assert card["title"] == "Дельфін"
     assert card["countryId"] == refs.ukraine.id
     assert card["seriesName"] == "Флора і фауна"
-    assert card["denomination"] == "2 гривні"
+    assert card["denomination"]["label"] == "2 гривні"
+    assert card["denomination"]["value"] == "2.000"
+    assert card["denomination"]["unit"] == "hryvnia"
     assert card["catalogNumber"] == "KM# 123"
     assert card["quantityOwned"] == 1
     assert card["purchaseTotalUah"] == "666.00"

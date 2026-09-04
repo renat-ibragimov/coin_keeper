@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE, pick_name
 from app.models import CoinSeries, Country, User
 from app.models.enums import UserRole
 from app.repositories.series import SeriesRepository
@@ -36,13 +37,17 @@ class UnknownCountryError(SeriesError):
     detail = "Unknown countryId."
 
 
-def _out(series: CoinSeries) -> SeriesOut:
+def _out(series: CoinSeries, locale: str = DEFAULT_LOCALE) -> SeriesOut:
     return SeriesOut(
         id=series.id,
         country_id=series.country_id,
-        name=series.name_original,
-        name_ru=series.name_ru,
+        name=pick_name(locale, uk=series.name_uk, en=series.name_en, original=series.name_original),
+        name_original=series.name_original,
+        original_lang=series.original_lang,
+        name_uk=series.name_uk,
+        name_uk_source=series.name_uk_source,
         name_en=series.name_en,
+        name_en_source=series.name_en_source,
         description=series.description,
         start_year=series.start_year,
         end_year=series.end_year,
@@ -50,18 +55,20 @@ def _out(series: CoinSeries) -> SeriesOut:
 
 
 class SeriesService:
-    def __init__(self, session: AsyncSession, user: User) -> None:
+    def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
         self._session = session
         self._user = user
-        self._repo = SeriesRepository(session, user_id=user.id)
+        self._locale = locale
+        self._repo = SeriesRepository(session, user_id=user.id, locale=locale)
 
     async def list_series(self, country_id: int | None) -> list[SeriesOut]:
-        return [_out(series) for series in await self._repo.list_series(country_id)]
+        return [_out(series, self._locale) for series in await self._repo.list_series(country_id)]
 
     async def create(self, payload: SeriesCreate) -> SeriesOut:
         if self._user.role != UserRole.ADMIN:
             raise SeriesForbiddenError
-        if await self._session.get(Country, payload.country_id) is None:
+        country = await self._session.get(Country, payload.country_id)
+        if country is None:
             raise UnknownCountryError
         name = payload.name.strip()
         if await self._repo.find_by_name(payload.country_id, name) is not None:
@@ -69,12 +76,14 @@ class SeriesService:
         series = CoinSeries(
             country_id=payload.country_id,
             name_original=name,
+            # A new series is named in the issuer's language by definition.
+            original_lang=country.original_lang,
             description=payload.description,
             start_year=payload.start_year,
             end_year=payload.end_year,
         )
         await self._repo.add(series)
-        return _out(series)
+        return _out(series, self._locale)
 
     async def summary(self, series_id: int) -> SeriesSummaryOut:
         if await self._repo.get(series_id) is None:
@@ -85,7 +94,9 @@ class SeriesService:
         """Every series (of a country) with its summary; the list is small,
         so the per-series aggregate is simply run for each of them."""
         return [
-            SeriesProgressOut(series=_out(series), summary=await self._summary_of(series.id))
+            SeriesProgressOut(
+                series=_out(series, self._locale), summary=await self._summary_of(series.id)
+            )
             for series in await self._repo.list_series(country_id)
         ]
 

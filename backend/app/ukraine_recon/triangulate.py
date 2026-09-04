@@ -541,7 +541,7 @@ def build_series_table(
     ua_by_slug = {series.slug: series for series in ua_coins_series}
     ours_by_name: dict[str, SeriesEntry] = {}
     for series in ours:
-        for name in (series.name_original, series.name_ru, series.name_en):
+        for name in (series.name_original, series.name_uk, series.name_en):
             if name:
                 ours_by_name[normalize_title(name)] = series
 

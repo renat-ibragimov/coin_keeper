@@ -13,6 +13,7 @@ from app.models.catalog import (
     Country,
     Denomination,
     ExchangeRate,
+    Material,
 )
 from app.models.collection import (
     CollectionGoal,
@@ -48,6 +49,7 @@ __all__ = [
     "ExchangeRate",
     "Expense",
     "MarketPriceSnapshot",
+    "Material",
     "MediaFile",
     "PriceSourceLink",
     "PurchaseOffer",

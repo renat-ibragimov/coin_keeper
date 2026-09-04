@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
@@ -54,25 +54,37 @@ async def seed_currencies(session: AsyncSession) -> None:
     await session.flush()
 
 
+async def country_by_code(session: AsyncSession, code: str) -> Country:
+    """Countries are seeded by migration 0003; tests take them, not make them."""
+    country = (await session.execute(select(Country).where(Country.code == code))).scalar_one()
+    return country
+
+
 async def seed_reference(session: AsyncSession) -> ReferenceData:
     await seed_currencies(session)
 
-    ukraine = Country(name_original="Україна", code="UA")
-    usa = Country(name_original="США", code="US")
-    session.add_all([ukraine, usa])
+    ukraine = await country_by_code(session, "UA")
+    usa = await country_by_code(session, "US")
+    # Only Ukraine is seeded active; the storefront tests expect both.
+    usa.is_active = True
     await session.flush()
 
     uah_2 = Denomination(
-        country_id=ukraine.id, currency_code="UAH", value_minor_units=200, label_original="2 гривні"
+        country_id=ukraine.id,
+        currency_code="UAH",
+        value=Decimal(2),
+        unit="hryvnia",
+        sort_order=200,
     )
     uah_5 = Denomination(
         country_id=ukraine.id,
         currency_code="UAH",
-        value_minor_units=500,
-        label_original="5 гривень",
+        value=Decimal(5),
+        unit="hryvnia",
+        sort_order=500,
     )
     cent_1 = Denomination(
-        country_id=usa.id, currency_code="USD", value_minor_units=1, label_original="1 cent"
+        country_id=usa.id, currency_code="USD", value=Decimal(1), unit="cent", sort_order=1
     )
     session.add_all([uah_2, uah_5, cent_1])
 

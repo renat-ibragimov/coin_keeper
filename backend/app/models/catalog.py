@@ -28,7 +28,7 @@ from sqlalchemy.dialects.postgresql import ENUM
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at_column, updated_at_column
-from app.models.enums import CollectionGroup, MetalKind
+from app.models.enums import CollectionGroup, MetalKind, TranslationSource
 
 collection_group_enum = ENUM(
     CollectionGroup,
@@ -36,21 +36,39 @@ collection_group_enum = ENUM(
     values_callable=lambda e: [m.value for m in e],
 )
 metal_kind_enum = ENUM(MetalKind, name="metal_kind", values_callable=lambda e: [m.value for m in e])
+translation_source_enum = ENUM(
+    TranslationSource,
+    name="translation_source",
+    values_callable=lambda e: [m.value for m in e],
+)
 
 
 class Country(Base):
+    """A coin issuer, past or present.
+
+    Three name slots like every other named entity: `name_original` is the
+    endonym, `name_uk` and `name_en` are the translations. `is_active` decides
+    whether the country appears on the storefront (chips, the default shared
+    catalogue); the personal-item form offers all of them regardless
+    (docs/04-business-rules.md).
+    """
+
     __tablename__ = "countries"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     code: Mapped[str | None] = mapped_column(Text, unique=True)
     name_original: Mapped[str] = mapped_column(Text, nullable=False)
-    name_ru: Mapped[str | None] = mapped_column(Text)
+    original_lang: Mapped[str] = mapped_column(Text, nullable=False, server_default="uk")
+    name_uk: Mapped[str | None] = mapped_column(Text)
     name_en: Mapped[str | None] = mapped_column(Text)
     collect_variants: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
+    )
+    sort_order: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
     )
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
@@ -59,15 +77,22 @@ class Country(Base):
 
 
 class Denomination(Base):
+    """A face value as structure, not as a string.
+
+    The label ("5 копійок", "5 kopecks") is rendered per locale from
+    value + unit; see app/reference_data/denominations.py. `sort_order` is the
+    face value in the currency's smallest unit, which is what puts 50 копійок
+    before 1 гривня; `value` breaks ties between units of equal worth
+    (25 центів and ¼ долара).
+    """
+
     __tablename__ = "denominations"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     country_id: Mapped[int] = mapped_column(ForeignKey("countries.id"), nullable=False)
-    currency_code: Mapped[str | None] = mapped_column(ForeignKey("currencies.code"))
-    value_minor_units: Mapped[int | None] = mapped_column(BigInteger)
-    label_original: Mapped[str] = mapped_column(Text, nullable=False)
-    label_ru: Mapped[str | None] = mapped_column(Text)
-    label_en: Mapped[str | None] = mapped_column(Text)
+    currency_code: Mapped[str] = mapped_column(ForeignKey("currencies.code"), nullable=False)
+    value: Mapped[Decimal] = mapped_column(Numeric(14, 3), nullable=False)
+    unit: Mapped[str] = mapped_column(Text, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
@@ -75,9 +100,28 @@ class Denomination(Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "country_id", "label_original", name="uq_denominations_country_id_label_original"
+            "country_id",
+            "currency_code",
+            "unit",
+            "value",
+            name="uq_denominations_country_id_currency_code_unit_value",
         ),
     )
+
+
+class Material(Base):
+    """The composition dictionary behind catalog_items.composition_id.
+
+    Seeded from what the catalogue actually contains
+    (app/reference_data/materials.py), not from a general list of alloys.
+    """
+
+    __tablename__ = "materials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name_uk: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
 
 
 class CoinSeries(Base):
@@ -88,8 +132,11 @@ class CoinSeries(Base):
         ForeignKey("countries.id", ondelete="CASCADE"), nullable=False
     )
     name_original: Mapped[str] = mapped_column(Text, nullable=False)
-    name_ru: Mapped[str | None] = mapped_column(Text)
+    original_lang: Mapped[str] = mapped_column(Text, nullable=False, server_default="uk")
+    name_uk: Mapped[str | None] = mapped_column(Text)
+    name_uk_source: Mapped[TranslationSource | None] = mapped_column(translation_source_enum)
     name_en: Mapped[str | None] = mapped_column(Text)
+    name_en_source: Mapped[TranslationSource | None] = mapped_column(translation_source_enum)
     description: Mapped[str | None] = mapped_column(Text)
     start_year: Mapped[int | None] = mapped_column(Integer)
     end_year: Mapped[int | None] = mapped_column(Integer)
@@ -117,14 +164,24 @@ class CatalogItem(Base):
     )
     collection_group: Mapped[CollectionGroup] = mapped_column(collection_group_enum, nullable=False)
     subtype: Mapped[str | None] = mapped_column(Text)
+    # Three language slots. title_original is the issuer's own wording in
+    # original_lang and is never translated; the other two are translations and
+    # each says where it came from (docs/02-data-model.md).
     title_original: Mapped[str] = mapped_column(Text, nullable=False)
+    original_lang: Mapped[str] = mapped_column(Text, nullable=False, server_default="uk")
     title_uk: Mapped[str | None] = mapped_column(Text)
-    title_ru: Mapped[str | None] = mapped_column(Text)
+    title_uk_source: Mapped[TranslationSource | None] = mapped_column(translation_source_enum)
     title_en: Mapped[str | None] = mapped_column(Text)
+    title_en_source: Mapped[TranslationSource | None] = mapped_column(translation_source_enum)
     issue_year: Mapped[int] = mapped_column(Integer, nullable=False)
     issue_date: Mapped[date | None] = mapped_column(Date)
     mintage_announced: Mapped[int | None] = mapped_column(BigInteger)
     mintage_actual: Mapped[int | None] = mapped_column(BigInteger)
+    composition_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL")
+    )
+    # What the composition parser could not read, kept verbatim rather than
+    # guessed at (docs/09-data-migration.md).
     material: Mapped[str | None] = mapped_column(Text)
     metal_kind: Mapped[MetalKind] = mapped_column(
         metal_kind_enum,

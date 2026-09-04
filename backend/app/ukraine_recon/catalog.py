@@ -9,7 +9,7 @@ instead of touching a database at all.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -27,7 +27,8 @@ from app.models import (
     MediaFile,
     PriceSourceLink,
 )
-from app.ukraine_recon.normalize import denomination_value, match_key
+from app.reference_data.denominations import UNITS, render_label
+from app.ukraine_recon.normalize import match_key
 
 UKRAINE_NAMES = ("Україна", "Украина", "Ukraine")
 UKRAINE_CODE = "UA"
@@ -37,8 +38,8 @@ UKRAINE_CODE = "UA"
 class CatalogEntry:
     id: int
     title_original: str
+    original_lang: str
     title_uk: str | None
-    title_ru: str | None
     title_en: str | None
     denomination_label: str | None
     denomination: Decimal | None
@@ -70,7 +71,7 @@ class CatalogEntry:
     def titles(self) -> list[str]:
         """Every title we hold, deduplicated, original first."""
         seen: list[str] = []
-        for title in (self.title_original, self.title_uk, self.title_ru, self.title_en):
+        for title in (self.title_original, self.title_uk, self.title_en):
             if title and title not in seen:
                 seen.append(title)
         return seen
@@ -95,14 +96,18 @@ class CatalogEntry:
         )
         data.setdefault("photo_sources", [])
         data.setdefault("source_links", [])
-        return cls(**data)
+        data.setdefault("original_lang", "uk")
+        # An export written before the three-language model still loads: keys
+        # the record no longer has are dropped rather than blowing up a run.
+        known = {field.name for field in fields(cls)}
+        return cls(**{name: value for name, value in data.items() if name in known})
 
 
 @dataclass
 class SeriesEntry:
     id: int
     name_original: str
-    name_ru: str | None
+    name_uk: str | None
     name_en: str | None
     item_count: int
     active_item_count: int
@@ -151,10 +156,15 @@ def _ukraine_filter() -> Select[tuple[int]]:
     )
 
 
-def _denomination_of(entry: Denomination | None, label: str | None) -> Decimal | None:
-    if entry is not None and entry.value_minor_units is not None:
-        return Decimal(entry.value_minor_units) / Decimal(100)
-    return denomination_value(label)
+def _denomination_of(entry: Denomination | None) -> Decimal | None:
+    """The face value in the currency's main unit — 5 for "5 гривень".
+
+    The sources print the denomination that way, so that is what the match key
+    compares.
+    """
+    if entry is None or entry.unit not in UNITS:
+        return None
+    return (Decimal(entry.value) * UNITS[entry.unit].minor_units) / Decimal(100)
 
 
 async def load_catalog(session: AsyncSession) -> CatalogSnapshot:
@@ -220,7 +230,11 @@ async def load_catalog(session: AsyncSession) -> CatalogSnapshot:
     )
     for item, series, denomination in (await session.execute(query)).all():
         price = prices.get(item.id)
-        label = denomination.label_original if denomination is not None else None
+        label = (
+            None
+            if denomination is None
+            else render_label(denomination.value, denomination.unit, "uk")
+        )
         item_links = links.get(item.id, [])
         references = [item.source_key, price[4] if price else None, *item_links]
         source_url = next((ref for ref in references if ref and "ua-coins.info" in ref), None)
@@ -228,11 +242,11 @@ async def load_catalog(session: AsyncSession) -> CatalogSnapshot:
             CatalogEntry(
                 id=item.id,
                 title_original=item.title_original,
+                original_lang=item.original_lang,
                 title_uk=item.title_uk,
-                title_ru=item.title_ru,
                 title_en=item.title_en,
                 denomination_label=label,
-                denomination=_denomination_of(denomination, label),
+                denomination=_denomination_of(denomination),
                 issue_year=item.issue_year,
                 issue_date=item.issue_date.isoformat() if item.issue_date else None,
                 collection_group=str(item.collection_group),
@@ -275,7 +289,7 @@ async def load_catalog(session: AsyncSession) -> CatalogSnapshot:
             SeriesEntry(
                 id=series.id,
                 name_original=series.name_original,
-                name_ru=series.name_ru,
+                name_uk=series.name_uk,
                 name_en=series.name_en,
                 item_count=int(total),
                 active_item_count=int(active),

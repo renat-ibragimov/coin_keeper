@@ -28,6 +28,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE
 from app.models import (
     CatalogItem,
     CoinSeries,
@@ -37,9 +38,11 @@ from app.models import (
     ExchangeRate,
     Expense,
     MarketPriceSnapshot,
+    Material,
     PriceSourceLink,
 )
 from app.models.enums import CollectionGroup, MetalKind
+from app.repositories.localization import localized
 
 
 @dataclass
@@ -65,7 +68,8 @@ class CatalogRow:
     item: CatalogItem
     country: str
     series_name: str | None
-    denomination: str | None
+    denomination: Denomination | None
+    composition: Material | None
     quantity_owned: int
     purchase_total_uah: Decimal
     market_price_uah: Decimal | None
@@ -80,9 +84,14 @@ class CatalogPage:
     total: int = 0
 
 
-def _display_title() -> ColumnElement[str]:
-    """title_uk → title_original; the original is NOT NULL (docs/02-data-model.md)."""
-    return func.coalesce(CatalogItem.title_uk, CatalogItem.title_original)
+def _display_title(locale: str) -> ColumnElement[str]:
+    """title_{locale} → title_original; the original is NOT NULL."""
+    return localized(
+        locale,
+        uk=CatalogItem.title_uk,
+        en=CatalogItem.title_en,
+        original=CatalogItem.title_original,
+    )
 
 
 def _search_vector() -> ColumnElement[Any]:
@@ -91,8 +100,6 @@ def _search_vector() -> ColumnElement[Any]:
         func.coalesce(CatalogItem.title_original, "")
         + " "
         + func.coalesce(CatalogItem.title_uk, "")
-        + " "
-        + func.coalesce(CatalogItem.title_ru, "")
         + " "
         + func.coalesce(CatalogItem.title_en, "")
     )
@@ -153,7 +160,8 @@ def catalog_search_condition(q: str) -> ColumnElement[bool]:
     """Full text over titles, plus catalog numbers, country and year.
 
     Requires Country joined into the query. Shared with the collection listing,
-    which searches by the same catalog fields.
+    which searches by the same catalog fields. The country is searched in all
+    three of its names, so "Ukraine" finds Ukrainian coins under either locale.
     """
     term = q.strip()
     pattern = f"%{term}%"
@@ -163,6 +171,8 @@ def catalog_search_condition(q: str) -> ColumnElement[bool]:
         CatalogItem.catalog_uc.ilike(pattern),
         CatalogItem.catalog_numista.ilike(pattern),
         Country.name_original.ilike(pattern),
+        Country.name_uk.ilike(pattern),
+        Country.name_en.ilike(pattern),
     ]
     if term.isdigit() and len(term) == 4:
         alternatives.append(CatalogItem.issue_year == int(term))
@@ -170,10 +180,18 @@ def catalog_search_condition(q: str) -> ColumnElement[bool]:
 
 
 class CatalogRepository:
-    def __init__(self, session: AsyncSession, *, user_id: int, is_admin: bool) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        *,
+        user_id: int,
+        is_admin: bool,
+        locale: str = DEFAULT_LOCALE,
+    ) -> None:
         self._session = session
         self._user_id = user_id
         self._is_admin = is_admin
+        self._locale = locale
 
     # ------------------------------------------------------------ visibility
 
@@ -292,6 +310,19 @@ class CatalogRepository:
             .lateral("latest_price")
         )
 
+    def _country_name(self) -> ColumnElement[str]:
+        return localized(
+            self._locale, uk=Country.name_uk, en=Country.name_en, original=Country.name_original
+        )
+
+    def _series_name(self) -> ColumnElement[str]:
+        return localized(
+            self._locale,
+            uk=CoinSeries.name_uk,
+            en=CoinSeries.name_en,
+            original=CoinSeries.name_original,
+        )
+
     @staticmethod
     def _source_url_subquery() -> ColumnElement[str | None]:
         return (
@@ -316,11 +347,11 @@ class CatalogRepository:
             return column.desc().nulls_last() if descending else column.asc().nulls_last()
 
         by_sort: dict[str, list[Any]] = {
-            "title": [_display_title()],
-            "country": [Country.name_original],
-            "series": [CoinSeries.name_original],
+            "title": [_display_title(self._locale)],
+            "country": [self._country_name()],
+            "series": [self._series_name()],
             "year": [CatalogItem.issue_year],
-            "denomination": [Denomination.value_minor_units, Denomination.label_original],
+            "denomination": [Denomination.sort_order, Denomination.value],
             "owned": [owned.c.quantity_owned],
             "purchase": [owned.c.purchase_total_uah],
             "price": [price.c.price_uah],
@@ -329,7 +360,7 @@ class CatalogRepository:
         ordering: list[Any] = [direction(column) for column in columns]
         # Stable tiebreakers, mirroring the legacy default listing order.
         if filters.sort == "country":
-            ordering += [CatalogItem.issue_year.desc(), _display_title()]
+            ordering += [CatalogItem.issue_year.desc(), _display_title(self._locale)]
         ordering.append(CatalogItem.id)
         return ordering
 
@@ -348,9 +379,10 @@ class CatalogRepository:
         query = (
             select(
                 CatalogItem,
-                Country.name_original.label("country"),
-                CoinSeries.name_original.label("series_name"),
-                Denomination.label_original.label("denomination"),
+                self._country_name().label("country"),
+                self._series_name().label("series_name"),
+                Denomination,
+                Material,
                 owned.c.quantity_owned,
                 owned.c.purchase_total_uah,
                 price.c.price_uah,
@@ -361,6 +393,7 @@ class CatalogRepository:
             .join(Country, Country.id == CatalogItem.country_id)
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
+            .outerjoin(Material, Material.id == CatalogItem.composition_id)
             .outerjoin(owned, true())
             .outerjoin(price, true())
             .where(*conditions)
@@ -374,7 +407,8 @@ class CatalogRepository:
                 item=row.CatalogItem,
                 country=row.country,
                 series_name=row.series_name,
-                denomination=row.denomination,
+                denomination=row.Denomination,
+                composition=row.Material,
                 quantity_owned=int(row.quantity_owned or 0),
                 purchase_total_uah=Decimal(row.purchase_total_uah or 0),
                 market_price_uah=row.price_uah,
@@ -399,9 +433,10 @@ class CatalogRepository:
         query = (
             select(
                 CatalogItem,
-                Country.name_original.label("country"),
-                CoinSeries.name_original.label("series_name"),
-                Denomination.label_original.label("denomination"),
+                self._country_name().label("country"),
+                self._series_name().label("series_name"),
+                Denomination,
+                Material,
                 owned.c.quantity_owned,
                 owned.c.purchase_total_uah,
                 price.c.price_uah,
@@ -412,6 +447,7 @@ class CatalogRepository:
             .join(Country, Country.id == CatalogItem.country_id)
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
+            .outerjoin(Material, Material.id == CatalogItem.composition_id)
             .outerjoin(owned, true())
             .outerjoin(price, true())
             .where(
@@ -430,7 +466,8 @@ class CatalogRepository:
             item=row.CatalogItem,
             country=row.country,
             series_name=row.series_name,
-            denomination=row.denomination,
+            denomination=row.Denomination,
+            composition=row.Material,
             quantity_owned=int(row.quantity_owned or 0),
             purchase_total_uah=Decimal(row.purchase_total_uah or 0),
             market_price_uah=row.price_uah,

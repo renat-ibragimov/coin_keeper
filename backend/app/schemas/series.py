@@ -4,16 +4,23 @@ from __future__ import annotations
 
 from pydantic import Field
 
+from app.models.enums import TranslationSource
 from app.schemas.base import CamelModel
 from app.schemas.common import Money
 
 
 class SeriesOut(CamelModel):
+    """`name` is the series in the requested locale; the slots follow it."""
+
     id: int
     country_id: int
     name: str
-    name_ru: str | None
+    name_original: str
+    original_lang: str
+    name_uk: str | None
+    name_uk_source: TranslationSource | None
     name_en: str | None
+    name_en_source: TranslationSource | None
     description: str | None
     start_year: int | None
     end_year: int | None

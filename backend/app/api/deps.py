@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.errors import ProblemError
 from app.core.config import Settings, get_settings
+from app.core.locale import normalize_locale
 from app.core.mail import MailBackend, get_mail_backend
 from app.core.security import InvalidTokenError, decode_access_token
 from app.db.session import get_db_session
@@ -30,6 +31,21 @@ def get_auth_service(session: DbSession, settings: AppSettings, mail: Mail) -> A
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+
+
+def request_locale(
+    request: Request,
+    locale: Annotated[str | None, Query()] = None,
+) -> str:
+    """Which language the answer is written in.
+
+    ?locale= wins, because a screen may show one language while the browser
+    asks for another; otherwise Accept-Language; otherwise Ukrainian.
+    """
+    return normalize_locale(locale or request.headers.get("accept-language"))
+
+
+RequestLocale = Annotated[str, Depends(request_locale)]
 
 
 def client_ip(request: Request) -> str:

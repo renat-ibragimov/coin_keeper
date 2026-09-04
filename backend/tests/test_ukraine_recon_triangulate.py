@@ -108,8 +108,8 @@ def item(
     return CatalogEntry(
         id=item_id,
         title_original=title,
+        original_lang="uk",
         title_uk=None,
-        title_ru=None,
         title_en=None,
         denomination_label=f"{denomination} гривень",
         denomination=Decimal(denomination),

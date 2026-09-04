@@ -63,7 +63,12 @@ ignore = ["S101"]
 "tests/fixtures/build_legacy_db.py" = ["RUF001", "RUF002", "RUF003"]
 # Same exemption for the API test seed: Ukrainian coin and series names are data.
 "tests/seed.py" = ["RUF001", "RUF002", "RUF003"]
-"alembic/versions/*" = ["E501"]
+# A migration docstring quotes the data it is about: Russian titles,
+# Ukrainian material strings. Same exemption as the parsers below.
+"alembic/versions/*" = ["E501", "RUF001", "RUF002", "RUF003"]
+# Country endonyms, denomination words and the material phrases the sources
+# print are data too, same exemption as the reconnaissance parsers.
+"app/reference_data/*" = ["RUF001", "RUF002", "RUF003"]
 # The reconnaissance parsers select cells by the Ukrainian labels the sites
 # print ("Назва", "Тираж"); those literals are the sites' data, not prose.
 "app/ukraine_recon/*" = ["RUF001", "RUF002", "RUF003"]

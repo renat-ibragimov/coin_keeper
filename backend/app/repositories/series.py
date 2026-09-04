@@ -15,8 +15,10 @@ from decimal import Decimal
 from sqlalchemy import ColumnElement, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE
 from app.models import CatalogItem, CoinSeries, CollectionItem
 from app.repositories.catalog import has_visible_price, latest_price_uah_for
+from app.repositories.localization import localized
 
 
 @dataclass
@@ -29,15 +31,25 @@ class SeriesSummaryData:
 
 
 class SeriesRepository:
-    def __init__(self, session: AsyncSession, *, user_id: int) -> None:
+    def __init__(
+        self, session: AsyncSession, *, user_id: int, locale: str = DEFAULT_LOCALE
+    ) -> None:
         self._session = session
         self._user_id = user_id
+        self._locale = locale
 
     async def list_series(self, country_id: int | None = None) -> Sequence[CoinSeries]:
         query = select(CoinSeries)
         if country_id is not None:
             query = query.where(CoinSeries.country_id == country_id)
-        query = query.order_by(CoinSeries.name_original)
+        query = query.order_by(
+            localized(
+                self._locale,
+                uk=CoinSeries.name_uk,
+                en=CoinSeries.name_en,
+                original=CoinSeries.name_original,
+            )
+        )
         return (await self._session.execute(query)).scalars().all()
 
     async def get(self, series_id: int) -> CoinSeries | None:

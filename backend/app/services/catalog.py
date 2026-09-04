@@ -12,16 +12,19 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE, pick_name
 from app.models import (
     AuditLog,
     CatalogItem,
     CoinSeries,
     Country,
     Denomination,
+    Material,
     MediaFile,
     User,
 )
 from app.models.enums import UserRole
+from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogFilters, CatalogRepository, CatalogRow
 from app.repositories.collection import CollectionRepository
 from app.repositories.media import MediaRepository
@@ -32,6 +35,8 @@ from app.schemas.catalog import (
     CatalogItemCreate,
     CatalogItemUpdate,
     CatalogListItem,
+    CoinDenomination,
+    CoinMaterial,
     PriceHistoryItem,
 )
 from app.services.media_urls import CatalogImages, MediaUrlBuilder
@@ -77,17 +82,42 @@ class BadReferenceError(CatalogError):
         self.detail = detail
 
 
-def display_title(item: CatalogItem) -> str:
-    """First filled of title_uk → title_original → title_en → title_ru."""
-    return item.title_uk or item.title_original or item.title_en or item.title_ru or ""
+def display_title(item: CatalogItem, locale: str = DEFAULT_LOCALE) -> str:
+    """title_{locale} → title_original (docs/04-business-rules.md)."""
+    return pick_name(locale, uk=item.title_uk, en=item.title_en, original=item.title_original)
+
+
+def denomination_out(denomination: Denomination | None, locale: str) -> CoinDenomination | None:
+    if denomination is None:
+        return None
+    return CoinDenomination(
+        id=denomination.id,
+        value=denomination.value,
+        unit=denomination.unit,
+        currency_code=denomination.currency_code,
+        label=render_label(denomination.value, denomination.unit, locale),
+    )
+
+
+def material_out(material: Material | None, locale: str) -> CoinMaterial | None:
+    if material is None:
+        return None
+    return CoinMaterial(
+        id=material.id,
+        code=material.code,
+        name=material.name_uk if locale == "uk" else material.name_en,
+    )
 
 
 class CatalogService:
-    def __init__(self, session: AsyncSession, user: User) -> None:
+    def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
         self._session = session
         self._user = user
+        self._locale = locale
         self._is_admin = user.role == UserRole.ADMIN
-        self._repo = CatalogRepository(session, user_id=user.id, is_admin=self._is_admin)
+        self._repo = CatalogRepository(
+            session, user_id=user.id, is_admin=self._is_admin, locale=locale
+        )
         self._media = MediaRepository(session, user_id=user.id)
         self._urls = MediaUrlBuilder()
 
@@ -167,6 +197,7 @@ class CatalogService:
             country_id=payload.country_id,
             series_id=payload.series_id,
             denomination_id=payload.denomination_id,
+            composition_id=payload.composition_id,
         )
         values = payload.model_dump(exclude={"shared"})
         item = CatalogItem(
@@ -183,6 +214,7 @@ class CatalogService:
             country_id=changes.get("country_id", item.country_id),
             series_id=changes.get("series_id", item.series_id),
             denomination_id=changes.get("denomination_id", item.denomination_id),
+            composition_id=changes.get("composition_id", item.composition_id),
         )
         for field_name, value in changes.items():
             setattr(item, field_name, value)
@@ -275,7 +307,12 @@ class CatalogService:
         await self._repo.delete(item)
 
     async def _check_references(
-        self, *, country_id: int, series_id: int | None, denomination_id: int | None
+        self,
+        *,
+        country_id: int,
+        series_id: int | None,
+        denomination_id: int | None,
+        composition_id: int | None = None,
     ) -> None:
         country = await self._session.get(Country, country_id)
         if country is None:
@@ -288,6 +325,8 @@ class CatalogService:
             denomination = await self._session.get(Denomination, denomination_id)
             if denomination is None or denomination.country_id != country_id:
                 raise BadReferenceError("Unknown denominationId or it belongs to another country.")
+        if composition_id is not None and await self._session.get(Material, composition_id) is None:
+            raise BadReferenceError("Unknown compositionId.")
 
     def _audit(self, action: str, entity_id: int, details: dict[str, object] | None) -> None:
         self._session.add(
@@ -316,17 +355,20 @@ class CatalogService:
             "id": item.id,
             "country": row.country,
             "series_name": row.series_name,
-            "denomination": row.denomination,
+            "denomination": denomination_out(row.denomination, self._locale),
             "year": item.issue_year,
-            "title": display_title(item),
+            "title": display_title(item, self._locale),
             "title_original": item.title_original,
+            "original_lang": item.original_lang,
             "title_uk": item.title_uk,
-            "title_ru": item.title_ru,
+            "title_uk_source": item.title_uk_source,
             "title_en": item.title_en,
+            "title_en_source": item.title_en_source,
             "variety": item.subtype,
             "catalog_number": item.catalog_km or item.catalog_uc or item.catalog_numista,
             "collection_group": item.collection_group,
             "metal_kind": item.metal_kind,
+            "composition": material_out(row.composition, self._locale),
             "material": item.material,
             "market_price_uah": row.market_price_uah,
             "price_source": row.price_source,

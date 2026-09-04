@@ -36,6 +36,7 @@ from app.models import (
     ExchangeRate,
     Expense,
     MarketPriceSnapshot,
+    Material,
     MediaFile,
     PriceSourceLink,
     UcoinCatalogSource,
@@ -43,8 +44,24 @@ from app.models import (
     UserSettings,
 )
 from app.models.enums import UserRole
+from app.reference_data import countries as country_seed
+from app.reference_data import materials as material_seed
+from app.reference_data.denominations import DenominationParseError, parse_label
 
 logger = logging.getLogger("app.legacy_migration")
+
+
+def _translation_or_none(value: Any, original: str) -> str | None:
+    """A translated slot repeating the original is not a translation.
+
+    The desktop application wrote the same string into all three name columns;
+    keeping those copies would make every record look translated.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    return None if not text or text == original.strip() else text
+
 
 COLLECTION_GROUPS = frozenset({"circulation", "commemorative", "collector", "other"})
 METAL_KINDS = frozenset({"precious", "base", "unknown"})
@@ -68,7 +85,6 @@ EXPENSE_CATEGORIES = frozenset(
 # highest inserted id afterwards.
 SEQUENCED_MODELS: tuple[tuple[str, Any], ...] = (
     ("users", User),
-    ("countries", Country),
     ("denominations", Denomination),
     ("coin_series", CoinSeries),
     ("catalog_items", CatalogItem),
@@ -158,6 +174,13 @@ class MigrationRunner:
         self._owner_id: int | None = None
         # Keys that actually made it in, used to catch dangling references.
         self._known_keys: dict[str, set[Any]] = {}
+        # Countries are reference data owned by the schema (migration 0003
+        # seeds every issuer), so the legacy ids are mapped onto them rather
+        # than inserted; everything below carries the mapped id.
+        self._country_ids: dict[int, int] = {}
+        self._country_langs: dict[int, str] = {}
+        self._country_codes: dict[int, str | None] = {}
+        self._material_ids: dict[str, int] = {}
 
     # ------------------------------------------------------------------ entry
 
@@ -244,7 +267,8 @@ class MigrationRunner:
             self._currency_row,
             conflict_index=["code"],
         )
-        await self._copy(connection, "countries", Country, self._country_row)
+        await self._map_countries(connection)
+        await self._load_materials()
         await self._copy(connection, "denominations", Denomination, self._denomination_row)
         await self._copy(connection, "coin_series", CoinSeries, self._series_row)
 
@@ -256,39 +280,120 @@ class MigrationRunner:
             "decimal_places": int(row.get("decimal_places") or 2),
         }
 
-    def _country_row(self, row: Mapping[str, Any]) -> dict[str, Any]:
-        return {
-            "id": row["id"],
-            "code": row.get("code"),
-            "name_original": row["name_original"],
-            "name_ru": row.get("name_ru"),
-            "name_en": row.get("name_en"),
-            "collect_variants": convert.to_bool(row.get("collect_variants")),
-            "is_active": convert.to_bool(row.get("is_active")),
-            "created_at": convert.to_timestamptz(row.get("created_at")),
-            "updated_at": convert.to_timestamptz(row.get("updated_at")),
-        }
+    async def _map_countries(self, connection: sqlite3.Connection) -> None:
+        """Match every source country to a seeded one; insert what is missing.
+
+        The seed knows the country under several names ("Украина", "Україна",
+        "Ukraine"), which is how a legacy row finds its target without a
+        duplicate. Its own id is not preserved: the target already holds every
+        issuer, and one of them almost certainly sits on that id.
+        """
+        existing = (await self._session.execute(select(Country))).scalars().all()
+        by_code = {country.code: country for country in existing if country.code}
+        by_name: dict[str, Country] = {}
+        for country in existing:
+            for name in (country.name_original, country.name_uk, country.name_en):
+                if name:
+                    by_name.setdefault(name.casefold(), country)
+
+        matched = 0
+        for row in reader.read_table(connection, "countries"):
+            legacy_id = int(row["id"])
+            seed = self._country_seed_for(row)
+            target = by_code.get(seed.code) if seed else None
+            if target is None:
+                for name in (row.get("name_original"), row.get("name_ru"), row.get("name_en")):
+                    if name and name.casefold() in by_name:
+                        target = by_name[name.casefold()]
+                        break
+            if target is not None:
+                self._country_ids[legacy_id] = int(target.id)
+                self._country_langs[legacy_id] = target.original_lang
+                self._country_codes[legacy_id] = target.code
+                matched += 1
+                continue
+            self._country_ids[legacy_id] = await self._insert_country(row, seed)
+            self._country_langs[legacy_id] = seed.original_lang if seed else "uk"
+            self._country_codes[legacy_id] = seed.code if seed else None
+
+        self._known_keys["countries"] = set(self._country_ids.values())
+        self._report.migrated["countries"] = len(self._country_ids)
+        logger.info("countries: %s of %s matched a seeded row", matched, len(self._country_ids))
+
+    @staticmethod
+    def _country_seed_for(row: Mapping[str, Any]) -> country_seed.CountrySeed | None:
+        code = row.get("code")
+        if code:
+            found = country_seed.find_by_code(str(code))
+            if found is not None:
+                return found
+        for name in (row.get("name_original"), row.get("name_ru"), row.get("name_en")):
+            if name:
+                found = country_seed.find_by_name(str(name))
+                if found is not None:
+                    return found
+        return None
+
+    async def _insert_country(
+        self, row: Mapping[str, Any], seed: country_seed.CountrySeed | None
+    ) -> int:
+        """A country the seed does not know: kept under its own name."""
+        self._report.conversion_warnings.append(
+            f"countries#{row.get('id')}: {row.get('name_original')!r} is not in the seed, created"
+        )
+        if self._options.dry_run:
+            return int(row["id"])
+        country = Country(
+            code=seed.code if seed else None,
+            name_original=seed.name_original if seed else str(row["name_original"]),
+            original_lang=seed.original_lang if seed else "uk",
+            name_uk=seed.name_uk if seed else None,
+            name_en=seed.name_en if seed else row.get("name_en"),
+            collect_variants=convert.to_bool(row.get("collect_variants")),
+            is_active=convert.to_bool(row.get("is_active")),
+        )
+        self._session.add(country)
+        await self._session.flush()
+        return int(country.id)
+
+    async def _load_materials(self) -> None:
+        rows = (await self._session.execute(select(Material))).scalars().all()
+        self._material_ids = {material.code: int(material.id) for material in rows}
+
+    def _country_id(self, legacy_id: Any) -> Any:
+        return self._country_ids.get(int(legacy_id), legacy_id) if legacy_id is not None else None
 
     def _denomination_row(self, row: Mapping[str, Any]) -> dict[str, Any]:
+        """The legacy label parsed into value + unit + currency.
+
+        The country code decides between the Ukrainian копійка and the Soviet
+        копейка; nothing else in the label distinguishes them.
+        """
+        legacy_country = int(row["country_id"])
+        try:
+            parsed = parse_label(
+                row["label_original"], country_code=self._country_codes.get(legacy_country)
+            )
+        except DenominationParseError as exc:
+            raise convert.ConversionError(str(exc)) from exc
         return {
             "id": row["id"],
-            "country_id": row["country_id"],
-            "currency_code": row.get("currency_code"),
-            "value_minor_units": row.get("value_minor_units"),
-            "label_original": row["label_original"],
-            "label_ru": row.get("label_ru"),
-            "label_en": row.get("label_en"),
-            "sort_order": int(row.get("sort_order") or 0),
+            "country_id": self._country_id(legacy_country),
+            "currency_code": parsed.currency_code,
+            "value": parsed.value,
+            "unit": parsed.unit,
+            "sort_order": parsed.minor_units,
             "is_active": convert.to_bool(row.get("is_active")),
         }
 
     def _series_row(self, row: Mapping[str, Any]) -> dict[str, Any]:
         return {
             "id": row["id"],
-            "country_id": row["country_id"],
+            "country_id": self._country_id(row["country_id"]),
             "name_original": row["name_original"],
-            "name_ru": row.get("name_ru"),
-            "name_en": row.get("name_en"),
+            "original_lang": self._country_langs.get(int(row["country_id"]), "uk"),
+            "name_uk": None,
+            "name_en": _translation_or_none(row.get("name_en"), row["name_original"]),
             "description": row.get("description"),
             "start_year": row.get("start_year"),
             "end_year": row.get("end_year"),
@@ -303,32 +408,42 @@ class MigrationRunner:
         await self._copy(connection, "exchange_rates", ExchangeRate, self._rate_row)
 
     def _catalog_row(self, row: Mapping[str, Any]) -> dict[str, Any]:
+        legacy_country = int(row["country_id"])
+        title_original = str(row.get("title_original") or "").strip()
+        if not title_original:
+            # A blank original with a Russian title: the Russian one is it.
+            title_original = str(row.get("title_ru") or "").strip()
+        composition = material_seed.parse_material(row.get("material"))
         return {
             "id": row["id"],
             "item_type": row.get("item_type") or "coin",
-            "country_id": row["country_id"],
+            "country_id": self._country_id(legacy_country),
             "series_id": row.get("series_id"),
             "denomination_id": row.get("denomination_id"),
             "collection_group": convert.to_enum_value(
                 row.get("collection_group"), COLLECTION_GROUPS, default="other"
             ),
             "subtype": row.get("subtype"),
-            "title_original": row["title_original"],
+            "title_original": title_original,
+            "original_lang": self._country_langs.get(legacy_country, "uk"),
             # title_uk stays empty: the legacy base has no Ukrainian titles.
-            # The NBU catalog job fills it in (docs/05-integrations.md).
+            # The Ukrainian pipeline fills it in (docs/05-integrations.md).
             "title_uk": None,
-            "title_ru": row.get("title_ru"),
-            "title_en": row.get("title_en"),
+            "title_uk_source": None,
+            "title_en": _translation_or_none(row.get("title_en"), title_original),
+            "title_en_source": None,
             "issue_year": row["issue_year"],
             "issue_date": convert.to_date(row.get("issue_date")),
             "mintage_announced": row.get("mintage_announced"),
             "mintage_actual": row.get("mintage_actual"),
-            "material": row.get("material"),
+            "composition_id": self._material_ids.get(composition.composition or ""),
+            # Only what the parser could not read stays as text.
+            "material": None if composition.composition else row.get("material"),
             "metal_kind": convert.to_enum_value(
                 row.get("metal_kind"), METAL_KINDS, default="unknown"
             ),
-            "weight_grams": row.get("weight_grams"),
-            "diameter_mm": row.get("diameter_mm"),
+            "weight_grams": row.get("weight_grams") or composition.weight_grams,
+            "diameter_mm": row.get("diameter_mm") or composition.diameter_mm,
             "thickness_mm": row.get("thickness_mm"),
             "shape": row.get("shape"),
             "edge": row.get("edge"),

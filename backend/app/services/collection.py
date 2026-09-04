@@ -13,8 +13,10 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE
 from app.models import CollectionItem, Currency, Expense, MediaFile, User
 from app.models.enums import ExpenseCategory, UserRole
+from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogRepository
 from app.repositories.collection import (
     CollectionFilters,
@@ -62,12 +64,13 @@ class MissingRateError(CollectionError):
 
 
 class CollectionService:
-    def __init__(self, session: AsyncSession, user: User) -> None:
+    def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
         self._session = session
         self._user = user
-        self._repo = CollectionRepository(session, owner_id=user.id)
+        self._locale = locale
+        self._repo = CollectionRepository(session, owner_id=user.id, locale=locale)
         self._catalog = CatalogRepository(
-            session, user_id=user.id, is_admin=user.role == UserRole.ADMIN
+            session, user_id=user.id, is_admin=user.role == UserRole.ADMIN, locale=locale
         )
         self._rates = RateRepository(session)
         self._media = MediaRepository(session, user_id=user.id)
@@ -219,10 +222,14 @@ class CollectionService:
         return CollectionItemOut(
             id=instance.id,
             catalog_item_id=item.id,
-            title=display_title(item),
+            title=display_title(item, self._locale),
             country=row.country,
             series_name=row.series_name,
-            denomination=row.denomination,
+            denomination=(
+                None
+                if row.denomination is None
+                else render_label(row.denomination.value, row.denomination.unit, self._locale)
+            ),
             year=item.issue_year,
             is_archived=item.is_archived,
             archive_reason=item.archive_reason,

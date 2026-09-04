@@ -6,7 +6,7 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CurrentUser, DbSession, Pagination
+from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
 from app.api.errors import ProblemError
 from app.repositories.collection import CollectionFilters
 from app.schemas.collection import (
@@ -40,6 +40,7 @@ def _unprocessable(problem_type: str, detail: str) -> ProblemError:
 async def list_collection(
     session: DbSession,
     user: CurrentUser,
+    locale: RequestLocale,
     pagination: Pagination,
     q: Annotated[str | None, Query(max_length=200)] = None,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
@@ -50,7 +51,7 @@ async def list_collection(
     filters = CollectionFilters(
         q=q, country_id=country_id, series_id=series_id, sort=sort, order=order
     )
-    items, total = await CollectionService(session, user).list_collection(
+    items, total = await CollectionService(session, user, locale).list_collection(
         filters, limit=pagination.page_size, offset=pagination.offset
     )
     return Page(items=items, total=total, page=pagination.page, page_size=pagination.page_size)
@@ -58,10 +59,10 @@ async def list_collection(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_item(
-    session: DbSession, user: CurrentUser, payload: CollectionItemCreate
+    session: DbSession, user: CurrentUser, locale: RequestLocale, payload: CollectionItemCreate
 ) -> CollectionItemOut:
     try:
-        return await CollectionService(session, user).create(payload)
+        return await CollectionService(session, user, locale).create(payload)
     except CatalogItemNotFoundError as exc:
         raise _not_found("catalog-item") from exc
     except UnknownCurrencyError as exc:
@@ -71,19 +72,25 @@ async def create_item(
 
 
 @router.get("/{item_id}")
-async def get_item(session: DbSession, user: CurrentUser, item_id: int) -> CollectionItemOut:
+async def get_item(
+    session: DbSession, user: CurrentUser, locale: RequestLocale, item_id: int
+) -> CollectionItemOut:
     try:
-        return await CollectionService(session, user).get(item_id)
+        return await CollectionService(session, user, locale).get(item_id)
     except CollectionItemNotFoundError as exc:
         raise _not_found("collection-item") from exc
 
 
 @router.patch("/{item_id}")
 async def update_item(
-    session: DbSession, user: CurrentUser, item_id: int, payload: CollectionItemUpdate
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    item_id: int,
+    payload: CollectionItemUpdate,
 ) -> CollectionItemOut:
     try:
-        return await CollectionService(session, user).update(item_id, payload)
+        return await CollectionService(session, user, locale).update(item_id, payload)
     except CollectionItemNotFoundError as exc:
         raise _not_found("collection-item") from exc
     except UnknownCurrencyError as exc:
@@ -93,8 +100,10 @@ async def update_item(
 
 
 @router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_item(session: DbSession, user: CurrentUser, item_id: int) -> None:
+async def delete_item(
+    session: DbSession, user: CurrentUser, locale: RequestLocale, item_id: int
+) -> None:
     try:
-        await CollectionService(session, user).delete(item_id)
+        await CollectionService(session, user, locale).delete(item_id)
     except CollectionItemNotFoundError as exc:
         raise _not_found("collection-item") from exc

@@ -28,7 +28,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import (
     CatalogItem,
     CollectionItem,
-    Country,
     Currency,
     Expense,
     MarketPriceSnapshot,
@@ -42,13 +41,14 @@ from app.models.enums import (
     MediaSource,
     UserRole,
 )
+from tests.seed import country_by_code
 
 
 async def _build_user_with_personal_items(session: AsyncSession) -> int:
     """A user owning personal catalog items plus coins sitting on them."""
     currency = Currency(code="UAH", name="Hryvnia", symbol="UAH")
-    country = Country(name_original="Ukraine", code="UA")
-    session.add_all([currency, country])
+    country = await country_by_code(session, "UA")
+    session.add(currency)
     await session.flush()
 
     user = User(

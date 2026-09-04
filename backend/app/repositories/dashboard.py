@@ -16,6 +16,7 @@ from typing import Any
 from sqlalchemy import ColumnElement, Select, case, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE
 from app.models import (
     CatalogItem,
     CoinSeries,
@@ -26,6 +27,7 @@ from app.models import (
 )
 from app.models.enums import ExpenseCategory
 from app.repositories.catalog import has_visible_price, latest_price_uah_for
+from app.repositories.localization import localized
 
 
 @dataclass
@@ -67,9 +69,12 @@ class RateRow:
 
 
 class DashboardRepository:
-    def __init__(self, session: AsyncSession, *, user_id: int) -> None:
+    def __init__(
+        self, session: AsyncSession, *, user_id: int, locale: str = DEFAULT_LOCALE
+    ) -> None:
         self._session = session
         self._user_id = user_id
+        self._locale = locale
 
     def _visible(self) -> ColumnElement[bool]:
         return or_(CatalogItem.created_by.is_(None), CatalogItem.created_by == self._user_id)
@@ -183,11 +188,24 @@ class DashboardRepository:
             personal_items=int(personal_items),
         )
 
+    def _country_name(self) -> ColumnElement[str]:
+        return localized(
+            self._locale, uk=Country.name_uk, en=Country.name_en, original=Country.name_original
+        )
+
+    def _series_name(self) -> ColumnElement[str]:
+        return localized(
+            self._locale,
+            uk=CoinSeries.name_uk,
+            en=CoinSeries.name_en,
+            original=CoinSeries.name_original,
+        )
+
     async def country_breakdown(self, limit: int = 6) -> list[BreakdownRow]:
         owned = CollectionItem
         result = await self._session.execute(
             select(
-                Country.name_original,
+                self._country_name(),
                 func.count(CatalogItem.id.distinct()).label("count"),
                 func.count(owned.catalog_item_id.distinct()).label("owned"),
             )
@@ -198,8 +216,11 @@ class DashboardRepository:
                 (owned.catalog_item_id == CatalogItem.id) & (owned.owner_id == self._user_id),
             )
             .where(*self._visible_active())
-            .group_by(Country.id, Country.name_original)
-            .order_by(func.count(CatalogItem.id.distinct()).desc(), Country.name_original)
+            # Grouping by the primary key alone: PostgreSQL knows the rest of
+            # the row depends on it, and repeating a bound expression in
+            # GROUP BY would not match it anyway.
+            .group_by(Country.id)
+            .order_by(func.count(CatalogItem.id.distinct()).desc(), self._country_name())
             .limit(limit)
         )
         return [
@@ -211,8 +232,8 @@ class DashboardRepository:
         owned = CollectionItem
         result = await self._session.execute(
             select(
-                CoinSeries.name_original,
-                Country.name_original,
+                self._series_name(),
+                self._country_name(),
                 func.count(CatalogItem.id.distinct()).label("count"),
                 func.count(owned.catalog_item_id.distinct()).label("owned"),
             )
@@ -224,8 +245,8 @@ class DashboardRepository:
                 (owned.catalog_item_id == CatalogItem.id) & (owned.owner_id == self._user_id),
             )
             .where(*self._visible_active())
-            .group_by(CoinSeries.id, CoinSeries.name_original, Country.name_original)
-            .order_by(func.count(CatalogItem.id.distinct()).desc(), CoinSeries.name_original)
+            .group_by(CoinSeries.id, Country.id)
+            .order_by(func.count(CatalogItem.id.distinct()).desc(), self._series_name())
             .limit(limit)
         )
         return [

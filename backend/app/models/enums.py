@@ -35,6 +35,19 @@ class MediaSource(enum.StrEnum):
     USER_UPLOAD = "user_upload"
     UCOIN = "ucoin"
     NBU = "nbu"
+    UA_COINS = "ua_coins"
+    MANUAL = "manual"
+
+
+class TranslationSource(enum.StrEnum):
+    """Where a translated name came from (docs/02-data-model.md).
+
+    Only the translated slots carry it: `*_original` is the issuer's own
+    wording and is never translated, so it has no source.
+    """
+
+    OFFICIAL = "official"
+    LLM = "llm"
     MANUAL = "manual"
 
 

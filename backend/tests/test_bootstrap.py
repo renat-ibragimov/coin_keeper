@@ -135,8 +135,8 @@ async def test_dashboard_figures(
     countries = {row["name"]: row for row in dashboard["countryBreakdown"]}
     assert countries["Україна"]["count"] == 3
     assert countries["Україна"]["owned"] == 2
-    assert countries["США"]["count"] == 1
-    assert countries["США"]["owned"] == 0
+    assert countries["Сполучені Штати"]["count"] == 1
+    assert countries["Сполучені Штати"]["owned"] == 0
 
     series = {row["name"]: row for row in dashboard["seriesBreakdown"]}
     assert series["Флора і фауна"]["count"] == 2

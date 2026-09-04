@@ -5,6 +5,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE
 from app.models import User, UserSettings
 from app.repositories.dashboard import DashboardRepository
 from app.schemas.auth import UserOut
@@ -20,10 +21,10 @@ from app.schemas.bootstrap import (
 
 
 class BootstrapService:
-    def __init__(self, session: AsyncSession, user: User) -> None:
+    def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
         self._session = session
         self._user = user
-        self._repo = DashboardRepository(session, user_id=user.id)
+        self._repo = DashboardRepository(session, user_id=user.id, locale=locale)
 
     async def bootstrap(self) -> BootstrapOut:
         data = await self._repo.dashboard()

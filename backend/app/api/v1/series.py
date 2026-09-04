@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, RequestLocale
 from app.api.errors import ProblemError
 from app.schemas.series import SeriesCreate, SeriesOut, SeriesProgressOut, SeriesSummaryOut
 from app.services.series import (
@@ -24,15 +24,18 @@ router = APIRouter(prefix="/series", tags=["series"])
 async def list_series(
     session: DbSession,
     user: CurrentUser,
+    locale: RequestLocale,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
 ) -> list[SeriesOut]:
-    return await SeriesService(session, user).list_series(country_id)
+    return await SeriesService(session, user, locale).list_series(country_id)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
-async def create_series(session: DbSession, user: CurrentUser, payload: SeriesCreate) -> SeriesOut:
+async def create_series(
+    session: DbSession, user: CurrentUser, locale: RequestLocale, payload: SeriesCreate
+) -> SeriesOut:
     try:
-        return await SeriesService(session, user).create(payload)
+        return await SeriesService(session, user, locale).create(payload)
     except SeriesForbiddenError as exc:
         raise ProblemError(
             status.HTTP_403_FORBIDDEN,
@@ -57,15 +60,18 @@ async def create_series(session: DbSession, user: CurrentUser, payload: SeriesCr
 async def series_progress(
     session: DbSession,
     user: CurrentUser,
+    locale: RequestLocale,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
 ) -> list[SeriesProgressOut]:
-    return await SeriesService(session, user).list_progress(country_id)
+    return await SeriesService(session, user, locale).list_progress(country_id)
 
 
 @router.get("/{series_id}/summary")
-async def series_summary(session: DbSession, user: CurrentUser, series_id: int) -> SeriesSummaryOut:
+async def series_summary(
+    session: DbSession, user: CurrentUser, locale: RequestLocale, series_id: int
+) -> SeriesSummaryOut:
     try:
-        return await SeriesService(session, user).summary(series_id)
+        return await SeriesService(session, user, locale).summary(series_id)
     except SeriesNotFoundError as exc:
         raise ProblemError(
             status.HTTP_404_NOT_FOUND,
