@@ -205,7 +205,7 @@ def test_archived_records_are_left_alone() -> None:
 
 
 def test_a_circulation_coin_with_an_nbu_card_is_linked_like_any_other() -> None:
-    """"обігові пам'ятні" — a circulation coin the NBU still catalogues by name.
+    """ "обігові пам'ятні" — a circulation coin the NBU still catalogues by name.
 
     The bridge no longer restricts itself to `commemorative`/`collector`
     records: a circulation coin with a matching cluster gets a title from the
