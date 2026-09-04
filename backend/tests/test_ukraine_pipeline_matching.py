@@ -193,18 +193,40 @@ def test_a_coin_belongs_to_one_record_and_the_second_goes_to_review() -> None:
     assert outcome.claimed[f"{SOURCE_NBU}:1"] == 1
 
 
-def test_circulation_and_archived_records_are_left_alone() -> None:
+def test_archived_records_are_left_alone() -> None:
     sources = sources_of(record(SOURCE_NBU, "1", "Соня садова", "2", 1999))
     outcome = bridge.decide(
-        [
-            item(1, "Соня садовая", "2", 1999, group="circulation"),
-            item(2, "Соня садовая", "2", 1999, archived=True),
-        ],
+        [item(1, "Соня садовая", "2", 1999, archived=True)],
         sources,
         LEXICON,
     )
     assert outcome.linked == []
     assert outcome.skipped_archived == 1
+
+
+def test_a_circulation_coin_with_an_nbu_card_is_linked_like_any_other() -> None:
+    """"обігові пам'ятні" — a circulation coin the NBU still catalogues by name.
+
+    The bridge no longer restricts itself to `commemorative`/`collector`
+    records: a circulation coin with a matching cluster gets a title from the
+    NBU exactly like a commemorative one does.
+    """
+    sources = sources_of(record(SOURCE_NBU, "1", "Області України", "10", 2026))
+    ours = item(1, "Області України", "10", 2026, group="circulation")
+    outcome = bridge.decide([ours], sources, LEXICON)
+
+    assert [d.item.id for d in outcome.linked] == [1]
+    assert outcome.summary()["linkedByGroup"] == {"circulation": 1}
+
+
+def test_a_circulation_coin_with_no_matching_cluster_has_no_candidates() -> None:
+    """Widening the bridge's scope does not invent matches out of nothing."""
+    sources = sources_of(record(SOURCE_NBU, "1", "Соня садова", "2", 1999))
+    ours = item(1, "Гривня обігова", "1", 2010, group="circulation")
+    outcome = bridge.decide([ours], sources, LEXICON)
+
+    assert outcome.linked == []
+    assert [i.id for i in outcome.without_candidates] == [1]
 
 
 def test_a_coin_of_another_year_is_not_a_candidate() -> None:
@@ -249,6 +271,13 @@ def test_the_review_file_is_written_read_and_applied(tmp_path: Path) -> None:
     assert problems == []
     assert applied.review == []
     assert cluster_key(applied.linked[0].cluster) == chosen
+
+
+def test_the_review_file_reads_back_with_an_excel_bom(tmp_path: Path) -> None:
+    """Excel saves a reviewed CSV back with a UTF-8 BOM; it must not break the header."""
+    path = tmp_path / "review.csv"
+    path.write_bytes("decision,itemId,clusterKey\nyes,2,nbu:4\n".encode("utf-8-sig"))
+    assert bridge.read_review_csv(path) == {2: "nbu:4"}
 
 
 def test_two_decisions_for_one_record_are_refused(tmp_path: Path) -> None:

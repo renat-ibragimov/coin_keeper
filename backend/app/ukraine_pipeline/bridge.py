@@ -1,7 +1,13 @@
 """bridge — deciding which of our records is which coin.
 
 The cluster built from the three sources is the unit of truth; this step says
-which of our catalogue records it is. Two ways in:
+which of our catalogue records it is. Every shared Ukrainian record is a
+candidate, not only the commemorative ones: some circulation coins are also
+struck as "обігові пам'ятні" and carry an NBU numismatic card, so a
+circulation record can match a cluster exactly like a commemorative one. The
+same-year/denomination check is what keeps this from over-matching — a record
+with no candidate in its slot still ends up in `without_candidates`. Two ways
+in:
 
 A. a ua-coins.info reference we already hold — 594 of them came with the
    legacy database, and a reference is not a guess;
@@ -99,11 +105,15 @@ class BridgeOutcome:
 
     def summary(self) -> dict[str, Any]:
         by_strategy: dict[str, int] = {}
+        by_group: dict[str, int] = {}
         for decision in self.linked:
             by_strategy[decision.strategy] = by_strategy.get(decision.strategy, 0) + 1
+            group = decision.item.collection_group
+            by_group[group] = by_group.get(group, 0) + 1
         return {
             "linked": len(self.linked),
             "byStrategy": by_strategy,
+            "linkedByGroup": by_group,
             "toReview": len(self.review),
             "withoutCandidates": len(self.without_candidates),
             "skippedArchived": self.skipped_archived,
@@ -175,9 +185,6 @@ def decide(items: Iterable[OurItem], sources: Sources, lexicon: Lexicon) -> Brid
         if item.is_archived:
             outcome.skipped_archived += 1
             continue
-        if not item.is_commemorative:
-            # Circulation coins are not in the NBU numismatic catalogue.
-            continue
         by_link = _by_ua_coins_link(item, sources)
         if by_link is None:
             to_score.append(item)
@@ -237,9 +244,14 @@ def write_review_csv(path: Path, outcome: BridgeOutcome) -> int:
 
 
 def read_review_csv(path: Path) -> dict[int, str]:
-    """{catalog item id: cluster key} out of the rows marked yes."""
+    """{catalog item id: cluster key} out of the rows marked yes.
+
+    Opened as utf-8-sig: a person reviews the CSV in Excel, which saves it
+    back with a BOM, and a plain utf-8 read would leave that BOM glued onto
+    the first column's name.
+    """
     chosen: dict[int, str] = {}
-    with path.open(encoding="utf-8", newline="") as handle:
+    with path.open(encoding="utf-8-sig", newline="") as handle:
         for row in csv.DictReader(handle):
             if (row.get("decision") or "").strip().casefold() not in YES:
                 continue
