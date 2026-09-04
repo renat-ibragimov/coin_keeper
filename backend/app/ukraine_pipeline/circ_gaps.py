@@ -62,11 +62,19 @@ class GapsOutcome:
 
 
 def _existing_slots(items: Sequence[OurItem]) -> set[tuple[Decimal, str, int]]:
+    """(value, unit, year) an active, non-NBU-linked circulation record occupies.
+
+    An NBU-linked record does not count, even if circ-reclassify was skipped
+    for this run: it is a commemorative groupFor misfiled here
+    (docs/04-business-rules.md, rule 11), not the real circulation coin this
+    slot is checked against.
+    """
     return {
         (item.denomination, item.denomination_unit, item.issue_year)
         for item in items
         if not item.is_archived
         and item.collection_group == CollectionGroup.CIRCULATION
+        and not item.is_nbu_linked
         and item.denomination is not None
         and item.denomination_unit is not None
     }

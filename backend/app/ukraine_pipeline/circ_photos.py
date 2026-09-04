@@ -40,6 +40,7 @@ from app.core.media_keys import (
 from app.core.storage import ObjectStorage
 from app.models import CatalogItem, Denomination, MediaFile
 from app.models.enums import CollectionGroup, MediaRole, MediaSource
+from app.ukraine_pipeline.catalog import nbu_linked_ids
 from app.ukraine_pipeline.circ_nbu import ROLES, page_url, parse_page, pick_card
 from app.ukraine_pipeline.circ_types import TYPES, CoinType, type_for
 from app.ukraine_recon.http import PoliteClient, SourceUnreachableError
@@ -59,6 +60,7 @@ class PhotoOutcome:
     removed_ucoin_rows: int = 0
     bytes_total: int = 0
     types_left: int = 0
+    skipped_nbu_linked: int = 0
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -70,10 +72,11 @@ class PhotoOutcome:
             "failed": len(self.failed),
             "removedUcoinRows": self.removed_ucoin_rows,
             "totalMegabytes": round(self.bytes_total / 1024 / 1024, 1),
+            "skippedNbuLinked": self.skipped_nbu_linked,
         }
 
 
-async def _items_by_type(session: AsyncSession, country_id: int) -> dict[str, list[int]]:
+async def _items_by_type(session: AsyncSession, country_id: int) -> tuple[dict[str, list[int]], int]:
     rows = (
         await session.execute(
             select(CatalogItem.id, CatalogItem.issue_year, Denomination.value, Denomination.unit)
@@ -86,12 +89,17 @@ async def _items_by_type(session: AsyncSession, country_id: int) -> dict[str, li
             )
         )
     ).all()
+    nbu_ids = await nbu_linked_ids(session, [item_id for item_id, *_ in rows])
     by_type: dict[str, list[int]] = {}
+    skipped = 0
     for item_id, year, value, unit in rows:
+        if item_id in nbu_ids:
+            skipped += 1
+            continue
         coin_type = type_for(value, unit, year)
         if coin_type is not None:
             by_type.setdefault(coin_type.key, []).append(item_id)
-    return by_type
+    return by_type, skipped
 
 
 async def _existing_official(session: AsyncSession, item_ids: list[int]) -> set[tuple[int, str]]:
@@ -213,7 +221,7 @@ async def download_photos(
     log: Callable[[str], None],
 ) -> PhotoOutcome:
     outcome = PhotoOutcome()
-    by_type = await _items_by_type(session, country_id)
+    by_type, outcome.skipped_nbu_linked = await _items_by_type(session, country_id)
     item_ids = [item_id for ids in by_type.values() for item_id in ids]
     outcome.removed_ucoin_rows = await _drop_ucoin_links(session, item_ids, dry_run=dry_run)
     held = await _existing_official(session, item_ids)

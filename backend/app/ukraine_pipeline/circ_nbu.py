@@ -18,6 +18,7 @@ docs/05-integrations.md already prescribes for the other two sources.
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 
 from selectolax.parser import HTMLParser, Node
@@ -91,6 +92,17 @@ def parse_page(html: str) -> list[ObigCard]:
     return cards
 
 
+def _normalize_title(value: str) -> str:
+    """NFC, and every kind of whitespace (incl. \xa0 nbsp) collapsed to " ".
+
+    bank.gov.ua's markup has been seen gluing words with a non-breaking space
+    where photo_title_hint uses a plain one; str.split() with no argument
+    already splits on any Unicode whitespace, so rejoining on " " is the
+    whole fix.
+    """
+    return " ".join(unicodedata.normalize("NFC", value).split())
+
+
 def pick_card(cards: list[ObigCard], coin_type: CoinType) -> ObigCard | None:
     """The one card among the page's stack that this type means.
 
@@ -99,10 +111,13 @@ def pick_card(cards: list[ObigCard], coin_type: CoinType) -> ObigCard | None:
     The one page that genuinely stacks two designs we track separately — the
     hryvnia at "100_1996" — is disambiguated by an exact title match, not a
     substring: "1 гривня" is a prefix of "1 гривня зразка 2018 року" and
-    would otherwise match both.
+    would otherwise match both. Both sides are normalized first so a stray
+    nbsp or a differently-composed character on the page does not silently
+    fail the match.
     """
     if not cards:
         return None
     if coin_type.photo_title_hint is None:
         return cards[0]
-    return next((card for card in cards if card.title == coin_type.photo_title_hint), None)
+    hint = _normalize_title(coin_type.photo_title_hint)
+    return next((card for card in cards if _normalize_title(card.title) == hint), None)

@@ -29,6 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import CatalogItem, Denomination
 from app.models.enums import CollectionGroup, TranslationSource
 from app.reference_data.denominations import UNITS, render_label
+from app.ukraine_pipeline.catalog import nbu_linked_ids
 
 
 def title_uk(value: Decimal, unit: str) -> str:
@@ -44,6 +45,7 @@ class TitlesOutcome:
     updated: int = 0
     unchanged: int = 0
     skipped_unknown_unit: int = 0
+    skipped_nbu_linked: int = 0
     examples: list[dict[str, Any]] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
@@ -51,6 +53,7 @@ class TitlesOutcome:
             "updated": self.updated,
             "unchanged": self.unchanged,
             "skippedUnknownUnit": self.skipped_unknown_unit,
+            "skippedNbuLinked": self.skipped_nbu_linked,
         }
 
 
@@ -68,8 +71,12 @@ async def apply_titles(session: AsyncSession, *, country_id: int, dry_run: bool)
             )
         )
     ).all()
+    nbu_ids = await nbu_linked_ids(session, [item.id for item, _value, _unit in rows])
 
     for item, value, unit in rows:
+        if item.id in nbu_ids:
+            outcome.skipped_nbu_linked += 1
+            continue
         if unit not in UNITS:
             outcome.skipped_unknown_unit += 1
             continue

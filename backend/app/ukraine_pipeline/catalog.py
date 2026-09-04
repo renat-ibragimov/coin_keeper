@@ -7,6 +7,7 @@ issuer, and personal items belong to their authors
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -68,6 +69,9 @@ class OurItem:
     # Defaulted, not loaded, on a record load_items never populates it for —
     # a test built by hand rather than by the query below.
     denomination_unit: str | None = None
+    # Only circ_reclassify reads this: an `official` title with no NBU link
+    # at all is worth a person's look, not a silent regroup.
+    title_uk_source: str | None = None
     # source -> external id, from price_source_links, the legacy source_key or
     # the URL of the newest shared price snapshot.
     links: dict[str, str] = field(default_factory=dict)
@@ -75,6 +79,21 @@ class OurItem:
     @property
     def is_commemorative(self) -> bool:
         return self.collection_group in COMMEMORATIVE_GROUPS
+
+    @property
+    def is_nbu_linked(self) -> bool:
+        """The NBU numismatic catalogue (app/ukraine_recon/nbu.py) already
+        references this record — via price_source_links or a "nbu:" source
+        key, both folded into `links` by _attach_links already.
+
+        Not to be confused with media_files.source == MediaSource.NBU, the
+        photo-provenance tag circ_photos.py writes for the unrelated "Про
+        монети" page: that marks who supplied a picture, this marks that the
+        record is a catalogue entry, not an ordinary circulation coin
+        (docs/04-business-rules.md, rule 11 — the legacy groupFor heuristic
+        that put commemoratives it linked here anyway).
+        """
+        return SOURCE_NBU in self.links
 
 
 def source_key_reference(source_key: str | None) -> tuple[str, str] | None:
@@ -136,6 +155,7 @@ async def load_items(session: AsyncSession, country_id: int) -> list[OurItem]:
             is_archived=item.is_archived,
             source_key=item.source_key,
             denomination_unit=unit,
+            title_uk_source=str(item.title_uk_source) if item.title_uk_source is not None else None,
         )
         for item, series_name, unit, value in (await session.execute(query)).all()
     ]
@@ -182,3 +202,28 @@ async def _attach_links(session: AsyncSession, items: list[OurItem]) -> None:
     for item_id, url in snapshots.all():
         item = by_id[item_id]
         item.links.setdefault(SOURCE_UA_COINS, url or "")
+
+
+async def nbu_linked_ids(session: AsyncSession, item_ids: Sequence[int]) -> set[int]:
+    """Which of these catalog_items ids the NBU numismatic catalogue references.
+
+    Mirrors OurItem.is_nbu_linked exactly (source_key "nbu:%" or a
+    price_source_links row with source NBU), for the circ-* steps that query
+    CatalogItem directly and never build an OurItem to ask instead.
+    """
+    if not item_ids:
+        return set()
+    rows = await session.execute(
+        select(CatalogItem.id).where(
+            CatalogItem.id.in_(item_ids),
+            or_(
+                CatalogItem.source_key.like("nbu:%"),
+                CatalogItem.id.in_(
+                    select(PriceSourceLink.catalog_item_id).where(
+                        PriceSourceLink.source == LINK_SOURCES[SOURCE_NBU]
+                    )
+                ),
+            ),
+        )
+    )
+    return set(rows.scalars().all())

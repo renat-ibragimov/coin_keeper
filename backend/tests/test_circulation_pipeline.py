@@ -21,13 +21,21 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import CatalogItem, Denomination, MediaFile
-from app.models.enums import CollectionGroup, MediaSource, TranslationSource
-from app.ukraine_pipeline import circ_bridge, circ_gaps, circ_mintage, circ_photos, circ_titles
-from app.ukraine_pipeline.catalog import OurItem, load_items, ukraine_country_id
+from app.models import CatalogItem, Denomination, MediaFile, PriceSourceLink
+from app.models.enums import CollectionGroup, MatchStatus, MediaSource, TranslationSource
+from app.ukraine_pipeline import (
+    circ_bridge,
+    circ_gaps,
+    circ_mintage,
+    circ_photos,
+    circ_reclassify,
+    circ_titles,
+)
+from app.ukraine_pipeline.catalog import LINK_SOURCES, OurItem, load_items, ukraine_country_id
 from app.ukraine_pipeline.circ_nbu import page_url, parse_page, pick_card
 from app.ukraine_pipeline.circ_types import SUBTYPE_1992, SUBTYPE_2018, TYPES, type_for
 from app.ukraine_recon.http import PoliteClient
+from app.ukraine_recon.models import SOURCE_NBU
 from app.ukraine_recon.wikipedia import parse_mintage_table
 from tests.seed import country_by_code, make_catalog_item, seed_currencies
 
@@ -39,6 +47,8 @@ MINTAGE_TABLE_HTML = """
 <tr><th colspan="12">Тестовий монетний двір</th></tr>
 <tr><td>1992</td><td>610 млн</td><td>Ні</td><td>446 млн</td><td>480 млн</td><td>402 млн</td>
 <td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>1938 млн</td></tr>
+<tr><td>2004</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td>
+<td>Ні</td><td>10 млн</td><td>Ні</td><td>Ні</td><td>Ні</td><td>10 млн</td></tr>
 <tr><td>2013</td><td>10 тис**</td><td>Ні</td><td>175 млн</td><td>210 млн</td><td>180 млн</td>
 <td>60 млн</td><td>10 тис**</td><td>Ні</td><td>Ні</td><td>Ні</td><td>625 млн</td></tr>
 <tr><td>2018</td><td>10 тис**</td><td>10 тис**</td><td>10 тис**</td><td>10 тис**</td>
@@ -166,6 +176,20 @@ def test_a_type_with_no_hint_takes_the_first_card() -> None:
 
 def test_page_url_is_the_ua_uah_obig_coin_path() -> None:
     assert page_url("50_2013") == "https://bank.gov.ua/ua/uah/obig-coin/50_2013"
+
+
+def test_pick_card_normalizes_nbsp_before_comparing_titles() -> None:
+    """bank.gov.ua has been seen gluing a title with a non-breaking space."""
+    glued_title = "1\xa0гривня зразка 2018 року"
+    html = obig_page_html(
+        (glued_title, "В обігу", "27.04.2018"),
+        ("1 гривня", "Поступово вилучається з обігу", "12.03.1997"),
+    )
+    cards = parse_page(html)
+    new_type = type_for(Decimal(1), "hryvnia", 2018)
+    assert new_type is not None
+    picked = pick_card(cards, new_type)
+    assert picked is not None and picked.title == glued_title
 
 
 # ------------------------------------------------------------------- circ_bridge
@@ -662,6 +686,229 @@ async def test_photos_are_not_downloaded_twice(
 
     assert second.stored == 0
     assert second.already_stored == 1
+
+
+# --------------------------------------------------------------- circ_reclassify
+async def test_reclassify_moves_a_nbu_linked_jubilee_and_the_belt_holds_before_it_runs(
+    db_session: AsyncSession,
+) -> None:
+    """The main scenario: a jubilee 1-hryvnia the legacy import misfiled as
+    circulation (docs/04-business-rules.md, rule 11), already linked to the
+    NBU numismatic catalogue and carrying an official name.
+
+    Every other circ-* step is exercised first, while the jubilee is still
+    sitting in `circulation` — proving the belt holds even if circ-reclassify
+    were skipped in a partial `--steps` run — before circ-reclassify itself
+    moves it out.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="hryvnia", sort_order=100
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    jubilee = await make_catalog_item(
+        db_session,
+        country=country,
+        title="Помаранчева революція",
+        year=2004,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        source_key="nbu:123",
+        title_uk="Помаранчева революція",
+        title_uk_source=TranslationSource.OFFICIAL,
+    )
+    cells = parse_mintage_table(MINTAGE_TABLE_HTML)
+
+    # circ-titles leaves it alone.
+    titles_outcome = await circ_titles.apply_titles(db_session, country_id=country.id, dry_run=False)
+    await db_session.commit()
+    assert titles_outcome.summary()["skippedNbuLinked"] == 1
+    refreshed = await db_session.get(CatalogItem, jubilee.id)
+    assert refreshed is not None and refreshed.title_uk == "Помаранчева революція"
+
+    # circ-mintage leaves it alone (a 2004 hryvnia cell now exists and would
+    # otherwise fill mintage_actual on the jubilee).
+    mintage_outcome = await circ_mintage.apply_mintage(
+        db_session, country_id=country.id, mintage=cells, dry_run=False
+    )
+    await db_session.commit()
+    assert mintage_outcome.summary()["skippedNbuLinked"] == 1
+    refreshed = await db_session.get(CatalogItem, jubilee.id)
+    assert refreshed is not None and refreshed.mintage_actual is None
+
+    # circ-photos does not offer it to any type.
+    by_type, skipped = await circ_photos._items_by_type(db_session, country.id)
+    assert skipped == 1
+    assert jubilee.id not in {item_id for ids in by_type.values() for item_id in ids}
+
+    # circ-bridge does not try to link it to Wikipedia.
+    items = await load_items(db_session, country.id)
+    bridge_outcome = circ_bridge.decide(items, cells)
+    assert bridge_outcome.summary()["skippedNbuLinked"] == 1
+    assert jubilee.id not in {item.id for item in bridge_outcome.linked}
+    assert jubilee.id not in {item.id for item in bridge_outcome.without_wikipedia_entry}
+
+    # circ-gaps creates the real 1 hryvnia 2004 despite the jubilee occupying
+    # the year in title only, not the slot.
+    gaps_outcome = await circ_gaps.create_missing(
+        db_session, country_id=country.id, items=items, mintage=cells, dry_run=False
+    )
+    await db_session.commit()
+    assert gaps_outcome.summary()["created"] >= 1
+    real_hryvnia_2004 = (
+        await db_session.execute(
+            select(CatalogItem).where(CatalogItem.source_key == "wiki-circ:1-hryvnia:2004")
+        )
+    ).scalar_one()
+    assert real_hryvnia_2004.id != jubilee.id
+    assert real_hryvnia_2004.collection_group is CollectionGroup.CIRCULATION
+
+    # Now circ-reclassify moves the jubilee, and only the jubilee.
+    items = await load_items(db_session, country.id)
+    reclassify_outcome = await circ_reclassify.apply_reclassify(
+        db_session, items=items, dry_run=False
+    )
+    await db_session.commit()
+
+    assert reclassify_outcome.reclassified == [
+        {"itemId": jubilee.id, "title": "Помаранчева революція", "year": 2004}
+    ]
+    refreshed = await db_session.get(CatalogItem, jubilee.id)
+    assert refreshed is not None
+    assert refreshed.collection_group is CollectionGroup.COMMEMORATIVE
+    assert refreshed.title_uk == "Помаранчева революція"
+    assert refreshed.source_key == "nbu:123"
+
+
+async def test_reclassify_catches_a_price_source_link_without_a_source_key(
+    db_session: AsyncSession,
+) -> None:
+    """A karbovanets commemorative (1995-1996) has no "грив" in its face value
+    at all, so groupFor's own logic never had a reason to route it to
+    circulation — it is caught here purely by its NBU link.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    karbovanets = await make_catalog_item(
+        db_session,
+        country=country,
+        title="2 000 000 карбованців",
+        year=1995,
+        group=CollectionGroup.CIRCULATION,
+    )
+    db_session.add(
+        PriceSourceLink(
+            catalog_item_id=karbovanets.id,
+            source=LINK_SOURCES[SOURCE_NBU],
+            external_id="777",
+            match_status=MatchStatus.CONFIRMED,
+        )
+    )
+    await db_session.commit()
+
+    items = await load_items(db_session, country.id)
+    outcome = circ_reclassify.decide(items)
+
+    assert [row["itemId"] for row in outcome.reclassified] == [karbovanets.id]
+
+
+async def test_reclassify_leaves_an_honest_circulation_coin_alone(db_session: AsyncSession) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(25), unit="kopiika", sort_order=25
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    await make_catalog_item(
+        db_session,
+        country=country,
+        title="25 копеек",
+        year=1996,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    items = await load_items(db_session, country.id)
+
+    outcome = circ_reclassify.decide(items)
+
+    assert outcome.reclassified == []
+    assert outcome.official_without_nbu_link == []
+
+    titles_outcome = await circ_titles.apply_titles(db_session, country_id=country.id, dry_run=False)
+    assert titles_outcome.summary()["skippedNbuLinked"] == 0
+
+
+async def test_reclassify_reports_but_does_not_move_an_official_title_without_nbu_link(
+    db_session: AsyncSession,
+) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    item = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня",
+        year=2010,
+        group=CollectionGroup.CIRCULATION,
+        title_uk="1 гривня",
+        title_uk_source=TranslationSource.OFFICIAL,
+    )
+    items = await load_items(db_session, country.id)
+
+    outcome = circ_reclassify.decide(items)
+
+    assert outcome.reclassified == []
+    assert [row["itemId"] for row in outcome.official_without_nbu_link] == [item.id]
+
+    await circ_reclassify.apply_reclassify(db_session, items=items, dry_run=False)
+    await db_session.commit()
+    refreshed = await db_session.get(CatalogItem, item.id)
+    assert refreshed is not None and refreshed.collection_group is CollectionGroup.CIRCULATION
+
+
+async def test_reclassify_dry_run_writes_nothing(db_session: AsyncSession) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    jubilee = await make_catalog_item(
+        db_session,
+        country=country,
+        title="Помаранчева революція",
+        year=2004,
+        group=CollectionGroup.CIRCULATION,
+        source_key="nbu:123",
+    )
+    items = await load_items(db_session, country.id)
+
+    outcome = await circ_reclassify.apply_reclassify(db_session, items=items, dry_run=True)
+
+    assert outcome.summary()["reclassified"] == 1
+    refreshed = await db_session.get(CatalogItem, jubilee.id)
+    assert refreshed is not None and refreshed.collection_group is CollectionGroup.CIRCULATION
+
+
+async def test_reclassify_is_idempotent(db_session: AsyncSession) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    await make_catalog_item(
+        db_session,
+        country=country,
+        title="Помаранчева революція",
+        year=2004,
+        group=CollectionGroup.CIRCULATION,
+        source_key="nbu:123",
+    )
+
+    items = await load_items(db_session, country.id)
+    first = await circ_reclassify.apply_reclassify(db_session, items=items, dry_run=False)
+    await db_session.commit()
+    assert first.summary()["reclassified"] == 1
+
+    items = await load_items(db_session, country.id)
+    second = await circ_reclassify.apply_reclassify(db_session, items=items, dry_run=False)
+    await db_session.commit()
+    assert second.summary()["reclassified"] == 0
 
 
 # -------------------------------------------------------------------------- misc

@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import CatalogItem, Denomination
 from app.models.enums import CollectionGroup
+from app.ukraine_pipeline.catalog import nbu_linked_ids
 from app.ukraine_pipeline.circ_types import SUBTYPE_1992, SUBTYPE_2018
 from app.ukraine_recon.wikipedia import PATTERN_2001, PATTERN_2018, MintageCell
 
@@ -41,6 +42,7 @@ class MintageOutcome:
     updated: int = 0
     unchanged: int = 0
     no_wikipedia_cell: int = 0
+    skipped_nbu_linked: int = 0
     ambiguous: list[dict[str, Any]] = field(default_factory=list)
     discrepancies: list[dict[str, Any]] = field(default_factory=list)
 
@@ -49,6 +51,7 @@ class MintageOutcome:
             "updated": self.updated,
             "unchanged": self.unchanged,
             "noWikipediaCell": self.no_wikipedia_cell,
+            "skippedNbuLinked": self.skipped_nbu_linked,
             "ambiguous": len(self.ambiguous),
             "discrepancies": len(self.discrepancies),
         }
@@ -94,8 +97,12 @@ async def apply_mintage(
             )
         )
     ).all()
+    nbu_ids = await nbu_linked_ids(session, [item.id for item, _value, _unit in rows])
 
     for item, value, unit in rows:
+        if item.id in nbu_ids:
+            outcome.skipped_nbu_linked += 1
+            continue
         cell = index.get((value, unit, item.issue_year))
         if cell is None:
             outcome.no_wikipedia_cell += 1

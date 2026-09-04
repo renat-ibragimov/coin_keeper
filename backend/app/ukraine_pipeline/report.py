@@ -24,6 +24,7 @@ STEP_ORDER = (
     "titles",
     "photos",
     "prices",
+    "circ-reclassify",
     "circ-bridge",
     "circ-gaps",
     "circ-titles",

@@ -79,6 +79,10 @@ class BridgeOutcome:
     # without losing it.
     review: list[tuple[OurItem, int]] = field(default_factory=list)
     without_wikipedia_entry: list[OurItem] = field(default_factory=list)
+    # NBU-catalogue-linked records circ-reclassify should have already moved
+    # out of circulation; counted here too in case it was skipped for this
+    # run (app/ukraine_pipeline/circ_reclassify.py).
+    skipped_nbu_linked: int = 0
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -87,6 +91,7 @@ class BridgeOutcome:
             "linked": len(self.linked),
             "toReview": len(self.review),
             "withoutWikipediaEntry": len(self.without_wikipedia_entry),
+            "skippedNbuLinked": self.skipped_nbu_linked,
         }
 
 
@@ -202,6 +207,9 @@ def decide(
     by_key: dict[tuple[Decimal, str, int], list[OurItem]] = {}
     for item in items:
         if item.is_archived or item.collection_group != CIRCULATION:
+            continue
+        if item.is_nbu_linked:
+            outcome.skipped_nbu_linked += 1
             continue
         if item.denomination is None or item.denomination_unit is None:
             continue

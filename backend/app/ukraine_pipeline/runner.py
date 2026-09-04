@@ -36,6 +36,7 @@ from app.ukraine_pipeline import (
     circ_gaps,
     circ_mintage,
     circ_photos,
+    circ_reclassify,
     circ_titles,
     gaps,
     merge,
@@ -70,8 +71,12 @@ COMMEMORATIVE_STEPS = (
 # Independent of the steps above — a different bridge, a different source
 # (the Wikipedia mintage table, not the three commemorative sources) — but
 # ordered the same way: link first, fill what is missing, then names, numbers
-# and photographs.
+# and photographs. circ-reclassify runs before any of that: `circulation` is
+# contaminated by the legacy groupFor heuristic (docs/04-business-rules.md,
+# rule 11) with commemoratives the NBU catalogue already links, and no step
+# after it may treat those as ordinary circulation coins.
 CIRCULATION_STEPS = (
+    "circ-reclassify",
     "circ-bridge",
     "circ-gaps",
     "circ-titles",
@@ -343,6 +348,19 @@ class Runner:
         await self._commit()
 
     # ---------------------------------------------------------- circulation
+    async def _step_circ_reclassify(self) -> None:
+        outcome = await circ_reclassify.apply_reclassify(
+            self.session, items=self._items, dry_run=self.options.dry_run
+        )
+        self.report.step(
+            "circ-reclassify",
+            outcome.summary(),
+            reclassified=outcome.reclassified[:50],
+            officialWithoutNbuLink=outcome.official_without_nbu_link[:50],
+        )
+        await self._commit()
+        await self._load_catalog()
+
     async def _step_circ_bridge(self) -> None:
         assert self._country_id is not None
         outcome = await circ_bridge.run_bridge(

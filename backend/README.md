@@ -372,8 +372,8 @@ stored flagged, not dropped, and stay out of the collection value.
   the Wayback Machine copy.
 - `--since-year N` — only coins issued in or after that year, for a trial.
 - `--pause SECONDS` (default 0.45), `--cache-dir DIR`.
-- `--steps circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos` — the
-  circulation steps below, same rule: any subset, always in this order.
+- `--steps circ-reclassify,circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos`
+  — the circulation steps below, same rule: any subset, always in this order.
 - `--circ-review-out FILE`, `--apply-circ-review FILE` — `circ-bridge`'s own
   review CSV and its reviewed answer, kept apart from `--review-out` /
   `--apply-review` so running both bridges together cannot have one overwrite
@@ -386,12 +386,17 @@ Exit codes: `0` fine, `2` bad arguments, `3` the NBU could not be read,
 
 Ukraine's ~197 unlinked circulation records — kopecks 1/2/5/10/25/50 and
 hryvnias 1/2/5/10 — go through a separate group of steps in the same script:
-`circ-bridge, circ-gaps, circ-titles, circ-mintage, circ-photos`. They share
-the runner, the report and `app/ukraine_pipeline/catalog.py` with the steps
-above, but read different sources — the Wikipedia mintage table instead of
-the three commemorative ones — and the bridge here needs no fuzzy score: a
-(face value, unit, year) key is either held by one of our records or it is
-not. What each step does and why: `../docs/05-integrations.md`, section 10.
+`circ-reclassify, circ-bridge, circ-gaps, circ-titles, circ-mintage,
+circ-photos`. They share the runner, the report and
+`app/ukraine_pipeline/catalog.py` with the steps above, but read different
+sources — the Wikipedia mintage table instead of the three commemorative
+ones — and the bridge here needs no fuzzy score: a (face value, unit, year)
+key is either held by one of our records or it is not. `circulation` is not
+clean, though: the legacy import heuristic also left commemorative coins
+already linked to the NBU numismatic catalogue in there (rule 11,
+`../docs/04-business-rules.md`) — `circ-reclassify` moves those out first,
+and the other five steps skip any that are still NBU-linked regardless. What
+each step does and why: `../docs/05-integrations.md`, section 10.
 
 Nothing is fetched unless the step needs it: `--steps circ-photos` alone
 touches neither the commemorative catalogue nor the Wikipedia mintage table,
@@ -402,7 +407,7 @@ since `circ-titles` and `circ-photos` do not read the table at all.
 ```bash
 docker compose run --rm -v "$PWD/migration-reports:/reports" \
   api python scripts/ukraine_pipeline.py \
-    --steps circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos \
+    --steps circ-reclassify,circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos \
     --report /reports/circ.json --cache-dir /reports/ukraine-cache
 ```
 
@@ -410,7 +415,22 @@ Read `circ-gaps.skippedNoType` — a (denomination, year) the mintage table
 names but the type map (`app/ukraine_pipeline/circ_types.py`) has no range
 for is not created, and is worth a look before `--apply`.
 
-### 2. Link what is certain
+### 2. Reclassify NBU-linked records
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-reclassify \
+    --report /reports/circ-reclassify.json --cache-dir /reports/ukraine-cache
+```
+
+Read `circ-reclassify.officialWithoutNbuLink` before moving on: a non-empty
+list is a `circulation` record with an official title but no NBU catalogue
+link at all — worth a person's look, not an automatic move. Run this before
+anything else touches `circulation`: the other circ-* steps skip NBU-linked
+records regardless, but reclassifying first means the run below never even
+counts them as candidates.
+
+### 3. Link what is certain
 
 ```bash
 docker compose run --rm -v "$PWD/migration-reports:/reports" \
@@ -431,7 +451,7 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
     --report /reports/circ-bridge-2.json --cache-dir /reports/ukraine-cache
 ```
 
-### 3. Gaps, titles, mintage
+### 4. Gaps, titles, mintage
 
 ```bash
 docker compose run --rm -v "$PWD/migration-reports:/reports" \
@@ -444,7 +464,7 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
 hryvnia changeover, and only for a record with no `subtype` set to say which
 of the two 2018 figures is its own.
 
-### 4. Photos, in portions
+### 5. Photos, in portions
 
 ```bash
 docker compose run --rm -v "$PWD/migration-reports:/reports" \
@@ -465,6 +485,10 @@ skipped one with reason (1 kopiika 2019, a coin the table's own legend marks
 written correctly, `circ-photos` stored 336 files (168 records × 2 sides)
 across all eleven types with zero failures. Real numbers against the owner's
 migrated database are for the real run.
+
+An empty database has no NBU-contaminated `circulation` records to find, so
+this rehearsal never exercised `circ-reclassify` — a run of it against the
+owner's migrated data is still pending.
 
 ## Legacy data migration
 
