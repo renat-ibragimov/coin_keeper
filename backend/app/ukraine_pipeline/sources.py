@@ -19,8 +19,6 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date
-from decimal import Decimal
-from typing import Any
 
 from app.ukraine_recon import nbu, triangulate, ua_coins, wikipedia
 from app.ukraine_recon.http import FetchResult, PoliteClient, SourceUnreachableError
@@ -30,7 +28,7 @@ from app.ukraine_recon.models import (
     SOURCE_WIKIPEDIA,
     SourceRecord,
 )
-from app.ukraine_recon.normalize import bare_title, fix_homoglyphs, strip_source_suffix
+from app.ukraine_recon.normalize import bare_title, fix_homoglyphs
 from app.ukraine_recon.triangulate import Cluster
 
 FIRST_YEAR = 1992
@@ -339,21 +337,3 @@ def _fetch_wikipedia(
     sources.wikipedia = records
     sources.access[SOURCE_WIKIPEDIA] = "live"
     log(f"wikipedia: {len(records)} rows")
-
-
-# ------------------------------------------------------------------ mapping
-def denomination_of(cluster: Cluster) -> Decimal | None:
-    return cluster.denomination
-
-
-def cluster_summary(cluster: Cluster) -> dict[str, Any]:
-    """What a cluster looks like in a report or a review CSV."""
-    record = cluster.record_of(SOURCE_NBU)
-    return {
-        "key": cluster_key(cluster),
-        "title": strip_source_suffix(cluster.title),
-        "year": cluster.year,
-        "denomination": None if cluster.denomination is None else str(cluster.denomination),
-        "sources": sorted(cluster.sources),
-        "series": record.series if record is not None else None,
-    }
