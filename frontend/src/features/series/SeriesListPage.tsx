@@ -28,7 +28,7 @@ export function SeriesListPage() {
   const countryId = Number.parseInt(params.get('countryId') ?? '', 10) || undefined;
   const sort: SeriesSort = params.get('sort') === 'name' ? 'name' : 'completion';
 
-  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: fetchCountries });
+  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
   const progressQuery = useQuery({
     queryKey: ['series', 'progress', countryId],
     queryFn: () => fetchSeriesProgress(countryId),

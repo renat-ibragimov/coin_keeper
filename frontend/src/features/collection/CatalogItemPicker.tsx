@@ -16,7 +16,7 @@ interface CatalogItemPickerProps {
 
 /** Inline catalog search with a result list: shared items plus the user's own. */
 export function CatalogItemPicker({ onSelect }: CatalogItemPickerProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [text, setText] = useState('');
   const [query, setQuery] = useState('');
   const [listOpen, setListOpen] = useState(true);
@@ -72,9 +72,11 @@ export function CatalogItemPicker({ onSelect }: CatalogItemPickerProps) {
             >
               <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
               <span className={styles.resultBody}>
-                <span className={styles.resultTitle}>{coinTitle(item)}</span>
+                <span className={styles.resultTitle}>{coinTitle(item, i18n.language)}</span>
                 <span className={styles.resultMeta}>
-                  {[item.country, String(item.year), item.denomination].filter(Boolean).join(' · ')}
+                  {[item.country, String(item.year), item.denomination?.label]
+                    .filter(Boolean)
+                    .join(' · ')}
                 </span>
               </span>
               <span className={styles.resultBadges}>

@@ -21,8 +21,12 @@ function progress(id: number, name: string, owned: number, total: number): Serie
       id,
       countryId: 1,
       name,
-      nameRu: null,
+      nameOriginal: name,
+      originalLang: 'uk',
+      nameUk: null,
+      nameUkSource: null,
       nameEn: null,
+      nameEnSource: null,
       description: null,
       startYear: null,
       endYear: null,
@@ -67,7 +71,18 @@ describe('SeriesListPage', () => {
   it('renders every series with its progress, spend and valuation', async () => {
     vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
     vi.mocked(fetchCountries).mockResolvedValue([
-      { id: 1, code: 'UA', name: 'Україна', nameRu: null, nameEn: null, collectVariants: false },
+      {
+        id: 1,
+        code: 'UA',
+        name: 'Україна',
+        nameOriginal: 'Україна',
+        originalLang: 'uk',
+        nameUk: 'Україна',
+        nameEn: 'Ukraine',
+        collectVariants: false,
+        isActive: true,
+        sortOrder: 0,
+      },
     ]);
     render(
       <QueryClientProvider

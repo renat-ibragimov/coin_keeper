@@ -79,7 +79,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                     <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
                     <span>
                       <Link to={`/catalog/${item.id}`} className={styles.coinTitle}>
-                        {coinTitle(item)}
+                        {coinTitle(item, i18n.language)}
                       </Link>
                       <span className={styles.coinBadges}>
                         {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
@@ -93,7 +93,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                 <td>{item.country}</td>
                 <td>{item.seriesName ?? '—'}</td>
                 <td className="tabular">{item.year}</td>
-                <td>{item.denomination ?? '—'}</td>
+                <td>{item.denomination?.label ?? '—'}</td>
                 <td>
                   {owned ? (
                     <Badge tone="success">

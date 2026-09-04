@@ -5,11 +5,14 @@
  * - A 401 on an authorised request triggers one refresh attempt through the
  *   cookie endpoint, then the original request is retried.
  * - RFC 7807 problem responses are parsed into a typed ApiError.
+ * - Every request carries the interface language: the API answers with names
+ *   in that locale (docs/03-api-contract.md).
  */
 
 const API_BASE: string = import.meta.env.VITE_API_BASE ?? '/api/v1';
 
 let accessToken: string | null = null;
+let apiLocale = 'uk';
 const listeners = new Set<(token: string | null) => void>();
 
 export function setAccessToken(token: string | null): void {
@@ -19,6 +22,11 @@ export function setAccessToken(token: string | null): void {
 
 export function getAccessToken(): string | null {
   return accessToken;
+}
+
+/** Which language the API should answer in. Set from the i18n locale. */
+export function setApiLocale(locale: string): void {
+  apiLocale = locale;
 }
 
 export function onAccessTokenChange(listener: (token: string | null) => void): () => void {
@@ -70,7 +78,7 @@ async function parseProblem(response: Response): Promise<ApiError> {
 }
 
 async function rawRequest(path: string, options: RequestOptions, token: string | null) {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = { 'Accept-Language': apiLocale };
   if (options.body !== undefined) headers['Content-Type'] = 'application/json';
   if (options.auth !== false && token) headers['Authorization'] = `Bearer ${token}`;
   const init: RequestInit = {

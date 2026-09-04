@@ -36,8 +36,9 @@ export function fetchCatalog(filters: CatalogFilters): Promise<CatalogPage> {
   return api<CatalogPage>(`/catalog${query}`);
 }
 
-export function fetchCountries(): Promise<CountryOut[]> {
-  return api<CountryOut[]>('/countries');
+/** `active` is the storefront (chips, filters); `all` is the personal-item form. */
+export function fetchCountries(scope: 'active' | 'all' = 'active'): Promise<CountryOut[]> {
+  return api<CountryOut[]>(`/countries${toQuery({ scope: scope === 'all' ? 'all' : undefined })}`);
 }
 
 export function fetchDenominations(countryId: number | undefined): Promise<DenominationOut[]> {

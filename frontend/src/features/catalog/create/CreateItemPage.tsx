@@ -26,6 +26,7 @@ import {
 } from '@/shared/ui';
 
 import { createCatalogItem, fetchCountries, fetchDenominations, fetchSeries } from '../api';
+import { CountrySelect } from './CountrySelect';
 import styles from './CreateItemPage.module.css';
 
 const GROUPS: CollectionGroup[] = ['circulation', 'commemorative', 'collector', 'other'];
@@ -104,7 +105,13 @@ export function CreateItemPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const countryId = intOrNull(fields.countryId) ?? undefined;
-  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: fetchCountries });
+  // Every issuer, not just the active ones: a personal item may be a coin of
+  // any country that ever minted one (docs/04-business-rules.md, rule 2).
+  const countriesQuery = useQuery({
+    queryKey: ['countries', 'all'],
+    queryFn: () => fetchCountries('all'),
+  });
+  const country = countriesQuery.data?.find((row) => row.id === countryId) ?? null;
   const seriesQuery = useQuery({
     queryKey: ['series', 'list', countryId],
     queryFn: () => fetchSeries(countryId),
@@ -165,6 +172,8 @@ export function CreateItemPage() {
       denominationId: intOrNull(fields.denominationId),
       collectionGroup: fields.collectionGroup,
       titleOriginal,
+      // The original is written in the issuer's language by definition.
+      originalLang: country?.originalLang ?? 'uk',
       titleUk: blank(fields.titleUk),
       titleEn: blank(fields.titleEn),
       issueYear: Number(fields.issueYear),
@@ -228,20 +237,12 @@ export function CreateItemPage() {
                 />
               </FormRow>
               <FormRow>
-                <Select
-                  label={t('catalog.country')}
-                  required
-                  value={fields.countryId}
-                  onChange={(event) => set('countryId')(event.target.value)}
+                <CountrySelect
+                  countries={countriesQuery.data ?? []}
+                  value={country}
+                  onSelect={(chosen) => set('countryId')(String(chosen.id))}
                   error={message('countryId')}
-                >
-                  <option value="">{t('createItem.pickCountry')}</option>
-                  {(countriesQuery.data ?? []).map((country) => (
-                    <option key={country.id} value={country.id}>
-                      {country.name}
-                    </option>
-                  ))}
-                </Select>
+                />
                 <Select
                   label={t('catalog.tableSeries')}
                   value={fields.seriesId}

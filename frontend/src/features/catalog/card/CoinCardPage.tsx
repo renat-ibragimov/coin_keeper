@@ -5,8 +5,9 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
-import { coinTitle } from '@/shared/lib/coinTitle';
+import { coinTitle, showsOriginal } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
+import { languageName } from '@/shared/lib/languageName';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
 import {
   Badge,
@@ -85,8 +86,10 @@ function CardBody({ card }: { card: CatalogCard }) {
     queryFn: () => fetchOwnInstances(card.id),
   });
 
-  const title = coinTitle(card);
-  const subtitle = [card.denomination, card.country, String(card.year)].filter(Boolean).join(' · ');
+  const title = coinTitle(card, locale);
+  const subtitle = [card.denomination?.label, card.country, String(card.year)]
+    .filter(Boolean)
+    .join(' · ');
   const owned = card.quantityOwned > 0;
   const valuation =
     owned && card.marketPriceUah !== null
@@ -134,6 +137,15 @@ function CardBody({ card }: { card: CatalogCard }) {
           {card.isArchived ? <Badge tone="warning">{t('catalog.badgeArchived')}</Badge> : null}
         </div>
         <h1 className={styles.title}>{title}</h1>
+        {/* What the issuer calls the coin, when that is not what is shown. */}
+        {showsOriginal(card, locale) ? (
+          <p className={styles.original}>
+            {t('card.originalName', {
+              title: card.titleOriginal,
+              language: languageName(card.originalLang, locale),
+            })}
+          </p>
+        ) : null}
         <p className={styles.subtitle}>{subtitle}</p>
         <p className={styles.lead}>{t('card.lead')}</p>
       </header>

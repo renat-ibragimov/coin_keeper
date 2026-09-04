@@ -35,7 +35,7 @@ export function CoinCard({ item, action }: CoinCardProps) {
   const { t, i18n } = useTranslation();
   const price = formatUah(item.marketPriceUah, i18n.language);
   const owned = item.quantityOwned > 0;
-  const title = coinTitle(item);
+  const title = coinTitle(item, i18n.language);
   const cardUrl = `/catalog/${item.id}`;
 
   return (
@@ -50,7 +50,9 @@ export function CoinCard({ item, action }: CoinCardProps) {
         </span>
       </div>
       <div className={styles.body}>
-        {item.denomination ? <div className={styles.denomination}>{item.denomination}</div> : null}
+        {item.denomination ? (
+          <div className={styles.denomination}>{item.denomination.label}</div>
+        ) : null}
         <h3 className={styles.title}>
           <Link to={cardUrl} className={styles.titleLink}>
             {title}

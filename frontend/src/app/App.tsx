@@ -1,4 +1,6 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 
 import { AuthProvider } from '@/features/auth/AuthProvider';
@@ -37,10 +39,30 @@ const queryClient = new QueryClient({
   },
 });
 
+/**
+ * Cached answers are in the language they were fetched in.
+ *
+ * The API renders every name — coin titles, countries, series, denominations —
+ * for the locale of the request, so switching the language makes the whole
+ * cache stale at once. Clearing it is the honest response; per-locale query
+ * keys would spread the same fact across every feature.
+ */
+function LocaleCacheReset() {
+  const queryClient = useQueryClient();
+  const { i18n } = useTranslation();
+  useEffect(() => {
+    const reset = () => queryClient.clear();
+    i18n.on('languageChanged', reset);
+    return () => i18n.off('languageChanged', reset);
+  }, [i18n, queryClient]);
+  return null;
+}
+
 export function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
+        <LocaleCacheReset />
         <ToastProvider>
           <AuthProvider>
             <BrowserRouter>

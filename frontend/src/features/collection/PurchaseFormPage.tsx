@@ -34,7 +34,7 @@ import styles from './PurchaseFormPage.module.css';
  * /collection/:id/edit            — change an existing purchase
  */
 export function PurchaseFormPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -140,11 +140,11 @@ export function PurchaseFormPage() {
                     ) : null}
                   </div>
                   <Link to={`/catalog/${cardQuery.data.id}`} className={styles.itemTitle}>
-                    {coinTitle(cardQuery.data)}
+                    {coinTitle(cardQuery.data, i18n.language)}
                   </Link>
                   <div className={styles.itemMeta}>
                     {[
-                      cardQuery.data.denomination,
+                      cardQuery.data.denomination?.label,
                       cardQuery.data.country,
                       String(cardQuery.data.year),
                     ]

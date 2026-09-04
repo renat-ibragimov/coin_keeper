@@ -40,14 +40,26 @@ export function specRows(card: CatalogCard, t: TFunction, locale: string): Prope
       label: t('card.specIssueDate'),
       value: formatDate(card.issueDate, locale),
     },
-    { key: 'denomination', label: t('card.specDenomination'), value: card.denomination },
+    {
+      key: 'denomination',
+      label: t('card.specDenomination'),
+      value: card.denomination?.label ?? null,
+    },
     {
       key: 'metal',
       label: t('card.specMetal'),
       value:
-        card.metalKind === 'unknown' && !card.material ? null : t(METAL_LABELS[card.metalKind]),
+        card.metalKind === 'unknown' && !card.composition && !card.material
+          ? null
+          : t(METAL_LABELS[card.metalKind]),
     },
-    { key: 'material', label: t('card.specMaterial'), value: card.material },
+    {
+      key: 'material',
+      label: t('card.specMaterial'),
+      // The dictionary name when the composition was recognised; otherwise
+      // whatever text the source gave us.
+      value: card.composition?.name ?? card.material,
+    },
     { key: 'variety', label: t('card.specVariety'), value: card.variety },
     { key: 'subtype', label: t('card.specSubtype'), value: card.subtype },
     { key: 'catalogNumbers', label: t('card.specCatalogNumbers'), value: catalogNumbers(card) },

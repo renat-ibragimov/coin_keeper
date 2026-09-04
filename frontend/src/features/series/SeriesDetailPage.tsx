@@ -34,7 +34,7 @@ export function SeriesDetailPage() {
     queryKey: ['series', 'list', undefined],
     queryFn: () => fetchSeries(),
   });
-  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: fetchCountries });
+  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
   const summaryQuery = useQuery({
     queryKey: ['series', 'summary', seriesId],
     queryFn: () => fetchSeriesSummary(seriesId),

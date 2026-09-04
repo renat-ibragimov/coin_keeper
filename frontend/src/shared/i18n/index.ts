@@ -1,6 +1,8 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
+import { setApiLocale } from '@/shared/api/client';
+
 import en from './en.json';
 import uk from './uk.json';
 
@@ -18,6 +20,8 @@ function initialLocale(): Locale {
   return 'uk';
 }
 
+setApiLocale(initialLocale());
+
 void i18n.use(initReactI18next).init({
   resources: {
     uk: { translation: uk },
@@ -30,6 +34,7 @@ void i18n.use(initReactI18next).init({
 
 export function setLocale(locale: Locale): void {
   void i18n.changeLanguage(locale);
+  setApiLocale(locale);
   document.documentElement.lang = locale;
   try {
     localStorage.setItem(STORAGE_KEY, locale);

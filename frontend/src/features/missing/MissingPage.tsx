@@ -40,7 +40,7 @@ export function MissingPage() {
     placeholderData: keepPreviousData,
   });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
-  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: fetchCountries });
+  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
   const seriesQuery = useQuery({
     queryKey: ['series', 'list', filters.countryId],
     queryFn: () => fetchSeries(filters.countryId),

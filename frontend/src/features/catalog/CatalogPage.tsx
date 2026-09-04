@@ -38,7 +38,7 @@ export function CatalogPage() {
     queryFn: () => fetchCatalog(filters),
     placeholderData: keepPreviousData,
   });
-  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: fetchCountries });
+  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
   const denominationsQuery = useQuery({
     queryKey: ['denominations', filters.countryId],
     queryFn: () => fetchDenominations(filters.countryId),

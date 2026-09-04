@@ -475,7 +475,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Countries */
+        /**
+         * List Countries
+         * @description `scope=active` is the storefront; `scope=all` is the personal-item form,
+         *     where the user may enter a coin of any issuer ever.
+         */
         get: operations["list_countries_api_v1_countries_get"];
         put?: never;
         post?: never;
@@ -575,26 +579,28 @@ export interface components {
             country: string;
             /** Seriesname */
             seriesName: string | null;
-            /** Denomination */
-            denomination: string | null;
+            denomination: components["schemas"]["CoinDenomination"] | null;
             /** Year */
             year: number;
             /** Title */
             title: string;
             /** Titleoriginal */
             titleOriginal: string;
+            /** Originallang */
+            originalLang: string;
             /** Titleuk */
             titleUk: string | null;
-            /** Titleru */
-            titleRu: string | null;
+            titleUkSource: components["schemas"]["TranslationSource"] | null;
             /** Titleen */
             titleEn: string | null;
+            titleEnSource: components["schemas"]["TranslationSource"] | null;
             /** Variety */
             variety: string | null;
             /** Catalognumber */
             catalogNumber: string | null;
             collectionGroup: components["schemas"]["CollectionGroup"];
             metalKind: components["schemas"]["MetalKind"];
+            composition: components["schemas"]["CoinMaterial"] | null;
             /** Material */
             material: string | null;
             /** Marketpriceuah */
@@ -708,10 +714,13 @@ export interface components {
             subtype?: string | null;
             /** Titleoriginal */
             titleOriginal: string;
+            /**
+             * Originallang
+             * @default uk
+             */
+            originalLang: string;
             /** Titleuk */
             titleUk?: string | null;
-            /** Titleru */
-            titleRu?: string | null;
             /** Titleen */
             titleEn?: string | null;
             /** Issueyear */
@@ -722,6 +731,8 @@ export interface components {
             mintageAnnounced?: number | null;
             /** Mintageactual */
             mintageActual?: number | null;
+            /** Compositionid */
+            compositionId?: number | null;
             /** Material */
             material?: string | null;
             /** @default unknown */
@@ -765,10 +776,10 @@ export interface components {
             subtype?: string | null;
             /** Titleoriginal */
             titleOriginal?: string | null;
+            /** Originallang */
+            originalLang?: string | null;
             /** Titleuk */
             titleUk?: string | null;
-            /** Titleru */
-            titleRu?: string | null;
             /** Titleen */
             titleEn?: string | null;
             /** Issueyear */
@@ -779,6 +790,8 @@ export interface components {
             mintageAnnounced?: number | null;
             /** Mintageactual */
             mintageActual?: number | null;
+            /** Compositionid */
+            compositionId?: number | null;
             /** Material */
             material?: string | null;
             metalKind?: components["schemas"]["MetalKind"] | null;
@@ -811,26 +824,28 @@ export interface components {
             country: string;
             /** Seriesname */
             seriesName: string | null;
-            /** Denomination */
-            denomination: string | null;
+            denomination: components["schemas"]["CoinDenomination"] | null;
             /** Year */
             year: number;
             /** Title */
             title: string;
             /** Titleoriginal */
             titleOriginal: string;
+            /** Originallang */
+            originalLang: string;
             /** Titleuk */
             titleUk: string | null;
-            /** Titleru */
-            titleRu: string | null;
+            titleUkSource: components["schemas"]["TranslationSource"] | null;
             /** Titleen */
             titleEn: string | null;
+            titleEnSource: components["schemas"]["TranslationSource"] | null;
             /** Variety */
             variety: string | null;
             /** Catalognumber */
             catalogNumber: string | null;
             collectionGroup: components["schemas"]["CollectionGroup"];
             metalKind: components["schemas"]["MetalKind"];
+            composition: components["schemas"]["CoinMaterial"] | null;
             /** Material */
             material: string | null;
             /** Marketpriceuah */
@@ -864,6 +879,31 @@ export interface components {
             currentPassword: string;
             /** Newpassword */
             newPassword: string;
+        };
+        /**
+         * CoinDenomination
+         * @description Face value as structure plus the label for the requested locale.
+         */
+        CoinDenomination: {
+            /** Id */
+            id: number;
+            /** Value */
+            value: string;
+            /** Unit */
+            unit: string;
+            /** Currencycode */
+            currencyCode: string;
+            /** Label */
+            label: string;
+        };
+        /** CoinMaterial */
+        CoinMaterial: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
         };
         /**
          * CollectionGroup
@@ -965,7 +1005,11 @@ export interface components {
             /** Detail */
             detail?: string | null;
         };
-        /** CountryOut */
+        /**
+         * CountryOut
+         * @description `name` is the country in the requested locale; the slots are all there
+         *     too, so a form can search by any of them (docs/03-api-contract.md).
+         */
         CountryOut: {
             /** Id */
             id: number;
@@ -973,12 +1017,20 @@ export interface components {
             code: string | null;
             /** Name */
             name: string;
-            /** Nameru */
-            nameRu: string | null;
+            /** Nameoriginal */
+            nameOriginal: string;
+            /** Originallang */
+            originalLang: string;
+            /** Nameuk */
+            nameUk: string | null;
             /** Nameen */
             nameEn: string | null;
             /** Collectvariants */
             collectVariants: boolean;
+            /** Isactive */
+            isActive: boolean;
+            /** Sortorder */
+            sortOrder: number;
         };
         /** CurrencyOut */
         CurrencyOut: {
@@ -1024,22 +1076,23 @@ export interface components {
             /** Isempty */
             isEmpty: boolean;
         };
-        /** DenominationOut */
+        /**
+         * DenominationOut
+         * @description Structure plus the label rendered for the requested locale.
+         */
         DenominationOut: {
             /** Id */
             id: number;
             /** Countryid */
             countryId: number;
             /** Currencycode */
-            currencyCode: string | null;
-            /** Valueminorunits */
-            valueMinorUnits: number | null;
+            currencyCode: string;
+            /** Value */
+            value: string;
+            /** Unit */
+            unit: string;
             /** Label */
             label: string;
-            /** Labelru */
-            labelRu: string | null;
-            /** Labelen */
-            labelEn: string | null;
             /** Sortorder */
             sortOrder: number;
         };
@@ -1300,7 +1353,10 @@ export interface components {
             /** Endyear */
             endYear?: number | null;
         };
-        /** SeriesOut */
+        /**
+         * SeriesOut
+         * @description `name` is the series in the requested locale; the slots follow it.
+         */
         SeriesOut: {
             /** Id */
             id: number;
@@ -1308,10 +1364,16 @@ export interface components {
             countryId: number;
             /** Name */
             name: string;
-            /** Nameru */
-            nameRu: string | null;
+            /** Nameoriginal */
+            nameOriginal: string;
+            /** Originallang */
+            originalLang: string;
+            /** Nameuk */
+            nameUk: string | null;
+            nameUkSource: components["schemas"]["TranslationSource"] | null;
             /** Nameen */
             nameEn: string | null;
+            nameEnSource: components["schemas"]["TranslationSource"] | null;
             /** Description */
             description: string | null;
             /** Startyear */
@@ -1370,6 +1432,15 @@ export interface components {
             /** Expiresin */
             expiresIn: number;
         };
+        /**
+         * TranslationSource
+         * @description Where a translated name came from (docs/02-data-model.md).
+         *
+         *     Only the translated slots carry it: `*_original` is the issuer's own
+         *     wording and is never translated, so it has no source.
+         * @enum {string}
+         */
+        TranslationSource: "official" | "llm" | "manual";
         /** UpdateMeRequest */
         UpdateMeRequest: {
             /** Displayname */
@@ -1759,7 +1830,9 @@ export interface operations {
     };
     bootstrap_api_v1_bootstrap_get: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1773,6 +1846,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BootstrapOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1794,6 +1876,7 @@ export interface operations {
                 archived?: boolean;
                 sort?: "title" | "country" | "series" | "year" | "denomination" | "owned" | "purchase" | "price";
                 order?: "asc" | "desc";
+                locale?: string | null;
                 page?: number;
                 pageSize?: number;
             };
@@ -1825,7 +1908,9 @@ export interface operations {
     };
     create_item_api_v1_catalog_post: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1858,7 +1943,9 @@ export interface operations {
     };
     get_card_api_v1_catalog__item_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -1889,7 +1976,9 @@ export interface operations {
     };
     delete_item_api_v1_catalog__item_id__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -1918,7 +2007,9 @@ export interface operations {
     };
     update_item_api_v1_catalog__item_id__patch: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -1953,7 +2044,9 @@ export interface operations {
     };
     list_prices_api_v1_catalog__item_id__prices_get: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -1984,7 +2077,9 @@ export interface operations {
     };
     list_own_instances_api_v1_catalog__item_id__collection_items_get: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -2015,7 +2110,9 @@ export interface operations {
     };
     archive_item_api_v1_catalog__item_id__archive_post: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -2050,7 +2147,9 @@ export interface operations {
     };
     unarchive_item_api_v1_catalog__item_id__unarchive_post: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -2087,6 +2186,7 @@ export interface operations {
                 seriesId?: number | null;
                 sort?: "date" | "title" | "total";
                 order?: "asc" | "desc";
+                locale?: string | null;
                 page?: number;
                 pageSize?: number;
             };
@@ -2118,7 +2218,9 @@ export interface operations {
     };
     create_item_api_v1_collection_post: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2151,7 +2253,9 @@ export interface operations {
     };
     get_item_api_v1_collection__item_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -2182,7 +2286,9 @@ export interface operations {
     };
     delete_item_api_v1_collection__item_id__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -2211,7 +2317,9 @@ export interface operations {
     };
     update_item_api_v1_collection__item_id__patch: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 item_id: number;
@@ -2400,6 +2508,7 @@ export interface operations {
         parameters: {
             query?: {
                 countryId?: number | null;
+                locale?: string | null;
             };
             header?: never;
             path?: never;
@@ -2429,7 +2538,9 @@ export interface operations {
     };
     create_series_api_v1_series_post: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2464,6 +2575,7 @@ export interface operations {
         parameters: {
             query?: {
                 countryId?: number | null;
+                locale?: string | null;
             };
             header?: never;
             path?: never;
@@ -2493,7 +2605,9 @@ export interface operations {
     };
     series_summary_api_v1_series__series_id__summary_get: {
         parameters: {
-            query?: never;
+            query?: {
+                locale?: string | null;
+            };
             header?: never;
             path: {
                 series_id: number;
@@ -2524,7 +2638,10 @@ export interface operations {
     };
     list_countries_api_v1_countries_get: {
         parameters: {
-            query?: never;
+            query?: {
+                scope?: "active" | "all";
+                locale?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2540,12 +2657,22 @@ export interface operations {
                     "application/json": components["schemas"]["CountryOut"][];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
     list_denominations_api_v1_denominations_get: {
         parameters: {
             query?: {
                 countryId?: number | null;
+                locale?: string | null;
             };
             header?: never;
             path?: never;

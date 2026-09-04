@@ -21,18 +21,27 @@ function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
     id: 7,
     country: 'Україна',
     seriesName: 'Флора і фауна України',
-    denomination: '2 ₴',
+    denomination: {
+      id: 4,
+      value: '2.000',
+      unit: 'hryvnia',
+      currencyCode: 'UAH',
+      label: '2 гривні',
+    },
     year: 2017,
     title: 'Дельфін',
     titleOriginal: 'Дельфін',
+    originalLang: 'uk',
     titleUk: 'Дельфін',
-    titleRu: null,
+    titleUkSource: 'official',
     titleEn: 'Dolphin',
+    titleEnSource: 'official',
     variety: null,
     catalogNumber: null,
     collectionGroup: 'commemorative',
     metalKind: 'base',
-    material: 'нейзильбер',
+    composition: { id: 13, code: 'nickel_silver', name: 'Нейзильбер' },
+    material: null,
     marketPriceUah: '460.00',
     priceSource: 'ua-coins',
     priceObservedAt: '2024-05-18T00:00:00Z',
@@ -125,7 +134,7 @@ describe('CoinCardPage', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Дельфін' })).toBeInTheDocument();
-    expect(screen.getByText('2 ₴ · Україна · 2017')).toBeInTheDocument();
+    expect(screen.getByText('2 гривні · Україна · 2017')).toBeInTheDocument();
     expect(screen.getByText('KM# 123')).toBeInTheDocument();
     expect(screen.getByText('Тираж (заявлений)')).toBeInTheDocument();
     expect(screen.getByText('31 мм')).toBeInTheDocument();
@@ -139,6 +148,31 @@ describe('CoinCardPage', () => {
     expect(screen.getByText('Аукціон Violity')).toBeInTheDocument();
     expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
     expect(screen.getByText('Цін ще немає.')).toBeInTheDocument();
+  });
+
+  it('shows what the issuer calls the coin when the reader sees a translation', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({
+        title: 'Карбованець',
+        titleOriginal: 'Рубль',
+        originalLang: 'ru',
+        titleUk: 'Карбованець',
+      }),
+    );
+    renderPage();
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Карбованець' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Оригінал: Рубль/)).toBeInTheDocument();
+  });
+
+  it('leaves the original line out when the name shown is the original', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    renderPage();
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Дельфін' })).toBeInTheDocument();
+    expect(screen.queryByText(/Оригінал:/)).toBeNull();
   });
 
   it('hides the money block and says there is nothing yet without instances', async () => {

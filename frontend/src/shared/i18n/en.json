@@ -281,7 +281,8 @@
     "legendTrend": "source price",
     "legendOwn": "my price",
     "legendSuspect": "suspect price",
-    "chartLabel": "Price chart: {{count}} points from {{from}} to {{to}}"
+    "chartLabel": "Price chart: {{count}} points from {{from}} to {{to}}",
+    "originalName": "Original: {{title}} ({{language}})"
   },
   "units": {
     "mm": "mm",
@@ -373,7 +374,9 @@
     "submit": "Create the item",
     "created": "Item created.",
     "adminRequired": "Only an administrator can create shared catalog records.",
-    "invalidReference": "The country, series or denomination does not exist. Reload and try again."
+    "invalidReference": "The country, series or denomination does not exist. Reload and try again.",
+    "countryHint": "Any issuing country — start typing its name",
+    "countryChosen": "Chosen: {{name}}"
   },
   "series": {
     "title": "Series",
