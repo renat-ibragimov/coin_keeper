@@ -76,7 +76,9 @@ class PhotoOutcome:
         }
 
 
-async def _items_by_type(session: AsyncSession, country_id: int) -> tuple[dict[str, list[int]], int]:
+async def _items_by_type(
+    session: AsyncSession, country_id: int
+) -> tuple[dict[str, list[int]], int]:
     rows = (
         await session.execute(
             select(CatalogItem.id, CatalogItem.issue_year, Denomination.value, Denomination.unit)

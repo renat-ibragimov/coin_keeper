@@ -722,7 +722,9 @@ async def test_reclassify_moves_a_nbu_linked_jubilee_and_the_belt_holds_before_i
     cells = parse_mintage_table(MINTAGE_TABLE_HTML)
 
     # circ-titles leaves it alone.
-    titles_outcome = await circ_titles.apply_titles(db_session, country_id=country.id, dry_run=False)
+    titles_outcome = await circ_titles.apply_titles(
+        db_session, country_id=country.id, dry_run=False
+    )
     await db_session.commit()
     assert titles_outcome.summary()["skippedNbuLinked"] == 1
     refreshed = await db_session.get(CatalogItem, jubilee.id)
@@ -837,7 +839,9 @@ async def test_reclassify_leaves_an_honest_circulation_coin_alone(db_session: As
     assert outcome.reclassified == []
     assert outcome.official_without_nbu_link == []
 
-    titles_outcome = await circ_titles.apply_titles(db_session, country_id=country.id, dry_run=False)
+    titles_outcome = await circ_titles.apply_titles(
+        db_session, country_id=country.id, dry_run=False
+    )
     assert titles_outcome.summary()["skippedNbuLinked"] == 0
 
 
