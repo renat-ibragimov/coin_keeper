@@ -12,6 +12,15 @@ function render(ui: ReactElement) {
   return renderBare(<MemoryRouter>{ui}</MemoryRouter>);
 }
 
+function photo(side: string): CatalogListItem['obverseImage'] {
+  return {
+    preview: `https://storage.test/${side}_300.webp`,
+    medium: `https://storage.test/${side}_600.webp`,
+    large: `https://storage.test/${side}_1200.webp`,
+    attribution: 'Національний банк України',
+  };
+}
+
 function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
   return {
     id: 1,
@@ -43,8 +52,8 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
     priceObservedAt: null,
     quantityOwned: 0,
     purchaseTotalUah: '0.00',
-    obverseImageUrl: null,
-    reverseImageUrl: null,
+    obverseImage: null,
+    reverseImage: null,
     thumbnailUrl: null,
     isOwn: false,
     isArchived: false,
@@ -71,9 +80,7 @@ describe('CoinCard images', () => {
   });
 
   it('replaces an unreachable photo with the same placeholder', () => {
-    const { container } = render(
-      <CoinCard item={makeItem({ obverseImageUrl: 'https://ucoin.net/coin/obverse.jpg' })} />,
-    );
+    const { container } = render(<CoinCard item={makeItem({ obverseImage: photo('obverse') })} />);
 
     const image = container.querySelector('img');
     expect(image).not.toBeNull();
@@ -88,10 +95,7 @@ describe('CoinCard images', () => {
   it('keeps a failed side out while the other side still loads', () => {
     const { container } = render(
       <CoinCard
-        item={makeItem({
-          obverseImageUrl: 'https://ucoin.net/coin/obverse.jpg',
-          reverseImageUrl: 'https://ucoin.net/coin/reverse.jpg',
-        })}
+        item={makeItem({ obverseImage: photo('obverse'), reverseImage: photo('reverse') })}
       />,
     );
     expect(container.querySelectorAll('img')).toHaveLength(2);

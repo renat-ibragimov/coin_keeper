@@ -43,6 +43,11 @@
   line-height: 1.15;
 }
 
+.attribution {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
 .original {
   margin: 0;
   color: var(--color-text-muted);

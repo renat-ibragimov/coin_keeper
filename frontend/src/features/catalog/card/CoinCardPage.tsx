@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
+import { imageSources } from '@/shared/lib/coinImage';
 import { coinTitle, showsOriginal } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
 import { languageName } from '@/shared/lib/languageName';
@@ -96,9 +97,14 @@ function CardBody({ card }: { card: CatalogCard }) {
       ? formatUah(Number(card.marketPriceUah) * card.quantityOwned, locale)
       : null;
   const sides = [
-    { key: 'obverse' as const, url: card.obverseImageUrl, label: t('card.obverse') },
-    { key: 'reverse' as const, url: card.reverseImageUrl, label: t('card.reverse') },
-  ];
+    { key: 'obverse' as const, image: card.obverseImage, label: t('card.obverse') },
+    { key: 'reverse' as const, image: card.reverseImage, label: t('card.reverse') },
+  ].map((side) => ({
+    ...side,
+    // The card shows the medium file and the lightbox the large one.
+    card: imageSources(side.image, 'card'),
+    full: imageSources(side.image, 'lightbox'),
+  }));
   const enlargedSide = sides.find((side) => side.key === enlarged);
 
   // The catalog keeps its filters in the URL, so going back through history
@@ -154,9 +160,14 @@ function CardBody({ card }: { card: CatalogCard }) {
         <section className={styles.photos} aria-label={t('card.photosLabel')}>
           {sides.map((side) => (
             <figure key={side.key} className={styles.photo}>
-              <CoinImage src={side.url} alt="" fit="contain" className={styles.photoFrame} />
-              <figcaption className={styles.photoLabel}>{side.label}</figcaption>
-              {side.url ? (
+              <CoinImage {...side.card} alt="" fit="contain" className={styles.photoFrame} />
+              <figcaption className={styles.photoLabel}>
+                {side.label}
+                {side.image?.attribution ? (
+                  <span className={styles.attribution}> · {side.image.attribution}</span>
+                ) : null}
+              </figcaption>
+              {side.card.src ? (
                 <button
                   type="button"
                   className={styles.zoom}
@@ -284,7 +295,7 @@ function CardBody({ card }: { card: CatalogCard }) {
         label={`${enlargedSide?.label ?? ''} — ${title}`}
       >
         <CoinImage
-          src={enlargedSide?.url}
+          src={enlargedSide?.full.src}
           alt={`${enlargedSide?.label ?? ''} — ${title}`}
           fit="contain"
           className={styles.lightboxImage}

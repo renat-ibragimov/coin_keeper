@@ -126,7 +126,7 @@ export function PurchaseFormPage() {
             {cardQuery.data ? (
               <div className={styles.itemBody}>
                 <CoinImage
-                  src={cardQuery.data.thumbnailUrl ?? cardQuery.data.obverseImageUrl}
+                  src={cardQuery.data.thumbnailUrl ?? cardQuery.data.obverseImage?.preview ?? null}
                   alt=""
                   className={styles.itemImage}
                 />

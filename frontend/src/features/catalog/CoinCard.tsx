@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
+import { imageSources } from '@/shared/lib/coinImage';
 import { coinTitle } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
@@ -11,16 +12,18 @@ import { Badge, CoinImage } from '@/shared/ui';
 import styles from './CoinCard.module.css';
 
 function CoinImages({ item }: { item: CatalogListItem }) {
-  const sides = [item.obverseImageUrl, item.reverseImageUrl].filter(Boolean);
+  const obverse = imageSources(item.obverseImage, 'list');
+  const reverse = imageSources(item.reverseImage, 'list');
+  const shown = [obverse, reverse].filter((side) => side.src);
   // With one side stored, or none at all, a single frame spans the media area;
   // CoinImage decides on its own whether it shows a photo or the placeholder.
-  if (sides.length < 2) {
-    return <CoinImage src={sides[0]} alt="" className={styles.imageSingle} />;
+  if (shown.length < 2) {
+    return <CoinImage {...(shown[0] ?? { src: null })} alt="" className={styles.imageSingle} />;
   }
   return (
     <>
-      <CoinImage src={item.obverseImageUrl} alt="" className={styles.image} />
-      <CoinImage src={item.reverseImageUrl} alt="" className={styles.image} />
+      <CoinImage {...obverse} alt="" className={styles.image} />
+      <CoinImage {...reverse} alt="" className={styles.image} />
     </>
   );
 }

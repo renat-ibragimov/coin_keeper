@@ -5,6 +5,8 @@ import styles from './CoinImage.module.css';
 interface CoinImageProps {
   /** Absolute or same-origin URL; null whenever the item has no photo. */
   src?: string | null;
+  /** Denser variants of the same photo, "url 1x, url 2x". */
+  srcSet?: string;
   /**
    * Alt text. Pass "" for images that sit next to the coin title: the title
    * already names them, so a repeated description is noise for a screen reader.
@@ -25,7 +27,7 @@ interface CoinImageProps {
  * come from the NBU in stage 6); a missing and an unreachable photo simply look
  * the same, and neither shows a broken <img>.
  */
-export function CoinImage({ src, alt, className, fit = 'cover' }: CoinImageProps) {
+export function CoinImage({ src, srcSet, alt, className, fit = 'cover' }: CoinImageProps) {
   // Remembering the URL that failed rather than a plain flag gives the reset
   // for free when the item changes, and keeps one failure final: the error
   // handler never rewrites src, so a dead URL is requested once, not in a loop.
@@ -44,6 +46,7 @@ export function CoinImage({ src, alt, className, fit = 'cover' }: CoinImageProps
     <span className={frame}>
       <img
         src={src}
+        srcSet={srcSet}
         alt={alt}
         loading="lazy"
         decoding="async"

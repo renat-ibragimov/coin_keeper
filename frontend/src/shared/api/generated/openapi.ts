@@ -613,10 +613,8 @@ export interface components {
             quantityOwned: number;
             /** Purchasetotaluah */
             purchaseTotalUah: string;
-            /** Obverseimageurl */
-            obverseImageUrl: string | null;
-            /** Reverseimageurl */
-            reverseImageUrl: string | null;
+            obverseImage: components["schemas"]["CoinImageOut"] | null;
+            reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
             thumbnailUrl: string | null;
             /** Isown */
@@ -858,10 +856,8 @@ export interface components {
             quantityOwned: number;
             /** Purchasetotaluah */
             purchaseTotalUah: string;
-            /** Obverseimageurl */
-            obverseImageUrl: string | null;
-            /** Reverseimageurl */
-            reverseImageUrl: string | null;
+            obverseImage: components["schemas"]["CoinImageOut"] | null;
+            reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
             thumbnailUrl: string | null;
             /** Isown */
@@ -895,6 +891,20 @@ export interface components {
             currencyCode: string;
             /** Label */
             label: string;
+        };
+        /**
+         * CoinImageOut
+         * @description One side of a coin at the sizes stored for it, plus who to credit.
+         */
+        CoinImageOut: {
+            /** Preview */
+            preview: string | null;
+            /** Medium */
+            medium: string | null;
+            /** Large */
+            large: string | null;
+            /** Attribution */
+            attribution: string | null;
         };
         /** CoinMaterial */
         CoinMaterial: {
