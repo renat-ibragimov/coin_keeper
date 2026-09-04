@@ -126,6 +126,21 @@ def test_every_legacy_template_parses(country: str, label: str, value: str, unit
     assert parsed.currency_code == UNITS[unit].currency_code
 
 
+@pytest.mark.parametrize(
+    ("label", "value", "unit"),
+    [
+        ("1 грн", "1", "hryvnia"),
+        ("250 грн", "250", "hryvnia"),
+        ("2000000 крб", "2000000", "karbovanets"),
+        ("50 коп", "50", "kopiika"),
+    ],
+)
+def test_the_abbreviations_the_national_bank_writes(label: str, value: str, unit: str) -> None:
+    """Its cards say "1 грн", never "1 гривня"; an unread label is a lost face value."""
+    parsed = parse_label(label, country_code="UA")
+    assert (parsed.value, parsed.unit) == (Decimal(value), unit)
+
+
 def test_the_same_word_means_two_coins_in_two_countries() -> None:
     """Ukrainian копійка and Soviet копейка are spelled alike in the legacy base."""
     assert parse_label("5 копеек", country_code="UA").unit == "kopiika"

@@ -206,6 +206,10 @@ Read the summary before anything else:
 - `series.unmappedNames` — anything listed here needs a line in
   `app/ukraine_recon/series_map.json` before the real run.
 - `gaps.created` — how many coins the issuer has and we do not (~237).
+- `gaps.wouldDuplicate` — coins not created because one of our own unlinked
+  records is already in that year and face value. Reviewed in step 3b.
+- `repair-gaps.filled` — which columns records from an earlier run were missing.
+- `merge.candidates` — pairs of our records that look like one coin.
 - `titles.wikipediaDisagreements` — where Wikipedia tells a different story.
 
 ### 2. Link what is certain
@@ -234,17 +238,76 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
 
 Only one row per item may say yes; two is an error, not a preference.
 
-### 4. Series, gaps, titles
+### 4. Series, gaps, repair
 
 ```bash
 docker compose run --rm -v "$PWD/migration-reports:/reports" \
-  api python scripts/ukraine_pipeline.py --apply --steps series,gaps,titles \
-    --report /reports/ukraine-names.json --cache-dir /reports/ukraine-cache
+  api python scripts/ukraine_pipeline.py --apply --steps series,gaps,repair-gaps \
+    --report /reports/ukraine-gaps.json --cache-dir /reports/ukraine-cache \
+    --duplicates-out /reports/gaps-duplicates.csv
 ```
 
 Series before gaps: gaps creates records under the NBU series names, and
 renaming ours afterwards would collide with what it just made. The script
 enforces the order; `--steps` only chooses which of them run.
+
+`repair-gaps` goes back over the records an earlier run created and fills the
+columns it left empty — the face value, the metal kind, the series. It writes
+only into empty columns, so a correction someone made by hand stays.
+
+### 4b. The coins gaps did not create
+
+`gaps-duplicates.csv` holds the coins gaps refused to create because one of our
+own unlinked records is already sitting in that year and face value. It is in
+the same format as the bridge's review file: `yes` against the row that is the
+same coin, and the bridge links **our** record to that card.
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps bridge \
+    --apply-review /reports/gaps-duplicates.csv \
+    --report /reports/ukraine-bridge-3.json --cache-dir /reports/ukraine-cache
+```
+
+A pair that is **not** one coin needs no answer here: link our record to its
+real card in the ordinary review, and the next run of gaps will create the
+missing coin because nothing unlinked stands in its slot any more.
+
+### 4c. Duplicates already created
+
+Records the first run of gaps created on top of ours are merged, not deleted
+by hand.
+
+```bash
+# list the pairs
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --steps merge \
+    --merge-out /reports/merge-review.csv \
+    --report /reports/ukraine-merge.json --cache-dir /reports/ukraine-cache
+
+# then, with yes against the pairs that are one coin
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps merge \
+    --apply-merge /reports/merge-review.csv \
+    --report /reports/ukraine-merge-2.json --cache-dir /reports/ukraine-cache
+```
+
+`sharedWords` and `nbuDescription` are what tell four coins of one name apart:
+the leopard, the lion, the griffin and the man are in the card's prose, never
+in its title. The survivor is the record made from the card; everything the old
+record carried — the owners' coins and photographs, purchases, sales, offers,
+price history, links — moves onto it, and the report prints the instances and
+the money on both records before and on the survivor after. **They must add
+up.** Run it without `--apply` first: a dry run prints exactly the same
+arithmetic and moves nothing.
+
+### 4d. Titles
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps titles \
+    --report /reports/ukraine-names.json --cache-dir /reports/ukraine-cache
+```
 
 ### 5. Photos, in portions
 
@@ -274,8 +337,13 @@ stored flagged, not dropped, and stay out of the collection value.
 
 ### Flags
 
-- `--steps bridge,series,gaps,titles,photos,prices` — any subset.
+- `--steps bridge,series,gaps,repair-gaps,merge,titles,photos,prices` — any
+  subset, run in that order whatever order they are written in.
 - `--limit N` — stop `photos` and `gaps` after N items.
+- `--duplicates-out FILE` — where `gaps` writes the coins it did not create;
+  `--apply-review` reads it back.
+- `--merge-out FILE`, `--apply-merge FILE` — the duplicate pairs, and the
+  reviewed answer.
 - `--ua-coins auto|live|wayback|skip` — `auto` tries the site and falls back to
   the Wayback Machine copy.
 - `--since-year N` — only coins issued in or after that year, for a trial.

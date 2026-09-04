@@ -9,6 +9,13 @@ ids are the same in both locales, so the English listing gives an official
 title_en and an official English series name for every card — with no
 translation involved (docs/05-integrations.md, section 8).
 
+And the rolls. Circulation commemoratives ("обігові пам'ятні монети", 10 UAH
+since 2022) are not numismatic products, so the catalogue has no card for the
+coin — only for the roll of 25 it is sold in. That card still names the coin,
+dates it, pictures it and states the roll's face value, so the coin is read
+off it: the denomination is the roll's divided by the number of coins in it.
+Without this the whole series arrives at the bridge with no candidate at all.
+
 Nothing here touches the database. Repeated runs cost no requests: every
 response is on disk under --cache-dir.
 """
@@ -17,9 +24,11 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 
+from app.models.enums import MetalKind
+from app.reference_data.materials import parse_material
 from app.ukraine_recon import nbu, triangulate, ua_coins, wikipedia
 from app.ukraine_recon.http import FetchResult, PoliteClient, SourceUnreachableError
 from app.ukraine_recon.models import (
@@ -40,6 +49,36 @@ MODE_SKIP = "skip"
 # The obverse and reverse of an NBU card: "{code}a.png" and "{code}r.png".
 # "{code}a0.png" and friends are extra views, and "u.pdf" is the booklet.
 _NBU_SIDE_RE = re.compile(r"/files/coins_images/([A-Za-z0-9]+)([ar])\.png$")
+
+PRECIOUS_CODES = ("silver", "gold", "platinum")
+
+# What the National Bank writes in "Матеріал". A closed list: the search form
+# of the site offers exactly these nine values, so they are mapped rather than
+# guessed at. Silver and gold carry no fineness on the card, which is why they
+# point at no dictionary row — the metal kind is known all the same, and that
+# is what the collection value depends on.
+NBU_METALS: dict[str, tuple[str | None, MetalKind]] = {
+    "срібло": (None, MetalKind.PRECIOUS),
+    "золото": (None, MetalKind.PRECIOUS),
+    "біметалеві із дорогоцінних металів": ("bimetal", MetalKind.PRECIOUS),
+    "біметалеві із недорогоцінних металів": ("bimetal", MetalKind.BASE),
+    "нейзильбер": ("nickel_silver", MetalKind.BASE),
+    "мельхіор": ("copper_nickel", MetalKind.BASE),
+    "сплав на основі цинку": (None, MetalKind.BASE),
+    "не вказується (набір)": (None, MetalKind.UNKNOWN),
+    "інший (банкнота)": (None, MetalKind.UNKNOWN),
+}
+
+# "Ролик обігових пам'ятних монет [номіналом 10 гривень] «X» (у ролику 25 монет)"
+_ROLL_HEAD_RE = re.compile(
+    r"^Ролик\s+обігових\s+пам.?ятних\s+монет\s+(?:номіналом\s+[\d\s]+\S+\s+)?",
+    re.IGNORECASE,
+)
+_ROLL_TAIL_RE = re.compile(r"\(\s*у\s+ролику\s+(?P<count>\d+)\s+монет\s*\)\s*$", re.IGNORECASE)
+# The English site names the coin first and describes the roll in brackets
+# after it, in half a dozen wordings; every trailing bracket is the roll.
+_TRAILING_BRACKETS_RE = re.compile(r"(?:\s*\([^()]*\))+\s*$")
+_LABEL_UNIT_RE = re.compile(r"[^\d\s.,]+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,6 +112,18 @@ class Sources:
         for cluster in self.clusters:
             record = cluster.record_of(source)
             if record is not None and record.source_id == source_id:
+                return cluster
+        return None
+
+    def cluster_by_url(self, source: str, url: str) -> Cluster | None:
+        """The same lookup for the sources we store a page address of.
+
+        Wikipedia numbers its coins by its own sequence, so what goes into
+        price_source_links is the article URL, not an id.
+        """
+        for cluster in self.clusters:
+            record = cluster.record_of(source)
+            if record is not None and record.url == url:
                 return cluster
         return None
 
@@ -134,6 +185,77 @@ def _unquote(text: str) -> str:
 def nbu_title(record: SourceRecord) -> str:
     """The NBU name of the coin: no metal marker, no packaging phrase."""
     return official_title(record.title_uk)
+
+
+def nbu_metal(text: str | None) -> tuple[str | None, MetalKind]:
+    """(composition code, metal kind) out of an NBU "Матеріал".
+
+    The nine words the site uses are mapped outright; anything else falls back
+    to the general parser, which reads the uCoin-shaped strings our own
+    catalogue carries. An unreadable material leaves the kind unknown rather
+    than calling the coin base metal.
+    """
+    key = " ".join((text or "").casefold().split())
+    if key in NBU_METALS:
+        return NBU_METALS[key]
+    code = parse_material(text).composition
+    if code is None:
+        return None, MetalKind.UNKNOWN
+    return code, MetalKind.PRECIOUS if code.startswith(PRECIOUS_CODES) else MetalKind.BASE
+
+
+def roll_coin(record: SourceRecord) -> SourceRecord | None:
+    """The coin a roll card is a roll of, or None if the card is not a roll.
+
+    Everything comes off the card: the name it quotes, the year it is dated,
+    the images it shows (they are the coin's obverse and reverse, not a photo
+    of the packaging) and the face value, which is the roll's divided by the
+    number of coins the title states. The roll's own mintage counts rolls, so
+    it is not carried over, and its material says "не вказується (набір)".
+    """
+    title = record.title_uk or ""
+    tail = _ROLL_TAIL_RE.search(title)
+    if tail is None or record.denomination is None:
+        return None
+    head = _ROLL_HEAD_RE.sub("", title[: tail.start()])
+    if head == title[: tail.start()]:
+        return None
+    name = official_title(head)
+    count = int(tail.group("count"))
+    if not name or count <= 0:
+        return None
+    denomination = record.denomination / count
+    unit = _LABEL_UNIT_RE.search(record.denomination_label or "")
+    return replace(
+        record,
+        title_uk=name,
+        title_ru=None,
+        denomination=denomination,
+        denomination_label=(
+            f"{format(denomination.normalize(), 'f')} {unit.group(0)}" if unit else None
+        ),
+        mintage=None,
+        mintage_actual=None,
+        metal=None,
+        series=None,
+        kind="coin",
+        image_urls=list(record.image_urls),
+        extra={**record.extra, "fromRoll": count, "rollTitle": title},
+    )
+
+
+def roll_coin_english(title: str | None) -> str | None:
+    """The coin's English name out of an English roll title.
+
+    The English site puts the coin first and the roll in brackets after it —
+    "(a roll of circulation commemorative coins) (25 coins to a roll)" — in
+    half a dozen wordings, so every trailing bracket is dropped rather than
+    any one of them matched.
+    """
+    if not title:
+        return None
+    name = _TRAILING_BRACKETS_RE.sub("", title).strip()
+    return name or None
 
 
 def nbu_sides(record: SourceRecord) -> dict[str, str]:
@@ -223,14 +345,61 @@ def _fetch_nbu(
     try:
         english = _nbu_cards(client, nbu.LOCALE_EN, date_from=date_from, warn=warn)
     except SourceUnreachableError as exc:
+        # An English title is worth having and no coin depends on it; the
+        # rolls do carry coins, so they are read either way.
         warn(f"nbu english unreachable: {exc}")
-        return
+        english = []
     sources.nbu_english = {
         card.nbu_id: NbuEnglish(title=official_title(card.title), series=_tidy_english(card.series))
         for card in english
         if card.nbu_id
     }
     log(f"nbu english: {len(sources.nbu_english)} cards")
+    _fetch_nbu_rolls(client, sources, log=log, warn=warn, date_from=date_from)
+
+
+def _fetch_nbu_rolls(
+    client: PoliteClient,
+    sources: Sources,
+    *,
+    log: Callable[[str], None],
+    warn: Callable[[str], None],
+    date_from: str | None,
+) -> None:
+    """The souvenir listing, read for the coins inside the rolls.
+
+    Circulation commemoratives have no card of their own; the roll they are
+    sold in does. Only roll cards are kept — the rest of the souvenir listing
+    is packaging, and packaging is not a coin.
+    """
+    try:
+        cards = _nbu_cards(
+            client, nbu.LOCALE_UK, date_from=date_from, warn=warn, category=nbu.CATEGORY_SOUVENIR
+        )
+    except SourceUnreachableError as exc:
+        warn(f"nbu souvenirs unreachable: {exc}")
+        return
+    try:
+        english_cards = _nbu_cards(
+            client, nbu.LOCALE_EN, date_from=date_from, warn=warn, category=nbu.CATEGORY_SOUVENIR
+        )
+    except SourceUnreachableError as exc:
+        warn(f"nbu english souvenirs unreachable: {exc}")
+        english_cards = []
+    english = {card.nbu_id: card.title for card in english_cards if card.nbu_id}
+
+    rolls = 0
+    for card in cards:
+        record = nbu.card_to_record(card)
+        name_en = roll_coin_english(english.get(record.source_id))
+        coin = roll_coin(record)
+        if coin is None:
+            continue
+        sources.nbu.append(coin)
+        if name_en:
+            sources.nbu_english.setdefault(coin.source_id, NbuEnglish(title=name_en, series=None))
+        rolls += 1
+    log(f"nbu rolls: {rolls} circulation commemoratives read off their roll cards")
 
 
 def _nbu_cards(
@@ -239,20 +408,22 @@ def _nbu_cards(
     *,
     date_from: str | None,
     warn: Callable[[str], None],
+    category: str = nbu.CATEGORY_COIN,
 ) -> list[nbu.NbuCard]:
     cards: list[nbu.NbuCard] = []
     page_number = 1
     page_count: int | None = None
     url = nbu.search_url(locale)
     while page_count is None or page_number <= page_count:
-        result = client.post(url, nbu.search_form(page_number, date_from=date_from))
+        form = nbu.search_form(page_number, category=category, date_from=date_from)
+        result = client.post(url, form)
         if not result.ok:
-            warn(f"nbu {locale} page {page_number}: HTTP {result.status}")
+            warn(f"nbu {locale} {category} page {page_number}: HTTP {result.status}")
             break
         parsed = nbu.parse_search_page(result.text)
         page_count = parsed.page_count or 1 if page_count is None else page_count
         if not parsed.cards:
-            warn(f"nbu {locale} page {page_number}: no cards parsed")
+            warn(f"nbu {locale} {category} page {page_number}: no cards parsed")
             break
         cards.extend(parsed.cards)
         page_number += 1

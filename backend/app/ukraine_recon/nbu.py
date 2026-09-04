@@ -240,6 +240,10 @@ def card_to_record(card: NbuCard) -> SourceRecord:
             "edge": fields.get(FIELD_EDGE),
             "thumbnails": card.thumbnails,
             "hasDescription": bool(card.description),
+            # The card's own prose. It is the only place the NBU says what is
+            # drawn on the coin, which is what tells two same-year, same-value
+            # issues of one series apart.
+            "description": card.description,
         },
     )
 

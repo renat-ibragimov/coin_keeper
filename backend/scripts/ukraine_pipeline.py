@@ -1,9 +1,9 @@
 """The Ukrainian pipeline (stage 4.5, part B).
 
 Links our catalogue to the National Bank, ua-coins.info and Wikipedia, fills
-the gaps, takes the official names, series and photographs, and records one
-price per coin. The steps are in app/ukraine_pipeline/; this file is the
-command line around them.
+the gaps, repairs and merges what an earlier run of it left behind, takes the
+official names, series and photographs, and records one price per coin. The
+steps are in app/ukraine_pipeline/; this file is the command line around them.
 
     python scripts/ukraine_pipeline.py --dry-run --report /reports/ukraine.json \
         --cache-dir /reports/ukraine-cache
@@ -41,7 +41,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--cache-dir", type=Path, help="disk cache for fetched pages and images")
     parser.add_argument(
         "--steps",
-        help="comma-separated subset of bridge,gaps,titles,series,photos,prices",
+        help="comma-separated subset of the steps, in any order",
     )
     parser.add_argument(
         "--apply",
@@ -61,6 +61,21 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--apply-review", type=Path, dest="review_in", help="a reviewed CSV to read decisions from"
+    )
+    parser.add_argument(
+        "--duplicates-out",
+        type=Path,
+        help="where gaps writes the coins it did not create because one of our own "
+        "records is already in that year and face value; --apply-review reads it back",
+    )
+    parser.add_argument(
+        "--merge-out", type=Path, help="where to write the duplicate pairs for review"
+    )
+    parser.add_argument(
+        "--apply-merge",
+        type=Path,
+        dest="merge_in",
+        help="a reviewed merge CSV; the pairs marked yes are merged, one record kept",
     )
     parser.add_argument(
         "--ua-coins",
@@ -104,6 +119,9 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
         "cacheDir": str(args.cache_dir) if args.cache_dir else None,
         "reviewOut": str(args.review_out) if args.review_out else None,
         "reviewIn": str(args.review_in) if args.review_in else None,
+        "duplicatesOut": str(args.duplicates_out) if args.duplicates_out else None,
+        "mergeOut": str(args.merge_out) if args.merge_out else None,
+        "mergeIn": str(args.merge_in) if args.merge_in else None,
     }
     report.assumptions = [
         "Only shared Ukrainian records take part; personal items belong to their authors.",
@@ -142,6 +160,9 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
             limit=args.limit,
             review_out=args.review_out,
             review_in=args.review_in,
+            duplicates_out=args.duplicates_out,
+            merge_out=args.merge_out,
+            merge_in=args.merge_in,
             report_path=args.report,
         )
         try:
@@ -177,9 +198,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.apply and args.dry_run:
         print("--apply and --dry-run contradict each other", file=sys.stderr)
         return EXIT_USAGE
-    if args.review_in is not None and not args.review_in.exists():
-        print(f"review file not found: {args.review_in}", file=sys.stderr)
-        return EXIT_USAGE
+    for name, path in (("review", args.review_in), ("merge", args.merge_in)):
+        if path is not None and not path.exists():
+            print(f"{name} file not found: {path}", file=sys.stderr)
+            return EXIT_USAGE
     log = Progress()
     try:
         return asyncio.run(_run(args, log))

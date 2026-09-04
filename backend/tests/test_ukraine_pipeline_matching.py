@@ -2,8 +2,12 @@
 
 No database and no network — this is the decision layer. What is checked is
 what the step promises: the dictionary does the work a character ratio cannot,
-the threshold holds, a coin belongs to one record, and a person's decision in
-the CSV comes back exactly as written.
+the threshold holds, a coin belongs to one record, a reference we already hold
+outranks any resemblance, and a person's decision in the CSV comes back
+exactly as written.
+
+Reading the sources is here too, for the parts a decision depends on: the
+coin inside a roll card and the National Bank's own material words.
 """
 
 from __future__ import annotations
@@ -13,10 +17,18 @@ from pathlib import Path
 
 import pytest
 
+from app.models.enums import MetalKind
 from app.ukraine_pipeline import bridge
-from app.ukraine_pipeline.catalog import OurItem
+from app.ukraine_pipeline.catalog import OurItem, source_key_reference
 from app.ukraine_pipeline.lexicon import load_lexicon, strip_import_noise
-from app.ukraine_pipeline.sources import Sources, cluster_key, official_title
+from app.ukraine_pipeline.sources import (
+    Sources,
+    cluster_key,
+    nbu_metal,
+    official_title,
+    roll_coin,
+    roll_coin_english,
+)
 from app.ukraine_recon.models import SOURCE_NBU, SOURCE_UA_COINS, SOURCE_WIKIPEDIA, SourceRecord
 from app.ukraine_recon.triangulate import cluster_records
 
@@ -315,3 +327,182 @@ def test_the_links_a_cluster_yields() -> None:
     assert links[SOURCE_UA_COINS].startswith("https://")
     assert links[SOURCE_WIKIPEDIA].startswith("https://")
     assert links[SOURCE_NBU] == "5"
+
+
+# ------------------------------------------------------------- source keys
+def test_a_source_key_from_any_source_is_a_reference() -> None:
+    """A record made from an NBU card carries that card, and that is a link."""
+    assert source_key_reference("nbu:1307") == (SOURCE_NBU, "1307")
+    assert source_key_reference("wiki:silver:12") == (SOURCE_WIKIPEDIA, "silver:12")
+    assert source_key_reference("https://www.ua-coins.info/ua/list/42-x") == (
+        SOURCE_UA_COINS,
+        "https://www.ua-coins.info/ua/list/42-x",
+    )
+    assert source_key_reference("ucoin:ua-1234") is None
+    assert source_key_reference(None) is None
+
+
+def test_the_card_a_record_was_made_from_links_it_without_scoring() -> None:
+    """The gaps step's own records must not be scored against ours.
+
+    Both are called "Пектораль" in the same year and face value; the one that
+    holds the card is that coin, and the other is what a person looks at.
+    """
+    sources = sources_of(record(SOURCE_NBU, "1307", "Пектораль", "20", 2021))
+    made = item(3106, "Пектораль", "20", 2021, links={SOURCE_NBU: "1307"})
+    ours = item(1122, "Пектораль", "20", 2021)
+    outcome = bridge.decide([made, ours], sources, LEXICON)
+
+    assert [(d.item.id, d.strategy) for d in outcome.linked] == [(3106, "link")]
+    assert [d.item.id for d in outcome.review] == [1122]
+    # The review file names the record that took the coin.
+    assert outcome.claimed[f"{SOURCE_NBU}:1307"] == 3106
+
+
+def test_a_wikipedia_article_address_resolves_to_its_cluster() -> None:
+    wiki = record(SOURCE_WIKIPEDIA, "silver:12", "Соня садова", "2", 1999)
+    sources = sources_of(wiki)
+    ours = item(1, "Соня садовая", "2", 1999, links={SOURCE_WIKIPEDIA: wiki.url})
+    outcome = bridge.decide([ours], sources, LEXICON)
+    assert [d.strategy for d in outcome.linked] == ["link"]
+
+
+def test_a_decision_rescues_a_record_the_run_gave_no_candidates(tmp_path: Path) -> None:
+    """What the gaps step's would-duplicate file is for.
+
+    The record and the coin never met on a score, so the run reports the one
+    as having no candidate at all; a person's yes still has to link them.
+    """
+    sources = sources_of(record(SOURCE_NBU, "1307", "Пектораль з левом", "20", 2021))
+    ours = item(1122, "Скіфська пектораль", "20", 2021)
+    outcome = bridge.decide([ours], sources, LEXICON)
+    assert [i.id for i in outcome.without_candidates] == [1122]
+
+    applied, problems = bridge.apply_review(outcome, {1122: f"{SOURCE_NBU}:1307"}, sources)
+    assert problems == []
+    assert applied.without_candidates == []
+    assert [d.item.id for d in applied.linked] == [1122]
+
+
+# ------------------------------------------------------------------- rolls
+def roll_record(
+    source_id: str = "1740",
+    *,
+    title: str = (
+        'Ролик обігових пам`ятних монет "Ми сильні. Ми разом. Запорізька область" '
+        "(у ролику 25 монет)"
+    ),
+    denomination: str = "250",
+    label: str = "250 грн",
+) -> SourceRecord:
+    return SourceRecord(
+        source=SOURCE_NBU,
+        source_id=source_id,
+        title_uk=title,
+        denomination=Decimal(denomination),
+        denomination_label=label,
+        year=2026,
+        issue_date="2026-02-24",
+        mintage=15_000,
+        metal="не вказується (набір)",
+        kind="souvenir",
+        url="https://bank.gov.ua/ua/uah/numismatic-products/souvenier-coins",
+        image_urls=["https://bank.gov.ua/files/coins_images/8GYa.png"],
+    )
+
+
+def test_the_coin_inside_a_roll_is_read_off_the_roll_card() -> None:
+    """The catalogue has no card for a circulation commemorative — only for its roll."""
+    coin = roll_coin(roll_record())
+
+    assert coin is not None
+    assert coin.title_uk == "Ми сильні. Ми разом. Запорізька область"
+    assert coin.denomination == Decimal(10)
+    assert coin.denomination_label == "10 грн"
+    assert coin.kind == "coin"
+    assert coin.year == 2026
+    assert coin.extra["fromRoll"] == 25
+    # The roll's mintage counts rolls, and its material says "набір": neither
+    # belongs to the coin.
+    assert coin.mintage is None
+    assert coin.metal is None
+    # The images on the card are the coin's own sides.
+    assert coin.image_urls == ["https://bank.gov.ua/files/coins_images/8GYa.png"]
+
+
+def test_a_roll_of_forty_divides_by_forty() -> None:
+    forty = roll_record(
+        "1578",
+        title=(
+            "Ролик обігових пам`ятних монет номіналом 10 гривень "
+            "`Сили територіальної оборони Збройних Сил України` (у ролику 40 монет)"
+        ),
+        denomination="400",
+        label="400 грн",
+    )
+    coin = roll_coin(forty)
+    assert coin is not None
+    assert coin.title_uk == "Сили територіальної оборони Збройних Сил України"
+    assert coin.denomination == Decimal(10)
+
+
+def test_a_souvenir_that_is_not_a_roll_stays_a_souvenir() -> None:
+    packaging = roll_record(title="Сувенірна упаковка до Дня Незалежності", denomination="0")
+    assert roll_coin(packaging) is None
+
+
+def test_the_english_roll_title_names_the_coin() -> None:
+    assert (
+        roll_coin_english(
+            "We Are Strong. We Are United. Zaporizhzhia Oblast "
+            "(a roll of circulation commemorative coins) (25 coins to a roll)"
+        )
+        == "We Are Strong. We Are United. Zaporizhzhia Oblast"
+    )
+    assert (
+        roll_coin_english(
+            "The Territorial Defense Forces of Ukraine's Armed Forces "
+            "(a roll of 10-hryvnia circulation commemorative coins) "
+            "(each roll contains 40 coins)"
+        )
+        == "The Territorial Defense Forces of Ukraine's Armed Forces"
+    )
+    assert roll_coin_english(None) is None
+
+
+def test_a_circulation_commemorative_matches_through_its_roll_card() -> None:
+    """The defect: "Ми сильні. Ми разом" 2026 had no candidate at all.
+
+    The numismatic catalogue has no card for a 10-hryvnia circulation coin, so
+    until the roll cards were read the whole series arrived at the bridge with
+    nothing to match against.
+    """
+    coin = roll_coin(roll_record())
+    assert coin is not None
+    sources = sources_of(coin)
+    ours = item(
+        1,
+        "Ми сильні. Ми разом. Запорізька область",
+        "10",
+        2026,
+        group="circulation",
+    )
+    outcome = bridge.decide([ours], sources, LEXICON)
+
+    assert outcome.without_candidates == []
+    assert [d.item.id for d in outcome.linked] == [1]
+    assert outcome.summary()["linkedByGroup"] == {"circulation": 1}
+
+
+def test_the_nbu_material_words_are_read() -> None:
+    """Nine words, all Ukrainian; the general parser only knows the Russian ones."""
+    assert nbu_metal("срібло") == (None, MetalKind.PRECIOUS)
+    assert nbu_metal("золото") == (None, MetalKind.PRECIOUS)
+    assert nbu_metal("нейзильбер") == ("nickel_silver", MetalKind.BASE)
+    assert nbu_metal("біметалеві із недорогоцінних металів") == ("bimetal", MetalKind.BASE)
+    assert nbu_metal("біметалеві із дорогоцінних металів") == ("bimetal", MetalKind.PRECIOUS)
+    assert nbu_metal("не вказується (набір)") == (None, MetalKind.UNKNOWN)
+    # An unreadable material is unknown, not base metal.
+    assert nbu_metal(None) == (None, MetalKind.UNKNOWN)
+    # The uCoin-shaped strings our own catalogue carries still work.
+    assert nbu_metal("AgСеребро 0.925, 33.62g") == ("silver_925", MetalKind.PRECIOUS)

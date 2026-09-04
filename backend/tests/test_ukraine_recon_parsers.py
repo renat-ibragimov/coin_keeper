@@ -138,6 +138,10 @@ def test_nbu_card_becomes_a_record_with_mintage_split() -> None:
     assert record.metal == "срібло"
     assert record.extra["artist"]
     assert record.kind == "coin"
+    # The prose is kept, not only counted: it is the only place the card says
+    # what is drawn on the coin, and that is what tells two same-named issues
+    # of one series apart when they are merged.
+    assert record.extra["description"] == page.cards[0].description
 
 
 def test_nbu_search_form_sends_only_used_filters() -> None:

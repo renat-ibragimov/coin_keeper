@@ -133,16 +133,21 @@ _UNKNOWN_UNIT = "unknown"
 
 # Word stems, matched as a prefix of the unit word. Order matters only in that
 # no stem here is a prefix of another.
+#
+# The abbreviations are here because the National Bank writes them: its cards
+# say "1 грн" and "50 коп", never the full word. A label it can produce that
+# this cannot read is a denomination lost.
 _UNIT_STEMS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("цент", "cent"), "cent"),
     (("дайм", "dime"), "dime"),
     (("доллар", "долар", "dollar"), "dollar"),
-    (("гривн", "гривен", "гривень", "гривня", "гривні", "hryvn"), "hryvnia"),
+    (("грн", "гривн", "гривен", "гривень", "гривня", "гривні", "hryvn", "uah"), "hryvnia"),
     (("карбован", "krb", "крб", "karbovan"), "karbovanets"),
     (("полтинник", "poltinnik"), "poltinnik"),
     (("червон", "червін", "chervon"), "chervonets"),
     (("рубл", "ruble", "rouble"), "ruble"),
-    (("копе", "копі", "kope", "kopi"), "kopeck"),
+    # "коп" covers копейка, копійка and the abbreviation alike.
+    (("коп", "kop"), "kopeck"),
 )
 
 _VULGAR_FRACTIONS = {

@@ -13,7 +13,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-STEP_ORDER = ("bridge", "series", "gaps", "titles", "photos", "prices")
+STEP_ORDER = (
+    "bridge",
+    "series",
+    "gaps",
+    "repair-gaps",
+    "merge",
+    "titles",
+    "photos",
+    "prices",
+)
 EXAMPLES_IN_SUMMARY = 10
 
 

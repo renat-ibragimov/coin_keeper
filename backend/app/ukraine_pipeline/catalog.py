@@ -32,6 +32,17 @@ LINK_SOURCES = {
     SOURCE_NBU: "NBU",
     SOURCE_WIKIPEDIA: "Wikipedia",
 }
+# The prefixes catalog_items.source_key carries. A record the gaps step made
+# holds "nbu:1307" and nothing else — no price_source_links row — so a source
+# key is a reference exactly like a link is, and the bridge has to read it as
+# one or the two records for that coin go to review against each other.
+SOURCE_KEY_PREFIXES = {
+    "nbu:": SOURCE_NBU,
+    "ua-coins:": SOURCE_UA_COINS,
+    "ua_coins:": SOURCE_UA_COINS,
+    "wikipedia:": SOURCE_WIKIPEDIA,
+    "wiki:": SOURCE_WIKIPEDIA,
+}
 COMMEMORATIVE_GROUPS = ("commemorative", "collector")
 
 
@@ -50,6 +61,7 @@ class OurItem:
     series_id: int | None
     series_name: str | None
     is_archived: bool
+    source_key: str | None = None
     # source -> external id, from price_source_links, the legacy source_key or
     # the URL of the newest shared price snapshot.
     links: dict[str, str] = field(default_factory=dict)
@@ -57,6 +69,22 @@ class OurItem:
     @property
     def is_commemorative(self) -> bool:
         return self.collection_group in COMMEMORATIVE_GROUPS
+
+
+def source_key_reference(source_key: str | None) -> tuple[str, str] | None:
+    """(source, external id) out of a source key, or None when it names none.
+
+    Both forms count: the prefixed keys the pipeline writes ("nbu:1307") and
+    the bare ua-coins.info URL the legacy importer left behind.
+    """
+    key = (source_key or "").strip()
+    if not key:
+        return None
+    for prefix, source in SOURCE_KEY_PREFIXES.items():
+        if key.startswith(prefix):
+            external_id = key[len(prefix) :].strip()
+            return (source, external_id) if external_id else None
+    return (SOURCE_UA_COINS, key) if "ua-coins.info" in key else None
 
 
 async def ukraine_country_id(session: AsyncSession) -> int | None:
@@ -93,6 +121,7 @@ async def load_items(session: AsyncSession, country_id: int) -> list[OurItem]:
             series_id=item.series_id,
             series_name=series_name,
             is_archived=item.is_archived,
+            source_key=item.source_key,
         )
         for item, series_name, unit, value in (await session.execute(query)).all()
     ]
@@ -115,17 +144,13 @@ async def _attach_links(session: AsyncSession, items: list[OurItem]) -> None:
         if item is not None and canonical is not None:
             item.links[canonical] = external_id
 
-    # The legacy database also left ua-coins references in the source key and
-    # in the URL of the price snapshots; both are worth reading.
-    fallback = await session.execute(
-        select(CatalogItem.id, CatalogItem.source_key).where(
-            CatalogItem.id.in_(by_id), CatalogItem.source_key.is_not(None)
-        )
-    )
-    for item_id, source_key in fallback.all():
-        item = by_id[item_id]
-        if "ua-coins.info" in (source_key or "") and SOURCE_UA_COINS not in item.links:
-            item.links[SOURCE_UA_COINS] = source_key
+    # The source key is a reference too: the legacy database left ua-coins URLs
+    # in it, and the gaps step writes "nbu:<card id>" there.
+    for item in items:
+        reference = source_key_reference(item.source_key)
+        if reference is not None:
+            source, external_id = reference
+            item.links.setdefault(source, external_id)
 
     snapshots = await session.execute(
         select(MarketPriceSnapshot.catalog_item_id, MarketPriceSnapshot.source_url)

@@ -9,8 +9,12 @@ same-year/denomination check is what keeps this from over-matching — a record
 with no candidate in its slot still ends up in `without_candidates`. Two ways
 in:
 
-A. a ua-coins.info reference we already hold — 594 of them came with the
-   legacy database, and a reference is not a guess;
+A. a reference we already hold, from any of the three sources — a
+   price_source_links row, or a source key ("nbu:1307", a ua-coins.info URL).
+   594 ua-coins references came with the legacy database and every record the
+   gaps step created carries the card it was made from; a reference is not a
+   guess, and a coin whose card we already hold must never be scored against
+   the same-named record next to it;
 B. a score over the candidates of the same year and face value, comparing our
    Russian title with the Ukrainian one through the lexicon.
 
@@ -126,12 +130,30 @@ def ua_coins_id(reference: str) -> str | None:
     return match.group(1) if match else None
 
 
-def _by_ua_coins_link(item: OurItem, sources: Sources) -> Cluster | None:
-    reference = item.links.get(SOURCE_UA_COINS)
+def cluster_of_reference(sources: Sources, source: str, reference: str) -> Cluster | None:
+    """The cluster a stored reference points at, in whatever form we store it.
+
+    ua-coins is a URL with the id in it (or, from an old source key, the bare
+    id); the NBU is the card id; Wikipedia is the article address.
+    """
     if not reference:
         return None
-    coin_id = ua_coins_id(reference)
-    return None if coin_id is None else sources.cluster_of(SOURCE_UA_COINS, coin_id)
+    if source == SOURCE_UA_COINS:
+        coin_id = ua_coins_id(reference) or (reference if reference.isdigit() else None)
+        return None if coin_id is None else sources.cluster_of(SOURCE_UA_COINS, coin_id)
+    found = sources.cluster_of(source, reference)
+    if found is not None:
+        return found
+    return sources.cluster_by_url(source, reference) if reference.startswith("http") else None
+
+
+def _by_reference(item: OurItem, sources: Sources) -> Cluster | None:
+    """The first of our references that resolves, the issuer's first."""
+    for source in (SOURCE_NBU, SOURCE_UA_COINS, SOURCE_WIKIPEDIA):
+        found = cluster_of_reference(sources, source, item.links.get(source, ""))
+        if found is not None:
+            return found
+    return None
 
 
 def _same_slot(item: OurItem, cluster: Cluster) -> bool:
@@ -173,8 +195,8 @@ def decide(items: Iterable[OurItem], sources: Sources, lexicon: Lexicon) -> Brid
     match — so it goes to review with the record that took it named, rather
     than being reported as having no candidate at all.
 
-    Existing ua-coins references are applied first, all of them, before
-    anything is scored: a reference we already hold outranks a resemblance.
+    Existing references are applied first, all of them, before anything is
+    scored: a reference we already hold outranks a resemblance.
     """
     outcome = BridgeOutcome()
     clusters = coin_clusters(sources)
@@ -185,7 +207,7 @@ def decide(items: Iterable[OurItem], sources: Sources, lexicon: Lexicon) -> Brid
         if item.is_archived:
             outcome.skipped_archived += 1
             continue
-        by_link = _by_ua_coins_link(item, sources)
+        by_link = _by_reference(item, sources)
         if by_link is None:
             to_score.append(item)
             continue
@@ -266,22 +288,39 @@ def read_review_csv(path: Path) -> dict[int, str]:
 def apply_review(
     outcome: BridgeOutcome, decisions: dict[int, str], sources: Sources
 ) -> tuple[BridgeOutcome, list[str]]:
-    """Move the reviewed pairs from `review` to `linked`."""
+    """Move the reviewed pairs into `linked`.
+
+    A decision may also name a record the run reported as having no candidate:
+    that is what the gaps step's would-duplicate file is full of — a coin the
+    issuer has and a record of ours the score never brought together.
+    """
     by_key = sources.cluster_by_key()
     problems: list[str] = []
     still_open: list[Decision] = []
+    unresolved: list[OurItem] = []
+
     for decision in outcome.review:
         key = decisions.get(decision.item.id)
-        if key is None:
-            still_open.append(decision)
-            continue
-        cluster = by_key.get(key)
-        if cluster is None:
+        cluster = by_key.get(key) if key is not None else None
+        if key is not None and cluster is None:
             problems.append(f"item #{decision.item.id}: unknown cluster {key!r}")
+        if cluster is None:
             still_open.append(decision)
             continue
         outcome.linked.append(Decision(decision.item, cluster, "review", decision.score))
+
+    for item in outcome.without_candidates:
+        key = decisions.get(item.id)
+        cluster = by_key.get(key) if key is not None else None
+        if key is not None and cluster is None:
+            problems.append(f"item #{item.id}: unknown cluster {key!r}")
+        if cluster is None:
+            unresolved.append(item)
+            continue
+        outcome.linked.append(Decision(item, cluster, "review", 0.0))
+
     outcome.review = still_open
+    outcome.without_candidates = unresolved
     return outcome, problems
 
 

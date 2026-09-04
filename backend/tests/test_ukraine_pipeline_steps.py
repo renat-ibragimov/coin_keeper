@@ -1,9 +1,12 @@
-"""The steps that write: gaps, titles, series, photos, prices.
+"""The steps that write: gaps, repair-gaps, merge, titles, series, photos, prices.
 
 Against the real schema, with the network mocked. Each test states one promise
-of the step it covers: gaps creates coins and not products, titles takes the
-issuer's wording, photos falls back from the National Bank to ua-coins and
-never downloads the same image twice, prices flags what fails the checks.
+of the step it covers: gaps creates coins and not products and never a second
+record for a coin we already have, repair-gaps fills what an earlier run left
+empty and touches nothing else, merge moves every coin of every owner before
+the old record goes, titles takes the issuer's wording, photos falls back from
+the National Bank to ua-coins and never downloads the same image twice, prices
+flags what fails the checks.
 """
 
 from __future__ import annotations
@@ -19,16 +22,36 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import CatalogItem, CoinSeries, MarketPriceSnapshot, MediaFile, PriceSourceLink
-from app.models.enums import CollectionGroup, MediaRole, MediaSource, TranslationSource
-from app.ukraine_pipeline import bridge, gaps, photos, prices, series, titles
+from app.models import (
+    CatalogItem,
+    CoinSeries,
+    CollectionItem,
+    Denomination,
+    MarketPriceSnapshot,
+    MediaFile,
+    PriceSourceLink,
+)
+from app.models.enums import (
+    CollectionGroup,
+    MediaRole,
+    MediaSource,
+    MetalKind,
+    TranslationSource,
+)
+from app.ukraine_pipeline import bridge, gaps, merge, photos, prices, repair, series, titles
 from app.ukraine_pipeline.catalog import load_items, ukraine_country_id
 from app.ukraine_pipeline.lexicon import load_lexicon
-from app.ukraine_pipeline.sources import NbuEnglish, Sources
+from app.ukraine_pipeline.sources import NbuEnglish, Sources, roll_coin
 from app.ukraine_recon.http import PoliteClient
 from app.ukraine_recon.models import SOURCE_NBU, SOURCE_UA_COINS, SourceRecord
 from app.ukraine_recon.triangulate import Cluster, cluster_records
-from tests.seed import country_by_code, make_catalog_item, seed_currencies
+from tests.seed import (
+    add_collection_item,
+    country_by_code,
+    make_catalog_item,
+    make_user,
+    seed_currencies,
+)
 
 LEXICON = load_lexicon()
 NBU_IMAGE = "https://bank.gov.ua/files/coins_images/A1{side}.png"
@@ -64,13 +87,15 @@ def nbu_record(
     kind: str = "coin",
     with_images: bool = True,
     material: str | None = "Нейзильбер, 12.8g, ø 31mm",
+    extra: dict[str, object] | None = None,
 ) -> SourceRecord:
+    """A card as the National Bank really writes one: "2 грн", "срібло"."""
     return SourceRecord(
         source=SOURCE_NBU,
         source_id=source_id,
         title_uk=title,
         denomination=Decimal(denomination),
-        denomination_label=f"{denomination} гривень",
+        denomination_label=f"{denomination} грн",
         year=year,
         issue_date=f"{year}-05-12",
         mintage=50_000,
@@ -84,6 +109,7 @@ def nbu_record(
         extra={
             "nbuId": source_id,
             "thumbnails": [f"https://bank.gov.ua/media/coins/{source_id}/avers.jpg"],
+            **(extra or {}),
         },
     )
 
@@ -590,3 +616,393 @@ async def test_our_side_is_read_with_its_links(db_session: AsyncSession) -> None
     items = await load_items(db_session, country_id)
     assert [item.title_original for item in items] == ["Соня"]
     assert items[0].is_commemorative
+
+
+# ------------------------------------------------------ gaps: the whole record
+async def test_gaps_fills_the_face_value_the_metal_and_the_series(
+    db_session: AsyncSession,
+) -> None:
+    """A record made from a card is a record, not a name and a year.
+
+    The card writes "1 грн" and "срібло"; a face value the parser cannot read
+    and a metal it does not recognise are what left 96 records empty.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    found = sources_of(
+        nbu_record(
+            "1767",
+            title='"До 30-річчя грошової реформи в Україні" (c)',
+            year=2026,
+            denomination="1",
+            series_name="Українська держава",
+            material="срібло",
+            extra={"massGrams": "31.1", "diameterMm": "38.6", "edge": "рифлений"},
+        ),
+        english={"1767": NbuEnglish(title="30 Years of the Currency Reform", series="Ukraine")},
+    )
+
+    outcome = await gaps.create_missing(
+        db_session, country_id=country.id, sources=found, linked_keys=set(), dry_run=False
+    )
+    await db_session.commit()
+
+    assert outcome.summary()["created"] == 1
+    created = (
+        await db_session.execute(select(CatalogItem).where(CatalogItem.source_key == "nbu:1767"))
+    ).scalar_one()
+    assert created.title_original == "До 30-річчя грошової реформи в Україні"
+    assert created.denomination_id is not None
+    denomination = await db_session.get(Denomination, created.denomination_id)
+    assert denomination is not None
+    assert (denomination.value, denomination.unit) == (Decimal("1.000"), "hryvnia")
+    # Silver carries no fineness on the card, so there is no dictionary row —
+    # but the metal kind is known, and that is what the collection value uses.
+    assert created.metal_kind is MetalKind.PRECIOUS
+    assert created.composition_id is None
+    assert created.material == "срібло"
+    assert created.weight_grams == Decimal("31.100")
+    assert created.diameter_mm == Decimal("38.60")
+    assert created.edge == "рифлений"
+    series = await db_session.get(CoinSeries, created.series_id)
+    assert series is not None
+    assert series.name_original == "Українська держава"
+
+
+async def test_gaps_creates_nothing_from_a_roll_card(db_session: AsyncSession) -> None:
+    """A roll card names the coin well enough to match it, not to create it."""
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    coin = roll_coin(
+        SourceRecord(
+            source=SOURCE_NBU,
+            source_id="1740",
+            title_uk=(
+                'Ролик обігових пам`ятних монет "Ми сильні. Ми разом. Запорізька область" '
+                "(у ролику 25 монет)"
+            ),
+            denomination=Decimal(250),
+            denomination_label="250 грн",
+            year=2026,
+            kind="souvenir",
+            url="https://bank.gov.ua/",
+        )
+    )
+    assert coin is not None
+    found = sources_of(coin)
+
+    outcome = await gaps.create_missing(
+        db_session, country_id=country.id, sources=found, linked_keys=set(), dry_run=False
+    )
+    assert outcome.summary() == {
+        **outcome.summary(),
+        "created": 0,
+        "skippedRollOnly": 1,
+    }
+    assert (await db_session.execute(select(CatalogItem))).scalars().all() == []
+
+
+async def test_gaps_does_not_duplicate_one_of_our_unlinked_records(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    """The defect: four "Пектораль" of ours met four new ones from the cards.
+
+    Same year, same face value, nothing linked: the coin is almost certainly
+    one we already have, so the pair goes into a file instead of the database.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    hryvnia = Denomination(
+        country_id=country.id,
+        currency_code="UAH",
+        value=Decimal(20),
+        unit="hryvnia",
+        sort_order=2000,
+    )
+    db_session.add(hryvnia)
+    await db_session.flush()
+    ours = await make_catalog_item(
+        db_session,
+        country=country,
+        title="Пектораль",
+        year=2021,
+        denomination=hryvnia,
+    )
+    found = sources_of(
+        nbu_record("1307", title="Пектораль", year=2021, denomination="20", series_name=None)
+    )
+    items = await load_items(db_session, country.id)
+
+    outcome = await gaps.create_missing(
+        db_session,
+        country_id=country.id,
+        sources=found,
+        linked_keys=set(),
+        dry_run=False,
+        items=items,
+        linked_ids=set(),
+    )
+    await db_session.commit()
+
+    assert outcome.summary()["created"] == 0
+    assert outcome.summary()["wouldDuplicate"] == 1
+    row = outcome.would_duplicate[0]
+    assert (row["itemId"], row["clusterKey"], row["note"]) == (
+        ours.id,
+        "nbu:1307",
+        "would_duplicate",
+    )
+
+    # The file it writes is the one --apply-review already reads.
+    path = tmp_path / "duplicates.csv"
+    assert gaps.write_duplicates_csv(path, outcome) == 1
+    text = path.read_text(encoding="utf-8").replace("\n,", "\nyes,")
+    path.write_text(text, encoding="utf-8")
+    assert bridge.read_review_csv(path) == {ours.id: "nbu:1307"}
+
+
+async def test_a_record_already_linked_does_not_hold_a_coin_back(
+    db_session: AsyncSession,
+) -> None:
+    """The guard only counts records nothing points at."""
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    ours = await make_catalog_item(db_session, country=country, title="Пектораль", year=2021)
+    found = sources_of(nbu_record("1307", title="Інша монета", year=2021, denomination="20"))
+    items = await load_items(db_session, country.id)
+
+    outcome = await gaps.create_missing(
+        db_session,
+        country_id=country.id,
+        sources=found,
+        linked_keys=set(),
+        dry_run=False,
+        items=items,
+        linked_ids={ours.id},
+    )
+    assert outcome.summary()["created"] == 1
+
+
+# --------------------------------------------------------------- repair-gaps
+async def test_repair_fills_the_columns_an_earlier_run_left_empty(
+    db_session: AsyncSession,
+) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    # A record as the first version of the gaps step wrote it: a name, a year,
+    # a source key and nothing else.
+    empty = await make_catalog_item(
+        db_session,
+        country=country,
+        title="До 30-річчя грошової реформи в Україні",
+        year=2026,
+        source_key="nbu:1767",
+    )
+    found = sources_of(
+        nbu_record(
+            "1767",
+            title="До 30-річчя грошової реформи в Україні",
+            year=2026,
+            denomination="1",
+            series_name="Українська держава",
+            material="срібло",
+            extra={"massGrams": "31.1"},
+        ),
+        english={"1767": NbuEnglish(title="30 Years of the Currency Reform", series="Ukraine")},
+    )
+
+    outcome = await repair.repair_gaps(
+        db_session, country_id=country.id, sources=found, dry_run=False
+    )
+    await db_session.commit()
+
+    assert outcome.summary()["updated"] == 1
+    assert outcome.filled["denomination_id"] == 1
+    assert outcome.filled["metal_kind"] == 1
+    assert outcome.filled["series_id"] == 1
+    stored = await db_session.get(CatalogItem, empty.id)
+    assert stored is not None
+    assert stored.denomination_id is not None
+    assert stored.metal_kind is MetalKind.PRECIOUS
+    assert stored.series_id is not None
+    assert stored.title_en == "30 Years of the Currency Reform"
+    assert stored.weight_grams == Decimal("31.100")
+
+    # Run twice: the second pass has nothing left to fill.
+    again = await repair.repair_gaps(
+        db_session, country_id=country.id, sources=found, dry_run=False
+    )
+    assert (again.updated, again.unchanged) == (0, 1)
+
+
+async def test_repair_never_overwrites_what_is_already_there(
+    db_session: AsyncSession,
+) -> None:
+    """A correction a person made outranks the card."""
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    corrected = await make_catalog_item(
+        db_session,
+        country=country,
+        title="Соня садова",
+        year=1999,
+        source_key="nbu:1",
+        metal_kind=MetalKind.BASE,
+        edge="гладкий",
+    )
+    found = sources_of(nbu_record("1", material="срібло", extra={"edge": "рифлений"}))
+
+    await repair.repair_gaps(db_session, country_id=country.id, sources=found, dry_run=False)
+    await db_session.commit()
+
+    stored = await db_session.get(CatalogItem, corrected.id)
+    assert stored is not None
+    assert stored.metal_kind is MetalKind.BASE
+    assert stored.edge == "гладкий"
+
+
+# --------------------------------------------------------------------- merge
+async def test_merge_lists_the_pairs_with_the_card_prose_beside_them(
+    db_session: AsyncSession,
+) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    await make_catalog_item(
+        db_session, country=country, title="Пектораль (лев)", year=2021, source_key=None
+    )
+    await make_catalog_item(
+        db_session, country=country, title="Пектораль", year=2021, source_key="nbu:1307"
+    )
+    found = sources_of(
+        nbu_record(
+            "1307",
+            title="Пектораль",
+            year=2021,
+            denomination="20",
+            extra={"description": ["На реверсі зображено пектораль із фігурою лева."]},
+        )
+    )
+
+    outcome = await merge.find_pairs(
+        db_session, country_id=country.id, sources=found, lexicon=LEXICON
+    )
+    assert len(outcome.candidates) == 1
+    row = outcome.candidates[0]
+    assert row["gapSourceKey"] == "nbu:1307"
+    assert "лева" in row["nbuDescription"]
+    assert "лев" in row["sharedWords"]
+
+
+async def test_merge_moves_the_owners_coins_and_retires_the_old_record(
+    db_session: AsyncSession,
+) -> None:
+    """The point of the step: nothing of the owner's is lost, one record is left."""
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    owner = await make_user(db_session, email="owner@example.test")
+    old = await make_catalog_item(db_session, country=country, title="Пектораль", year=2021)
+    kept = await make_catalog_item(
+        db_session, country=country, title="Пектораль", year=2021, source_key="nbu:1307"
+    )
+    await add_collection_item(
+        db_session, owner_id=owner.id, item=old, quantity=2, price="500", rate_uah="1"
+    )
+    await add_collection_item(
+        db_session, owner_id=owner.id, item=old, quantity=1, price="300", rate_uah="1"
+    )
+    db_session.add(
+        MediaFile(
+            catalog_item_id=old.id,
+            owner_id=owner.id,
+            role=MediaRole.OBVERSE,
+            source=MediaSource.USER_UPLOAD,
+            storage_key="catalog/old/obverse.webp",
+        )
+    )
+    await db_session.commit()
+
+    before_old = await merge.holdings_of(db_session, old.id)
+    assert (before_old.instances, before_old.quantity, before_old.media) == (2, 3, 1)
+    assert before_old.purchase_uah == Decimal("1300.00")
+
+    outcome = await merge.apply_merges(db_session, [(kept.id, old.id)], dry_run=False)
+    await db_session.commit()
+
+    assert outcome.problems == []
+    row = outcome.merged[0]
+    assert row["deleted"] is True
+    assert row["after"] == {
+        "instances": 2,
+        "quantity": 3,
+        "purchaseUah": "1300.00",
+        "media": 1,
+    }
+    assert await db_session.get(CatalogItem, old.id) is None
+    moved = (
+        (
+            await db_session.execute(
+                select(CollectionItem).where(CollectionItem.catalog_item_id == kept.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(moved) == 2
+    photo = (
+        await db_session.execute(select(MediaFile).where(MediaFile.catalog_item_id == kept.id))
+    ).scalar_one()
+    assert photo.storage_key == "catalog/old/obverse.webp"
+
+
+async def test_a_dry_run_merges_nothing(db_session: AsyncSession) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    owner = await make_user(db_session, email="dry@example.test")
+    old = await make_catalog_item(db_session, country=country, title="Пектораль", year=2021)
+    kept = await make_catalog_item(
+        db_session, country=country, title="Пектораль", year=2021, source_key="nbu:1307"
+    )
+    await add_collection_item(db_session, owner_id=owner.id, item=old, quantity=2, price="500")
+
+    outcome = await merge.apply_merges(db_session, [(kept.id, old.id)], dry_run=True)
+    await db_session.commit()
+
+    assert outcome.merged[0]["deleted"] is False
+    assert outcome.merged[0]["after"]["quantity"] == 2
+    assert await db_session.get(CatalogItem, old.id) is not None
+    assert (await merge.holdings_of(db_session, kept.id)).instances == 0
+
+
+async def test_a_personal_item_is_never_merged(db_session: AsyncSession) -> None:
+    """The pipeline speaks for the issuer; a personal item belongs to its author."""
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    owner = await make_user(db_session, email="author@example.test")
+    personal = await make_catalog_item(
+        db_session, country=country, title="Моя монета", year=2021, created_by=owner.id
+    )
+    kept = await make_catalog_item(
+        db_session, country=country, title="Пектораль", year=2021, source_key="nbu:1307"
+    )
+
+    outcome = await merge.apply_merges(db_session, [(kept.id, personal.id)], dry_run=False)
+    assert outcome.merged == []
+    assert outcome.problems and "shared records" in outcome.problems[0]
+    assert await db_session.get(CatalogItem, personal.id) is not None
+
+
+async def test_a_merge_file_naming_one_record_twice_is_refused(tmp_path: Path) -> None:
+    path = tmp_path / "merge.csv"
+    path.write_text(
+        "decision,gapItemId,ourItemId\nyes,3106,1122\nyes,3107,1122\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError, match="twice"):
+        merge.read_merge_csv(path)
+
+
+def test_a_merge_file_reads_back_with_an_excel_bom(tmp_path: Path) -> None:
+    path = tmp_path / "merge.csv"
+    path.write_bytes(
+        "decision,gapItemId,ourItemId\nyes,3106,1122\n,3107,1123\n".encode("utf-8-sig")
+    )
+    assert merge.read_merge_csv(path) == [(3106, 1122)]

@@ -226,6 +226,15 @@ async def add_collection_item(
     return row
 
 
+async def make_user(session: AsyncSession, *, email: str) -> User:
+    """A verified user, for tests that need an owner and not a login."""
+    user = User(email=email, password_hash="not-a-real-hash", email_verified=True)
+    session.add(user)
+    await session.commit()
+    session.expunge(user)
+    return user
+
+
 async def promote_to_admin(session: AsyncSession, email: str) -> None:
     await session.execute(update(User).where(User.email == email).values(role=UserRole.ADMIN))
     await session.commit()

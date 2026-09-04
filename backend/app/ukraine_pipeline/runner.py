@@ -3,11 +3,16 @@
 Steps are independent and each is safe to run twice. The order below is the
 order of dependency, and it is the order of the runbook in backend/README.md:
 
-    bridge  -> series -> gaps -> titles -> photos -> prices
+    bridge -> series -> gaps -> repair-gaps -> merge -> titles -> photos -> prices
 
 bridge decides which of our records is which coin; everything after it works
 from those links, read back out of the database rather than passed along, so a
 step can be run days later on its own.
+
+repair-gaps and merge clean up after an earlier run of gaps: the first fills
+in the columns it left empty, the second lists the records it duplicated. Both
+are ordinary steps and both are safe to run when there is nothing to do.
+merge only writes when it is handed a reviewed file with --apply-merge.
 
 Each step commits on its own. A failure while downloading eight gigabytes of
 photographs must not undo the names.
@@ -25,18 +30,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.storage import ObjectStorage
 from app.models import Currency
-from app.ukraine_pipeline import bridge, gaps, photos, prices, series, titles
+from app.ukraine_pipeline import bridge, gaps, merge, photos, prices, repair, series, titles
 from app.ukraine_pipeline.catalog import OurItem, load_items, ukraine_country_id
 from app.ukraine_pipeline.lexicon import Lexicon, load_lexicon
 from app.ukraine_pipeline.report import PipelineReport
 from app.ukraine_pipeline.sources import Sources, cluster_key
 from app.ukraine_recon.http import PoliteClient
-from app.ukraine_recon.models import SOURCE_UA_COINS
+from app.ukraine_recon.models import SOURCES
 from app.ukraine_recon.triangulate import Cluster
 
 # series before gaps on purpose: gaps creates records under the NBU series
 # names, and renaming ours afterwards would collide with what it just made.
-STEPS = ("bridge", "series", "gaps", "titles", "photos", "prices")
+STEPS = (
+    "bridge",
+    "series",
+    "gaps",
+    "repair-gaps",
+    "merge",
+    "titles",
+    "photos",
+    "prices",
+)
 
 
 class PipelineError(Exception):
@@ -50,6 +64,9 @@ class Options:
     limit: int | None = None
     review_out: Path | None = None
     review_in: Path | None = None
+    duplicates_out: Path | None = None
+    merge_out: Path | None = None
+    merge_in: Path | None = None
     report_path: Path | None = None
 
 
@@ -80,7 +97,7 @@ class Runner:
 
         for step in STEPS:
             if step in self.options.steps:
-                await getattr(self, f"_step_{step}")()
+                await getattr(self, f"_step_{step.replace('-', '_')}")()
         return self.report
 
     async def _load_catalog(self) -> None:
@@ -155,11 +172,72 @@ class Runner:
             sources=self.sources,
             linked_keys=linked_keys,
             dry_run=self.options.dry_run,
+            lexicon=self.lexicon,
+            items=self._items,
+            linked_ids=set(pairs),
             limit=self.options.limit,
         )
-        self.report.step("gaps", outcome.summary(), created=outcome.created[:50])
+        rows = 0
+        if self.options.duplicates_out is not None and outcome.would_duplicate:
+            rows = gaps.write_duplicates_csv(self.options.duplicates_out, outcome)
+            self.log(f"gaps: {rows} would-duplicate rows written to {self.options.duplicates_out}")
+        self.report.step(
+            "gaps",
+            {**outcome.summary(), "duplicateRowsWritten": rows},
+            created=outcome.created[:50],
+            wouldDuplicate=outcome.would_duplicate[:50],
+        )
         for problem in outcome.problems:
             self.report.warn(f"gaps: {problem}")
+        await self._commit()
+        await self._load_catalog()
+
+    async def _step_repair_gaps(self) -> None:
+        assert self._country_id is not None
+        outcome = await repair.repair_gaps(
+            self.session,
+            country_id=self._country_id,
+            sources=self.sources,
+            dry_run=self.options.dry_run,
+        )
+        self.report.step(
+            "repair-gaps",
+            outcome.summary(),
+            examples=outcome.examples,
+            withoutCard=outcome.without_card[:50],
+        )
+        await self._commit()
+        await self._load_catalog()
+
+    async def _step_merge(self) -> None:
+        """Lists the duplicates; moves nothing unless handed a reviewed file."""
+        assert self._country_id is not None
+        outcome = await merge.find_pairs(
+            self.session,
+            country_id=self._country_id,
+            sources=self.sources,
+            lexicon=self.lexicon,
+        )
+        rows = 0
+        if self.options.merge_out is not None and outcome.candidates:
+            rows = merge.write_merge_csv(self.options.merge_out, outcome)
+            self.log(f"merge: {rows} candidate pairs written to {self.options.merge_out}")
+
+        applied = merge.MergeOutcome()
+        if self.options.merge_in is not None:
+            decisions = merge.read_merge_csv(self.options.merge_in)
+            self.log(f"merge: {len(decisions)} decisions read from {self.options.merge_in}")
+            applied = await merge.apply_merges(
+                self.session, decisions, dry_run=self.options.dry_run
+            )
+        for problem in applied.problems:
+            self.report.warn(f"merge: {problem}")
+        self.report.step(
+            "merge",
+            {**outcome.summary(), **applied.summary(), "candidateRowsWritten": rows},
+            candidates=outcome.candidates[:50],
+            merged=applied.merged[:50],
+        )
         await self._commit()
         await self._load_catalog()
 
@@ -238,14 +316,17 @@ class Runner:
         item_ids = [item.id for item in self._items]
         links = await bridge.linked_pairs(self.session, item_ids)
         pairs: dict[int, Cluster] = dict(self._bridge_pairs)
-        for item_id, by_source in links.items():
-            for source, external_id in by_source.items():
-                reference = (
-                    bridge.ua_coins_id(external_id) if source == SOURCE_UA_COINS else external_id
+        for item in self._items:
+            # The source key counts as a reference too, and the rows the
+            # bridge wrote in this run outrank the ones the catalogue was
+            # loaded with.
+            by_source = {**item.links, **links.get(item.id, {})}
+            for source in SOURCES:
+                cluster = bridge.cluster_of_reference(
+                    self.sources, source, by_source.get(source, "")
                 )
-                cluster = self.sources.cluster_of(source, reference) if reference else None
                 if cluster is not None:
-                    pairs[item_id] = cluster
+                    pairs[item.id] = cluster
                     break
         return pairs
 
