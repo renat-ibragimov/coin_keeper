@@ -12,6 +12,7 @@ flags what fails the checks.
 from __future__ import annotations
 
 import io
+import json
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -41,6 +42,7 @@ from app.models.enums import (
 from app.ukraine_pipeline import bridge, gaps, merge, photos, prices, repair, series, titles
 from app.ukraine_pipeline.catalog import load_items, ukraine_country_id
 from app.ukraine_pipeline.lexicon import load_lexicon
+from app.ukraine_pipeline.report import PipelineReport
 from app.ukraine_pipeline.sources import NbuEnglish, Sources, roll_coin
 from app.ukraine_recon.http import PoliteClient
 from app.ukraine_recon.models import SOURCE_NBU, SOURCE_UA_COINS, SourceRecord
@@ -51,6 +53,7 @@ from tests.seed import (
     make_catalog_item,
     make_user,
     seed_currencies,
+    seed_reference,
 )
 
 LEXICON = load_lexicon()
@@ -891,6 +894,38 @@ async def test_merge_lists_the_pairs_with_the_card_prose_beside_them(
     assert row["gapSourceKey"] == "nbu:1307"
     assert "лева" in row["nbuDescription"]
     assert "лев" in row["sharedWords"]
+
+
+async def test_merge_dry_run_report_survives_a_candidate_with_a_face_value(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    """A candidate's denomination is a Decimal — report.write must not choke on it."""
+    ref = await seed_reference(db_session)
+    await make_catalog_item(
+        db_session, country=ref.ukraine, title="Пектораль (лев)", year=2021, source_key=None
+    )
+    await make_catalog_item(
+        db_session,
+        country=ref.ukraine,
+        title="Пектораль",
+        year=2021,
+        source_key="nbu:1307",
+        denomination=ref.uah_2,
+    )
+    found = sources_of(nbu_record("1307", title="Пектораль", year=2021, denomination="2"))
+    outcome = await merge.find_pairs(
+        db_session, country_id=ref.ukraine.id, sources=found, lexicon=LEXICON
+    )
+    assert isinstance(outcome.candidates[0]["denomination"], Decimal)
+
+    report = PipelineReport()
+    report.step("merge", outcome.summary(), candidates=outcome.candidates)
+    path = tmp_path / "report.json"
+
+    report.write(path)
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["details"]["merge"]["candidates"][0]["denomination"] == "2.000"
 
 
 async def test_merge_moves_the_owners_coins_and_retires_the_old_record(

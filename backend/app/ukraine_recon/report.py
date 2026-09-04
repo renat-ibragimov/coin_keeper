@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app.core.json_support import json_default
 from app.ukraine_recon.models import SOURCE_NBU, SOURCE_UA_COINS, SOURCE_WIKIPEDIA, SOURCES
 from app.ukraine_recon.triangulate import STRATEGIES
 
@@ -73,7 +74,10 @@ class ReconReport:
 
     def write(self, path: Path) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(self.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
+        path.write_text(
+            json.dumps(self.to_dict(), indent=2, ensure_ascii=False, default=json_default),
+            encoding="utf-8",
+        )
 
     # ------------------------------------------------------------- summary
     def summary_lines(self) -> list[str]:
