@@ -34,8 +34,25 @@ from app.ukraine_recon.normalize import (
 )
 
 BASE_URL = "https://bank.gov.ua"
+LOCALE_UK = "ua"
+LOCALE_EN = "en"
 CATALOG_URL = f"{BASE_URL}/ua/uah/numismatic-products/souvenier-coins"
 SEARCH_URL = f"{BASE_URL}/ua/component/source/searchSouvenierCoinResult"
+
+
+def catalog_url(locale: str = LOCALE_UK) -> str:
+    return f"{BASE_URL}/{locale}/uah/numismatic-products/souvenier-coins"
+
+
+def search_url(locale: str = LOCALE_UK) -> str:
+    """The same endpoint under the site's other language.
+
+    Card ids are the same in both locales, which is what makes the English
+    site usable as the source of official title_en (docs/05-integrations.md).
+    """
+    return f"{BASE_URL}/{locale}/component/source/searchSouvenierCoinResult"
+
+
 PAGE_SIZE = 100
 CATEGORY_COIN = "Coin"
 CATEGORY_SOUVENIR = "Souvenir"

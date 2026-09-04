@@ -155,6 +155,29 @@ def _composition_of(head: str) -> str | None:
     return next((code for phrase, code in _PHRASE_INDEX if normalised.endswith(phrase)), None)
 
 
+def strip_material(text: str) -> str:
+    """The same string without the material the parser recognises at its end.
+
+    The uCoin importer glued the whole coin heading together —
+    "1.000.000 карбованцев, 1996 Богдан Хмельницкий AgСеребро 0.925, 16.94g" —
+    so the material has to come off before anything can compare the names.
+    Nothing is removed when nothing is recognised.
+    """
+    if not text:
+        return text
+    trimmed = _DIAMETER_RE.sub("", _MASS_RE.sub("", text)).rstrip(" ,")
+    # lower() keeps the length for the alphabets involved, so an index found
+    # in the lowered copy is an index into the original.
+    lowered = _SPACES_RE.sub(" ", trimmed.lower().replace("ё", "е"))
+    precious = _PRECIOUS_RE.search(lowered)
+    if precious is not None:
+        return trimmed[: precious.start()].rstrip(" ,-–—")
+    for phrase, _code in _PHRASE_INDEX:
+        if lowered.endswith(phrase):
+            return trimmed[: len(trimmed) - len(phrase)].rstrip(" ,-–—")
+    return trimmed
+
+
 def _first_decimal(pattern: re.Pattern[str], text: str, group: str) -> Decimal | None:
     match = pattern.search(text)
     if match is None:

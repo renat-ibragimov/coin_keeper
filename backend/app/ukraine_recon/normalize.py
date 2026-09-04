@@ -37,6 +37,23 @@ _CYRILLIC = "а-яіїєґ"
 _LATIN_IN_CYRILLIC_RE = re.compile(
     f"(?<=[{_CYRILLIC}])[aceiopxyhkmtb]|[aceiopxyhkmtb](?=[{_CYRILLIC}])"
 )
+_HOMOGLYPHS_UPPER = str.maketrans("ACEIOPXYHKMTB", "АСЕІОРХУНКМТВ")
+_CYRILLIC_UPPER = "А-ЯІЇЄҐ"
+_LATIN_IN_CYRILLIC_UPPER_RE = re.compile(
+    f"(?<=[{_CYRILLIC_UPPER}])[ACEIOPXYHKMTB]|[ACEIOPXYHKMTB](?=[{_CYRILLIC_UPPER}])"
+)
+
+
+def fix_homoglyphs(value: str) -> str:
+    """Latin letters typed inside a Cyrillic word, put back.
+
+    The NBU writes "рокiв" and "УHР" with a Latin i and H. It is the same
+    word; a search for "років" should find it. Only a Latin letter with a
+    Cyrillic neighbour is touched, so "Морський дрон \"Sea Baby\"" is left
+    exactly as it is.
+    """
+    lower = _LATIN_IN_CYRILLIC_RE.sub(lambda m: m.group(0).translate(_HOMOGLYPHS), value)
+    return _LATIN_IN_CYRILLIC_UPPER_RE.sub(lambda m: m.group(0).translate(_HOMOGLYPHS_UPPER), lower)
 
 
 def normalize_title(value: str) -> str:

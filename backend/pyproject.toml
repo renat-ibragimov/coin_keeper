@@ -72,6 +72,10 @@ ignore = ["S101"]
 # The reconnaissance parsers select cells by the Ukrainian labels the sites
 # print ("Назва", "Тираж"); those literals are the sites' data, not prose.
 "app/ukraine_recon/*" = ["RUF001", "RUF002", "RUF003"]
+# Same for the pipeline: the lexicon and the parsers quote the two languages
+# they compare, letter by letter.
+"app/ukraine_pipeline/*" = ["RUF001", "RUF002", "RUF003"]
+"scripts/ukraine_pipeline.py" = ["RUF001", "RUF002", "RUF003"]
 "scripts/recon_ukraine.py" = ["RUF001", "RUF002", "RUF003"]
 
 [tool.mypy]

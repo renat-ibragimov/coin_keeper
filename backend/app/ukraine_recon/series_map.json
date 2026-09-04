@@ -1,43 +1,316 @@
 {
-  "_comment": "Series correspondence between the NBU list, ua-coins.info categories (by slug) and our coin_series names. `ours` holds aliases in any language; the reconnaissance matches by normalised name. Pairs marked with a `note` are unresolved and left for a person to settle.",
-  "entries": [
-    {"nbu": "2000-ліття Різдва Христового", "ua_coins": "2000-letiyu-rozhdestva-hristova", "ours": ["2000-летие Рождества Христова", "2000-ліття Різдва Христового"]},
-    {"nbu": "Античні пам`ятки України", "ua_coins": "antichnye-pamyatniki-ukrainy", "ours": ["Античные памятники Украины", "Античні пам'ятки України"]},
-    {"nbu": "Безсмертна моя Україно", "ua_coins": "bessmertnaya-moya-ukraina", "ours": ["Бессмертная моя Украина", "Безсмертна моя Україно"]},
-    {"nbu": "Видатні особистості України", "ua_coins": "vydayuschiesya-lichnosti-ukrainy", "ours": ["Выдающиеся личности Украины", "Видатні особистості України", "Выдающиеся личности"]},
-    {"nbu": "Вищі навчальні заклади України", "ua_coins": "vysshie-uchebnye-zavedeniya-ukrainy", "ours": ["Высшие учебные заведения Украины", "Вищі навчальні заклади України"]},
-    {"nbu": "Відродження української державності", "ua_coins": "vozrozhdenie-ukrainskoy-gosudarstvennosti", "ours": ["Возрождение украинской государственности", "Відродження української державності"]},
-    {"nbu": "Відродження християнської духовності в Україні", "ua_coins": "vozrozhdenie-hristianskoy-duhovnosti-v-ukraine", "ours": ["Возрождение христианской духовности в Украине", "Відродження християнської духовності в Україні"]},
-    {"nbu": "Герої козацької доби", "ua_coins": "geroi-kazackoy-epohi", "ours": ["Герои казацкой эпохи", "Герої козацької доби"]},
-    {"nbu": "Героям Майдану", "ua_coins": "geroyam-maydana", "ours": ["Героям Майдана", "Героям Майдану"]},
-    {"nbu": "Гетьманські столиці", "ua_coins": "getmanskie-stolicy", "ours": ["Гетманские столицы", "Гетьманські столиці"]},
-    {"nbu": "Дитячий Зодіак", "ua_coins": "detskiy-zodiak", "ours": ["Детский Зодиак", "Дитячий Зодіак"]},
-    {"nbu": "Друга світова війна", "ua_coins": "pobeda-v-velikoy-otechestvennoy-voyne-1941-1945-gg", "ours": ["Вторая мировая война", "Победа в Великой Отечественной войне 1941-1945 гг.", "Друга світова війна"], "note": "ua-coins keeps the old name of the series (Перемога у Великій Вітчизняній війні); the NBU renamed it. Same coins, to be confirmed by count."},
-    {"nbu": "Духовні скарби України", "ua_coins": "duhovnye-sokrovischa-ukrainy", "ours": ["Духовные сокровища Украины", "Духовні скарби України"]},
-    {"nbu": "Збройні Сили України", "ua_coins": "vooruzhennye-sily-ukrainy", "ours": ["Вооружённые силы Украины", "Вооруженные силы Украины", "Збройні Сили України"]},
-    {"nbu": "Знаки зодіаку", "ua_coins": "znaki-zodiaka", "ours": ["Знаки зодиака", "Знаки зодіаку"]},
-    {"nbu": "Інші монети", "ua_coins": "drugie-monety", "ours": ["Другие монеты", "Інші монети"], "note": "A catch-all, not a series: counts are not expected to agree, and our items without a series belong here too."},
-    {"nbu": "Княжа Україна", "ua_coins": "knyazha-ukraina", "ours": ["Княжеская Украина", "Княжа Україна"]},
-    {"nbu": "Літаки України", "ua_coins": "samolety-ukrainy", "ours": ["Самолёты Украины", "Самолеты Украины", "Літаки України"]},
-    {"nbu": "Міста-герої України", "ua_coins": "goroda-geroi-ukrainy", "ours": ["Города-герои Украины", "Міста-герої України"]},
-    {"nbu": "Морська історія України", "ua_coins": "morskaya-istoriya-ukrainy", "ours": ["Морская история Украины", "Морська історія України"]},
-    {"nbu": "На межі тисячоліть", "ua_coins": "na-rubezhe-tysyacheletiy", "ours": ["На рубеже тысячелетий", "На межі тисячоліть"]},
-    {"nbu": "Найменша золота монета", "ua_coins": "naimen-shaya-zolotaya-moneta", "ours": ["Наименьшая золотая монета", "Найменша золота монета"]},
-    {"nbu": "Народні музичні інструменти", "ua_coins": "narodnye-muzykal-nye-instrumenty", "ours": ["Народные музыкальные инструменты", "Народні музичні інструменти"]},
-    {"nbu": "Народні промисли та ремесла", "ua_coins": "narodnye-promysly-i-remesla", "ours": ["Народные промыслы и ремёсла Украины", "Народные промыслы и ремесла Украины", "Народні промисли та ремесла"]},
-    {"nbu": "Області України", "ua_coins": "oblasti-ukrainy", "ours": ["Области Украины", "Області України"]},
-    {"nbu": "Обрядові свята України", "ua_coins": "obryadovye-prazdniki-ukrainy", "ours": ["Обрядовые праздники Украины", "Обрядові свята України"]},
-    {"nbu": "Пам’ятки архітектури України", "ua_coins": "pam-039-pamyatniki-arhitektury-ukrainy", "ours": ["Памятники архитектуры Украины", "Пам'ятки архітектури України"]},
-    {"nbu": "Пам’ятки давніх культур України", "ua_coins": "pam-039-pamyatniki-drevnih-kul-tur-ukrainy", "ours": ["Памятники древних культур Украины", "Пам'ятки давніх культур України"]},
-    {"nbu": "Славетні роди України", "ua_coins": "slavnye-rody-ukrainy", "ours": ["Славные роды Украины", "Славетні роди України"]},
-    {"nbu": "Спорт", "ua_coins": "sport", "ours": ["Спорт"]},
-    {"nbu": "Стародавні міста України", "ua_coins": "drevnie-goroda-ukrainy", "ours": ["Древние города Украины", "Стародавні міста України"]},
-    {"nbu": "Східний календар", "ua_coins": "vostochnyy-kalendar", "ours": ["Восточный календарь", "Східний календар"]},
-    {"nbu": "Україна космічна", "ua_coins": "ukraina-kosmicheskaya", "ours": ["Космическая Украина", "Україна космічна"]},
-    {"nbu": "Українська держава", "ua_coins": "ukrainskoe-gosudarstvo", "ours": ["Украинская держава", "Українська держава"]},
-    {"nbu": "Українська спадщина", "ua_coins": "ukrainskoye-nasledie", "ours": ["Украинское наследие", "Українська спадщина"]},
-    {"nbu": "Фауна в пам`ятках культури України", "ua_coins": "fauna-v-pamyatnikah-kul-tury-ukrainy", "ours": ["Фауна в памятниках культуры Украины", "Фауна в пам'ятках культури України"]},
-    {"nbu": "Флора і фауна України", "ua_coins": "flora-fauna", "ours": ["Флора и фауна Украины", "Флора и фауна", "Флора і фауна України"]},
-    {"nbu": null, "ua_coins": "suvenirnaya-produkciya", "ours": [], "note": "ua-coins lists souvenir packaging as a category; the NBU keeps it as a separate product category (Souvenir), outside the coin list."}
-  ]
+ "_comment": "Series correspondence between the NBU list, ua-coins.info categories (by slug) and our coin_series names. `ours` holds aliases in any language; the reconnaissance matches by normalised name. Pairs marked with a `note` are unresolved and left for a person to settle.",
+ "entries": [
+  {
+   "nbu": "2000-ліття Різдва Христового",
+   "ua_coins": "2000-letiyu-rozhdestva-hristova",
+   "ours": [
+    "2000-летие Рождества Христова",
+    "2000-ліття Різдва Христового"
+   ]
+  },
+  {
+   "nbu": "Античні пам`ятки України",
+   "ua_coins": "antichnye-pamyatniki-ukrainy",
+   "ours": [
+    "Античные памятники Украины",
+    "Античні пам'ятки України"
+   ]
+  },
+  {
+   "nbu": "Безсмертна моя Україно",
+   "ua_coins": "bessmertnaya-moya-ukraina",
+   "ours": [
+    "Бессмертная моя Украина",
+    "Безсмертна моя Україно"
+   ]
+  },
+  {
+   "nbu": "Видатні особистості України",
+   "ua_coins": "vydayuschiesya-lichnosti-ukrainy",
+   "ours": [
+    "Выдающиеся личности Украины",
+    "Видатні особистості України",
+    "Выдающиеся личности"
+   ]
+  },
+  {
+   "nbu": "Вищі навчальні заклади України",
+   "ua_coins": "vysshie-uchebnye-zavedeniya-ukrainy",
+   "ours": [
+    "Высшие учебные заведения Украины",
+    "Вищі навчальні заклади України"
+   ]
+  },
+  {
+   "nbu": "Відродження української державності",
+   "ua_coins": "vozrozhdenie-ukrainskoy-gosudarstvennosti",
+   "ours": [
+    "Возрождение украинской государственности",
+    "Відродження української державності"
+   ]
+  },
+  {
+   "nbu": "Відродження християнської духовності в Україні",
+   "ua_coins": "vozrozhdenie-hristianskoy-duhovnosti-v-ukraine",
+   "ours": [
+    "Возрождение христианской духовности в Украине",
+    "Відродження християнської духовності в Україні"
+   ]
+  },
+  {
+   "nbu": "Герої козацької доби",
+   "ua_coins": "geroi-kazackoy-epohi",
+   "ours": [
+    "Герои казацкой эпохи",
+    "Герої козацької доби"
+   ]
+  },
+  {
+   "nbu": "Героям Майдану",
+   "ua_coins": "geroyam-maydana",
+   "ours": [
+    "Героям Майдана",
+    "Героям Майдану"
+   ]
+  },
+  {
+   "nbu": "Гетьманські столиці",
+   "ua_coins": "getmanskie-stolicy",
+   "ours": [
+    "Гетманские столицы",
+    "Гетьманські столиці"
+   ]
+  },
+  {
+   "nbu": "Дитячий Зодіак",
+   "ua_coins": "detskiy-zodiak",
+   "ours": [
+    "Детский Зодиак",
+    "Дитячий Зодіак"
+   ]
+  },
+  {
+   "nbu": "Друга світова війна",
+   "ua_coins": "pobeda-v-velikoy-otechestvennoy-voyne-1941-1945-gg",
+   "ours": [
+    "Вторая мировая война",
+    "Победа в Великой Отечественной войне 1941-1945 гг.",
+    "Друга світова війна",
+    "Перемога у Великій Вітчизняній війні 1941-1945 рр."
+   ],
+   "note": "ua-coins keeps the old name of the series (Перемога у Великій Вітчизняній війні); the NBU renamed it. Same coins, to be confirmed by count."
+  },
+  {
+   "nbu": "Духовні скарби України",
+   "ua_coins": "duhovnye-sokrovischa-ukrainy",
+   "ours": [
+    "Духовные сокровища Украины",
+    "Духовні скарби України"
+   ]
+  },
+  {
+   "nbu": "Збройні Сили України",
+   "ua_coins": "vooruzhennye-sily-ukrainy",
+   "ours": [
+    "Вооружённые силы Украины",
+    "Вооруженные силы Украины",
+    "Збройні Сили України"
+   ]
+  },
+  {
+   "nbu": "Знаки зодіаку",
+   "ua_coins": "znaki-zodiaka",
+   "ours": [
+    "Знаки зодиака",
+    "Знаки зодіаку"
+   ]
+  },
+  {
+   "nbu": "Інші монети",
+   "ua_coins": "drugie-monety",
+   "ours": [
+    "Другие монеты",
+    "Інші монети"
+   ],
+   "note": "A catch-all, not a series: counts are not expected to agree, and our items without a series belong here too."
+  },
+  {
+   "nbu": "Княжа Україна",
+   "ua_coins": "knyazha-ukraina",
+   "ours": [
+    "Княжеская Украина",
+    "Княжа Україна"
+   ]
+  },
+  {
+   "nbu": "Літаки України",
+   "ua_coins": "samolety-ukrainy",
+   "ours": [
+    "Самолёты Украины",
+    "Самолеты Украины",
+    "Літаки України"
+   ]
+  },
+  {
+   "nbu": "Міста-герої України",
+   "ua_coins": "goroda-geroi-ukrainy",
+   "ours": [
+    "Города-герои Украины",
+    "Міста-герої України"
+   ]
+  },
+  {
+   "nbu": "Морська історія України",
+   "ua_coins": "morskaya-istoriya-ukrainy",
+   "ours": [
+    "Морская история Украины",
+    "Морська історія України"
+   ]
+  },
+  {
+   "nbu": "На межі тисячоліть",
+   "ua_coins": "na-rubezhe-tysyacheletiy",
+   "ours": [
+    "На рубеже тысячелетий",
+    "На межі тисячоліть"
+   ]
+  },
+  {
+   "nbu": "Найменша золота монета",
+   "ua_coins": "naimen-shaya-zolotaya-moneta",
+   "ours": [
+    "Наименьшая золотая монета",
+    "Найменша золота монета"
+   ]
+  },
+  {
+   "nbu": "Народні музичні інструменти",
+   "ua_coins": "narodnye-muzykal-nye-instrumenty",
+   "ours": [
+    "Народные музыкальные инструменты",
+    "Народні музичні інструменти"
+   ]
+  },
+  {
+   "nbu": "Народні промисли та ремесла",
+   "ua_coins": "narodnye-promysly-i-remesla",
+   "ours": [
+    "Народные промыслы и ремёсла Украины",
+    "Народные промыслы и ремесла Украины",
+    "Народні промисли та ремесла"
+   ]
+  },
+  {
+   "nbu": "Області України",
+   "ua_coins": "oblasti-ukrainy",
+   "ours": [
+    "Области Украины",
+    "Області України"
+   ]
+  },
+  {
+   "nbu": "Обрядові свята України",
+   "ua_coins": "obryadovye-prazdniki-ukrainy",
+   "ours": [
+    "Обрядовые праздники Украины",
+    "Обрядові свята України"
+   ]
+  },
+  {
+   "nbu": "Пам’ятки архітектури України",
+   "ua_coins": "pam-039-pamyatniki-arhitektury-ukrainy",
+   "ours": [
+    "Памятники архитектуры Украины",
+    "Пам'ятки архітектури України"
+   ]
+  },
+  {
+   "nbu": "Пам’ятки давніх культур України",
+   "ua_coins": "pam-039-pamyatniki-drevnih-kul-tur-ukrainy",
+   "ours": [
+    "Памятники древних культур Украины",
+    "Пам'ятки давніх культур України"
+   ]
+  },
+  {
+   "nbu": "Славетні роди України",
+   "ua_coins": "slavnye-rody-ukrainy",
+   "ours": [
+    "Славные роды Украины",
+    "Славетні роди України"
+   ]
+  },
+  {
+   "nbu": "Спорт",
+   "ua_coins": "sport",
+   "ours": [
+    "Спорт"
+   ]
+  },
+  {
+   "nbu": "Стародавні міста України",
+   "ua_coins": "drevnie-goroda-ukrainy",
+   "ours": [
+    "Древние города Украины",
+    "Стародавні міста України"
+   ]
+  },
+  {
+   "nbu": "Східний календар",
+   "ua_coins": "vostochnyy-kalendar",
+   "ours": [
+    "Восточный календарь",
+    "Східний календар"
+   ]
+  },
+  {
+   "nbu": "Україна космічна",
+   "ua_coins": "ukraina-kosmicheskaya",
+   "ours": [
+    "Космическая Украина",
+    "Україна космічна"
+   ]
+  },
+  {
+   "nbu": "Українська держава",
+   "ua_coins": "ukrainskoe-gosudarstvo",
+   "ours": [
+    "Украинская держава",
+    "Українська держава"
+   ]
+  },
+  {
+   "nbu": "Українська спадщина",
+   "ua_coins": "ukrainskoye-nasledie",
+   "ours": [
+    "Украинское наследие",
+    "Українська спадщина"
+   ]
+  },
+  {
+   "nbu": "Фауна в пам`ятках культури України",
+   "ua_coins": "fauna-v-pamyatnikah-kul-tury-ukrainy",
+   "ours": [
+    "Фауна в памятниках культуры Украины",
+    "Фауна в пам'ятках культури України"
+   ]
+  },
+  {
+   "nbu": "Флора і фауна України",
+   "ua_coins": "flora-fauna",
+   "ours": [
+    "Флора и фауна Украины",
+    "Флора и фауна",
+    "Флора і фауна України",
+    "Флора і фауна"
+   ]
+  },
+  {
+   "nbu": null,
+   "ua_coins": "suvenirnaya-produkciya",
+   "ours": [],
+   "note": "ua-coins lists souvenir packaging as a category; the NBU keeps it as a separate product category (Souvenir), outside the coin list."
+  }
+ ]
 }
