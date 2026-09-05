@@ -60,4 +60,9 @@ describe('catalog filters ↔ URL', () => {
     expect(filters.page).toBe(1);
     expect(filters.owned).toBeUndefined();
   });
+
+  it('degrades a stale ?view=map to cards', () => {
+    const filters = parseFilters(new URLSearchParams('view=map'));
+    expect(filters.view).toBe('cards');
+  });
 });

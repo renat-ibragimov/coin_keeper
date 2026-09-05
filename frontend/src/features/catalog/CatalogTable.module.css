@@ -37,6 +37,20 @@
   background: var(--color-accent-soft);
 }
 
+/* Stretched-link pattern applied to a row: position:relative on modern
+ * browsers works on table rows, so the title link's ::after can cover the
+ * full row. The actions cell opts out with its own stacking context. */
+.table tbody tr {
+  position: relative;
+}
+
+.rowLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 .sortButton {
   border: none;
   background: none;
@@ -98,4 +112,27 @@
 
 .muted {
   color: var(--color-text-muted);
+}
+
+.actionsCell {
+  position: relative;
+  z-index: 2;
+  white-space: nowrap;
+}
+
+.actionsStatus {
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.actionsButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 900px) {
+  .actionsLabel {
+    display: none;
+  }
 }

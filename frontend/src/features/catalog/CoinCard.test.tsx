@@ -71,6 +71,22 @@ describe('CoinCard', () => {
   });
 });
 
+describe('CoinCard catalog CTA', () => {
+  it('offers to add the coin to the collection when it is missing', () => {
+    render(<CoinCard item={makeItem({ quantityOwned: 0 })} catalogCta />);
+    const link = screen.getByRole('link', { name: /Додати до колекції/ });
+    expect(link).toHaveAttribute('href', '/collection/coins/new?catalogItemId=1');
+  });
+
+  it('shows a status and an "add another copy" link when already owned', () => {
+    render(<CoinCard item={makeItem({ quantityOwned: 2 })} catalogCta />);
+    expect(screen.getAllByText(/У моїй колекції/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('link', { name: /Додати до колекції/ })).not.toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'Додати ще екземпляр' });
+    expect(link).toHaveAttribute('href', '/collection/coins/new?catalogItemId=1');
+  });
+});
+
 describe('CoinCard images', () => {
   it('shows the placeholder when the item has no photo', () => {
     const { container } = render(<CoinCard item={makeItem()} />);

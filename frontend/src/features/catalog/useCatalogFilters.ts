@@ -16,7 +16,7 @@ export const SORT_FIELDS = [
 export type SortField = (typeof SORT_FIELDS)[number];
 
 export type Scope = 'all' | 'shared' | 'own';
-export type CatalogView = 'cards' | 'table' | 'map';
+export type CatalogView = 'cards' | 'table';
 
 export interface CatalogFilters {
   q: string;
@@ -70,7 +70,8 @@ export function parseFilters(params: URLSearchParams): CatalogFilters {
     sort: SORT_FIELDS.includes(sort as SortField) ? (sort as SortField) : 'country',
     order: params.get('order') === 'desc' ? 'desc' : 'asc',
     page: intParam(params, 'page') ?? 1,
-    view: view === 'table' || view === 'map' ? view : 'cards',
+    // A stale `?view=map` (the completeness map was removed) quietly degrades to cards.
+    view: view === 'table' ? 'table' : 'cards',
   };
 }
 

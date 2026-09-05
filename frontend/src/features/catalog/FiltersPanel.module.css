@@ -1,11 +1,61 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
-.heading {
-  font-size: 21px;
+.mainRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+.search {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.field {
+  flex: 1 1 160px;
+  min-width: 140px;
+}
+
+.yearField {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.resetButton {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.moreToggle {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: var(--space-1) 0;
+}
+
+.moreToggle:hover {
+  text-decoration: underline;
+}
+
+.secondaryRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 
 .group {

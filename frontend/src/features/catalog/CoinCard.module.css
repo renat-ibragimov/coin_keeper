@@ -1,4 +1,5 @@
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--color-surface-raised);
@@ -33,8 +34,11 @@
   justify-content: center;
 }
 
-/* The whole media area opens the card; the badges stay on top of it. */
+/* The whole media area opens the card; the badges stay on top of it.
+ * position+z-index lift it above the title's stretched-link overlay. */
 .mediaLink {
+  position: relative;
+  z-index: 2;
   display: flex;
   gap: 2px;
   width: 100%;
@@ -89,6 +93,17 @@
   color: var(--color-accent);
 }
 
+/* Stretched-link pattern: the pseudo-element covers the whole card, so a
+ * click anywhere empty opens it, while keyboard/middle-click/context-menu
+ * keep working on a real link. Interactive elements above it opt out via
+ * their own z-index. */
+.titleLinkStretched::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 .meta {
   font-size: 13.5px;
   color: var(--color-text-secondary);
@@ -104,6 +119,8 @@
 }
 
 .source {
+  position: relative;
+  z-index: 2;
   align-self: flex-start;
   margin-top: var(--space-2);
   font-size: 12.5px;
@@ -135,9 +152,27 @@
 }
 
 .action {
+  position: relative;
+  z-index: 2;
   padding: 0 var(--space-4) var(--space-3);
 }
 
 .action > * {
   width: 100%;
+}
+
+.collectionStatus {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+}
+
+.statusOwned {
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+.addAnother {
+  font-size: 13px;
 }

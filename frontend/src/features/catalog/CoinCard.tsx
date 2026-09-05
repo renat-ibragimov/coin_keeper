@@ -7,7 +7,7 @@ import { imageSources } from '@/shared/lib/coinImage';
 import { coinTitle } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
-import { Badge, CoinImage } from '@/shared/ui';
+import { Badge, Button, CoinImage } from '@/shared/ui';
 
 import styles from './CoinCard.module.css';
 
@@ -32,14 +32,21 @@ interface CoinCardProps {
   item: CatalogListItem;
   /** Optional call to action under the price, e.g. "Add a purchase". */
   action?: ReactNode;
+  /**
+   * Catalog listing mode: stretches the title link over the whole card
+   * (keyboard, middle-click and context menu all keep working) and shows the
+   * "add to collection" CTA instead of `action`.
+   */
+  catalogCta?: boolean;
 }
 
-export function CoinCard({ item, action }: CoinCardProps) {
+export function CoinCard({ item, action, catalogCta = false }: CoinCardProps) {
   const { t, i18n } = useTranslation();
   const price = formatUah(item.marketPriceUah, i18n.language);
   const owned = item.quantityOwned > 0;
   const title = coinTitle(item, i18n.language);
   const cardUrl = `/catalog/${item.id}`;
+  const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
 
   return (
     <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
@@ -57,7 +64,10 @@ export function CoinCard({ item, action }: CoinCardProps) {
           <div className={styles.denomination}>{item.denomination.label}</div>
         ) : null}
         <h3 className={styles.title}>
-          <Link to={cardUrl} className={styles.titleLink}>
+          <Link
+            to={cardUrl}
+            className={[styles.titleLink, catalogCta ? styles.titleLinkStretched : ''].join(' ')}
+          >
             {title}
           </Link>
         </h3>
@@ -99,7 +109,24 @@ export function CoinCard({ item, action }: CoinCardProps) {
           </span>
         ) : null}
       </div>
-      {action ? <div className={styles.action}>{action}</div> : null}
+      {catalogCta ? (
+        <div className={styles.action}>
+          {owned ? (
+            <div className={styles.collectionStatus}>
+              <span className={styles.statusOwned}>✓ {t('catalog.badgeInCollection')}</span>
+              <Link to={addUrl} className={styles.addAnother}>
+                {t('catalog.addAnotherCopy')}
+              </Link>
+            </div>
+          ) : (
+            <Link to={addUrl}>
+              <Button size="sm">+ {t('catalog.addToCollection')}</Button>
+            </Link>
+          )}
+        </div>
+      ) : action ? (
+        <div className={styles.action}>{action}</div>
+      ) : null}
     </article>
   );
 }

@@ -6,7 +6,7 @@ import { ApiError } from '@/shared/api/client';
 import { useDismissable } from '@/shared/lib/useDismissable';
 import { Button, EmptyState, ErrorState, Pagination, Select, Skeleton, Tabs } from '@/shared/ui';
 
-import { fetchCatalog, fetchCountries, fetchDenominations, PAGE_SIZE } from './api';
+import { fetchCatalog, fetchCountries, fetchDenominations, fetchSeries, PAGE_SIZE } from './api';
 import { CatalogTable } from './CatalogTable';
 import { CoinCard } from './CoinCard';
 import { FiltersPanel } from './FiltersPanel';
@@ -42,6 +42,10 @@ export function CatalogPage() {
     queryKey: ['denominations', filters.countryId],
     queryFn: () => fetchDenominations(filters.countryId),
   });
+  const seriesQuery = useQuery({
+    queryKey: ['series', 'catalog', filters.countryId],
+    queryFn: () => fetchSeries(filters.countryId),
+  });
 
   const page = catalogQuery.data;
   const total = page?.total ?? 0;
@@ -56,6 +60,8 @@ export function CatalogPage() {
       }}
       reset={reset}
       countries={countriesQuery.data ?? []}
+      series={seriesQuery.data ?? []}
+      seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
     />
   );
@@ -69,108 +75,97 @@ export function CatalogPage() {
         </div>
       </header>
 
-      <div className={styles.layout}>
-        <aside className={styles.sidebar}>{filtersPanel}</aside>
+      <div className={styles.filtersBar}>{filtersPanel}</div>
 
-        <section className={styles.content}>
-          <div className={styles.toolbar}>
-            <span className={`${styles.counter} tabular`}>
-              {t('pagination.shown', { shown, total })}
-            </span>
+      <section className={styles.content}>
+        <div className={styles.toolbar}>
+          <span className={`${styles.counter} tabular`}>
+            {t('pagination.shown', { shown, total })}
+          </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            className={styles.filtersButton}
+            onClick={() => setDrawerOpen(true)}
+          >
+            ☰ {t('catalog.filters')}
+          </Button>
+          <Tabs<CatalogView>
+            aria-label={t('catalog.viewLabel')}
+            options={[
+              { value: 'cards', label: t('catalog.viewCards') },
+              { value: 'table', label: t('catalog.viewTable') },
+            ]}
+            value={filters.view}
+            onChange={(view) => update({ view, page: filters.page })}
+          />
+          <span className={styles.sortControls}>
+            <Select
+              value={filters.sort}
+              onChange={(event) => update({ sort: event.target.value as SortField })}
+              aria-label={t('catalog.sort')}
+            >
+              {SORT_FIELDS.map((field) => (
+                <option key={field} value={field}>
+                  {t(SORT_LABELS[field])}
+                </option>
+              ))}
+            </Select>
             <Button
               variant="secondary"
               size="sm"
-              className={styles.filtersButton}
-              onClick={() => setDrawerOpen(true)}
+              onClick={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
+              aria-label={filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
+              title={filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
             >
-              ☰ {t('catalog.filters')}
+              {filters.order === 'asc' ? '↑' : '↓'}
             </Button>
-            <Tabs<CatalogView>
-              aria-label={t('catalog.viewLabel')}
-              options={[
-                { value: 'cards', label: t('catalog.viewCards') },
-                { value: 'table', label: t('catalog.viewTable') },
-                { value: 'map', label: t('catalog.viewMap') },
-              ]}
-              value={filters.view}
-              onChange={(view) => update({ view, page: filters.page })}
-            />
-            <span className={styles.sortControls}>
-              <Select
-                value={filters.sort}
-                onChange={(event) => update({ sort: event.target.value as SortField })}
-                aria-label={t('catalog.sort')}
-              >
-                {SORT_FIELDS.map((field) => (
-                  <option key={field} value={field}>
-                    {t(SORT_LABELS[field])}
-                  </option>
-                ))}
-              </Select>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
-                aria-label={
-                  filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')
-                }
-                title={filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
-              >
-                {filters.order === 'asc' ? '↑' : '↓'}
-              </Button>
-            </span>
+          </span>
+        </div>
+
+        <p className={styles.priceNote}>ⓘ {t('catalog.priceNote')}</p>
+
+        {catalogQuery.isError ? (
+          <ErrorState
+            detail={
+              catalogQuery.error instanceof ApiError && catalogQuery.error.status === 0
+                ? t('errors.network')
+                : undefined
+            }
+            onRetry={() => void catalogQuery.refetch()}
+          />
+        ) : null}
+
+        {catalogQuery.isPending ? (
+          <div className={styles.grid}>
+            {Array.from({ length: 8 }, (_, index) => (
+              <Skeleton key={index} height={280} />
+            ))}
           </div>
+        ) : null}
 
-          <p className={styles.priceNote}>ⓘ {t('catalog.priceNote')}</p>
+        {page && page.items.length === 0 ? (
+          <EmptyState title={t('catalog.emptyTitle')} description={t('catalog.emptyText')} />
+        ) : null}
 
-          {catalogQuery.isError ? (
-            <ErrorState
-              detail={
-                catalogQuery.error instanceof ApiError && catalogQuery.error.status === 0
-                  ? t('errors.network')
-                  : undefined
-              }
-              onRetry={() => void catalogQuery.refetch()}
-            />
-          ) : null}
-
-          {catalogQuery.isPending ? (
+        {page && page.items.length > 0 ? (
+          filters.view === 'cards' ? (
             <div className={styles.grid}>
-              {Array.from({ length: 8 }, (_, index) => (
-                <Skeleton key={index} height={280} />
+              {page.items.map((item) => (
+                <CoinCard key={item.id} item={item} catalogCta />
               ))}
             </div>
-          ) : null}
+          ) : (
+            <CatalogTable items={page.items} filters={filters} update={update} />
+          )
+        ) : null}
 
-          {page && page.items.length === 0 ? (
-            <EmptyState title={t('catalog.emptyTitle')} description={t('catalog.emptyText')} />
-          ) : null}
-
-          {page && page.items.length > 0 ? (
-            filters.view === 'cards' ? (
-              <div className={styles.grid}>
-                {page.items.map((item) => (
-                  <CoinCard key={item.id} item={item} />
-                ))}
-              </div>
-            ) : filters.view === 'table' ? (
-              <CatalogTable items={page.items} filters={filters} update={update} />
-            ) : (
-              <EmptyState
-                icon="🗺"
-                title={t('catalog.viewMap')}
-                description={t('catalog.mapComingSoon')}
-              />
-            )
-          ) : null}
-
-          <Pagination
-            page={filters.page}
-            pageCount={pageCount}
-            onChange={(next) => update({ page: next })}
-          />
-        </section>
-      </div>
+        <Pagination
+          page={filters.page}
+          pageCount={pageCount}
+          onChange={(next) => update({ page: next })}
+        />
+      </section>
 
       {drawerOpen ? (
         <div className={styles.drawerOverlay} onClick={() => setDrawerOpen(false)}>

@@ -21,16 +21,7 @@
   margin: var(--space-1) 0 0;
 }
 
-.layout {
-  display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: var(--space-5);
-  align-items: start;
-}
-
-.sidebar {
-  position: sticky;
-  top: calc(var(--header-height) + var(--space-4));
+.filtersBar {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -86,12 +77,8 @@
   display: none;
 }
 
-@media (max-width: 1020px) {
-  .layout {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar {
+@media (max-width: 900px) {
+  .filtersBar {
     display: none;
   }
 

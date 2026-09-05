@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import type { CatalogListItem } from '@/shared/api/types';
 import { coinTitle } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
-import { Badge, CoinImage } from '@/shared/ui';
+import { Badge, Button, CoinImage } from '@/shared/ui';
 
 import type { CatalogFilters, SortField } from './useCatalogFilters';
 import styles from './CatalogTable.module.css';
@@ -24,6 +24,7 @@ const COLUMNS: { key: string; sort?: SortField }[] = [
   { key: 'tableAvailability', sort: 'owned' },
   { key: 'tablePurchase', sort: 'purchase' },
   { key: 'tablePrice', sort: 'price' },
+  { key: 'tableActions' },
 ];
 
 export function CatalogTable({ items, filters, update }: CatalogTableProps) {
@@ -72,13 +73,17 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
         <tbody>
           {items.map((item) => {
             const owned = item.quantityOwned > 0;
+            const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
             return (
               <tr key={item.id} className={item.isArchived ? styles.archivedRow : undefined}>
                 <td>
                   <div className={styles.coinCell}>
                     <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
                     <span>
-                      <Link to={`/catalog/${item.id}`} className={styles.coinTitle}>
+                      <Link
+                        to={`/catalog/${item.id}`}
+                        className={`${styles.coinTitle} ${styles.rowLink}`}
+                      >
                         {coinTitle(item, i18n.language)}
                       </Link>
                       <span className={styles.coinBadges}>
@@ -110,6 +115,25 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                 <td className="tabular">
                   {formatUah(item.marketPriceUah, i18n.language) ?? (
                     <span className={styles.muted}>{t('catalog.noPrice')}</span>
+                  )}
+                </td>
+                <td className={styles.actionsCell}>
+                  {owned ? (
+                    <span className={styles.actionsStatus}>✓ {t('catalog.badgeInCollection')}</span>
+                  ) : (
+                    <Link to={addUrl}>
+                      <Button
+                        size="sm"
+                        className={styles.actionsButton}
+                        aria-label={t('catalog.addToCollection')}
+                        title={t('catalog.addToCollection')}
+                      >
+                        <span aria-hidden="true">+</span>
+                        <span className={styles.actionsLabel}>
+                          {t('catalog.addToCollection')}
+                        </span>
+                      </Button>
+                    </Link>
                   )}
                 </td>
               </tr>
