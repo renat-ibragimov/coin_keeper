@@ -82,9 +82,17 @@ def search_form(
     category: str | None = CATEGORY_COIN,
     date_from: str | None = None,
     date_to: str | None = None,
+    search: str | None = None,
+    nominal: str | None = None,
 ) -> dict[str, str]:
     """The POST body. Empty filter values make the endpoint answer 404, so
-    only the filters actually used are sent."""
+    only the filters actually used are sent.
+
+    `search` is a loose keyword match against the endpoint's own index (it
+    is not a phrase match — confirmed live 2026-09-05: "20 років запровадження
+    гривні" returned 213 unrelated results), so a caller narrows with other
+    filters rather than relying on the search string alone to pin one card.
+    """
     form = {"page": str(page), "perPage": str(per_page)}
     if category:
         form["category[]"] = category
@@ -92,6 +100,10 @@ def search_form(
         form["from"] = date_from
     if date_to:
         form["to"] = date_to
+    if search:
+        form["search"] = search
+    if nominal:
+        form["nominal[]"] = nominal
     return form
 
 

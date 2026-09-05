@@ -34,11 +34,14 @@ from app.ukraine_pipeline import (
     bridge,
     circ_bridge,
     circ_gaps,
+    circ_inventory,
     circ_mintage,
     circ_photos,
     circ_reclassify,
     circ_titles,
+    circ_variants,
     gaps,
+    jubilee_bridge,
     merge,
     photos,
     prices,
@@ -78,12 +81,26 @@ COMMEMORATIVE_STEPS = (
 CIRCULATION_STEPS = (
     "circ-reclassify",
     "circ-bridge",
+    # Right after circ-bridge, before circ-gaps: a duplicate this step
+    # retires must already know which of its slot-mates is the linked base
+    # (circ-bridge's own job), and circ-gaps must not mistake a slot a
+    # duplicate still occupies for an empty one (docs/05-integrations.md,
+    # section 10 — though in practice the base already occupies the slot
+    # either way, so there is no real ordering hazard, only a logical one).
+    "circ-variants",
     "circ-gaps",
     "circ-titles",
     "circ-mintage",
     "circ-photos",
 )
-STEPS = COMMEMORATIVE_STEPS + CIRCULATION_STEPS
+# One-off tools for the remainder of the catalogue (docs/05-integrations.md,
+# section 10 continuation): a targeted NBU match for six specific
+# mispatriated jubilee records, and a survey CSV of everything else part B's
+# bridge left unlinked. Independent of the ordered chains above — either can
+# run alone — but grouped at the end of STEPS so `--steps` with no argument
+# still runs everything once.
+EXTRA_STEPS = ("jubilee-bridge", "inventory-b")
+STEPS = COMMEMORATIVE_STEPS + CIRCULATION_STEPS + EXTRA_STEPS
 
 
 class PipelineError(Exception):
@@ -114,6 +131,18 @@ class Options:
     # non-NBU-linked circulation record instead of only filling empty ones —
     # see circ_mintage.py's module docstring.
     circ_refresh_mintage: bool = False
+    # circ-variants: its own review file, apart from --review-out/-in and
+    # --circ-review-out/-in — a different shape again (docs/05-integrations.md).
+    circ_variants_review_out: Path | None = None
+    circ_variants_review_in: Path | None = None
+    # jubilee-bridge: one CSV, own flag pair.
+    jubilee_review_out: Path | None = None
+    jubilee_review_in: Path | None = None
+    # inventory-b: writes with --inventory-out; a `link` decision is applied
+    # back with --apply-inventory-review, read the same way jubilee-bridge's
+    # own review file is (see app/ukraine_pipeline/circ_inventory.py).
+    inventory_out: Path | None = None
+    inventory_review_in: Path | None = None
 
 
 @dataclass
@@ -404,6 +433,37 @@ class Runner:
         await self._commit()
         await self._load_catalog()
 
+    async def _step_circ_variants(self) -> None:
+        outcome = await circ_variants.run_variants(
+            self.session, items=self._items, dry_run=self.options.dry_run
+        )
+        applied = circ_variants.CircVariantsOutcome()
+        if self.options.circ_variants_review_in is not None:
+            path = self.options.circ_variants_review_in
+            decisions = circ_variants.read_review_csv(path)
+            applied = await circ_variants.apply_review(
+                self.session, decisions, dry_run=self.options.dry_run
+            )
+            self.log(f"circ-variants review: {len(decisions)} decisions read from {path}")
+        rows = 0
+        if self.options.circ_variants_review_out is not None and outcome.review:
+            rows = circ_variants.write_review_csv(self.options.circ_variants_review_out, outcome)
+            self.log(
+                f"circ-variants: {rows} review rows written to "
+                f"{self.options.circ_variants_review_out}"
+            )
+        self.report.step(
+            "circ-variants",
+            {**outcome.summary(), "reviewApplied": len(applied.created), "reviewRowsWritten": rows},
+            created=(outcome.created + applied.created)[:50],
+            subtypesAssigned=outcome.subtypes_assigned[:50],
+            personalInstancesOnVariant=(
+                outcome.personal_instances_on_variant + applied.personal_instances_on_variant
+            )[:50],
+        )
+        await self._commit()
+        await self._load_catalog()
+
     async def _step_circ_gaps(self) -> None:
         assert self._country_id is not None
         outcome = await circ_gaps.create_missing(
@@ -466,6 +526,51 @@ class Runner:
             failed=outcome.failed[:50],
         )
         await self._commit()
+
+    # ------------------------------------------------------------------ extra
+    async def _step_jubilee_bridge(self) -> None:
+        outcome = jubilee_bridge.find_candidates(
+            self.client, items=self._items, lexicon=self.lexicon, log=self.log
+        )
+        written = 0
+        if self.options.jubilee_review_in is not None:
+            path = self.options.jubilee_review_in
+            decisions = jubilee_bridge.read_review_csv(path)
+            if not self.options.dry_run:
+                written = await jubilee_bridge.write_links(self.session, decisions)
+            self.log(f"jubilee-bridge: {len(decisions)} decisions read from {path}")
+        rows = 0
+        if self.options.jubilee_review_out is not None and outcome.review:
+            rows = jubilee_bridge.write_review_csv(self.options.jubilee_review_out, outcome)
+            self.log(
+                f"jubilee-bridge: {rows} review rows written to {self.options.jubilee_review_out}"
+            )
+        self.report.step(
+            "jubilee-bridge",
+            {**outcome.summary(), "linkRowsWritten": written, "reviewRowsWritten": rows},
+            noCandidates=outcome.no_candidates[:50],
+        )
+        await self._commit()
+        await self._load_catalog()
+
+    async def _step_inventory_b(self) -> None:
+        outcome = circ_inventory.build_inventory(self._items, self.sources, self.lexicon)
+        rows = 0
+        if self.options.inventory_out is not None and outcome.rows:
+            rows = circ_inventory.write_csv(self.options.inventory_out, outcome)
+            self.log(f"inventory-b: {rows} rows written to {self.options.inventory_out}")
+        written = 0
+        if self.options.inventory_review_in is not None:
+            path = self.options.inventory_review_in
+            decisions = jubilee_bridge.read_review_csv(path)
+            if not self.options.dry_run:
+                written = await jubilee_bridge.write_links(self.session, decisions)
+            self.log(f"inventory-b: {len(decisions)} link decisions read from {path}")
+        self.report.step(
+            "inventory-b", {**outcome.summary(), "csvRowsWritten": rows, "linkRowsWritten": written}
+        )
+        await self._commit()
+        await self._load_catalog()
 
     # -------------------------------------------------------------- internals
     async def _linked_clusters(self) -> dict[int, Cluster]:

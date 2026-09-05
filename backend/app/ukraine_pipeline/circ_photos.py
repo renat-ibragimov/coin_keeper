@@ -59,10 +59,11 @@ from app.models.enums import CollectionGroup, MediaRole, MediaSource
 from app.ukraine_pipeline.catalog import nbu_linked_ids
 from app.ukraine_pipeline.circ_nbu import ROLES, page_url, parse_page, pick_card
 from app.ukraine_pipeline.circ_types import TYPES, CoinType, type_for
+from app.ukraine_pipeline.photos import ATTRIBUTION as SOURCE_ATTRIBUTION
+from app.ukraine_pipeline.photos import LICENSE as SOURCE_LICENSE
+from app.ukraine_recon import ua_coins
 from app.ukraine_recon.http import PoliteClient, SourceUnreachableError
 
-ATTRIBUTION = "Національний банк України"
-LICENSE = "bank.gov.ua/ua/useterms: the material may be used with a reference to the source"
 MAX_IMAGE_BYTES = 12 * 1024 * 1024
 
 
@@ -99,7 +100,13 @@ async def _items_by_type(
 ) -> tuple[dict[str, list[int]], int]:
     rows = (
         await session.execute(
-            select(CatalogItem.id, CatalogItem.issue_year, Denomination.value, Denomination.unit)
+            select(
+                CatalogItem.id,
+                CatalogItem.issue_year,
+                CatalogItem.subtype,
+                Denomination.value,
+                Denomination.unit,
+            )
             .join(Denomination, Denomination.id == CatalogItem.denomination_id)
             .where(
                 CatalogItem.country_id == country_id,
@@ -112,11 +119,11 @@ async def _items_by_type(
     nbu_ids = await nbu_linked_ids(session, [item_id for item_id, *_ in rows])
     by_type: dict[str, list[int]] = {}
     skipped = 0
-    for item_id, year, value, unit in rows:
+    for item_id, year, subtype, value, unit in rows:
         if item_id in nbu_ids:
             skipped += 1
             continue
-        coin_type = type_for(value, unit, year)
+        coin_type = type_for(value, unit, year, subtype)
         if coin_type is not None:
             by_type.setdefault(coin_type.key, []).append(item_id)
     return by_type, skipped
@@ -205,26 +212,12 @@ def _download(client: PoliteClient, url: str) -> bytes | None:
     return body or None if result.ok else None
 
 
-def _fetch_type(
-    client: PoliteClient, coin_type: CoinType, outcome: PhotoOutcome
-) -> dict[str, ProcessedImage] | None:
-    """Both sides of one type, processed once — or None if the page has neither."""
-    try:
-        result = client.get(page_url(coin_type.photo_slug))
-    except SourceUnreachableError as exc:
-        outcome.failed.append({"type": coin_type.key, "error": str(exc)})
-        return None
-    if not result.ok:
-        outcome.failed.append({"type": coin_type.key, "error": f"HTTP {result.status}"})
-        return None
-    card = pick_card(parse_page(result.text), coin_type)
-    if card is None or not card.images:
-        outcome.types_without_card.append(coin_type.key)
-        return None
-
+def _download_role_images(
+    client: PoliteClient, coin_type: CoinType, images: dict[str, str], outcome: PhotoOutcome
+) -> dict[str, ProcessedImage]:
     processed: dict[str, ProcessedImage] = {}
     for role in ROLES:
-        url = card.images.get(role)
+        url = images.get(role)
         if url is None:
             continue
         try:
@@ -239,7 +232,56 @@ def _fetch_type(
             outcome.failed.append(
                 {"type": coin_type.key, "role": role, "url": url, "error": str(exc)}
             )
+    return processed
+
+
+def _fetch_from_ua_coins(
+    client: PoliteClient, coin_type: CoinType, outcome: PhotoOutcome
+) -> dict[str, ProcessedImage] | None:
+    """The fallback for a type the National Bank gives no card of at all.
+
+    Only hryvnia_1_2004 uses this today (docs/05-integrations.md, section
+    10): the ua-coins.info id is known in advance (circ_types.py), so this
+    builds the image URLs directly the same way
+    app/ukraine_pipeline/sources.py:ua_coins_sides does for the commemorative
+    pipeline — no page fetch needed to locate the images, only the two
+    downloads themselves.
+    """
+    assert coin_type.ua_coins_id is not None
+    images = {
+        role: ua_coins.image_url(coin_type.ua_coins_id, role, "middle_webp") for role in ROLES
+    }
+    processed = _download_role_images(client, coin_type, images, outcome)
     return processed or None
+
+
+def _fetch_type(
+    client: PoliteClient, coin_type: CoinType, outcome: PhotoOutcome
+) -> tuple[dict[str, ProcessedImage], MediaSource] | None:
+    """Both sides of one type, processed once — or None if no source has either.
+
+    Tries the National Bank's own "Про монети" card first; a type with no
+    card there but a known ua-coins.info id (currently only hryvnia_1_2004)
+    falls back to that instead of landing in `types_without_card`.
+    """
+    try:
+        result = client.get(page_url(coin_type.photo_slug))
+    except SourceUnreachableError as exc:
+        outcome.failed.append({"type": coin_type.key, "error": str(exc)})
+        return None
+    if not result.ok:
+        outcome.failed.append({"type": coin_type.key, "error": f"HTTP {result.status}"})
+        return None
+    card = pick_card(parse_page(result.text), coin_type)
+    if card is None or not card.images:
+        if coin_type.ua_coins_id is not None:
+            processed = _fetch_from_ua_coins(client, coin_type, outcome)
+            return (processed, MediaSource.UA_COINS) if processed else None
+        outcome.types_without_card.append(coin_type.key)
+        return None
+
+    processed = _download_role_images(client, coin_type, card.images, outcome)
+    return (processed, MediaSource.NBU) if processed else None
 
 
 def _store_for_item(
@@ -249,6 +291,7 @@ def _store_for_item(
     item_id: int,
     role: str,
     processed: ProcessedImage,
+    source: MediaSource,
     dry_run: bool,
 ) -> None:
     if dry_run:
@@ -263,9 +306,9 @@ def _store_for_item(
             catalog_item_id=item_id,
             owner_id=None,
             role=MediaRole(role),
-            source=MediaSource.NBU,
-            license=LICENSE,
-            attribution=ATTRIBUTION,
+            source=source,
+            license=SOURCE_LICENSE[source],
+            attribution=SOURCE_ATTRIBUTION[source],
             storage_key=primary_key_of(keys),
             thumbnail_key=preview_key_of(keys),
             variants=stored_variants(keys),
@@ -324,9 +367,10 @@ async def download_photos(
     outcome.types_left = len(pending) - len(batch)
 
     for index, coin_type in enumerate(batch, start=1):
-        processed_by_role = _fetch_type(client, coin_type, outcome)
-        if not processed_by_role:
+        fetched = _fetch_type(client, coin_type, outcome)
+        if not fetched:
             continue
+        processed_by_role, source = fetched
         for item_id in by_type[coin_type.key]:
             touched = False
             for role, processed in processed_by_role.items():
@@ -338,6 +382,7 @@ async def download_photos(
                     item_id=item_id,
                     role=role,
                     processed=processed,
+                    source=source,
                     dry_run=dry_run,
                 )
                 outcome.stored += 1

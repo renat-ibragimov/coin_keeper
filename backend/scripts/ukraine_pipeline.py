@@ -115,6 +115,41 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "empty field; without it a disagreement with an existing value is only reported",
     )
     parser.add_argument(
+        "--circ-variants-review-out",
+        type=Path,
+        help="where circ-variants writes duplicates it could not name from stored "
+        "uCoin data alone (a title marker or a physical-profile match)",
+    )
+    parser.add_argument(
+        "--apply-circ-variants-review",
+        type=Path,
+        dest="circ_variants_review_in",
+        help="a reviewed circ-variants CSV, variantName filled in by hand, to apply",
+    )
+    parser.add_argument(
+        "--jubilee-review-out",
+        type=Path,
+        help="where jubilee-bridge writes its NBU search candidates for review",
+    )
+    parser.add_argument(
+        "--apply-jubilee-review",
+        type=Path,
+        dest="jubilee_review_in",
+        help="a reviewed jubilee-bridge CSV to read decisions from",
+    )
+    parser.add_argument(
+        "--inventory-out",
+        type=Path,
+        help="where inventory-b writes its survey of the unlinked remainder",
+    )
+    parser.add_argument(
+        "--apply-inventory-review",
+        type=Path,
+        dest="inventory_review_in",
+        help="a reviewed inventory-b CSV; only rows marked yes with a suggestedAction "
+        "of link are applied, the same way jubilee-bridge's own review is",
+    )
+    parser.add_argument(
         "--ua-coins",
         choices=(
             source_module.MODE_AUTO,
@@ -148,7 +183,11 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
     report = PipelineReport()
     dry_run = not args.apply
     steps = parse_steps(args.steps)
-    needs_commemorative = any(step in COMMEMORATIVE_STEPS for step in steps)
+    # inventory-b scores against the same cached NBU scrape the commemorative
+    # steps need — it is not one of them, but it needs the same fetch.
+    needs_commemorative = any(step in COMMEMORATIVE_STEPS for step in steps) or (
+        "inventory-b" in steps
+    )
     needs_mintage = any(step in MINTAGE_STEPS for step in steps)
     circ_refresh_types = frozenset(
         key.strip() for key in (args.circ_refresh_types or "").split(",") if key.strip()
@@ -169,6 +208,16 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
         "circReviewIn": str(args.circ_review_in) if args.circ_review_in else None,
         "circRefreshTypes": sorted(circ_refresh_types) if circ_refresh_types else None,
         "circRefreshMintage": args.circ_refresh_mintage,
+        "circVariantsReviewOut": (
+            str(args.circ_variants_review_out) if args.circ_variants_review_out else None
+        ),
+        "circVariantsReviewIn": (
+            str(args.circ_variants_review_in) if args.circ_variants_review_in else None
+        ),
+        "jubileeReviewOut": str(args.jubilee_review_out) if args.jubilee_review_out else None,
+        "jubileeReviewIn": str(args.jubilee_review_in) if args.jubilee_review_in else None,
+        "inventoryOut": str(args.inventory_out) if args.inventory_out else None,
+        "inventoryReviewIn": str(args.inventory_review_in) if args.inventory_review_in else None,
     }
     report.assumptions = [
         "Only shared Ukrainian records take part; personal items belong to their authors.",
@@ -222,6 +271,12 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
             circ_review_in=args.circ_review_in,
             circ_refresh_types=circ_refresh_types,
             circ_refresh_mintage=args.circ_refresh_mintage,
+            circ_variants_review_out=args.circ_variants_review_out,
+            circ_variants_review_in=args.circ_variants_review_in,
+            jubilee_review_out=args.jubilee_review_out,
+            jubilee_review_in=args.jubilee_review_in,
+            inventory_out=args.inventory_out,
+            inventory_review_in=args.inventory_review_in,
             report_path=args.report,
         )
         try:
@@ -262,6 +317,9 @@ def main(argv: list[str] | None = None) -> int:
         ("review", args.review_in),
         ("merge", args.merge_in),
         ("circ review", args.circ_review_in),
+        ("circ variants review", args.circ_variants_review_in),
+        ("jubilee review", args.jubilee_review_in),
+        ("inventory review", args.inventory_review_in),
     )
     for name, path in checks:
         if path is not None and not path.exists():

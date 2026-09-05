@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import csv
 import io
+from dataclasses import replace
 from decimal import Decimal
 from pathlib import Path
 
@@ -33,7 +34,14 @@ from PIL import Image
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import CatalogItem, Denomination, MediaFile, PriceSourceLink
+from app.models import (
+    CatalogItem,
+    CatalogVariant,
+    CollectionItem,
+    Denomination,
+    MediaFile,
+    PriceSourceLink,
+)
 from app.models.enums import CollectionGroup, MatchStatus, MediaSource, TranslationSource
 from app.ukraine_pipeline import (
     circ_bridge,
@@ -42,10 +50,12 @@ from app.ukraine_pipeline import (
     circ_photos,
     circ_reclassify,
     circ_titles,
+    circ_variants,
 )
 from app.ukraine_pipeline.catalog import LINK_SOURCES, OurItem, load_items, ukraine_country_id
 from app.ukraine_pipeline.circ_nbu import page_url, parse_page, pick_card
 from app.ukraine_pipeline.circ_types import (
+    BY_KEY,
     SUBTYPE_1992,
     SUBTYPE_2004,
     SUBTYPE_2018,
@@ -55,7 +65,8 @@ from app.ukraine_pipeline.circ_types import (
 from app.ukraine_recon.http import PoliteClient
 from app.ukraine_recon.models import SOURCE_NBU, SOURCE_WIKIPEDIA
 from app.ukraine_recon.wikipedia import MintageCell, parse_mintage_table
-from tests.seed import country_by_code, make_catalog_item, seed_currencies
+from tests.helpers import unique_email
+from tests.seed import country_by_code, make_catalog_item, make_user, seed_currencies
 
 # Trimmed rows of the real table (header; both 1992 mint-name sections;
 # 1993, 1996, 2001, 2003, 2004, 2013, 2017, 2018, 2019, 2025) — see the
@@ -224,6 +235,29 @@ def test_the_1992_2004_hryvnia_types_share_a_page_with_no_real_card_for_2004() -
 def test_years_before_ukraine_existed_match_nothing() -> None:
     assert type_for(Decimal(1), "kopiika", 1990) is None
     assert type_for(Decimal(2), "hryvnia", 2010) is None
+
+
+def test_a_subtype_outside_its_own_year_range_overrides_the_plain_lookup() -> None:
+    """A 2018-dated old-design coin (struck for collector sets — see
+    circ_variants.py) must not fall through to hryvnia_1_2018, the only type
+    with an open year_from, just because 2018 is outside hryvnia_1_2004's
+    ordinary 2004-2017 range. Passing its own subtype is what fixes that.
+    """
+    plain = type_for(Decimal(1), "hryvnia", 2018)
+    assert plain is not None and plain.key == "hryvnia_1_2018"
+
+    old_design = type_for(Decimal(1), "hryvnia", 2018, subtype=SUBTYPE_2004)
+    assert old_design is not None and old_design.key == "hryvnia_1_2004"
+
+    older_design = type_for(Decimal(1), "hryvnia", 2018, subtype=SUBTYPE_1992)
+    assert older_design is not None and older_design.key == "hryvnia_1_1992"
+
+
+def test_a_subtype_no_type_carries_falls_back_to_the_plain_lookup() -> None:
+    """Kopecks have no subtype at all — passing one that matches nothing must
+    not make an otherwise ordinary lookup return None."""
+    coin_type = type_for(Decimal(1), "kopiika", 2000, subtype="not a real subtype")
+    assert coin_type is not None and coin_type.key == "kopiika_1"
 
 
 # --------------------------------------------------------------- wikipedia table
@@ -846,6 +880,41 @@ async def test_mintage_resolves_the_2018_hryvnia_split_by_subtype(
     assert any(row["itemId"] == no_subtype.id for row in outcome.ambiguous)
 
 
+async def test_mintage_resolves_subtype_2004_the_same_as_1992(db_session: AsyncSession) -> None:
+    """The Wikipedia table's "**** образец 2001 року" marker does not tell
+    the 1992 ornamental design apart from the 2004 "Volodymyr the Great"
+    redesign (circ_types.py) — both are simply the "old" coin next to the
+    2018 redesign, so a record circ_variants.py assigns SUBTYPE_2004 to must
+    resolve the same 20,000 figure SUBTYPE_1992 does, not stay ambiguous.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="hryvnia", sort_order=100
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    old_2004_design = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня зразка 2004 року",
+        year=2018,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        subtype=SUBTYPE_2004,
+    )
+    cells = parse_mintage_table(MINTAGE_TABLE_HTML)
+
+    outcome = await circ_mintage.apply_mintage(
+        db_session, country_id=country.id, mintage=cells, dry_run=False
+    )
+    await db_session.commit()
+
+    refreshed = await db_session.get(CatalogItem, old_2004_design.id)
+    assert refreshed is not None and refreshed.mintage_actual == 20_000
+    assert outcome.ambiguous == []
+
+
 # -------------------------------------------------------------------- circ_photos
 @pytest.fixture
 def obig_client(tmp_path: Path) -> PoliteClient:
@@ -934,6 +1003,75 @@ async def test_photos_are_stored_once_per_item_of_a_type(
     assert {f.catalog_item_id for f in files} == {first.id, second.id}
     assert all(f.source is MediaSource.NBU for f in files)
     assert len(storage.objects) > 0
+
+
+async def test_photos_fall_back_to_ua_coins_when_the_type_has_no_nbu_card(
+    db_session: AsyncSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """hryvnia_1_2004's real situation: the "Про монети" page loads fine but
+    carries no card matching its (deliberately unmatched) title hint. A type
+    with a known ua-coins.info id falls back to it instead of landing in
+    typesWithoutCard.
+    """
+    patched_type = replace(BY_KEY["hryvnia_1_2004"], ua_coins_id=777)
+    monkeypatch.setattr("app.ukraine_pipeline.circ_types.TYPES", (patched_type,))
+    monkeypatch.setattr("app.ukraine_pipeline.circ_photos.TYPES", (patched_type,))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.startswith("/ua/uah/obig-coin/"):
+            # Only the ornamental design's real card — no card titled to
+            # match hryvnia_1_2004's own hint (circ_types.py docstring).
+            return httpx.Response(
+                200, text=obig_page_html(("1 гривня", "Вилучена з обігу", "12.03.1997"))
+            )
+        if request.url.host == "www.ua-coins.info" and "/images/coins/middle/" in request.url.path:
+            return httpx.Response(200, content=png_bytes(400))
+        return httpx.Response(404)
+
+    client = PoliteClient(
+        cache_dir=tmp_path / "cache",
+        transport=httpx.MockTransport(handler),
+        sleep=lambda _seconds: None,
+    )
+
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="hryvnia", sort_order=100
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    item = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня зразка 2004 року",
+        year=2010,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    storage = RecordingStorage()
+
+    outcome = await circ_photos.download_photos(
+        db_session,
+        client=client,
+        storage=storage,
+        country_id=country.id,  # type: ignore[arg-type]
+        dry_run=False,
+        limit=None,
+        log=lambda _msg: None,
+    )
+    await db_session.commit()
+
+    assert outcome.types_without_card == []
+    assert outcome.stored == 2
+    files = (
+        (await db_session.execute(select(MediaFile).where(MediaFile.catalog_item_id == item.id)))
+        .scalars()
+        .all()
+    )
+    assert len(files) == 2
+    assert all(f.source is MediaSource.UA_COINS for f in files)
+    assert all(f.attribution == "ua-coins.info" for f in files)
 
 
 async def test_photos_are_not_downloaded_twice(
@@ -1453,6 +1591,334 @@ async def test_reclassify_is_idempotent(db_session: AsyncSession) -> None:
     second = await circ_reclassify.apply_reclassify(db_session, items=items, dry_run=False)
     await db_session.commit()
     assert second.summary()["reclassified"] == 0
+
+
+# ------------------------------------------------------------------ circ_variants
+async def _link_to_wikipedia(session: AsyncSession, item_id: int) -> None:
+    session.add(
+        PriceSourceLink(
+            catalog_item_id=item_id,
+            source=LINK_SOURCES[SOURCE_WIKIPEDIA],
+            external_id="Монети_української_гривні",
+            match_status=MatchStatus.CONFIRMED,
+        )
+    )
+    await session.commit()
+
+
+async def test_variants_names_a_trizub_duplicate_from_its_own_title(
+    db_session: AsyncSession,
+) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(10), unit="kopiika", sort_order=10
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    base = await make_catalog_item(
+        db_session,
+        country=country,
+        title="10 копійок",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    dup = await make_catalog_item(
+        db_session,
+        country=country,
+        title="10 копійок, вдавлений тризуб",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    await _link_to_wikipedia(db_session, base.id)
+
+    items = await load_items(db_session, country.id)
+    outcome = await circ_variants.run_variants(db_session, items=items, dry_run=False)
+    await db_session.commit()
+
+    assert outcome.summary()["created"] == 1
+    assert outcome.review == []
+    variant = (
+        await db_session.execute(
+            select(CatalogVariant).where(CatalogVariant.catalog_item_id == base.id)
+        )
+    ).scalar_one()
+    assert variant.name == "Втиснутий тризуб"
+    assert variant.notes == f"circ-variants: former catalog_items.id={dup.id}"
+    refreshed_dup = await db_session.get(CatalogItem, dup.id)
+    assert refreshed_dup is not None and refreshed_dup.is_archived
+    assert refreshed_dup.archive_reason == "переведено до варіанту каталогу"
+    refreshed_base = await db_session.get(CatalogItem, base.id)
+    assert refreshed_base is not None and not refreshed_base.is_archived
+
+
+async def test_variants_distinguishes_twins_by_stored_magnetism(db_session: AsyncSession) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(25), unit="kopiika", sort_order=25
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    base = await make_catalog_item(
+        db_session,
+        country=country,
+        title="25 копійок",
+        year=2014,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        material="неіржавіюча сталь, немагнітна",
+    )
+    dup = await make_catalog_item(
+        db_session,
+        country=country,
+        title="25 копійок",
+        year=2014,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        material="сталь з латунним покриттям, магнітна",
+    )
+    await _link_to_wikipedia(db_session, base.id)
+
+    items = await load_items(db_session, country.id)
+    await circ_variants.run_variants(db_session, items=items, dry_run=False)
+    await db_session.commit()
+
+    variant = (
+        await db_session.execute(
+            select(CatalogVariant).where(CatalogVariant.catalog_item_id == base.id)
+        )
+    ).scalar_one()
+    assert variant.name == "Магнітна"
+    assert (await db_session.get(CatalogItem, dup.id)).is_archived  # type: ignore[union-attr]
+
+
+async def test_variants_sends_an_unnamed_duplicate_to_review_and_apply_names_it(
+    db_session: AsyncSession, tmp_path: Path
+) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="hryvnia", sort_order=100
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    base = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня",
+        year=2013,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    dup = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня",
+        year=2013,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    await _link_to_wikipedia(db_session, base.id)
+
+    items = await load_items(db_session, country.id)
+    outcome = await circ_variants.run_variants(db_session, items=items, dry_run=False)
+    await db_session.commit()
+
+    assert outcome.summary()["created"] == 0
+    assert len(outcome.review) == 1
+    assert (await db_session.get(CatalogItem, dup.id)).is_archived is False  # type: ignore[union-attr]
+
+    path = tmp_path / "circ-variants-review.csv"
+    circ_variants.write_review_csv(path, outcome)
+    with path.open("r+", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+        assert len(rows) == 1
+        assert rows[0]["dupItemId"] == str(dup.id)
+        assert rows[0]["baseItemId"] == str(base.id)
+    # A person fills in decision + variantName by hand.
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=circ_variants.CSV_COLUMNS)
+        writer.writeheader()
+        writer.writerow(
+            {
+                "decision": "yes",
+                "dupItemId": dup.id,
+                "dupTitle": "1 гривня",
+                "dupMaterial": "",
+                "dupWeight": "",
+                "dupDiameter": "",
+                "baseItemId": base.id,
+                "baseTitle": "1 гривня",
+                "variantName": "Тонший гурт",
+            }
+        )
+
+    decisions = circ_variants.read_review_csv(path)
+    assert decisions == [
+        circ_variants.ReviewDecision(dup_id=dup.id, base_id=base.id, variant_name="Тонший гурт")
+    ]
+    applied = await circ_variants.apply_review(db_session, decisions, dry_run=False)
+    await db_session.commit()
+
+    assert applied.summary()["created"] == 1
+    refreshed_dup = await db_session.get(CatalogItem, dup.id)
+    assert refreshed_dup is not None and refreshed_dup.is_archived
+    variant = (
+        await db_session.execute(
+            select(CatalogVariant).where(CatalogVariant.catalog_item_id == base.id)
+        )
+    ).scalar_one()
+    assert variant.name == "Тонший гурт"
+
+    # Idempotent: re-applying the same decision touches nothing further.
+    again = await circ_variants.apply_review(db_session, decisions, dry_run=False)
+    await db_session.commit()
+    assert again.summary()["created"] == 0
+
+
+async def test_variants_reports_personal_instances_but_still_archives(
+    db_session: AsyncSession,
+) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(10), unit="kopiika", sort_order=10
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    base = await make_catalog_item(
+        db_session,
+        country=country,
+        title="10 копійок",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    dup = await make_catalog_item(
+        db_session,
+        country=country,
+        title="10 копійок, вдавлений тризуб",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    await _link_to_wikipedia(db_session, base.id)
+    owner = await make_user(db_session, email=unique_email())
+    db_session.add(CollectionItem(owner_id=owner.id, catalog_item_id=dup.id, quantity=1))
+    await db_session.commit()
+
+    items = await load_items(db_session, country.id)
+    outcome = await circ_variants.run_variants(db_session, items=items, dry_run=False)
+    await db_session.commit()
+
+    assert outcome.personal_instances_on_variant == [{"itemId": dup.id, "instances": 1}]
+    assert (await db_session.get(CatalogItem, dup.id)).is_archived  # type: ignore[union-attr]
+    # the instance itself is untouched, still pointing at the now-archived record
+    instance = (
+        await db_session.execute(
+            select(CollectionItem).where(CollectionItem.catalog_item_id == dup.id)
+        )
+    ).scalar_one()
+    assert instance.owner_id == owner.id
+
+
+async def test_variants_assigns_2018_subtypes_without_wrongly_merging_two_designs(
+    db_session: AsyncSession,
+) -> None:
+    """The real shape of id 1517/1519/1520 (docs/05-integrations.md, section
+    10): once each record's own stored weight/diameter picks its design, the
+    new-design record and the old-design record are two legitimate coins
+    sharing a year label, not a duplicate pair — neither gets archived.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="hryvnia", sort_order=100
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    new_design = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня зразка 2018 року",
+        year=2018,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        weight_grams=Decimal("3.3"),
+        diameter_mm=Decimal("18.9"),
+    )
+    old_design = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня",
+        year=2018,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        weight_grams=Decimal("6.8"),
+        diameter_mm=Decimal("26"),
+    )
+    await _link_to_wikipedia(db_session, new_design.id)
+
+    items = await load_items(db_session, country.id)
+    outcome = await circ_variants.run_variants(db_session, items=items, dry_run=False)
+    await db_session.commit()
+
+    assert outcome.summary()["created"] == 0
+    assert outcome.review == []
+    assert {row["subtype"] for row in outcome.subtypes_assigned} == {SUBTYPE_2018, SUBTYPE_2004}
+    assert (await db_session.get(CatalogItem, new_design.id)).is_archived is False  # type: ignore[union-attr]
+    assert (await db_session.get(CatalogItem, old_design.id)).is_archived is False  # type: ignore[union-attr]
+    assert (await db_session.get(CatalogItem, old_design.id)).subtype == SUBTYPE_2004  # type: ignore[union-attr]
+
+    # circ-mintage now resolves both instead of leaving either ambiguous.
+    cells = parse_mintage_table(MINTAGE_TABLE_HTML)
+    mintage_outcome = await circ_mintage.apply_mintage(
+        db_session, country_id=country.id, mintage=cells, dry_run=False
+    )
+    await db_session.commit()
+    assert mintage_outcome.ambiguous == []
+    assert (await db_session.get(CatalogItem, new_design.id)).mintage_actual == 140_000_000  # type: ignore[union-attr]
+    assert (await db_session.get(CatalogItem, old_design.id)).mintage_actual == 20_000  # type: ignore[union-attr]
+
+
+async def test_variants_run_twice_creates_nothing_the_second_time(db_session: AsyncSession) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(10), unit="kopiika", sort_order=10
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    base = await make_catalog_item(
+        db_session,
+        country=country,
+        title="10 копійок",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    await make_catalog_item(
+        db_session,
+        country=country,
+        title="10 копійок, вдавлений тризуб",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    await _link_to_wikipedia(db_session, base.id)
+
+    items = await load_items(db_session, country.id)
+    first = await circ_variants.run_variants(db_session, items=items, dry_run=False)
+    await db_session.commit()
+    assert first.summary()["created"] == 1
+
+    items = await load_items(db_session, country.id)
+    second = await circ_variants.run_variants(db_session, items=items, dry_run=False)
+    await db_session.commit()
+    assert second.summary()["created"] == 0
 
 
 # -------------------------------------------------------------------------- misc

@@ -95,6 +95,13 @@ class CoinType:
     # out of the others (see app/ukraine_pipeline/circ_nbu.py:pick_card).
     photo_slug: str
     photo_title_hint: str | None = None
+    # Fallback for a type the National Bank never gave a card of its own —
+    # currently only hryvnia_1_2004 (docs/05-integrations.md, section 10).
+    # The ua-coins.info numeric coin id; app/ukraine_pipeline/circ_photos.py
+    # builds the 600px image URLs from it the same way
+    # app/ukraine_pipeline/sources.py:ua_coins_sides already does for the
+    # commemorative pipeline (part B), rather than a live page fetch.
+    ua_coins_id: int | None = None
 
 
 # year_to for the kopecks is the last year the Wikipedia mintage table
@@ -208,13 +215,29 @@ TYPES: tuple[CoinType, ...] = (
 BY_KEY: dict[str, CoinType] = {coin_type.key: coin_type for coin_type in TYPES}
 
 
-def type_for(value: Decimal, unit: str, year: int) -> CoinType | None:
+def type_for(value: Decimal, unit: str, year: int, subtype: str | None = None) -> CoinType | None:
     """The one type a (denomination, year) belongs to, or None outside all of them.
 
-    At most one type ever matches: the ranges above do not overlap (that is
-    what the 2017/2018 split on the hryvnia is for), so this never has to
-    choose between two candidates.
+    At most one type ever matches by (denomination, year) alone: the ranges
+    above do not overlap (that is what the 2017/2018 split on the hryvnia is
+    for), so plain lookup never has to choose between two candidates.
+
+    `subtype` exists for the one case a year range cannot express: a record
+    struck for collector sets outside its design's ordinary circulation years
+    (docs/05-integrations.md, section 10 — the 2018-dated old-design 1 hryvnia
+    coins app/ukraine_pipeline/circ_variants.py assigns SUBTYPE_1992 or
+    SUBTYPE_2004 to). Without this, a 2018-dated old-design record would fall
+    through to hryvnia_1_2018 — the only type with an open-ended year_from —
+    and circ_photos would hand it the wrong (2018 nickel-plated-steel) photo.
+    When a caller passes a subtype, an exact (unit, value, subtype) match is
+    tried first, ignoring year ranges entirely; only when that finds nothing
+    does lookup fall back to the plain year-range search above. A caller that
+    passes no subtype (every existing call site) sees no behavior change.
     """
+    if subtype is not None:
+        for coin_type in TYPES:
+            if coin_type.unit == unit and coin_type.value == value and coin_type.subtype == subtype:
+                return coin_type
     for coin_type in TYPES:
         if coin_type.unit != unit or coin_type.value != value:
             continue

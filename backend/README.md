@@ -386,8 +386,8 @@ Exit codes: `0` fine, `2` bad arguments, `3` the NBU could not be read,
 
 Ukraine's ~197 unlinked circulation records — kopecks 1/2/5/10/25/50 and
 hryvnias 1/2/5/10 — go through a separate group of steps in the same script:
-`circ-reclassify, circ-bridge, circ-gaps, circ-titles, circ-mintage,
-circ-photos`. They share the runner, the report and
+`circ-reclassify, circ-bridge, circ-variants, circ-gaps, circ-titles,
+circ-mintage, circ-photos`. They share the runner, the report and
 `app/ukraine_pipeline/catalog.py` with the steps above, but read different
 sources — the Wikipedia mintage table instead of the three commemorative
 ones — and the bridge here needs no fuzzy score: a (face value, unit, year)
@@ -407,7 +407,7 @@ since `circ-titles` and `circ-photos` do not read the table at all.
 ```bash
 docker compose run --rm -v "$PWD/migration-reports:/reports" \
   api python scripts/ukraine_pipeline.py \
-    --steps circ-reclassify,circ-bridge,circ-gaps,circ-titles,circ-mintage,circ-photos \
+    --steps circ-reclassify,circ-bridge,circ-variants,circ-gaps,circ-titles,circ-mintage,circ-photos \
     --report /reports/circ.json --cache-dir /reports/ukraine-cache
 ```
 
@@ -450,6 +450,43 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
     --apply-circ-review /reports/circ-bridge-review.csv \
     --report /reports/circ-bridge-2.json --cache-dir /reports/ukraine-cache
 ```
+
+### 3b. Variants — the duplicates circ-bridge's review left unresolved
+
+`circ-bridge-review.csv` rows left unresolved on purpose (the standing
+`catalog_variants` gap, not a bridge decision — `../docs/05-integrations.md`,
+section 10) become variants of whichever record circ-bridge just linked to
+Wikipedia. Run after circ-bridge (and after applying its review, so the base
+of each slot is already linked):
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-variants \
+    --circ-variants-review-out /reports/circ-variants-review.csv \
+    --report /reports/circ-variants.json --cache-dir /reports/ukraine-cache
+```
+
+Named automatically from the duplicate's own stored title ("вдавлений
+тризуб") or material text (magnetic/non-magnetic steel); the rest need a
+person to fill in `variantName` in `circ-variants-review.csv`, then:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-variants \
+    --apply-circ-variants-review /reports/circ-variants-review.csv \
+    --report /reports/circ-variants-2.json --cache-dir /reports/ukraine-cache
+```
+
+Read `personalInstancesOnVariant` — not blocking, just worth a look: a
+duplicate carrying someone's own coin is archived like any other, the
+instance itself untouched. This step also assigns `subtype` (the 2018
+hryvnia changeover, and any denomination like it) from a record's own
+`weight_grams`/`diameter_mm` before naming anything — two records that come
+out with the *same* subtype are a real duplicate and proceed as above; two
+with different subtypes are legitimate distinct designs and neither is
+archived. Read `subtypesAssigned` once, then run circ-mintage's refresh
+below — it is what actually clears `circ-mintage.ambiguous` for those
+records.
 
 ### 4. Gaps, titles, mintage
 
@@ -521,6 +558,95 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
 The key is the type a record groups under *today*, by the current type map —
 not whatever type it was originally photographed under. `--dry-run` first
 prints `refreshedItems` without deleting anything.
+
+`hryvnia_1_2004` has no National Bank card at all (`typesWithoutCard`) and,
+as of 2026-09-05, no confirmed ua-coins.info id either — see
+`../docs/05-integrations.md`, section 10, for what was checked and why it
+stayed unconfirmed. Once a real id is found, set
+`app.ukraine_pipeline.circ_types.BY_KEY["hryvnia_1_2004"].ua_coins_id` and
+run `--circ-refresh-types hryvnia_1_2004` again; the step already knows how
+to fetch from ua-coins.info instead of the National Bank when a type carries
+that id and no card.
+
+### 7. Jubilee bridge — six specific records, one search each
+
+Six jubilee 1-hryvnia records (2004, 2005, 2010, 2012, 2015, 2016), moved to
+`commemorative` by hand outside circ-reclassify and never NBU-linked at all
+(`../docs/05-integrations.md`, section 10). Not part of `circ-*` — a
+standalone step, found by shape, not by id:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --steps jubilee-bridge \
+    --jubilee-review-out /reports/jubilee-review.csv \
+    --report /reports/jubilee.json --cache-dir /reports/ukraine-cache
+```
+
+Every candidate goes to the CSV regardless of score — there is no
+auto-apply here, unlike `bridge`/`circ-bridge`. Read `noCandidates` first:
+live reconnaissance found no 1-hryvnia NBU card for any of the six themes at
+all (section 10), so an empty result is expected until a person broadens the
+search. Put `yes` against the right row, then:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps jubilee-bridge \
+    --apply-jubilee-review /reports/jubilee-review.csv \
+    --report /reports/jubilee-2.json --cache-dir /reports/ukraine-cache
+```
+
+This only writes `price_source_links`; it does not touch `source_key`. Once
+a record is linked, re-run the part B steps below on it — `titles`,
+`photos`, `repair-gaps` — the same way any newly-linked record is picked up,
+since they all read links back from the database rather than from this run's
+own state.
+
+### 8. Inventory of what part B's bridge left unlinked
+
+A survey CSV of the ~100 remaining unlinked commemorative/collector records
+— nothing is applied except `link` rows:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --steps inventory-b \
+    --inventory-out /reports/inventory.csv \
+    --report /reports/inventory.json --cache-dir /reports/ukraine-cache
+```
+
+`suggestedAction` per row: `link` (a fuzzy NBU candidate cleared the
+threshold — `nbuId` is already filled in with the best one), `archive` (the
+title says this is a yearly set — `collection_group` has no enum value for
+one, so this is a suggestion with a reason, not an automatic change),
+`manual` (everything else, an admin operation outside this pipeline). Only
+`link` rows marked `yes` are applied, through the same mechanism
+jubilee-bridge uses (the CSV columns are deliberately the same shape):
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps inventory-b \
+    --apply-inventory-review /reports/inventory.csv \
+    --report /reports/inventory-2.json --cache-dir /reports/ukraine-cache
+```
+
+`archive`/`manual` rows are for a person to act on by hand; nothing here
+does it for them.
+
+### Full battle-run order
+
+One list, in the order to actually run these in against the owner's
+database — steps already covered above by number, plus the reviews between
+them:
+
+1. `circ-reclassify` (step 2)
+2. `circ-bridge`, then its review (step 3)
+3. `circ-variants`, then its review (step 3b)
+4. `circ-gaps, circ-titles, circ-mintage` (step 4)
+5. `circ-mintage --circ-refresh-mintage` (step 4, "Refresh mintage") — required after circ-variants assigns any `subtype`, to actually clear `circ-mintage.ambiguous`
+6. `circ-photos` (step 5)
+7. `circ-photos --circ-refresh-types hryvnia_1_2004` (step 6) — once a real `ua_coins_id` is set (step 6 above)
+8. `jubilee-bridge`, then its review (step 7)
+9. Part B's `titles, photos, repair-gaps` re-run on whatever jubilee-bridge just linked (step 7's own note)
+10. `inventory-b`, then its review for `link` rows (step 8)
 
 ### Rehearsal against a live source, 2026-09-04
 

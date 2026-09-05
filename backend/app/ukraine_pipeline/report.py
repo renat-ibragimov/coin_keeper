@@ -26,10 +26,13 @@ STEP_ORDER = (
     "prices",
     "circ-reclassify",
     "circ-bridge",
+    "circ-variants",
     "circ-gaps",
     "circ-titles",
     "circ-mintage",
     "circ-photos",
+    "jubilee-bridge",
+    "inventory-b",
 )
 EXAMPLES_IN_SUMMARY = 10
 

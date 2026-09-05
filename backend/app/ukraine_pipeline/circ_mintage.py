@@ -45,10 +45,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import CatalogItem, Denomination
 from app.models.enums import CollectionGroup
 from app.ukraine_pipeline.catalog import nbu_linked_ids
-from app.ukraine_pipeline.circ_types import SUBTYPE_1992, SUBTYPE_2018
+from app.ukraine_pipeline.circ_types import SUBTYPE_1992, SUBTYPE_2004, SUBTYPE_2018
 from app.ukraine_recon.wikipedia import PATTERN_2001, PATTERN_2018, MintageCell, MintageEntry
 
-_PATTERN_BY_SUBTYPE = {SUBTYPE_1992: PATTERN_2001, SUBTYPE_2018: PATTERN_2018}
+# The Wikipedia table's own two-way split (docs/05-integrations.md, section
+# 10: "**** образец 2001 года" vs "***** образец 2018 року") is coarser than
+# circ_types.py's three subtypes: it does not separate the 1992 ornamental
+# design from the 2004 "Volodymyr the Great" one — both are simply the "old"
+# coin next to the 2018 redesign. So both SUBTYPE_1992 and SUBTYPE_2004
+# resolve the same table entry; only SUBTYPE_2018 is its own.
+_PATTERN_BY_SUBTYPE = {
+    SUBTYPE_1992: PATTERN_2001,
+    SUBTYPE_2004: PATTERN_2001,
+    SUBTYPE_2018: PATTERN_2018,
+}
 
 
 @dataclass
