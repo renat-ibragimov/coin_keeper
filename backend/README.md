@@ -368,6 +368,9 @@ stored flagged, not dropped, and stay out of the collection value.
   `--apply-review` reads it back.
 - `--merge-out FILE`, `--apply-merge FILE` — the duplicate pairs, and the
   reviewed answer.
+- `--merge-b-out FILE`, `--apply-merge-b FILE` — `merge-b`'s own orphan/twin
+  review CSV and its reviewed answer, a different shape of pair from
+  `--merge-out` (that one is `gaps.py`'s own duplicates).
 - `--ua-coins auto|live|wayback|skip` — `auto` tries the site and falls back to
   the Wayback Machine copy.
 - `--since-year N` — only coins issued in or after that year, for a trial.
@@ -601,10 +604,49 @@ a record is linked, re-run the part B steps below on it — `titles`,
 since they all read links back from the database rather than from this run's
 own state.
 
-### 8. Inventory of what part B's bridge left unlinked
+### 8. merge-b — the legacy Excel remainder that already has a twin
 
-A survey CSV of the ~100 remaining unlinked commemorative/collector records
-— nothing is applied except `link` rows:
+A 2026-09-05 diagnosis of the same part-B remainder found 136 shared
+Ukrainian records with no National Bank link at all, not the ~103 the
+earlier estimate assumed — and that 118 of the 136 are not gaps, they are
+duplicates: the legacy Excel migration imported them under a Russian uCoin
+heading next to a record `gaps.py` (part B) already created for the same
+coin from the National Bank's own card. Needs no network at all — everything
+it compares is already in our own database:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --steps merge-b \
+    --merge-b-out /reports/merge-b.csv \
+    --report /reports/merge-b.json --cache-dir /reports/ukraine-cache
+```
+
+One row per orphan, `suggestedTwinId` filled in when a candidate in its own
+(year, denomination) slot clearly leads the runner-up (`suggestedAction:
+merge`); a close call is `manual`, an empty slot is `no-twin` (the six
+jubilee 1-hryvnia records from step 7 above, and other one-off records with
+no National Bank card at all, land here). `../docs/05-integrations.md`,
+section 10, explains why `bridge`/`inventory-b`'s own open-search threshold
+never surfaced these pairs on its own. Only `merge` rows marked `yes` are
+applied, straight through `merge.apply_merges` (the same function `merge`'s
+own step already uses for the duplicates `gaps.py` makes):
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps merge-b \
+    --apply-merge-b /reports/merge-b.csv \
+    --report /reports/merge-b-2.json --cache-dir /reports/ukraine-cache
+```
+
+`manual`/`no-twin` rows are for a person to look at by hand; nothing here
+acts on them. Re-running the same reviewed file changes nothing — the
+orphan is gone after the first pass.
+
+### 9. Inventory of what part B's bridge left unlinked
+
+A survey CSV of the remaining unlinked commemorative/collector records —
+run `merge-b` first (step 8): every pair it merges is one fewer row here.
+Nothing is applied except `link` rows:
 
 ```bash
 docker compose run --rm -v "$PWD/migration-reports:/reports" \
@@ -646,7 +688,8 @@ them:
 7. `circ-photos --circ-refresh-types hryvnia_1_2004` (step 6) — once a real `ua_coins_id` is set (step 6 above)
 8. `jubilee-bridge`, then its review (step 7)
 9. Part B's `titles, photos, repair-gaps` re-run on whatever jubilee-bridge just linked (step 7's own note)
-10. `inventory-b`, then its review for `link` rows (step 8)
+10. `merge-b`, then its review (step 8) — before inventory-b (step 9), so its merges shrink that survey
+11. `inventory-b`, then its review for `link` rows (step 9)
 
 ### Rehearsal against a live source, 2026-09-04
 

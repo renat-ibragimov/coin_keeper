@@ -32,6 +32,7 @@ STEP_ORDER = (
     "circ-mintage",
     "circ-photos",
     "jubilee-bridge",
+    "merge-b",
     "inventory-b",
 )
 EXAMPLES_IN_SUMMARY = 10

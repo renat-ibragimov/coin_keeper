@@ -43,6 +43,7 @@ from app.ukraine_pipeline import (
     gaps,
     jubilee_bridge,
     merge,
+    merge_b,
     photos,
     prices,
     repair,
@@ -95,11 +96,15 @@ CIRCULATION_STEPS = (
 )
 # One-off tools for the remainder of the catalogue (docs/05-integrations.md,
 # section 10 continuation): a targeted NBU match for six specific
-# mispatriated jubilee records, and a survey CSV of everything else part B's
-# bridge left unlinked. Independent of the ordered chains above — either can
+# mispatriated jubilee records, a self-to-self merge of the legacy Excel
+# remainder that already has a twin in our own catalogue (section 10's
+# "merge-b" subsection), and a survey CSV of whatever is left genuinely
+# unlinked afterwards. merge-b runs before inventory-b on purpose: every pair
+# it merges away is one fewer row for inventory-b to survey. Independent of
+# the ordered chains above and of each other otherwise — any of the three can
 # run alone — but grouped at the end of STEPS so `--steps` with no argument
 # still runs everything once.
-EXTRA_STEPS = ("jubilee-bridge", "inventory-b")
+EXTRA_STEPS = ("jubilee-bridge", "merge-b", "inventory-b")
 STEPS = COMMEMORATIVE_STEPS + CIRCULATION_STEPS + EXTRA_STEPS
 
 
@@ -143,6 +148,12 @@ class Options:
     # own review file is (see app/ukraine_pipeline/circ_inventory.py).
     inventory_out: Path | None = None
     inventory_review_in: Path | None = None
+    # merge-b: its own review file, applied through merge.apply_merges itself
+    # (see app/ukraine_pipeline/merge_b.py) — a separate pair of flags from
+    # --merge-out/--apply-merge, which is merge.py's own CSV for the
+    # duplicates gaps.py makes, a different shape of pair entirely.
+    merge_b_out: Path | None = None
+    merge_b_in: Path | None = None
 
 
 @dataclass
@@ -549,6 +560,34 @@ class Runner:
             "jubilee-bridge",
             {**outcome.summary(), "linkRowsWritten": written, "reviewRowsWritten": rows},
             noCandidates=outcome.no_candidates[:50],
+        )
+        await self._commit()
+        await self._load_catalog()
+
+    async def _step_merge_b(self) -> None:
+        """Lists the orphan/twin pairs; moves nothing unless handed a reviewed file."""
+        assert self._country_id is not None
+        outcome = await merge_b.find_orphans(
+            self.session, country_id=self._country_id, lexicon=self.lexicon
+        )
+        rows = 0
+        if self.options.merge_b_out is not None and outcome.rows:
+            rows = merge_b.write_review_csv(self.options.merge_b_out, outcome)
+            self.log(f"merge-b: {rows} orphan rows written to {self.options.merge_b_out}")
+
+        applied = merge.MergeOutcome()
+        if self.options.merge_b_in is not None:
+            decisions = merge_b.read_review_csv(self.options.merge_b_in)
+            self.log(f"merge-b: {len(decisions)} decisions read from {self.options.merge_b_in}")
+            applied = await merge.apply_merges(
+                self.session, decisions, dry_run=self.options.dry_run
+            )
+        for problem in applied.problems:
+            self.report.warn(f"merge-b: {problem}")
+        self.report.step(
+            "merge-b",
+            {**outcome.summary(), **applied.summary(), "csvRowsWritten": rows},
+            merged=applied.merged[:50],
         )
         await self._commit()
         await self._load_catalog()

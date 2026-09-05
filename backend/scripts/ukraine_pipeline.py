@@ -150,6 +150,20 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "of link are applied, the same way jubilee-bridge's own review is",
     )
     parser.add_argument(
+        "--merge-b-out",
+        type=Path,
+        help="where merge-b writes its orphan/twin candidates for review — the legacy "
+        "Excel remainder that already has a twin in our own catalogue, a different "
+        "shape of pair from --merge-out (that CSV is gaps.py's own duplicates)",
+    )
+    parser.add_argument(
+        "--apply-merge-b",
+        type=Path,
+        dest="merge_b_in",
+        help="a reviewed merge-b CSV; rows marked yes are merged through the same "
+        "merge.apply_merges as --apply-merge",
+    )
+    parser.add_argument(
         "--ua-coins",
         choices=(
             source_module.MODE_AUTO,
@@ -218,6 +232,8 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
         "jubileeReviewIn": str(args.jubilee_review_in) if args.jubilee_review_in else None,
         "inventoryOut": str(args.inventory_out) if args.inventory_out else None,
         "inventoryReviewIn": str(args.inventory_review_in) if args.inventory_review_in else None,
+        "mergeBOut": str(args.merge_b_out) if args.merge_b_out else None,
+        "mergeBIn": str(args.merge_b_in) if args.merge_b_in else None,
     }
     report.assumptions = [
         "Only shared Ukrainian records take part; personal items belong to their authors.",
@@ -277,6 +293,8 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
             jubilee_review_in=args.jubilee_review_in,
             inventory_out=args.inventory_out,
             inventory_review_in=args.inventory_review_in,
+            merge_b_out=args.merge_b_out,
+            merge_b_in=args.merge_b_in,
             report_path=args.report,
         )
         try:
@@ -320,6 +338,7 @@ def main(argv: list[str] | None = None) -> int:
         ("circ variants review", args.circ_variants_review_in),
         ("jubilee review", args.jubilee_review_in),
         ("inventory review", args.inventory_review_in),
+        ("merge-b review", args.merge_b_in),
     )
     for name, path in checks:
         if path is not None and not path.exists():
