@@ -18,6 +18,22 @@ records the duplication costs kilobytes, not gigabytes.
 Idempotent the way app/ukraine_pipeline/photos.py already is: a record
 already holding both sides from `nbu` is left alone, and its uCoin hotlink
 row — never downloaded, not ours to show — is dropped the same way.
+
+`refresh_types` is the escape hatch idempotency needs when the type map
+itself changes underneath already-stored photos — the 1 hryvnia 1992/2004
+split (app/ukraine_pipeline/circ_types.py) left every 2004-2017 record
+holding the wrong (pre-2004) card's photo, and idempotency alone would keep
+it there forever. Passing a type's key here deletes that type's existing
+`nbu` images before the normal pass runs, so it re-fetches (or, for a type
+`typesWithoutCard` says has no real card, correctly ends up with none) rather
+than being silently skipped as "already stored". A type not named here
+behaves exactly as before. Deleting is safe to do wholesale rather than
+trying to single out this step's own writes: every record `_items_by_type`
+offers a type is, by that same query, not NBU-linked, and app/ukraine_pipeline/
+photos.py (part B) only ever writes an `nbu` image to a record its own bridge
+linked to the NBU numismatic catalogue — which would make it NBU-linked too.
+So a `nbu`-sourced image on one of these records can only be this step's own,
+whatever type it is grouped under.
 """
 
 from __future__ import annotations
@@ -61,6 +77,7 @@ class PhotoOutcome:
     bytes_total: int = 0
     types_left: int = 0
     skipped_nbu_linked: int = 0
+    refreshed_items: int = 0
 
     def summary(self) -> dict[str, Any]:
         return {
@@ -73,6 +90,7 @@ class PhotoOutcome:
             "removedUcoinRows": self.removed_ucoin_rows,
             "totalMegabytes": round(self.bytes_total / 1024 / 1024, 1),
             "skippedNbuLinked": self.skipped_nbu_linked,
+            "refreshedItems": self.refreshed_items,
         }
 
 
@@ -132,6 +150,54 @@ async def _drop_ucoin_links(session: AsyncSession, item_ids: list[int], *, dry_r
         await session.execute(delete(MediaFile).where(*condition))
         await session.flush()
     return count
+
+
+async def _refresh_existing(
+    session: AsyncSession,
+    *,
+    storage: ObjectStorage | None,
+    item_ids: list[int],
+    dry_run: bool,
+    log: Callable[[str], None],
+) -> int:
+    """Remove `nbu` obverse/reverse images already on these items, for `refresh_types`.
+
+    Why it is safe to take every `nbu` image on the id rather than trying to
+    tell this step's own writes apart from app/ukraine_pipeline/photos.py's —
+    see the module docstring. Returns the number of distinct items touched
+    (or, in a dry run, that would be); no rows or objects are actually
+    deleted when `dry_run` is set, matching every other step here.
+    """
+    if not item_ids:
+        return 0
+    rows = (
+        (
+            await session.execute(
+                select(MediaFile).where(
+                    MediaFile.catalog_item_id.in_(item_ids),
+                    MediaFile.source == MediaSource.NBU,
+                    MediaFile.role.in_([MediaRole(role) for role in ROLES]),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not rows:
+        return 0
+    touched = {row.catalog_item_id for row in rows}
+    if dry_run:
+        log(f"circ-refresh: would remove {len(rows)} images across {len(touched)} items")
+        return len(touched)
+
+    keys = [key for row in rows for key in (row.variants or {}).values()]
+    if storage is not None:
+        storage.delete_many(keys)
+    for row in rows:
+        await session.delete(row)
+    await session.flush()
+    log(f"circ-refresh: removed {len(rows)} images across {len(touched)} items")
+    return len(touched)
 
 
 def _download(client: PoliteClient, url: str) -> bytes | None:
@@ -221,12 +287,25 @@ async def download_photos(
     dry_run: bool,
     limit: int | None,
     log: Callable[[str], None],
+    refresh_types: frozenset[str] = frozenset(),
 ) -> PhotoOutcome:
     outcome = PhotoOutcome()
     by_type, outcome.skipped_nbu_linked = await _items_by_type(session, country_id)
     item_ids = [item_id for ids in by_type.values() for item_id in ids]
     outcome.removed_ucoin_rows = await _drop_ucoin_links(session, item_ids, dry_run=dry_run)
+
+    refresh_item_ids = [item_id for key in refresh_types for item_id in by_type.get(key, [])]
+    outcome.refreshed_items = await _refresh_existing(
+        session, storage=storage, item_ids=refresh_item_ids, dry_run=dry_run, log=log
+    )
+
     held = await _existing_official(session, item_ids)
+    if dry_run:
+        # A dry run leaves the rows in place (see _refresh_existing), so
+        # `held` still holds them — subtract by hand, the same set a real
+        # run would have emptied, so the batch below still simulates the
+        # re-fetch instead of treating a refreshed item as already done.
+        held -= {(item_id, role) for item_id in refresh_item_ids for role in ROLES}
 
     # A type is pending if any of its items is missing a side; already_stored
     # is counted per item, up front, so an item whose type is not even in

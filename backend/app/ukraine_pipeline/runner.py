@@ -106,6 +106,10 @@ class Options:
     circ_review_out: Path | None = None
     circ_review_in: Path | None = None
     report_path: Path | None = None
+    # circ-photos only: type keys (app/ukraine_pipeline/circ_types.py) whose
+    # already-stored `nbu` images should be deleted and re-fetched instead of
+    # left alone by the step's usual idempotency — see circ_photos.py.
+    circ_refresh_types: frozenset[str] = field(default_factory=frozenset)
 
 
 @dataclass
@@ -448,6 +452,7 @@ class Runner:
             dry_run=self.options.dry_run,
             limit=self.options.limit,
             log=self.log,
+            refresh_types=self.options.circ_refresh_types,
         )
         self.report.step(
             "circ-photos",

@@ -33,9 +33,15 @@ from app.ukraine_pipeline import (
 )
 from app.ukraine_pipeline.catalog import LINK_SOURCES, OurItem, load_items, ukraine_country_id
 from app.ukraine_pipeline.circ_nbu import page_url, parse_page, pick_card
-from app.ukraine_pipeline.circ_types import SUBTYPE_1992, SUBTYPE_2018, TYPES, type_for
+from app.ukraine_pipeline.circ_types import (
+    SUBTYPE_1992,
+    SUBTYPE_2004,
+    SUBTYPE_2018,
+    TYPES,
+    type_for,
+)
 from app.ukraine_recon.http import PoliteClient
-from app.ukraine_recon.models import SOURCE_NBU
+from app.ukraine_recon.models import SOURCE_NBU, SOURCE_WIKIPEDIA
 from app.ukraine_recon.wikipedia import parse_mintage_table
 from tests.seed import country_by_code, make_catalog_item, seed_currencies
 
@@ -111,8 +117,47 @@ def test_every_year_of_every_denomination_matches_at_most_one_type() -> None:
 def test_the_2018_hryvnia_split_has_no_overlap() -> None:
     old = type_for(Decimal(1), "hryvnia", 2017)
     new = type_for(Decimal(1), "hryvnia", 2018)
-    assert old is not None and old.subtype == SUBTYPE_1992
+    assert old is not None and old.key == "hryvnia_1_2004" and old.subtype == SUBTYPE_2004
     assert new is not None and new.subtype == SUBTYPE_2018
+
+
+def test_the_1_hryvnia_1992_2004_split_has_no_overlap() -> None:
+    """The ornamental design (1992-2003) and the "Volodymyr the Great"
+    redesign (2004-2017) are different types with different subtypes, split
+    at the boundary postanova No. 476 (07.10.2004) actually drew — see
+    app/ukraine_pipeline/circ_types.py for why the National Bank's own page
+    does not make this split for us.
+    """
+    ornamental = type_for(Decimal(1), "hryvnia", 2003)
+    volodymyr = type_for(Decimal(1), "hryvnia", 2004)
+    assert ornamental is not None
+    assert ornamental.key == "hryvnia_1_1992"
+    assert ornamental.subtype == SUBTYPE_1992
+    assert volodymyr is not None
+    assert volodymyr.key == "hryvnia_1_2004"
+    assert volodymyr.subtype == SUBTYPE_2004
+
+
+def test_every_year_1992_to_2017_matches_a_1_hryvnia_type() -> None:
+    for year in range(1992, 2018):
+        coin_type = type_for(Decimal(1), "hryvnia", year)
+        assert coin_type is not None, year
+        assert coin_type.key in {"hryvnia_1_1992", "hryvnia_1_2004"}, year
+
+
+def test_the_1992_2004_hryvnia_types_share_a_page_with_no_real_card_for_2004() -> None:
+    """`hryvnia_1_2004`'s hint deliberately names a title the shared "Про
+    монети" page does not carry, so it lands in `typesWithoutCard` rather
+    than reusing the ornamental design's photo (the original bug).
+    """
+    html = obig_page_html(("1 гривня", "Поступово вилучається з обігу", "12.03.1997"))
+    cards = parse_page(html)
+    ornamental = type_for(Decimal(1), "hryvnia", 2003)
+    volodymyr = type_for(Decimal(1), "hryvnia", 2010)
+    assert ornamental is not None and volodymyr is not None
+    assert ornamental.photo_slug == volodymyr.photo_slug
+    assert pick_card(cards, ornamental) is not None
+    assert pick_card(cards, volodymyr) is None
 
 
 def test_years_before_ukraine_existed_match_nothing() -> None:
@@ -160,7 +205,7 @@ def test_the_page_stacks_every_card_and_pick_card_finds_the_right_one() -> None:
         "reverse": "https://bank.gov.ua/admin_uploads/coin/0r.png",
     }
 
-    old_type = type_for(Decimal(1), "hryvnia", 2017)
+    old_type = type_for(Decimal(1), "hryvnia", 2003)
     new_type = type_for(Decimal(1), "hryvnia", 2018)
     assert old_type is not None and new_type is not None
     assert pick_card(cards, old_type).title == "1 гривня"  # type: ignore[union-attr]
@@ -584,6 +629,10 @@ class RecordingStorage:
     def put(self, key: str, payload: bytes, content_type: str) -> None:
         self.objects[key] = payload
 
+    def delete_many(self, keys: list[str]) -> None:
+        for key in keys:
+            self.objects.pop(key, None)
+
     def ensure_bucket(self) -> None:
         return None
 
@@ -686,6 +735,188 @@ async def test_photos_are_not_downloaded_twice(
 
     assert second.stored == 0
     assert second.already_stored == 1
+
+
+@pytest.fixture
+def two_type_client(tmp_path: Path) -> PoliteClient:
+    """Distinct "Про монети" pages per denomination, so a hryvnia refresh
+    (photo_slug `100_1996`) cannot be confused with an untouched kopiika
+    (photo_slug `1_1996`).
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/100_1996"):
+            card = ("1 гривня", "Поступово вилучається з обігу", "12.03.1997")
+            return httpx.Response(200, text=obig_page_html(card))
+        if request.url.path.startswith("/ua/uah/obig-coin/"):
+            return httpx.Response(
+                200, text=obig_page_html(("1 копійка", "Вилучена з обігу", "02.09.1996"))
+            )
+        if "admin_uploads" in request.url.path:
+            return httpx.Response(200, content=png_bytes(400))
+        return httpx.Response(404)
+
+    return PoliteClient(
+        cache_dir=tmp_path / "cache",
+        transport=httpx.MockTransport(handler),
+        sleep=lambda _seconds: None,
+    )
+
+
+async def test_circ_refresh_types_replaces_only_the_named_types_photos(
+    db_session: AsyncSession, two_type_client: PoliteClient
+) -> None:
+    """The 1992/2004 hryvnia split (circ_types.py) leaves 2004-2017 records
+    holding the pre-split card's photo; `--circ-refresh-types` is the only
+    way to make circ-photos re-fetch instead of skipping them as already
+    stored. A type not named in `refresh_types` must be left untouched.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    hryvnia_denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="hryvnia", sort_order=100
+    )
+    kopiika_denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="kopiika", sort_order=1
+    )
+    db_session.add_all([hryvnia_denomination, kopiika_denomination])
+    await db_session.commit()
+    hryvnia_item = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня",
+        year=2003,
+        denomination=hryvnia_denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    kopiika_item = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 копійка",
+        year=1992,
+        denomination=kopiika_denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    storage = RecordingStorage()
+
+    first = await circ_photos.download_photos(
+        db_session,
+        client=two_type_client,
+        storage=storage,
+        country_id=country.id,  # type: ignore[arg-type]
+        dry_run=False,
+        limit=None,
+        log=lambda _msg: None,
+    )
+    await db_session.commit()
+    assert first.stored == 4  # two sides, two items
+
+    kopiika_files_before = (
+        (
+            await db_session.execute(
+                select(MediaFile.id).where(MediaFile.catalog_item_id == kopiika_item.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    hryvnia_files_before = (
+        (
+            await db_session.execute(
+                select(MediaFile).where(MediaFile.catalog_item_id == hryvnia_item.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    hryvnia_ids_before = {row.id for row in hryvnia_files_before}
+
+    second = await circ_photos.download_photos(
+        db_session,
+        client=two_type_client,
+        storage=storage,
+        country_id=country.id,  # type: ignore[arg-type]
+        dry_run=False,
+        limit=None,
+        log=lambda _msg: None,
+        refresh_types=frozenset({"hryvnia_1_1992"}),
+    )
+    await db_session.commit()
+
+    assert second.refreshed_items == 1
+    assert second.stored == 2  # the hryvnia item's two sides, re-fetched
+    assert second.already_stored == 1  # the untouched kopiika item
+
+    kopiika_files_after = (
+        (
+            await db_session.execute(
+                select(MediaFile.id).where(MediaFile.catalog_item_id == kopiika_item.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert set(kopiika_files_after) == set(kopiika_files_before)
+
+    hryvnia_files = (
+        (
+            await db_session.execute(
+                select(MediaFile).where(MediaFile.catalog_item_id == hryvnia_item.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(hryvnia_files) == 2
+    assert {f.id for f in hryvnia_files}.isdisjoint(hryvnia_ids_before)
+    assert all(f.source is MediaSource.NBU for f in hryvnia_files)
+
+
+async def test_circ_refresh_types_dry_run_deletes_nothing(
+    db_session: AsyncSession, obig_client: PoliteClient
+) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="kopiika", sort_order=1
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 копійка",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+    )
+    storage = RecordingStorage()
+
+    await circ_photos.download_photos(
+        db_session,
+        client=obig_client,
+        storage=storage,
+        country_id=country.id,  # type: ignore[arg-type]
+        dry_run=False,
+        limit=None,
+        log=lambda _msg: None,
+    )
+    await db_session.commit()
+    objects_before = dict(storage.objects)
+
+    dry = await circ_photos.download_photos(
+        db_session,
+        client=obig_client,
+        storage=storage,
+        country_id=country.id,  # type: ignore[arg-type]
+        dry_run=True,
+        limit=None,
+        log=lambda _msg: None,
+        refresh_types=frozenset({"kopiika_1"}),
+    )
+
+    assert dry.refreshed_items == 1
+    assert storage.objects == objects_before
 
 
 # --------------------------------------------------------------- circ_reclassify
@@ -870,6 +1101,71 @@ async def test_reclassify_reports_but_does_not_move_an_official_title_without_nb
     await db_session.commit()
     refreshed = await db_session.get(CatalogItem, item.id)
     assert refreshed is not None and refreshed.collection_group is CollectionGroup.CIRCULATION
+
+
+async def test_reclassify_excludes_a_wikipedia_linked_official_coin_from_the_counter(
+    db_session: AsyncSession,
+) -> None:
+    """circ-titles sets `official` on every honest circulation coin's name on
+    its own, so after one full run `official_without_nbu_link` would
+    otherwise catch every one of them. A record circ-bridge tied to the
+    Wikipedia mintage table (a `price_source_links` row, source Wikipedia)
+    is exactly the case circ-titles vouches for — it must not be counted.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    item = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня",
+        year=2010,
+        group=CollectionGroup.CIRCULATION,
+        title_uk="1 гривня",
+        title_uk_source=TranslationSource.OFFICIAL,
+    )
+    db_session.add(
+        PriceSourceLink(
+            catalog_item_id=item.id,
+            source=LINK_SOURCES[SOURCE_WIKIPEDIA],
+            external_id="Монети_української_гривні",
+            match_status=MatchStatus.CONFIRMED,
+        )
+    )
+    await db_session.commit()
+
+    items = await load_items(db_session, country.id)
+    outcome = circ_reclassify.decide(items)
+
+    assert outcome.reclassified == []
+    assert outcome.official_without_nbu_link == []
+
+
+async def test_reclassify_excludes_a_wiki_circ_source_key_from_the_counter(
+    db_session: AsyncSession,
+) -> None:
+    """Same exclusion, for a record circ-gaps created itself — it carries no
+    `price_source_links` row, just the `wiki-circ:` source key circ-gaps
+    stamps on it (app/ukraine_pipeline/circ_gaps.py).
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 гривня",
+        year=2011,
+        group=CollectionGroup.CIRCULATION,
+        title_uk="1 гривня",
+        title_uk_source=TranslationSource.OFFICIAL,
+        source_key="wiki-circ:1-hryvnia:2011",
+    )
+    await db_session.commit()
+
+    items = await load_items(db_session, country.id)
+    outcome = circ_reclassify.decide(items)
+
+    assert outcome.reclassified == []
+    assert outcome.official_without_nbu_link == []
 
 
 async def test_reclassify_dry_run_writes_nothing(db_session: AsyncSession) -> None:

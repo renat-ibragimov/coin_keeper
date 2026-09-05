@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from typing import TYPE_CHECKING
 
 import boto3
@@ -47,6 +48,20 @@ class ObjectStorage:
     def put(self, key: str, payload: bytes, content_type: str) -> None:
         self._client.put_object(
             Bucket=self._bucket, Key=key, Body=payload, ContentType=content_type
+        )
+
+    def delete_many(self, keys: Iterable[str]) -> None:
+        """Best-effort batch delete; a no-op for an empty sequence.
+
+        S3's DeleteObjects does not error on a key that is already gone, so a
+        caller replacing a record's photos does not need to check what exists
+        first.
+        """
+        keys = list(keys)
+        if not keys:
+            return
+        self._client.delete_objects(
+            Bucket=self._bucket, Delete={"Objects": [{"Key": key} for key in keys]}
         )
 
     def presigned_get_url(self, key: str, expires_seconds: int = 3600) -> str:

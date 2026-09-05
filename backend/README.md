@@ -472,8 +472,30 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
     --report /reports/circ-photos.json --cache-dir /reports/ukraine-cache
 ```
 
-`--limit` here counts *types*, not records — there are only eleven, so one
-run with no limit is normally enough; `typesLeft` says whether to repeat it.
+`--limit` here counts *types*, not records — there are twelve since the 1
+hryvnia split below, so one run with no limit is normally enough; `typesLeft`
+says whether to repeat it.
+
+### 6. Refresh photos after a type-map split
+
+Idempotency ("both sides already stored — leave it") means a type-map change
+does not fix already-stored photos on its own: after the 1 hryvnia
+1992/2004 split (`../docs/05-integrations.md`, section 10), every 2004-2017
+record was still holding the pre-split card's (wrong) photo, and a plain
+re-run would have skipped every one of them as already done.
+`--circ-refresh-types` deletes a named type's stored `nbu` photos first, so
+the normal pass re-fetches instead of skipping:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-photos \
+    --circ-refresh-types hryvnia_1_2004 \
+    --report /reports/circ-photos-refresh.json --cache-dir /reports/ukraine-cache
+```
+
+The key is the type a record groups under *today*, by the current type map —
+not whatever type it was originally photographed under. `--dry-run` first
+prints `refreshedItems` without deleting anything.
 
 ### Rehearsal against a live source, 2026-09-04
 
@@ -483,12 +505,28 @@ skipped one with reason (1 kopiika 2019, a coin the table's own legend marks
 "issued unofficially" and the type map has no range for), `circ-titles` and
 `circ-mintage` found nothing left to do on records `circ-gaps` had just
 written correctly, `circ-photos` stored 336 files (168 records × 2 sides)
-across all eleven types with zero failures. Real numbers against the owner's
-migrated database are for the real run.
+across all eleven types (before the 1 hryvnia split) with zero failures.
 
-An empty database has no NBU-contaminated `circulation` records to find, so
-this rehearsal never exercised `circ-reclassify` — a run of it against the
-owner's migrated data is still pending.
+### Real run against the owner's database, 2026-09-04
+
+191 records ended up with a name, mintage and photo. Manual steps along the
+way:
+
+- `circ-bridge-review.csv`: 18 rows resolved `yes` (uCoin mint-quality
+  variants sharing a face value and year); 21 rows left unresolved on
+  purpose — that is the standing `catalog_variants` gap, not something the
+  bridge's own CSV review is meant to settle;
+- six jubilee 1 hryvnia records (id 1330-1335) were moved to
+  `commemorative` by hand, direct SQL, bypassing `circ-reclassify`: they
+  carry no NBU catalogue link at all, so `is_nbu_linked` cannot and will
+  not see them — the legacy `groupFor` heuristic routed them into
+  `circulation` on face value alone, with nothing automation can key off.
+
+The 1 hryvnia 1992/2004 split landed after this run, so its 2004-2017
+records still hold the pre-split photo until a `--circ-refresh-types
+hryvnia_1_2004` pass (step 6 above; `hryvnia_1_2004` because that is the key
+those years group under on the current map, not `hryvnia_1_1992`, which they
+happened to be stored under before the split existed).
 
 ## Legacy data migration
 

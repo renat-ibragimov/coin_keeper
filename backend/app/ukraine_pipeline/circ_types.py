@@ -16,11 +16,28 @@ kopecks, overlapping years across mints (both a Luhansk-struck and an
 Italian-struck 1992 kopeck exist). That is mint-and-alloy variety, exactly
 what docs/04-business-rules.md defers to `catalog_variants` and this task
 explicitly excludes ("«англійський тип» 1992 и прочие разновідності карбування
-— НЕ здесь"). One type per denomination is kept here except where the National
-Bank itself gives a coin a second, non-overlapping "Дата введення в обіг": the
-2013 restrike of 50 kopecks and, above all, the 2018 hryvnia — the one
-overlap this table cannot flatten away, because the handoff asks for it by
-name ("зразок 1992/1995-2018 и зразок 2018").
+— НЕ здесь"). One type per denomination is kept here except where a coin's
+own look changed enough that one shared photo would misrepresent part of its
+years: the 2013 restrike of 50 kopecks, the 1 hryvnia (below), and, above
+all, the 2018 hryvnia changeover the handoff asks for by name ("зразок
+1992/1995-2018 и зразок 2018").
+
+The 1 hryvnia is split three ways, not two: an ornamental design
+(introduced 12.03.1997, struck 1995-2003) and a "Volodymyr the Great" design
+(postanova No. 476, 07.10.2004, struck 2004-2017, for sets through 2018) are
+two different pictures the National Bank itself never gave separate cards —
+its "Про монети" page for this denomination (bank.gov.ua/ua/uah/obig-coin/
+100_1996, checked live 2026-09-04) carries exactly one pre-2018 card, titled
+plainly "1 гривня", whose sample photo is dated 2003 — the ornamental design
+— while its own "Роки карбування" list runs through 2015. Leaving this as one
+type (as it was until this split) means every 2004-2017 record is shown that
+2003 ornamental photo, which is not what those coins look like. Splitting the
+year range in two lets `hryvnia_1_1992` keep the one real card it is actually
+a picture of and `hryvnia_1_2004` — the 2004 design — carry no photo at all
+(`photo_title_hint` is a title deliberately not present on the page, so
+`circ_nbu.pick_card` returns nothing and the type lands in
+`typesWithoutCard`) rather than the wrong one. See docs/05-integrations.md,
+section 10, and docs/BACKLOG.md for the standing gap.
 
 Two coin sources use these types differently:
 
@@ -42,10 +59,17 @@ from app.models.enums import MetalKind
 KOPIIKA = "kopiika"
 HRYVNIA = "hryvnia"
 
-# The two subtype labels the handoff itself names. Nothing else in the map
-# carries a subtype: 2018 is the only year two of our types could both claim,
-# and that is exactly why the field exists.
+# The three subtype labels this map hands out — nothing else in it carries a
+# subtype. SUBTYPE_1992 and SUBTYPE_2018 exist first for the 2018 changeover
+# app/ukraine_pipeline/circ_mintage.py has to disambiguate (2018 is the only
+# year two designs could both claim a Wikipedia mintage cell for);
+# SUBTYPE_2004 is not needed for any such disambiguation — the National Bank
+# never gave the 2004 design its own "Дата введення в обіг" — but every
+# design distinct enough to need its own type here gets its own label,
+# exactly as the four 2018-pattern hryvnia denominations below all carry
+# SUBTYPE_2018 though only the 1-hryvnia cell is ever ambiguous.
 SUBTYPE_1992 = "зразка 1992 року"
+SUBTYPE_2004 = "зразка 2004 року"
 SUBTYPE_2018 = "зразка 2018 року"
 
 
@@ -124,13 +148,33 @@ TYPES: tuple[CoinType, ...] = (
     CoinType(
         # 1992/1995 in the handoff's own words: coins carrying 1992 exist
         # (Italian mint) alongside the 1995 aluminium-bronze card the National
-        # Bank keeps a "Дата введення в обіг" for (12.03.1997). year_to stops
-        # at 2017, one year short of the 2018 pattern change, so this type and
-        # hryvnia_1_2018 below never claim the same year.
-        "hryvnia_1_1992", HRYVNIA, Decimal(1), 1992, 2017, SUBTYPE_1992,
+        # Bank keeps a "Дата введення в обіг" for (12.03.1997) — the
+        # ornamental design, the one this card is actually a photo of
+        # (sample dated 2003). year_to stops at 2003, one year short of the
+        # 2004 "Volodymyr the Great" redesign below, so this type never
+        # claims a year the next one does.
+        "hryvnia_1_1992", HRYVNIA, Decimal(1), 1992, 2003, SUBTYPE_1992,
         "aluminium_bronze", MetalKind.BASE,
         Decimal("7.1"), Decimal("26"), Decimal("1.85"), "напис",
         "100_1996", "1 гривня",
+    ),
+    CoinType(
+        # postanova No. 476, 07.10.2004: the "Volodymyr the Great" redesign,
+        # struck 2004-2014 for circulation and through 2018 for collector
+        # sets only (docs/05-integrations.md, section 10) — year_to stops at
+        # 2017 so this type and hryvnia_1_2018 below never claim the same
+        # year, the same rule the 1992/2004 boundary above follows. Same
+        # page as hryvnia_1_1992 (the National Bank never gave this design
+        # its own card), same physical spec as the one real card actually
+        # states for the whole 1995-2015 span it covers — only the photo
+        # differs, and there isn't one: photo_title_hint below names a title
+        # this page does not carry, on purpose, so circ_nbu.pick_card finds
+        # nothing and circ_photos reports this type in `typesWithoutCard`
+        # rather than reusing the ornamental card's wrong photo.
+        "hryvnia_1_2004", HRYVNIA, Decimal(1), 2004, 2017, SUBTYPE_2004,
+        "aluminium_bronze", MetalKind.BASE,
+        Decimal("7.1"), Decimal("26"), Decimal("1.85"), "напис",
+        "100_1996", "1 гривня зразка 2004 року",
     ),
     CoinType(
         "hryvnia_1_2018", HRYVNIA, Decimal(1), 2018, None, SUBTYPE_2018,

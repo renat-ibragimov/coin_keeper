@@ -20,6 +20,14 @@ catalogue's or a person's work, not this step's to touch.
 
 Idempotent for free: once a record is `commemorative`, the next catalogue
 reload (Runner._load_catalog) no longer offers it to `decide()`.
+
+`official_without_nbu_link` needs the same idempotency in spirit:
+circ-titles gives every circulation record an `official` name on its own,
+so after one full run this counter would otherwise catch every honest
+circulation coin the pipeline itself already vouches for, every time.
+`_is_wikipedia_linked` filters those back out, leaving only a record with
+neither an NBU link nor a Wikipedia one — the actual "a person should look
+at this" case.
 """
 
 from __future__ import annotations
@@ -33,6 +41,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import CatalogItem
 from app.models.enums import CollectionGroup, TranslationSource
 from app.ukraine_pipeline.catalog import OurItem
+from app.ukraine_pipeline.circ_gaps import SOURCE_KEY_PREFIX
+from app.ukraine_recon.models import SOURCE_WIKIPEDIA
 
 
 @dataclass
@@ -42,6 +52,10 @@ class ReclassifyOutcome:
     # not moved, just surfaced: could be an honest circulation coin whose
     # name circ-titles already set to `official`, or a commemorative the
     # catalogue link is missing. Worth a person's look, not a guess here.
+    # Excludes records circ-titles itself vouches for by way of a Wikipedia
+    # connection (see _is_wikipedia_linked) — after one full run this is
+    # every honest circulation coin, and re-surfacing all of them each time
+    # would bury the rare record actually worth a look.
     official_without_nbu_link: list[dict[str, Any]] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
@@ -49,6 +63,26 @@ class ReclassifyOutcome:
             "reclassified": len(self.reclassified),
             "officialWithoutNbuLink": len(self.official_without_nbu_link),
         }
+
+
+def _is_wikipedia_linked(item: OurItem) -> bool:
+    """A Wikipedia connection this pipeline already made, not a person's.
+
+    circ-titles sets `official` on every circulation record's name on its
+    own (app/ukraine_pipeline/circ_titles.py) — after one full run, that is
+    every honest circulation coin, official title and all. What actually
+    distinguishes one worth a look from the ordinary case is whether the
+    record is tied to the Wikipedia mintage table this pipeline reads:
+    either a `price_source_links` row circ-bridge wrote (OurItem.links,
+    the same shape catalog._attach_links already builds), or the
+    "wiki-circ:<value>-<unit>:<year>" source key circ-gaps stamps on a
+    record it created itself. `source_key_reference` in catalog.py does not
+    recognize that prefix — it collides with nothing, on purpose, so this
+    step's own check does not have to share a meaning with the generic one.
+    """
+    if SOURCE_WIKIPEDIA in item.links:
+        return True
+    return (item.source_key or "").startswith(SOURCE_KEY_PREFIX)
 
 
 def decide(items: list[OurItem]) -> ReclassifyOutcome:
@@ -59,7 +93,7 @@ def decide(items: list[OurItem]) -> ReclassifyOutcome:
         row = {"itemId": item.id, "title": item.title_original, "year": item.issue_year}
         if item.is_nbu_linked:
             outcome.reclassified.append(row)
-        elif item.title_uk_source == TranslationSource.OFFICIAL:
+        elif item.title_uk_source == TranslationSource.OFFICIAL and not _is_wikipedia_linked(item):
             outcome.official_without_nbu_link.append(row)
     return outcome
 
