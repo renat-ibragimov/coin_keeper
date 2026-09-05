@@ -17,6 +17,7 @@ from tests.seed import (
     make_catalog_item,
     promote_to_admin,
     seed_reference,
+    set_country_active,
     user_id_by_email,
 )
 
@@ -446,6 +447,82 @@ async def test_image_visibility_by_provenance(
     # For anyone else the uCoin image is a placeholder, the NBU one is public.
     assert rows_b[ucoin_id]["obverseImage"] is None
     assert rows_b[nbu_id]["obverseImage"] is not None
+
+
+async def test_storefront_hides_records_of_a_deactivated_country(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13: a deactivated country's shared records
+    drop out of listings unless the user already owns or authored them."""
+    refs = ctx.refs
+    await set_country_active(db_session, refs.usa, active=False)
+
+    shared_ua = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018
+    )
+    shared_usa = await make_catalog_item(db_session, country=refs.usa, title="Liberty", year=1921)
+    owned_usa = await make_catalog_item(
+        db_session, country=refs.usa, title="Lincoln cent", year=1970
+    )
+    personal_usa_b = await make_catalog_item(
+        db_session, country=refs.usa, title="Особиста Б", year=1980, created_by=ctx.id_b
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa, price="10")
+
+    headers_a = auth(ctx.token_a)
+    headers_b = auth(ctx.token_b)
+
+    listing_a = (await client.get("/api/v1/catalog", headers=headers_a)).json()
+    assert {i["id"] for i in listing_a["items"]} == {shared_ua.id, owned_usa.id}
+    assert listing_a["total"] == 2
+
+    # B owns nothing of the US catalog, but their own personal item stays visible.
+    listing_b = (await client.get("/api/v1/catalog", headers=headers_b)).json()
+    assert {i["id"] for i in listing_b["items"]} == {shared_ua.id, personal_usa_b.id}
+
+    # The direct card is untouched by the storefront rule: still 200 for anyone,
+    # since the record is shared (created_by IS NULL) regardless of country state.
+    card_b = await client.get(f"/api/v1/catalog/{owned_usa.id}", headers=headers_b)
+    assert card_b.status_code == 200
+
+    _ = shared_usa  # never owned or authored by A or B: visible to neither.
+
+
+async def test_storefront_for_a_user_with_no_coins_at_all(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    ctx: SimpleNamespace,
+    mail_outbox: list[EmailMessage],
+) -> None:
+    refs = ctx.refs
+    await set_country_active(db_session, refs.usa, active=False)
+
+    shared_ua = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018
+    )
+    shared_usa = await make_catalog_item(db_session, country=refs.usa, title="Liberty", year=1921)
+    owned_usa_by_a = await make_catalog_item(
+        db_session, country=refs.usa, title="Lincoln cent", year=1970
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa_by_a, price="10")
+
+    _, token_c = await register_and_verify(client, mail_outbox)
+    headers_c = auth(token_c)
+
+    listing_c = (await client.get("/api/v1/catalog", headers=headers_c)).json()
+    assert {i["id"] for i in listing_c["items"]} == {shared_ua.id}
+    assert listing_c["total"] == 1
+
+    # The "missing" listing: only the active-country record, never the inactive ones.
+    missing_c = (await client.get("/api/v1/catalog?owned=false", headers=headers_c)).json()
+    assert {i["id"] for i in missing_c["items"]} == {shared_ua.id}
+
+    # Explicit countryId of a deactivated country: empty, no dedicated error.
+    by_country_c = await client.get(f"/api/v1/catalog?countryId={refs.usa.id}", headers=headers_c)
+    assert by_country_c.status_code == 200
+    assert by_country_c.json() == {"items": [], "total": 0, "page": 1, "pageSize": 50}
+
+    _ = shared_usa
 
 
 async def test_ua_coins_image_is_public(

@@ -3,7 +3,9 @@
 The formulas come from the legacy getDashboardSnapshot/getFinanceSummary
 (legacy/reference-code/database.ts) with the multi-user filters applied:
 owner_id on personal tables, the visibility filter on catalog and snapshots,
-and active-only completeness (docs/04-business-rules.md, rules 5, 8, 9).
+active-only completeness (docs/04-business-rules.md, rules 5, 8, 9), and
+storefront visibility on every catalog-wide aggregate (§13) so the KPIs match
+what the listings show.
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from app.models import (
     Expense,
 )
 from app.models.enums import ExpenseCategory
-from app.repositories.catalog import has_visible_price, latest_price_uah_for
+from app.repositories.catalog import has_visible_price, latest_price_uah_for, storefront_visible
 from app.repositories.localization import localized
 
 
@@ -80,7 +82,11 @@ class DashboardRepository:
         return or_(CatalogItem.created_by.is_(None), CatalogItem.created_by == self._user_id)
 
     def _visible_active(self) -> list[ColumnElement[bool]]:
-        return [self._visible(), not_(CatalogItem.is_archived)]
+        return [
+            self._visible(),
+            not_(CatalogItem.is_archived),
+            storefront_visible(self._user_id),
+        ]
 
     def _no_own_instance(self) -> ColumnElement[bool]:
         return (

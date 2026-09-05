@@ -16,7 +16,9 @@ from tests.seed import (
     add_rate,
     add_snapshot,
     make_catalog_item,
+    make_series,
     seed_reference,
+    set_country_active,
     user_id_by_email,
 )
 
@@ -143,6 +145,49 @@ async def test_dashboard_figures(
     assert series["Флора і фауна"]["owned"] == 1
     assert series["Флора і фауна"]["country"] == "Україна"
     assert series["Міста України"]["owned"] == 1
+
+
+async def test_dashboard_hides_a_deactivated_country_from_aggregates(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13: the dashboard KPIs match what the
+    catalog and series listings show once a country is deactivated."""
+    refs = ctx.refs
+    await set_country_active(db_session, refs.usa, active=False)
+
+    series_usa = await make_series(db_session, country=refs.usa, name="Standing Liberty")
+    shared_ua = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018
+    )
+    shared_usa = await make_catalog_item(db_session, country=refs.usa, title="Liberty", year=1921)
+    owned_usa = await make_catalog_item(
+        db_session, country=refs.usa, title="Quarter", year=1920, series=series_usa
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa, price="10")
+    await add_snapshot(db_session, shared_ua, "100.00")
+
+    dashboard = (await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))).json()[
+        "dashboard"
+    ]
+
+    # Visible active for A: shared_ua (Ukraine, active) and owned_usa (owned).
+    # shared_usa (unowned, inactive country) drops out entirely.
+    assert dashboard["catalogItems"] == 2
+    assert dashboard["countries"] == 2
+    assert dashboard["completedItems"] == 1
+    assert dashboard["missingItems"] == 1
+    assert dashboard["missingBudgetUah"] == "100.00"
+    assert dashboard["unpricedMissingItems"] == 0
+
+    countries = {row["name"]: row for row in dashboard["countryBreakdown"]}
+    assert countries["Сполучені Штати"]["count"] == 1
+    assert countries["Сполучені Штати"]["owned"] == 1
+
+    series = {row["name"]: row for row in dashboard["seriesBreakdown"]}
+    assert series["Standing Liberty"]["count"] == 1
+    assert series["Standing Liberty"]["owned"] == 1
+
+    _ = shared_usa
 
 
 async def test_finance_at_purchase_rates(

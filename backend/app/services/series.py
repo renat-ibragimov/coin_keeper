@@ -86,7 +86,7 @@ class SeriesService:
         return _out(series, self._locale)
 
     async def summary(self, series_id: int) -> SeriesSummaryOut:
-        if await self._repo.get(series_id) is None:
+        if await self._repo.get_visible(series_id) is None:
             raise SeriesNotFoundError
         return await self._summary_of(series_id)
 

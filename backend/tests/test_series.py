@@ -15,8 +15,10 @@ from tests.seed import (
     add_collection_item,
     add_snapshot,
     make_catalog_item,
+    make_series,
     promote_to_admin,
     seed_reference,
+    set_country_active,
     user_id_by_email,
 )
 
@@ -222,6 +224,51 @@ async def test_progress_lists_every_series_with_its_summary(
 async def test_summary_unknown_series_404(client: AsyncClient, ctx: SimpleNamespace) -> None:
     response = await client.get("/api/v1/series/999999/summary", headers=auth(ctx.token_a))
     assert response.status_code == 404
+
+
+async def test_storefront_hides_series_of_deactivated_country(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13: a series of a deactivated country
+    disappears from listings unless the user already owns something in it."""
+    refs = ctx.refs
+    await set_country_active(db_session, refs.usa, active=False)
+
+    series_usa = await make_series(db_session, country=refs.usa, name="Standing Liberty")
+    owned_item = await make_catalog_item(
+        db_session, country=refs.usa, title="Quarter", year=1920, series=series_usa
+    )
+    unowned_item = await make_catalog_item(
+        db_session, country=refs.usa, title="Dime", year=1921, series=series_usa
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_item, price="10")
+
+    headers_a = auth(ctx.token_a)
+    headers_b = auth(ctx.token_b)
+
+    listing_a = await client.get("/api/v1/series", headers=headers_a)
+    names_a = {row["name"] for row in listing_a.json()}
+    assert series_usa.name_original in names_a
+
+    listing_b = await client.get("/api/v1/series", headers=headers_b)
+    names_b = {row["name"] for row in listing_b.json()}
+    assert series_usa.name_original not in names_b
+
+    progress_a = (await client.get("/api/v1/series/summary", headers=headers_a)).json()
+    by_name_a = {row["series"]["name"]: row["summary"] for row in progress_a}
+    assert by_name_a[series_usa.name_original]["total"] == 2
+    assert by_name_a[series_usa.name_original]["owned"] == 1
+
+    progress_b = (await client.get("/api/v1/series/summary", headers=headers_b)).json()
+    assert series_usa.name_original not in {row["series"]["name"] for row in progress_b}
+
+    direct_a = await client.get(f"/api/v1/series/{series_usa.id}/summary", headers=headers_a)
+    assert direct_a.status_code == 200
+
+    direct_b = await client.get(f"/api/v1/series/{series_usa.id}/summary", headers=headers_b)
+    assert direct_b.status_code == 404
+
+    _ = unowned_item
 
 
 async def test_own_price_snapshot_feeds_value(

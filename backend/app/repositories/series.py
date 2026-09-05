@@ -1,9 +1,10 @@
 """Series data access and the per-series completeness aggregates.
 
-Series are a shared reference: everyone reads all of them. The summary,
-however, is per-user — its completeness counts only catalog items visible to
-the user, active in both the numerator and the denominator
-(docs/04-business-rules.md, rule 5).
+Series are a shared reference, but listings only surface storefront-visible
+ones — a deactivated country's series disappears unless the user already
+owns something in it (docs/04-business-rules.md, §13). The summary, once a
+series is reached, counts every catalog item visible to the user, active in
+both the numerator and the denominator (docs/04-business-rules.md, rule 5).
 """
 
 from __future__ import annotations
@@ -12,13 +13,37 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, func, not_, or_, select
+from sqlalchemy import ColumnElement, exists, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
-from app.models import CatalogItem, CoinSeries, CollectionItem
+from app.models import CatalogItem, CoinSeries, CollectionItem, Country
 from app.repositories.catalog import has_visible_price, latest_price_uah_for
 from app.repositories.localization import localized
+
+
+def series_storefront_visible(user_id: int) -> ColumnElement[bool]:
+    """Storefront visibility for a series (docs/04-business-rules.md, §13).
+
+    A series is visible when its country is active, or when the user already
+    owns at least one instance of a catalog item that belongs to it — an
+    owner's series from a deactivated country stays findable. Series have no
+    personal layer, so unlike `storefront_visible()` there is no created_by
+    branch.
+    """
+    return or_(
+        exists(
+            select(Country.id)
+            .where(Country.id == CoinSeries.country_id, Country.is_active)
+            .correlate(CoinSeries)
+        ),
+        exists(
+            select(CollectionItem.id)
+            .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+            .where(CatalogItem.series_id == CoinSeries.id, CollectionItem.owner_id == user_id)
+            .correlate(CoinSeries)
+        ),
+    )
 
 
 @dataclass
@@ -39,7 +64,7 @@ class SeriesRepository:
         self._locale = locale
 
     async def list_series(self, country_id: int | None = None) -> Sequence[CoinSeries]:
-        query = select(CoinSeries)
+        query = select(CoinSeries).where(series_storefront_visible(self._user_id))
         if country_id is not None:
             query = query.where(CoinSeries.country_id == country_id)
         query = query.order_by(
@@ -52,8 +77,14 @@ class SeriesRepository:
         )
         return (await self._session.execute(query)).scalars().all()
 
-    async def get(self, series_id: int) -> CoinSeries | None:
-        return await self._session.get(CoinSeries, series_id)
+    async def get_visible(self, series_id: int) -> CoinSeries | None:
+        """The series if storefront-visible to the user, else None: unlike
+        `/catalog/{id}`, a direct series summary follows the same rule as the
+        listing (docs/04-business-rules.md, §13)."""
+        query = select(CoinSeries).where(
+            CoinSeries.id == series_id, series_storefront_visible(self._user_id)
+        )
+        return (await self._session.execute(query)).scalar_one_or_none()
 
     async def find_by_name(self, country_id: int, name: str) -> CoinSeries | None:
         result = await self._session.execute(

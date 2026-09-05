@@ -60,6 +60,12 @@ async def country_by_code(session: AsyncSession, code: str) -> Country:
     return country
 
 
+async def set_country_active(session: AsyncSession, country: Country, active: bool) -> None:
+    """Flips `is_active` for the storefront-visibility tests (docs/04, §13)."""
+    await session.execute(update(Country).where(Country.id == country.id).values(is_active=active))
+    await session.commit()
+
+
 async def seed_reference(session: AsyncSession) -> ReferenceData:
     await seed_currencies(session)
 
@@ -137,6 +143,14 @@ async def make_catalog_item(
     await session.commit()
     session.expunge(item)
     return item
+
+
+async def make_series(session: AsyncSession, *, country: Country, name: str) -> CoinSeries:
+    series = CoinSeries(country_id=country.id, name_original=name)
+    session.add(series)
+    await session.commit()
+    session.expunge(series)
+    return series
 
 
 async def add_snapshot(

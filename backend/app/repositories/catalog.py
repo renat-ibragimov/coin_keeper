@@ -5,6 +5,12 @@ Every query in this repository carries the visibility filter
 explicitly requested, the verbatim `NOT is_archived` predicate that the partial
 indexes expect. Routes never assemble these conditions themselves
 (docs/07-auth.md, docs/02-data-model.md).
+
+Listings additionally carry `storefront_visible()` (docs/04-business-rules.md,
+§13): a record from a deactivated country drops out of listings and
+aggregates unless it is personal or already owned. The single-item card and
+its price/instance sub-resources are exempt on purpose — see that function's
+docstring.
 """
 
 from __future__ import annotations
@@ -104,6 +110,40 @@ def _search_vector() -> ColumnElement[Any]:
         + func.coalesce(CatalogItem.title_en, "")
     )
     return func.to_tsvector("simple", joined)
+
+
+def storefront_visible(user_id: int) -> ColumnElement[bool]:
+    """Storefront visibility for a shared catalog record (docs/04-business-rules.md, §13).
+
+    A record appears in listings and aggregates when its country is active,
+    when it is the user's own personal item, or when the user already holds
+    at least one instance of it — an owner keeps finding their coins from a
+    deactivated country in the catalog. Independent of `_visible()` (read
+    permission) and of the archive flag; never applied to the single-item
+    card or price/instance sub-resources, which stay reachable by id.
+
+    Self-contained EXISTS checks so the caller need not join Country: reused
+    verbatim by the series and dashboard repositories. Each subquery pins its
+    correlation to CatalogItem alone — the dashboard's breakdown queries join
+    Country and CollectionItem directly, and without this SQLAlchemy
+    auto-correlates those same tables out of these subqueries entirely.
+    """
+    return or_(
+        exists(
+            select(Country.id)
+            .where(Country.id == CatalogItem.country_id, Country.is_active)
+            .correlate(CatalogItem)
+        ),
+        CatalogItem.created_by == user_id,
+        exists(
+            select(CollectionItem.id)
+            .where(
+                CollectionItem.catalog_item_id == CatalogItem.id,
+                CollectionItem.owner_id == user_id,
+            )
+            .correlate(CatalogItem)
+        ),
+    )
 
 
 def snapshot_visible_to(user_id: int) -> ColumnElement[bool]:
@@ -226,6 +266,7 @@ class CatalogRepository:
         conditions: list[ColumnElement[bool]] = [
             self._visible(),
             self._archive_condition(filters.archived),
+            storefront_visible(self._user_id),
         ]
         if filters.scope == "shared":
             conditions.append(CatalogItem.created_by.is_(None))
