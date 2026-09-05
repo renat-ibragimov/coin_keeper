@@ -304,13 +304,30 @@ def _parse_entries(text: str) -> tuple[MintageEntry, ...]:
 
 
 def parse_mintage_table(html: str) -> list[MintageCell]:
-    """The "Тиражі та хронологія" table: one cell per (denomination, year).
+    """The "Тиражі та хронологія" table: one cell per (denomination, year) *row*.
 
     Rows are read through parse_tables, which already expands rowspan and
     colspan — including the mint-name divider rows the table uses to group
     years by where they were struck ("Італійський монетний двір", ...). Such
     a row has no year in its first cell after expansion and is skipped along
     with any row a cell carries no entry for.
+
+    1992 is the one year the live page (checked 2026-09-05) splits across two
+    such divider sections — Istituto Poligrafico e Zecca dello Stato struck
+    the bulk of that year's kopecks, the Луганський верстатобудівний завод
+    struck a separate, smaller run (real production for 10/25/50 kopecks,
+    trial batches only for 1/2/5 kopecks and 1 hryvnia) — so this function can
+    return *more than one* `MintageCell` for the same (value, unit, year): one
+    per row that names it, not one per key. A caller that needs a single
+    number for a year must add these together (app/ukraine_pipeline/
+    circ_mintage.py:usable_count) rather than take the last one parsed — doing
+    the latter is exactly the bug that shipped 1 kopiika 1992 as 300 (the
+    Luhansk trial count alone) instead of 610,000,300 (Italian mint plus that
+    trial). Every other year on the page names exactly one row.
+
+    Units are read per cell (млн=10⁶, тис=10³, шт=1, see `_MULTIPLIER`), not
+    from a table-wide header note — checked directly against the live page,
+    not assumed: every cell that carries a number spells out its own unit.
     """
     cells: list[MintageCell] = []
     for table in parse_tables(html):

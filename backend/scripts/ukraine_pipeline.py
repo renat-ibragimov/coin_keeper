@@ -108,6 +108,13 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "that already has both sides alone; without it circ-photos behaves as before",
     )
     parser.add_argument(
+        "--circ-refresh-mintage",
+        action="store_true",
+        help="circ-mintage recomputes mintage_actual for every non-NBU-linked circulation "
+        "record from the Wikipedia table and overwrites it, instead of only filling an "
+        "empty field; without it a disagreement with an existing value is only reported",
+    )
+    parser.add_argument(
         "--ua-coins",
         choices=(
             source_module.MODE_AUTO,
@@ -161,6 +168,7 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
         "circReviewOut": str(args.circ_review_out) if args.circ_review_out else None,
         "circReviewIn": str(args.circ_review_in) if args.circ_review_in else None,
         "circRefreshTypes": sorted(circ_refresh_types) if circ_refresh_types else None,
+        "circRefreshMintage": args.circ_refresh_mintage,
     }
     report.assumptions = [
         "Only shared Ukrainian records take part; personal items belong to their authors.",
@@ -213,6 +221,7 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
             circ_review_out=args.circ_review_out,
             circ_review_in=args.circ_review_in,
             circ_refresh_types=circ_refresh_types,
+            circ_refresh_mintage=args.circ_refresh_mintage,
             report_path=args.report,
         )
         try:

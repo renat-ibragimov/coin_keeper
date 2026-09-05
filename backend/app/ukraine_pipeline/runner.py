@@ -110,6 +110,10 @@ class Options:
     # already-stored `nbu` images should be deleted and re-fetched instead of
     # left alone by the step's usual idempotency — see circ_photos.py.
     circ_refresh_types: frozenset[str] = field(default_factory=frozenset)
+    # circ-mintage only: recompute and overwrite mintage_actual on every
+    # non-NBU-linked circulation record instead of only filling empty ones —
+    # see circ_mintage.py's module docstring.
+    circ_refresh_mintage: bool = False
 
 
 @dataclass
@@ -433,12 +437,14 @@ class Runner:
             country_id=self._country_id,
             mintage=self.mintage,
             dry_run=self.options.dry_run,
+            refresh=self.options.circ_refresh_mintage,
         )
         self.report.step(
             "circ-mintage",
             outcome.summary(),
             ambiguous=outcome.ambiguous[:50],
             discrepancies=outcome.discrepancies[:50],
+            refreshed=outcome.refreshed[:50],
         )
         await self._commit()
 

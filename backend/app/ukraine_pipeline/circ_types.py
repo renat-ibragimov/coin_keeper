@@ -165,15 +165,17 @@ TYPES: tuple[CoinType, ...] = (
         # 2017 so this type and hryvnia_1_2018 below never claim the same
         # year, the same rule the 1992/2004 boundary above follows. Same
         # page as hryvnia_1_1992 (the National Bank never gave this design
-        # its own card), same physical spec as the one real card actually
-        # states for the whole 1995-2015 span it covers — only the photo
-        # differs, and there isn't one: photo_title_hint below names a title
-        # this page does not carry, on purpose, so circ_nbu.pick_card finds
-        # nothing and circ_photos reports this type in `typesWithoutCard`
-        # rather than reusing the ornamental card's wrong photo.
+        # its own card) and no card of its own either: photo_title_hint below
+        # names a title this page does not carry, on purpose, so
+        # circ_nbu.pick_card finds nothing and circ_photos reports this type
+        # in `typesWithoutCard` rather than reusing the ornamental card's
+        # wrong photo. Mass is postanova No. 476's own figure for this
+        # design (6.8 g, aluminium bronze) — not the shared card's, which
+        # states the ornamental design's 7.1 g for the whole 1995-2015 span
+        # it covers and never separates the two.
         "hryvnia_1_2004", HRYVNIA, Decimal(1), 2004, 2017, SUBTYPE_2004,
         "aluminium_bronze", MetalKind.BASE,
-        Decimal("7.1"), Decimal("26"), Decimal("1.85"), "напис",
+        Decimal("6.8"), Decimal("26"), Decimal("1.85"), "напис",
         "100_1996", "1 гривня зразка 2004 року",
     ),
     CoinType(

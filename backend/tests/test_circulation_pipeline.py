@@ -1,11 +1,23 @@
 """The circulation mini-pipeline: types, the mintage table, and circ-bridge,
 circ-gaps, circ-titles, circ-mintage, circ-photos.
 
-Fixture HTML is a small, hand-built stand-in for the real pages — the same
-shape (a wikitable with a mint-name divider row, a "Про монети" page with two
-stacked `div.hide-show-currency` cards) rather than the pages themselves, so
-a test failure points at a real structural change instead of the size of the
-download.
+MINTAGE_TABLE_HTML below is a trimmed slice of the real "Тиражі та
+хронологія випуску розмінних та обігових монет" table, not a hand-built
+stand-in: an earlier fixture here was written from a description of the
+table's shape rather than the table itself, and it missed that 1992 is split
+across two mint-name divider rows — the exact gap that shipped
+`circ_mintage.py` recording 300 (one mint's trial batch) instead of
+610,000,300 (both mints added together) for 1 kopiika 1992. Rows are cut
+(1992's two, then a handful spread over 1993-2025) but not rewritten: every
+row kept is byte-for-byte the live page's own cells, styling attributes
+stripped. Snapshot: https://uk.wikipedia.org/wiki/Монети_української_гривні,
+retrieved 2026-09-05.
+
+The "Про монети" pages in `obig_page_html` below stay a hand-built stand-in:
+that page's own two-cards-stacked shape (docs/05-integrations.md, section 10)
+is simple enough to state directly, and the bug this file exists to guard
+against — a parser fixture invented instead of read off the real page — was
+about the mintage table's row structure, not this one's.
 """
 
 from __future__ import annotations
@@ -42,26 +54,75 @@ from app.ukraine_pipeline.circ_types import (
 )
 from app.ukraine_recon.http import PoliteClient
 from app.ukraine_recon.models import SOURCE_NBU, SOURCE_WIKIPEDIA
-from app.ukraine_recon.wikipedia import parse_mintage_table
+from app.ukraine_recon.wikipedia import MintageCell, parse_mintage_table
 from tests.seed import country_by_code, make_catalog_item, seed_currencies
 
+# Trimmed rows of the real table (header; both 1992 mint-name sections;
+# 1993, 1996, 2001, 2003, 2004, 2013, 2017, 2018, 2019, 2025) — see the
+# module docstring above for why this is a slice of the live page and not
+# a hand-built shape. Styling attributes (style=, class=, align=, width=)
+# and Parsoid's per-cell transclusion metadata are stripped; every tag,
+# link, colspan and cell value kept is the live page's own.
 MINTAGE_TABLE_HTML = """
 <table class="wikitable">
-<tr><th>Рік на<br/>монеті</th><th>1 копійка</th><th>2 копійки</th><th>5 копійок</th>
-<th>10 копійок</th><th>25 копійок</th><th>50 копійок</th><th>1 гривня</th>
-<th>2 гривні</th><th>5 гривень</th><th>10 гривень</th><th>Загалом</th></tr>
-<tr><th colspan="12">Тестовий монетний двір</th></tr>
-<tr><td>1992</td><td>610 млн</td><td>Ні</td><td>446 млн</td><td>480 млн</td><td>402 млн</td>
+<tr>
+<th>Рік на<br>монеті</th>
+<th>1 копійка</th>
+<th>2 копійки</th>
+<th>5 копійок</th>
+<th>10 копійок</th>
+<th>25 копійок</th>
+<th>50 копійок</th>
+<th>1 гривня</th>
+<th>2 гривні</th>
+<th>5 гривень</th>
+<th>10 гривень</th>
+<th>Загалом</th></tr>
+<tr>
+<th colspan="12">Італійський монетний двір (<a
+href="https://uk.wikipedia.org/wiki/Istituto_Poligrafico_e_Zecca_dello_Stato"
+>Istituto Poligrafico e Zecca dello Stato</a>)</th></tr>
+<tr>
+<td>1992</td><td>610 млн</td><td>Ні</td><td>446 млн</td><td>480 млн</td><td>402 млн</td>
 <td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>1938 млн</td></tr>
-<tr><td>2004</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td>
-<td>Ні</td><td>10 млн</td><td>Ні</td><td>Ні</td><td>Ні</td><td>10 млн</td></tr>
-<tr><td>2013</td><td>10 тис**</td><td>Ні</td><td>175 млн</td><td>210 млн</td><td>180 млн</td>
+<tr>
+<th colspan="12"><a
+href="https://uk.wikipedia.org/wiki/Луганський_монетний_двір"
+>Луганський верстатобудівний завод</a></th></tr>
+<tr>
+<td>1992</td><td>300 шт*</td><td>100 шт*</td><td>300 шт*</td><td>230 млн</td><td>80 млн</td>
+<td>316 млн</td><td>150 шт*</td><td>Ні</td><td>Ні</td><td>Ні</td><td>626 млн</td></tr>
+<tr>
+<td>1993</td><td>Ні</td><td>240 млн</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td>
+<td>Ні</td><td>Ні</td><td>Ні</td><td>240 млн</td></tr>
+<tr>
+<td>1996</td><td>5 тис**</td><td>7 тис**</td><td>5 тис**</td><td>50 млн</td><td>38 млн</td>
+<td>90 тис</td><td>1 млн</td><td>Ні</td><td>Ні</td><td>Ні</td><td>89 млн</td></tr>
+<tr>
+<td>2001</td><td>150 млн</td><td>90 млн</td><td>5 тис**</td><td>5 тис**</td><td>5 тис**</td>
+<td>5 тис**</td><td>100 млн</td><td>Ні</td><td>Ні</td><td>Ні</td><td>340 млн</td></tr>
+<tr>
+<td>2003</td><td>100 млн</td><td>5 тис**</td><td>50 млн</td><td>100 млн</td><td>5 тис***</td>
+<td>5 тис***</td><td>42 млн</td><td>Ні</td><td>Ні</td><td>Ні</td><td>292 млн</td></tr>
+<tr>
+<td>2004</td><td>200 млн</td><td>70 млн</td><td>80 млн</td><td>150 млн</td><td>Ні</td>
+<td>Ні</td><td>15 млн</td><td>Ні</td><td>Ні</td><td>Ні</td><td>515 млн</td></tr>
+<tr>
+<td>2013</td><td>10 тис**</td><td>10 тис**</td><td>175 млн</td><td>210 млн</td><td>180 млн</td>
 <td>60 млн</td><td>10 тис**</td><td>Ні</td><td>Ні</td><td>Ні</td><td>625 млн</td></tr>
-<tr><td>2018</td><td>10 тис**</td><td>10 тис**</td><td>10 тис**</td><td>10 тис**</td>
-<td>10 тис**</td><td>65 млн</td><td>140 млн***** 20 тис****</td><td>145 млн</td><td>Ні</td>
+<tr>
+<td>2017</td><td>Ні</td><td>Ні</td><td>Ні</td><td>?***</td><td>Ні</td><td>Ні</td><td>Ні</td>
+<td>Ні</td><td>Ні</td><td>Ні</td><td><center>?</center></td></tr>
+<tr>
+<td>2018</td><td>10 тис**</td><td>10 тис**</td><td>10 тис**</td><td>10 тис**</td>
+<td>10 тис**</td><td>65 млн</td><td>140 млн*****<br>20 тис****</td><td>145 млн</td><td>Ні</td>
 <td>Ні</td><td>350 млн</td></tr>
-<tr><td>2019</td><td>?***</td><td>Ні</td><td>Ні</td><td>200 млн</td><td>Ні</td><td>20 тис**</td>
+<tr>
+<td>2019</td><td>Так***</td><td>Ні</td><td>Ні</td><td>200 млн</td><td>Ні</td><td>20 тис**</td>
 <td>50 млн</td><td>67 млн</td><td>20 млн</td><td>Ні</td><td>337 млн</td></tr>
+<tr>
+<td>2025</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>Ні</td><td>20 млн</td>
+<td>20 тис</td><td>20 тис</td><td>60 млн</td><td>103,96 млн</td><td>183 млн</td></tr>
 </table>
 """
 
@@ -166,25 +227,65 @@ def test_years_before_ukraine_existed_match_nothing() -> None:
 
 
 # --------------------------------------------------------------- wikipedia table
+def _cells_by_key(
+    cells: list[MintageCell],
+) -> dict[tuple[Decimal, str, int], list[MintageCell]]:
+    by_key: dict[tuple[Decimal, str, int], list[MintageCell]] = {}
+    for cell in cells:
+        by_key.setdefault((cell.value, cell.unit, cell.year), []).append(cell)
+    return by_key
+
+
 def test_the_mintage_table_reads_plain_and_glued_and_dual_cells() -> None:
     cells = parse_mintage_table(MINTAGE_TABLE_HTML)
-    by_key = {(c.value, c.unit, c.year): c for c in cells}
+    by_key = _cells_by_key(cells)
 
-    plain = by_key[(Decimal(1), "kopiika", 1992)]
-    assert plain.entries[0].count == 610_000_000
-
-    zero = by_key[(Decimal(2), "kopiika", 1992)]
-    assert zero.entries[0].count == 0
+    plain = by_key[(Decimal(1), "kopiika", 1993)]
+    assert len(plain) == 1
+    assert plain[0].entries[0].count == 0
 
     collector = by_key[(Decimal(1), "kopiika", 2013)]
-    assert collector.entries[0].count == 10_000
-    assert collector.entries[0].collector_set
+    assert len(collector) == 1
+    assert collector[0].entries[0].count == 10_000
+    assert collector[0].entries[0].collector_set
 
     dual = by_key[(Decimal(1), "hryvnia", 2018)]
-    assert {(e.count, e.pattern) for e in dual.entries} == {(140_000_000, "2018"), (20_000, "2001")}
+    assert len(dual) == 1
+    assert {(e.count, e.pattern) for e in dual[0].entries} == {
+        (140_000_000, "2018"),
+        (20_000, "2001"),
+    }
 
-    unofficial = by_key[(Decimal(1), "kopiika", 2019)]
-    assert unofficial.entries[0].unknown
+    issued_no_count = by_key[(Decimal(1), "kopiika", 2019)][0]
+    assert issued_no_count.entries[0].issued_no_count
+    assert issued_no_count.entries[0].unofficial
+    assert issued_no_count.entries[0].count is None
+
+    unknown = by_key[(Decimal(10), "kopiika", 2017)][0]
+    assert unknown.entries[0].unknown
+    assert unknown.entries[0].unofficial
+    assert unknown.entries[0].count is None
+
+
+def test_the_1992_year_is_split_across_two_mint_name_rows() -> None:
+    """The real page's own shape, not an invented one: Istituto Poligrafico e
+    Zecca dello Stato and the Луганський завод each name a row for 1992, so
+    parse_mintage_table returns two MintageCell for the same key — the exact
+    shape circ_mintage.usable_count has to add together (see its docstring
+    and the "Фикс 2026-09-05" note in docs/05-integrations.md, section 10).
+    """
+    cells = parse_mintage_table(MINTAGE_TABLE_HTML)
+    by_key = _cells_by_key(cells)
+
+    kopiika_1992 = by_key[(Decimal(1), "kopiika", 1992)]
+    assert [entry.count for cell in kopiika_1992 for entry in cell.entries] == [
+        610_000_000,
+        300,
+    ]
+    assert kopiika_1992[1].entries[0].trial
+
+    # Every other (denomination, year) key on the trimmed page names one row.
+    assert all(len(rows) == 1 for key, rows in by_key.items() if key[2] != 1992)
 
 
 def test_the_mint_name_divider_row_is_not_mistaken_for_a_year() -> None:
@@ -546,11 +647,154 @@ async def test_mintage_fills_an_empty_field_only(db_session: AsyncSession) -> No
     )
     await db_session.commit()
 
+    # 610,000,300 — the Italian mint's 610 million plus the Luhansk trial
+    # batch of 300, added together (both are real rows for 1992, see
+    # test_the_1992_year_is_split_across_two_mint_name_rows above). Recording
+    # just the trial batch's 300 was the production bug this fix closes.
     refreshed_empty = await db_session.get(CatalogItem, empty.id)
     refreshed_filled = await db_session.get(CatalogItem, filled.id)
-    assert refreshed_empty is not None and refreshed_empty.mintage_actual == 610_000_000
+    assert refreshed_empty is not None and refreshed_empty.mintage_actual == 610_000_300
     assert refreshed_filled is not None and refreshed_filled.mintage_actual == 999
-    assert outcome.discrepancies and outcome.discrepancies[0]["itemId"] == filled.id
+    assert outcome.discrepancies and outcome.discrepancies[0] == {
+        "itemId": filled.id,
+        "existing": 999,
+        "wikipedia": 610_000_300,
+    }
+
+
+async def test_mintage_refresh_overwrites_a_filled_field_from_the_summed_total(
+    db_session: AsyncSession,
+) -> None:
+    """--circ-refresh-mintage's own case: a record filled by the pre-fix code
+    with just one mint's number (here, the Luhansk trial batch alone) gets
+    corrected to the real sum instead of only being reported as a
+    discrepancy.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="kopiika", sort_order=1
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    stale = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 копійка",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        mintage_actual=300,
+    )
+    cells = parse_mintage_table(MINTAGE_TABLE_HTML)
+
+    outcome = await circ_mintage.apply_mintage(
+        db_session, country_id=country.id, mintage=cells, dry_run=False, refresh=True
+    )
+    await db_session.commit()
+
+    refreshed = await db_session.get(CatalogItem, stale.id)
+    assert refreshed is not None and refreshed.mintage_actual == 610_000_300
+    assert outcome.discrepancies == []
+    assert outcome.refreshed == [{"itemId": stale.id, "old": 300, "new": 610_000_300}]
+
+
+async def test_mintage_refresh_dry_run_writes_nothing(db_session: AsyncSession) -> None:
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    denomination = Denomination(
+        country_id=country.id, currency_code="UAH", value=Decimal(1), unit="kopiika", sort_order=1
+    )
+    db_session.add(denomination)
+    await db_session.commit()
+    stale = await make_catalog_item(
+        db_session,
+        country=country,
+        title="1 копійка",
+        year=1992,
+        denomination=denomination,
+        group=CollectionGroup.CIRCULATION,
+        mintage_actual=300,
+    )
+    cells = parse_mintage_table(MINTAGE_TABLE_HTML)
+
+    outcome = await circ_mintage.apply_mintage(
+        db_session, country_id=country.id, mintage=cells, dry_run=True, refresh=True
+    )
+
+    assert outcome.refreshed == [{"itemId": stale.id, "old": 300, "new": 610_000_300}]
+    refreshed = await db_session.get(CatalogItem, stale.id)
+    assert refreshed is not None and refreshed.mintage_actual == 300
+
+
+NAMED_TRIAL_ONLY_TOTALS = {
+    # The Italian mint struck no 2-kopiyky coins in 1992 (a "no" cell) — the total
+    # is the Luhansk trial batch alone.
+    (Decimal(2), "kopiika", 1992): 100,
+    # Hryvnia circulation coins were not struck for mass release until 1996;
+    # the 1992 figure is a Luhansk trial pattern, nothing added to it.
+    (Decimal(1), "hryvnia", 1992): 150,
+}
+
+
+async def test_mintage_never_drops_below_1000_except_the_named_1992_trials(
+    db_session: AsyncSession,
+) -> None:
+    """A per-denomination invariant over every key the trimmed live page
+    covers: once entries are added together correctly, a mass-produced
+    coin's yearly mintage is always in the thousands at least — except the
+    two 1992 keys where the *only* row is a trial batch (see
+    NAMED_TRIAL_ONLY_TOTALS above; both are named, not swallowed by a
+    threshold). This is the regression guard for the summing fix: before it,
+    every denomination 1992 split across both mint rows would have silently
+    collapsed to whichever row parse_mintage_table happened to return last.
+    """
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    cells = parse_mintage_table(MINTAGE_TABLE_HTML)
+
+    denominations: dict[tuple[Decimal, str], Denomination] = {}
+    items: dict[tuple[Decimal, str, int], CatalogItem] = {}
+    keys = sorted({(cell.value, cell.unit, cell.year) for cell in cells}, key=str)
+    for value, unit, year in keys:
+        pair = (value, unit)
+        if pair not in denominations:
+            denomination = Denomination(
+                country_id=country.id,
+                currency_code="UAH",
+                value=value,
+                unit=unit,
+                sort_order=len(denominations),
+            )
+            db_session.add(denomination)
+            await db_session.commit()
+            denominations[pair] = denomination
+        items[(value, unit, year)] = await make_catalog_item(
+            db_session,
+            country=country,
+            title=f"{value} {unit}",
+            year=year,
+            denomination=denominations[pair],
+            group=CollectionGroup.CIRCULATION,
+        )
+
+    await circ_mintage.apply_mintage(
+        db_session, country_id=country.id, mintage=cells, dry_run=False
+    )
+    await db_session.commit()
+
+    checked_named_trials = set()
+    for key, item in items.items():
+        refreshed = await db_session.get(CatalogItem, item.id)
+        assert refreshed is not None
+        if refreshed.mintage_actual is None:
+            continue  # no coin that year / unknown / issued-without-count / ambiguous
+        if key in NAMED_TRIAL_ONLY_TOTALS:
+            assert refreshed.mintage_actual == NAMED_TRIAL_ONLY_TOTALS[key], key
+            checked_named_trials.add(key)
+        else:
+            assert refreshed.mintage_actual >= 1000, (key, refreshed.mintage_actual)
+    assert checked_named_trials == set(NAMED_TRIAL_ONLY_TOTALS)
 
 
 async def test_mintage_resolves_the_2018_hryvnia_split_by_subtype(

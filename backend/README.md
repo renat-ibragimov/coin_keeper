@@ -464,6 +464,31 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
 hryvnia changeover, and only for a record with no `subtype` set to say which
 of the two 2018 figures is its own.
 
+### Refresh mintage after the multi-mint sum fix
+
+`circ-mintage` used to leave an already-filled `mintage_actual` alone and
+only report a disagreement (`circ-mintage.discrepancies`); the 2026-09-05 fix
+(`../docs/05-integrations.md`, section 10) changed what the table's own
+number *is* for 1992 — the only year split across two mint-name sections —
+by summing both mints' entries instead of taking whichever one
+`parse_mintage_table` happened to return last. Any record `mintage_actual`
+was filled against the old code is now a discrepancy, not a match, and a
+plain re-run of step 4 above would only report it, not fix it.
+`--circ-refresh-mintage` recomputes and overwrites `mintage_actual` on every
+non-NBU-linked circulation record instead:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps circ-mintage \
+    --circ-refresh-mintage \
+    --report /reports/circ-mintage-refresh.json --cache-dir /reports/ukraine-cache
+```
+
+`--dry-run` first prints `circ-mintage.refreshed` and its `old → new`
+examples without writing anything. Records `circ-mintage.ambiguous` still
+skips (the 2018 hryvnia changeover, no `subtype` set) are untouched either
+way.
+
 ### 5. Photos, in portions
 
 ```bash
