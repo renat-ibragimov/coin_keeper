@@ -446,3 +446,41 @@ async def test_image_visibility_by_provenance(
     # For anyone else the uCoin image is a placeholder, the NBU one is public.
     assert rows_b[ucoin_id]["obverseImage"] is None
     assert rows_b[nbu_id]["obverseImage"] is not None
+
+
+async def test_ua_coins_image_is_public(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """ua_coins is a secondary but public source, used where NBU has no photo."""
+    from app.models import MediaFile
+    from app.models.enums import MediaRole, MediaSource
+
+    refs = ctx.refs
+    item = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Стародавні міста", year=2018
+    )
+    db_session.add(
+        MediaFile(
+            catalog_item_id=item.id,
+            role=MediaRole.OBVERSE,
+            source=MediaSource.UA_COINS,
+            storage_key="catalog/1/obverse/ua_coins_600.webp",
+            thumbnail_key="catalog/1/obverse/ua_coins_300.webp",
+            variants={
+                "300": "catalog/1/obverse/ua_coins_300.webp",
+                "600": "catalog/1/obverse/ua_coins_600.webp",
+            },
+            attribution="ua-coins.info",
+        )
+    )
+    await db_session.commit()
+    item_id = item.id
+
+    rows_b = {
+        row["id"]: row
+        for row in (await client.get("/api/v1/catalog", headers=auth(ctx.token_b))).json()["items"]
+    }
+    image = rows_b[item_id]["obverseImage"]
+    assert image is not None
+    assert "ua_coins_600.webp" in image["medium"]
+    assert image["attribution"] == "ua-coins.info"

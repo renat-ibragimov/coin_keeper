@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import MediaFile
 from app.models.enums import MediaSource
 
-PUBLIC_SOURCES = (MediaSource.NBU, MediaSource.MANUAL)
+PUBLIC_SOURCES = (MediaSource.NBU, MediaSource.MANUAL, MediaSource.UA_COINS)
 
 
 class MediaRepository:
@@ -19,7 +19,7 @@ class MediaRepository:
         self._user_id = user_id
 
     async def visible_for_catalog_items(self, item_ids: Sequence[int]) -> Sequence[MediaFile]:
-        """nbu/manual are public; user_upload and ucoin only for their owner."""
+        """nbu/manual/ua_coins are public; user_upload and ucoin only for their owner."""
         if not item_ids:
             return []
         result = await self._session.execute(
