@@ -6,11 +6,20 @@
   color: var(--color-text-muted);
 }
 
+/* A real photo — not the placeholder — sits on a fixed light plaque in both
+ * themes, and multiply on the image dissolves its white studio background
+ * into it (docs/08-ui-map.md). Full background removal is a media-pipeline
+ * task, deferred. */
+.framePhoto {
+  background: var(--color-photo-plaque);
+}
+
 .image {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
+  mix-blend-mode: multiply;
 }
 
 .contain {

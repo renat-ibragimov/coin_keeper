@@ -160,7 +160,7 @@ function CardBody({ card }: { card: CatalogCard }) {
         <section className={styles.photos} aria-label={t('card.photosLabel')}>
           {sides.map((side) => (
             <figure key={side.key} className={styles.photo}>
-              <CoinImage {...side.card} alt="" fit="contain" className={styles.photoFrame} />
+              <CoinImage {...side.card} alt="" className={styles.photoFrame} />
               <figcaption className={styles.photoLabel}>
                 {side.label}
                 {side.image?.attribution ? (
@@ -302,7 +302,6 @@ function CardBody({ card }: { card: CatalogCard }) {
         <CoinImage
           src={enlargedSide?.full.src}
           alt={`${enlargedSide?.label ?? ''} — ${title}`}
-          fit="contain"
           className={styles.lightboxImage}
         />
       </Lightbox>
