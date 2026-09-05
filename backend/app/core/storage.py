@@ -50,6 +50,10 @@ class ObjectStorage:
             Bucket=self._bucket, Key=key, Body=payload, ContentType=content_type
         )
 
+    def get(self, key: str) -> bytes:
+        response = self._client.get_object(Bucket=self._bucket, Key=key)
+        return response["Body"].read()
+
     def delete_many(self, keys: Iterable[str]) -> None:
         """Best-effort batch delete; a no-op for an empty sequence.
 

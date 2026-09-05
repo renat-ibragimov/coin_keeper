@@ -20,6 +20,8 @@ from typing import Final
 
 from PIL import Image, UnidentifiedImageError
 
+from app.services.media_background import classify, cut_background
+
 MAX_SOURCE_BYTES = 12 * 1024 * 1024
 MAX_SOURCE_SIDE = 4000
 QUALITY = 80
@@ -62,11 +64,18 @@ class ProcessedImage:
         return tuple(sorted(self.variants))
 
 
-def process_image(payload: bytes) -> ProcessedImage:
-    """Validate, strip metadata and encode every stored size.
+def process_image(payload: bytes, *, remove_background: bool = True) -> ProcessedImage:
+    """Validate, strip metadata, cut a white round background and encode every size.
 
     Raises ImageRejectedError for anything that is not an acceptable image;
     callers decide whether that is fatal or just a skipped row.
+
+    `remove_background` is the one point every ingest path (the Ukrainian
+    photo pipeline, and any future upload endpoint) shares, so a white,
+    round coin photo is cut to a transparent WebP as it comes in rather than
+    needing a separate pass later — see app.services.media_background and
+    docs/06-media-storage.md, "Удаление фона". A migration or other special
+    path that must keep bytes exactly as given can pass False.
     """
     if len(payload) > MAX_SOURCE_BYTES:
         msg = f"larger than {MAX_SOURCE_BYTES} bytes"
@@ -98,30 +107,48 @@ def process_image(payload: bytes) -> ProcessedImage:
         stripped = Image.new(converted.mode, converted.size)
         stripped.paste(converted)
 
-        variants: dict[int, bytes] = {}
-        width = height = 0
-        seen: set[tuple[int, int]] = set()
-        for side in VARIANT_SIDES:
-            resized = stripped.copy()
-            # thumbnail() only ever shrinks: a source smaller than the box is
-            # stored at its own size rather than blown up.
-            resized.thumbnail((side, side), Image.Resampling.LANCZOS)
-            if resized.size in seen:
-                # A 600 px source would otherwise be stored twice, once as
-                # "600" and once as an identical "1200".
-                continue
-            seen.add(resized.size)
-            variants[side] = _encode(resized)
-            width, height = resized.size
+        # Already-transparent input (a manual upload, say) is left as it is;
+        # only an opaque source is a candidate for the white-background cut.
+        if remove_background and stripped.mode == "RGB":
+            verdict = classify(stripped)
+            if verdict.cut and verdict.mask is not None:
+                stripped = cut_background(stripped, verdict.mask)
+
+        # Of the source, not of our encoding: it identifies the file upstream
+        # and is what tells a second run that nothing has changed.
+        return encode_variants(stripped, sha256=hashlib.sha256(payload).hexdigest())
+
+
+def encode_variants(image: Image.Image, *, sha256: str) -> ProcessedImage:
+    """Resize an already-decoded, already-decided image to every stored size.
+
+    Shared by process_image above and by the batch background-removal step
+    (backend/scripts/remove_photo_backgrounds.py), which starts from a
+    stored variant rather than a freshly downloaded payload and so has
+    nothing left to validate — only sizes left to produce.
+    """
+    variants: dict[int, bytes] = {}
+    width = height = 0
+    seen: set[tuple[int, int]] = set()
+    for side in VARIANT_SIDES:
+        resized = image.copy()
+        # thumbnail() only ever shrinks: a source smaller than the box is
+        # stored at its own size rather than blown up.
+        resized.thumbnail((side, side), Image.Resampling.LANCZOS)
+        if resized.size in seen:
+            # A 600 px source would otherwise be stored twice, once as
+            # "600" and once as an identical "1200".
+            continue
+        seen.add(resized.size)
+        variants[side] = _encode(resized)
+        width, height = resized.size
 
     return ProcessedImage(
         variants=variants,
         width=width,
         height=height,
         size_bytes=len(variants[max(variants)]),
-        # Of the source, not of our encoding: it identifies the file upstream
-        # and is what tells a second run that nothing has changed.
-        sha256=hashlib.sha256(payload).hexdigest(),
+        sha256=sha256,
     )
 
 

@@ -121,6 +121,68 @@ promote an account whose address has not been confirmed.
 No email address or password is ever hardcoded, in code, tests or examples:
 the repository is public.
 
+## Removing white backgrounds from coin photos
+
+Classic (non-ML) cleanup over `media_files` rows that already hold their own
+`storage_key` — a white, round coin photo is cut to a transparent WebP; a
+rectangular blister pack or a colored background is left alone. Rule and
+runbook detail: `../docs/06-media-storage.md`, "Удаление фона". The
+classifier is `app/services/media_background.py`; the command line is
+`scripts/remove_photo_backgrounds.py`.
+
+```bash
+# dry run: classifies every candidate, writes nothing
+docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --dry-run
+```
+
+Read `migration-reports/nobg-review.html` before applying: it shows a
+before/after thumbnail for every photo the classifier would cut, and a table
+of everything skipped, grouped by reason. `migration-reports/nobg-review.csv`
+(UTF-8 with BOM, opens cleanly in Excel) has the same rows plus the exact old
+storage key of each one — that pairing is the rollback plan, since the
+original is never deleted or overwritten.
+
+```bash
+# write the cut images and repoint the rows — long runs from tmux
+docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --apply
+
+# re-run against specific rows only (a retry, or after fixing something)
+docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --apply \
+  --only-ids 101,102,103
+```
+
+Idempotent: a row whose `storage_key` already carries the `-nobg` marker this
+script writes is skipped without a network call, so re-running the same
+command touches nothing twice.
+
+**Rollback** for one row: the CSV's `oldKey` and the row's current (`-nobg`) keys share the
+same base and the same set of sizes, so `thumbnail_key`/`variants` are mechanically
+reconstructible from `oldKey` alone — no need to have recorded them separately.
+
+```bash
+docker compose exec api python -c "
+from app.core.media_keys import preview_key_of, primary_key_of, stored_variants, variant_key
+from app.db.session import get_session_factory
+from app.models import MediaFile
+import asyncio
+
+async def main():
+    old_base = 'catalog/42/obverse/ab12cd34'  # oldKey from the CSV, minus _<size>.webp
+    async with get_session_factory()() as session:
+        row = await session.get(MediaFile, 123)  # mediaFileId from the CSV
+        sides = sorted(int(s) for s in row.variants)
+        keys = {side: variant_key(old_base, side) for side in sides}
+        row.storage_key = primary_key_of(keys)
+        row.thumbnail_key = preview_key_of(keys)
+        row.variants = stored_variants(keys)
+        await session.commit()
+
+asyncio.run(main())
+"
+```
+
+The `-nobg` object itself is not deleted by this — it is simply no longer referenced.
+
 ## Ukrainian sources reconnaissance (stage 4.5, part A)
 
 Read-only survey of the three sources on Ukrainian coins (the NBU catalogue,

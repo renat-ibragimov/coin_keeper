@@ -182,7 +182,11 @@ def prepare(
         return MediaOutcome(missing_path=original_path)
 
     try:
-        processed = process_image(file_path.read_bytes())
+        # A one-time transcription of the desktop database's own files: keep
+        # them exactly as they were rather than starting to cut backgrounds
+        # retroactively (backend/scripts/remove_photo_backgrounds.py is the
+        # deliberate, reviewable tool for that on already-stored photos).
+        processed = process_image(file_path.read_bytes(), remove_background=False)
     except ImageRejectedError as exc:
         return MediaOutcome(rejected=(original_path, str(exc)))
 
