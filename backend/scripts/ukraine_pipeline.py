@@ -22,7 +22,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO
 
-from app.ukraine_pipeline import circ_bridge
+from app.ukraine_pipeline import circ_bridge, translate_c
 from app.ukraine_pipeline import sources as source_module
 from app.ukraine_pipeline.report import PipelineReport
 from app.ukraine_pipeline.runner import (
@@ -164,6 +164,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "merge.apply_merges as --apply-merge",
     )
     parser.add_argument(
+        "--translate-out",
+        type=Path,
+        help="translate-c: where to write the (id, old original, new uk/en) review CSV; "
+        "passing it on a dry run is the one case where a dry run still calls the API",
+    )
+    parser.add_argument(
         "--ua-coins",
         choices=(
             source_module.MODE_AUTO,
@@ -234,6 +240,7 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
         "inventoryReviewIn": str(args.inventory_review_in) if args.inventory_review_in else None,
         "mergeBOut": str(args.merge_b_out) if args.merge_b_out else None,
         "mergeBIn": str(args.merge_b_in) if args.merge_b_in else None,
+        "translateOut": str(args.translate_out) if args.translate_out else None,
     }
     report.assumptions = [
         "Only shared Ukrainian records take part; personal items belong to their authors.",
@@ -248,6 +255,17 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
     if args.apply and ("photos" in steps or "circ-photos" in steps):
         storage = ObjectStorage(build_s3_client(settings), settings.s3_bucket)
         storage.ensure_bucket()
+
+    translate: translate_c.TranslateFn | None = None
+    if "translate-c" in steps and (args.apply or args.translate_out is not None):
+        if not settings.anthropic_api_key:
+            print(
+                "translate-c: ANTHROPIC_API_KEY is not set; needed for --apply or "
+                "--translate-out (a plain dry run does not call the API)",
+                file=sys.stderr,
+            )
+            return EXIT_USAGE
+        translate = translate_c.AnthropicTranslator(settings.anthropic_api_key)
 
     with PoliteClient(cache_dir=args.cache_dir, pause_seconds=args.pause) as client:
         fetched = source_module.Sources()
@@ -295,6 +313,7 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
             inventory_review_in=args.inventory_review_in,
             merge_b_out=args.merge_b_out,
             merge_b_in=args.merge_b_in,
+            translate_out=args.translate_out,
             report_path=args.report,
         )
         try:
@@ -307,6 +326,7 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
                     options=options,
                     log=log,
                     storage=storage,
+                    translate=translate,
                     mintage=mintage,
                 )
                 await runner.run()

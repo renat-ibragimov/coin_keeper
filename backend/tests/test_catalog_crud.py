@@ -17,6 +17,7 @@ from app.models import (
     Expense,
     MarketPriceSnapshot,
 )
+from app.models.enums import TranslationSource
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
@@ -146,6 +147,58 @@ async def test_patch_rights_matrix(
         f"/api/v1/catalog/{own_a_id}", json=changes, headers=auth(ctx.token_b)
     )
     assert foreign.status_code == 404
+
+
+async def test_admin_title_edit_sets_manual_source_and_validates_nonempty(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """PATCH-ing a shared record's names is an admin operation, and whatever
+    it writes is provenance 'manual', never the pipeline's 'official' or
+    'llm' (docs/02-data-model.md; docs/05-integrations.md, part C).
+    """
+    refs = ctx.refs
+    shared = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Стара назва",
+        year=2020,
+        title_uk="Стара назва",
+        title_uk_source=TranslationSource.LLM,
+        title_en="Old title",
+        title_en_source=TranslationSource.LLM,
+    )
+
+    edited = await client.patch(
+        f"/api/v1/catalog/{shared.id}",
+        json={
+            "titleOriginal": "Стара назва",
+            "titleUk": "Нова офіційна назва",
+            "titleEn": "New official title",
+        },
+        headers=auth(ctx.token_b),
+    )
+    assert edited.status_code == 200, edited.text
+    body = edited.json()
+    assert body["titleUk"] == "Нова офіційна назва"
+    assert body["titleUkSource"] == "manual"
+    assert body["titleEnSource"] == "manual"
+
+    stored = await db_session.get(CatalogItem, shared.id)
+    assert stored is not None
+    assert stored.title_uk_source is TranslationSource.MANUAL
+    assert stored.title_en_source is TranslationSource.MANUAL
+
+    empty = await client.patch(
+        f"/api/v1/catalog/{shared.id}", json={"titleUk": ""}, headers=auth(ctx.token_b)
+    )
+    assert empty.status_code == 422
+
+    denied = await client.patch(
+        f"/api/v1/catalog/{shared.id}",
+        json={"titleUk": "Спроба користувача"},
+        headers=auth(ctx.token_a),
+    )
+    assert denied.status_code == 403
 
 
 async def test_delete_personal_cascades_instances_and_expenses(

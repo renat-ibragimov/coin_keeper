@@ -135,8 +135,11 @@ class CatalogItemUpdate(CamelModel):
     subtype: str | None = None
     title_original: str | None = Field(default=None, min_length=1, max_length=500)
     original_lang: str | None = Field(default=None, min_length=2, max_length=8)
-    title_uk: str | None = Field(default=None, max_length=500)
-    title_en: str | None = Field(default=None, max_length=500)
+    # min_length=1 rather than the create schema's "may be absent": a translated
+    # slot is either untouched (field omitted) or replaced with real text, never
+    # set to an empty string (docs/03-api-contract.md, admin title editing).
+    title_uk: str | None = Field(default=None, min_length=1, max_length=500)
+    title_en: str | None = Field(default=None, min_length=1, max_length=500)
     issue_year: int | None = Field(default=None, ge=1, le=2200)
     issue_date: date | None = None
     mintage_announced: int | None = Field(default=None, ge=0)

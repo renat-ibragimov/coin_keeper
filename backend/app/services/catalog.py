@@ -23,7 +23,7 @@ from app.models import (
     MediaFile,
     User,
 )
-from app.models.enums import UserRole
+from app.models.enums import TranslationSource, UserRole
 from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogFilters, CatalogRepository, CatalogRow
 from app.repositories.collection import CollectionRepository
@@ -230,6 +230,13 @@ class CatalogService:
         )
         for field_name, value in changes.items():
             setattr(item, field_name, value)
+        # A title slot set through this endpoint is a human edit, whoever makes
+        # it — an admin correcting a shared record or an owner naming a personal
+        # one — never the pipeline's official wording or its own LLM guess.
+        if "title_uk" in changes:
+            item.title_uk_source = TranslationSource.MANUAL
+        if "title_en" in changes:
+            item.title_en_source = TranslationSource.MANUAL
         await self._session.flush()
         return await self.get_card(item_id)
 

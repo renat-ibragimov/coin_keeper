@@ -49,6 +49,7 @@ from app.ukraine_pipeline import (
     repair,
     series,
     titles,
+    translate_c,
 )
 from app.ukraine_pipeline.catalog import OurItem, load_items, ukraine_country_id
 from app.ukraine_pipeline.lexicon import Lexicon, load_lexicon
@@ -105,11 +106,23 @@ CIRCULATION_STEPS = (
 # run alone — but grouped at the end of STEPS so `--steps` with no argument
 # still runs everything once.
 EXTRA_STEPS = ("jubilee-bridge", "merge-b", "inventory-b")
-STEPS = COMMEMORATIVE_STEPS + CIRCULATION_STEPS + EXTRA_STEPS
+# LLM translation of whatever the steps above still left without an official
+# name (docs/05-integrations.md, part C) — no Sources, no NBU/ua-coins/Wikipedia
+# fetch, entirely independent of everything above. Last on purpose: it should
+# only ever see the genuine remainder, not a record another step would have
+# named for free this same run.
+TRANSLATE_STEPS = ("translate-c",)
+STEPS = COMMEMORATIVE_STEPS + CIRCULATION_STEPS + EXTRA_STEPS + TRANSLATE_STEPS
 
 
 class PipelineError(Exception):
     """Something the run cannot continue without."""
+
+
+async def _unreachable_translate(_tasks: object) -> None:
+    """Placeholder passed to translate_c when call_api is False — never invoked."""
+    message = "translate-c: translate() called without call_api"
+    raise PipelineError(message)
 
 
 @dataclass
@@ -154,6 +167,10 @@ class Options:
     # duplicates gaps.py makes, a different shape of pair entirely.
     merge_b_out: Path | None = None
     merge_b_in: Path | None = None
+    # translate-c: where to write the (id, old original, new uk/en) review CSV.
+    # Passing it on a dry run is the one exception to "dry run never calls the
+    # API" — see app/ukraine_pipeline/translate_c.py's module docstring.
+    translate_out: Path | None = None
 
 
 @dataclass
@@ -165,6 +182,10 @@ class Runner:
     options: Options
     log: Callable[[str], None]
     storage: ObjectStorage | None = None
+    # translate-c's one call-out; None means the step cannot reach the API —
+    # fine on a plain dry run, an error if --apply or --translate-out asks for
+    # it anyway (scripts/ukraine_pipeline.py checks this before the run starts).
+    translate: translate_c.TranslateFn | None = None
     lexicon: Lexicon = field(default_factory=load_lexicon)
     # The Wikipedia mintage table, fetched separately from `sources` above —
     # a different page, needed only by the circ-* steps. Empty unless one of
@@ -607,6 +628,33 @@ class Runner:
             self.log(f"inventory-b: {len(decisions)} link decisions read from {path}")
         self.report.step(
             "inventory-b", {**outcome.summary(), "csvRowsWritten": rows, "linkRowsWritten": written}
+        )
+        await self._commit()
+        await self._load_catalog()
+
+    # -------------------------------------------------------------- translate
+    async def _step_translate_c(self) -> None:
+        assert self._country_id is not None
+        call_api = not self.options.dry_run or self.options.translate_out is not None
+        if call_api and self.translate is None:
+            message = "translate-c needs the Anthropic API but no key is configured"
+            raise PipelineError(message)
+        outcome = await translate_c.run_translate_c(
+            self.session,
+            country_id=self._country_id,
+            # call_api already guards the None case; a plain dry run never calls this.
+            translate=self.translate or _unreachable_translate,
+            dry_run=self.options.dry_run,
+            call_api=call_api,
+        )
+        rows = 0
+        if self.options.translate_out is not None and outcome.rows:
+            rows = translate_c.write_review_csv(self.options.translate_out, outcome)
+            self.log(f"translate-c: {rows} rows written to {self.options.translate_out}")
+        for problem in outcome.errors:
+            self.report.warn(f"translate-c: batch {problem['ids']} — {problem['reason']}")
+        self.report.step(
+            "translate-c", {**outcome.summary(), "csvRowsWritten": rows}, errors=outcome.errors[:50]
         )
         await self._commit()
         await self._load_catalog()

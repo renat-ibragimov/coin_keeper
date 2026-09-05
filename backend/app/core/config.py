@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     )
     uacoins_base: str = Field(default="https://www.ua-coins.info", alias="UACOINS_BASE")
 
+    # --- LLM translation, scripts/ukraine_pipeline.py --steps translate-c ---
+    anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

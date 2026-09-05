@@ -21,6 +21,7 @@ dependencies = [
     "httpx>=0.28",
     "selectolax>=0.3.21",
     "rapidfuzz>=3.9",
+    "anthropic>=0.40",
 ]
 
 [project.optional-dependencies]

@@ -34,6 +34,7 @@ STEP_ORDER = (
     "jubilee-bridge",
     "merge-b",
     "inventory-b",
+    "translate-c",
 )
 EXAMPLES_IN_SUMMARY = 10
 

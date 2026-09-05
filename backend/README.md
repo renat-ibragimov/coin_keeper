@@ -722,6 +722,48 @@ hryvnia_1_2004` pass (step 6 above; `hryvnia_1_2004` because that is the key
 those years group under on the current map, not `hryvnia_1_1992`, which they
 happened to be stored under before the split existed).
 
+## LLM translation of the remainder (stage 4.5, part C)
+
+`--steps translate-c`. Everything the steps above could name from an
+issuer's own card is already `official`; what merge-b and inventory-b leave
+— legacy Excel records with a Russian uCoin heading and no National Bank
+card at all, the six jubilee 1-hryvnia records, and stray `title_en` gaps on
+records already linked — gets a name from a model instead, marked `llm`.
+Full details, the selection rule, and what `title_original` correction does
+to a Russian original: `../docs/05-integrations.md`, section 11.
+
+The only step in this pipeline that calls out to anything other than the
+National Bank / ua-coins.info / Wikipedia, and the only one that spends
+money per run — `ANTHROPIC_API_KEY` must be set in `.env` for `--apply` or
+`--translate-out`; a plain `--dry-run` never reaches the API at all, it only
+reports the selection and the batch plan.
+
+```bash
+# dry run with a real CSV to review — the one case a dry run still calls
+# the model; the Russian original a record is replacing survives only here
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py \
+    --steps translate-c --translate-out /reports/translate-c.csv \
+    --report /reports/translate-c.json --cache-dir /reports/ukraine-cache
+
+# after reviewing the CSV
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps translate-c \
+    --report /reports/translate-c-2.json --cache-dir /reports/ukraine-cache
+```
+
+There is no `--apply-review` for this step: unlike `bridge`/`merge`, the CSV
+carries no `decision` column to read back — `--apply` recomputes the same
+batches itself, and `*_source = 'llm'` already marks every written row as
+worth a second look later.
+
+Admin title editing (`titleUk`/`titleEn`/`titleOriginal` on a shared record)
+is the existing `PATCH /catalog/{id}` — see `../docs/03-api-contract.md`,
+"Правка названий": it now always stamps `*_source = 'manual'` and rejects an
+empty string. No new endpoint, no new screen — the admin-mode edit form on
+the record page is a backlog item (`../docs/BACKLOG.md`), the API contract
+is already there.
+
 ## Legacy data migration
 
 Moves the desktop SQLite database into PostgreSQL. Specification:
