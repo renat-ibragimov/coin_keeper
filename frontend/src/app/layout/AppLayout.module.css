@@ -50,25 +50,109 @@
   color: var(--color-accent);
 }
 
+.navDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: var(--space-1) 0;
+  background: var(--color-border);
+}
+
 .controls {
   display: flex;
   align-items: center;
   gap: var(--space-4);
 }
 
-.user {
+.account {
+  position: relative;
+}
+
+.accountButton {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 14px;
 }
 
-.userName {
-  font-size: 14px;
-  color: var(--color-text-secondary);
+.accountButton:hover {
+  background: var(--color-accent-soft);
+}
+
+.accountName {
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.accountMenu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: 25;
+}
+
+.accountMenuLink {
+  padding: 10px 16px;
+  color: var(--color-text);
+  text-decoration: none;
+  border: none;
+  background: none;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 14.5px;
+  cursor: pointer;
+}
+
+.accountMenuLink:hover {
+  background: var(--color-accent-soft);
+}
+
+.subnav {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5) 0;
+  max-width: 1440px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.subnavLink {
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.subnavLink:hover {
+  color: var(--color-text);
+  background: var(--color-accent-soft);
+}
+
+.subnavLinkActive {
+  color: var(--color-accent-strong);
+  background: var(--color-accent-soft);
+}
+
+:root[data-theme='dark'] .subnavLinkActive {
+  color: var(--color-accent);
 }
 
 .main {
@@ -89,7 +173,8 @@
 
 @media (max-width: 900px) {
   .nav,
-  .user {
+  .account,
+  .subnav {
     display: none;
   }
 

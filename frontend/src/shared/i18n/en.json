@@ -4,12 +4,15 @@
   },
   "nav": {
     "label": "Main navigation",
+    "collectionLabel": "Collection navigation",
     "dashboard": "Overview",
     "catalog": "Catalog",
     "series": "Series",
-    "collection": "Collection",
+    "myCollection": "My collection",
+    "coins": "Coins",
     "missing": "Missing",
     "settings": "Settings",
+    "admin": "Administration",
     "more": "More",
     "expenses": "Money"
   },
@@ -17,6 +20,9 @@
     "themeToggle": "Toggle theme",
     "account": "Account",
     "logout": "Sign out"
+  },
+  "account": {
+    "menuLabel": "Account menu"
   },
   "common": {
     "loading": "Loading…",
@@ -162,7 +168,6 @@
     "orderAsc": "Ascending",
     "orderDesc": "Descending",
     "priceNote": "Shared catalog prices update automatically from UA-Coins and the NBU.",
-    "addOwn": "Add your own item",
     "badgeOwn": "My item",
     "badgeArchived": "Archived",
     "badgeInCollection": "In collection",
@@ -172,8 +177,6 @@
     "sourceLink": "Source",
     "emptyTitle": "Nothing found",
     "emptyText": "Try changing the filters or the search query.",
-    "notFoundTitle": "Can't find a coin in the catalog?",
-    "notFoundText": "Create your own item or import your collection from uCoin.",
     "createOwn": "Create your own item",
     "importUcoin": "Import from uCoin",
     "tableCoin": "Coin",

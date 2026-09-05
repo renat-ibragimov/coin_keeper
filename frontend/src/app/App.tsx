@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { AuthLayout } from '@/features/auth/AuthLayout';
@@ -58,6 +58,40 @@ function LocaleCacheReset() {
   return null;
 }
 
+/** Redirects a retired path to `to`, keeping the query string and hash. */
+function RedirectTo({ to }: { to: string }) {
+  const location = useLocation();
+  return <Navigate to={{ pathname: to, search: location.search, hash: location.hash }} replace />;
+}
+
+/** `/series/:id` moved under the collection context. */
+function RedirectSeriesDetail() {
+  const { id } = useParams();
+  const location = useLocation();
+  return (
+    <Navigate
+      to={{ pathname: `/collection/series/${id}`, search: location.search, hash: location.hash }}
+      replace
+    />
+  );
+}
+
+/** `/collection/:id/edit` moved under `/collection/coins`. */
+function RedirectCollectionEdit() {
+  const { id } = useParams();
+  const location = useLocation();
+  return (
+    <Navigate
+      to={{
+        pathname: `/collection/coins/${id}/edit`,
+        search: location.search,
+        hash: location.hash,
+      }}
+      replace
+    />
+  );
+}
+
 export function App() {
   return (
     <ThemeProvider>
@@ -77,24 +111,43 @@ export function App() {
                 </Route>
                 <Route element={<ProtectedRoute />}>
                   <Route element={<AppLayout />}>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/dashboard" element={<Navigate to="/" replace />} />
+                    <Route path="/collection" element={<DashboardPage />} />
+                    <Route path="/collection/coins" element={<CollectionPage />} />
+                    <Route path="/collection/coins/new" element={<PurchaseFormPage />} />
+                    <Route path="/collection/coins/new-position" element={<CreateItemPage />} />
+                    <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
+                    <Route path="/collection/series" element={<SeriesListPage />} />
+                    <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
+                    <Route path="/collection/missing" element={<MissingPage />} />
+                    <Route path="/collection/money" element={<ExpensesPage />} />
                     <Route path="/catalog" element={<CatalogPage />} />
-                    <Route path="/catalog/new" element={<CreateItemPage />} />
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
                     <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
-                    <Route path="/series" element={<SeriesListPage />} />
-                    <Route path="/series/:id" element={<SeriesDetailPage />} />
-                    <Route path="/collection" element={<CollectionPage />} />
-                    <Route path="/collection/new" element={<PurchaseFormPage />} />
-                    <Route path="/collection/:id/edit" element={<PurchaseFormPage />} />
-                    <Route path="/missing" element={<MissingPage />} />
-                    <Route path="/expenses" element={<ExpensesPage />} />
                     <Route path="/settings" element={<SettingsPage />} />
                     <Route path="/admin" element={<ComingSoon titleKey="settings.adminTitle" />} />
+
+                    {/* Retired paths, kept as redirects for old bookmarks and links. */}
+                    <Route path="/" element={<Navigate to="/collection" replace />} />
+                    <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
+                    <Route path="/series" element={<Navigate to="/collection/series" replace />} />
+                    <Route path="/series/:id" element={<RedirectSeriesDetail />} />
+                    <Route
+                      path="/missing"
+                      element={<Navigate to="/collection/missing" replace />}
+                    />
+                    <Route path="/expenses" element={<Navigate to="/collection/money" replace />} />
+                    <Route
+                      path="/collection/new"
+                      element={<RedirectTo to="/collection/coins/new" />}
+                    />
+                    <Route path="/collection/:id/edit" element={<RedirectCollectionEdit />} />
+                    <Route
+                      path="/catalog/new"
+                      element={<RedirectTo to="/collection/coins/new-position" />}
+                    />
                   </Route>
                 </Route>
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<Navigate to="/collection" replace />} />
               </Routes>
             </BrowserRouter>
           </AuthProvider>

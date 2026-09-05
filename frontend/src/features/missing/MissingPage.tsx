@@ -23,9 +23,9 @@ import {
 import styles from './MissingPage.module.css';
 
 /**
- * /missing — catalog items the user has no instance of, with the catalog
- * filters (country, series, years). Its own screen rather than a catalog
- * filter, as docs/08-ui-map.md asks; the listing is GET /catalog?owned=false.
+ * /collection/missing — catalog items the user has no instance of, with the
+ * catalog filters (country, series, years). Its own screen rather than a
+ * catalog filter, as docs/08-ui-map.md asks; the listing is GET /catalog?owned=false.
  */
 export function MissingPage() {
   const { t, i18n } = useTranslation();
@@ -182,7 +182,10 @@ export function MissingPage() {
               key={item.id}
               item={item}
               action={
-                <Link to={`/collection/new?catalogItemId=${item.id}`} state={{ from: backTo }}>
+                <Link
+                  to={`/collection/coins/new?catalogItemId=${item.id}`}
+                  state={{ from: backTo }}
+                >
                   <Button size="sm" variant="secondary">
                     + {t('card.addPurchase')}
                   </Button>

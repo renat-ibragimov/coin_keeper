@@ -4,12 +4,15 @@
   },
   "nav": {
     "label": "Головна навігація",
+    "collectionLabel": "Навігація колекції",
     "dashboard": "Огляд",
     "catalog": "Каталог",
     "series": "Серії",
-    "collection": "Колекція",
+    "myCollection": "Моя колекція",
+    "coins": "Монети",
     "missing": "Не вистачає",
     "settings": "Налаштування",
+    "admin": "Адміністрування",
     "more": "Ще",
     "expenses": "Гроші"
   },
@@ -17,6 +20,9 @@
     "themeToggle": "Перемкнути тему",
     "account": "Акаунт",
     "logout": "Вийти"
+  },
+  "account": {
+    "menuLabel": "Меню акаунта"
   },
   "common": {
     "loading": "Завантаження…",
@@ -162,7 +168,6 @@
     "orderAsc": "За зростанням",
     "orderDesc": "За спаданням",
     "priceNote": "Ціни загального каталогу оновлюються автоматично з UA-Coins та НБУ.",
-    "addOwn": "Додати свою позицію",
     "badgeOwn": "Моя позиція",
     "badgeArchived": "Архівна",
     "badgeInCollection": "У колекції",
@@ -172,8 +177,6 @@
     "sourceLink": "Джерело",
     "emptyTitle": "Нічого не знайдено",
     "emptyText": "Спробуйте змінити фільтри або пошуковий запит.",
-    "notFoundTitle": "Не знайшли монету в каталозі?",
-    "notFoundText": "Створіть власну позицію або імпортуйте колекцію з uCoin.",
     "createOwn": "Створити свою позицію",
     "importUcoin": "Імпортувати з uCoin",
     "tableCoin": "Монета",

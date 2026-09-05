@@ -60,7 +60,7 @@ export function SeriesDetailPage() {
       <ErrorState
         title={t('series.notFound')}
         actions={
-          <Link to="/series">
+          <Link to="/collection/series">
             <Button variant="secondary">{t('nav.series')}</Button>
           </Link>
         }
@@ -77,7 +77,10 @@ export function SeriesDetailPage() {
       <PageHeader
         above={
           <Breadcrumbs
-            items={[{ label: t('nav.series'), to: '/series' }, { label: series?.name ?? '…' }]}
+            items={[
+              { label: t('nav.series'), to: '/collection/series' },
+              { label: series?.name ?? '…' },
+            ]}
           />
         }
         title={series?.name ?? <Skeleton width={280} height={36} />}
@@ -155,8 +158,8 @@ export function SeriesDetailPage() {
               action={
                 item.quantityOwned === 0 ? (
                   <Link
-                    to={`/collection/new?catalogItemId=${item.id}`}
-                    state={{ from: `/series/${seriesId}` }}
+                    to={`/collection/coins/new?catalogItemId=${item.id}`}
+                    state={{ from: `/collection/series/${seriesId}` }}
                   >
                     <Button size="sm" variant="secondary">
                       + {t('card.addPurchase')}

@@ -91,7 +91,7 @@ const intOrNull = (value: string) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-/** /catalog/new — a personal catalog item; an administrator may make it shared. */
+/** /collection/coins/new-position — a personal catalog item; an administrator may make it shared. */
 export function CreateItemPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -206,7 +206,10 @@ export function CreateItemPage() {
       <PageHeader
         above={
           <Breadcrumbs
-            items={[{ label: t('nav.catalog'), to: '/catalog' }, { label: t('catalog.createOwn') }]}
+            items={[
+              { label: t('nav.coins'), to: '/collection/coins' },
+              { label: t('catalog.createOwn') },
+            ]}
           />
         }
         title={t('catalog.createOwn')}
@@ -387,7 +390,11 @@ export function CreateItemPage() {
             )}
 
             <FormActions>
-              <Button type="button" variant="secondary" onClick={() => navigate('/catalog')}>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => navigate('/collection/coins')}
+              >
                 {t('common.cancel')}
               </Button>
               <Button type="submit" loading={mutation.isPending}>

@@ -1,7 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { useDismissable } from '@/shared/lib/useDismissable';
@@ -68,9 +67,6 @@ export function CatalogPage() {
           <h1 className={styles.title}>{t('catalog.title')}</h1>
           <p className={styles.subtitle}>{t('catalog.subtitle')}</p>
         </div>
-        <Link to="/catalog/new">
-          <Button>+ {t('catalog.addOwn')}</Button>
-        </Link>
       </header>
 
       <div className={styles.layout}>
@@ -167,21 +163,6 @@ export function CatalogPage() {
               />
             )
           ) : null}
-
-          <div className={styles.hint}>
-            <div>
-              <div className={styles.hintTitle}>{t('catalog.notFoundTitle')}</div>
-              <div className={styles.hintText}>{t('catalog.notFoundText')}</div>
-            </div>
-            <div className={styles.hintActions}>
-              <Link to="/import">
-                <Button variant="secondary">{t('catalog.importUcoin')}</Button>
-              </Link>
-              <Link to="/catalog/new">
-                <Button>+ {t('catalog.createOwn')}</Button>
-              </Link>
-            </div>
-          </div>
 
           <Pagination
             page={filters.page}

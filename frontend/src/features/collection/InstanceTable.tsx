@@ -67,7 +67,7 @@ export function InstanceTable({ items, onDelete }: InstanceTableProps) {
                 )}
               </td>
               <td className={styles.actions}>
-                <Link to={`/collection/${item.id}/edit`}>
+                <Link to={`/collection/coins/${item.id}/edit`}>
                   <Button variant="ghost" size="sm">
                     {t('common.edit')}
                   </Button>

@@ -87,9 +87,17 @@ export function CollectionPage() {
         title={t('collection.title')}
         subtitle={t('collection.subtitle')}
         actions={
-          <Link to="/collection/new">
-            <Button>+ {t('card.addPurchase')}</Button>
-          </Link>
+          <>
+            <Link to="/collection/coins/new-position">
+              <Button variant="ghost">{t('catalog.createOwn')}</Button>
+            </Link>
+            <Link to="/import">
+              <Button variant="ghost">{t('catalog.importUcoin')}</Button>
+            </Link>
+            <Link to="/collection/coins/new">
+              <Button>+ {t('card.addPurchase')}</Button>
+            </Link>
+          </>
         }
       />
 
@@ -148,7 +156,7 @@ export function CollectionPage() {
               <Link to="/catalog">
                 <Button>{t('common.backToCatalog')}</Button>
               </Link>
-              <Link to="/collection/new">
+              <Link to="/collection/coins/new">
                 <Button variant="secondary">{t('card.addPurchase')}</Button>
               </Link>
             </>

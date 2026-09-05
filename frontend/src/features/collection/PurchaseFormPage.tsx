@@ -29,9 +29,9 @@ import type { PurchaseValues } from './PurchaseForm';
 import styles from './PurchaseFormPage.module.css';
 
 /**
- * /collection/new?catalogItemId=  — a new purchase of a catalog item
- * /collection/new                 — pick the item first
- * /collection/:id/edit            — change an existing purchase
+ * /collection/coins/new?catalogItemId=  — a new purchase of a catalog item
+ * /collection/coins/new                 — pick the item first
+ * /collection/coins/:id/edit            — change an existing purchase
  */
 export function PurchaseFormPage() {
   const { t, i18n } = useTranslation();
@@ -67,7 +67,7 @@ export function PurchaseFormPage() {
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
 
   const from = (location.state as { from?: string } | null)?.from;
-  const destination = from ?? (editing ? '/collection' : `/catalog/${catalogItemId}`);
+  const destination = from ?? (editing ? '/collection/coins' : `/catalog/${catalogItemId}`);
 
   const mutation = useMutation({
     mutationFn: (values: PurchaseValues) =>
@@ -84,7 +84,7 @@ export function PurchaseFormPage() {
   });
 
   const crumbs = [
-    { label: t('nav.collection'), to: '/collection' },
+    { label: t('nav.coins'), to: '/collection/coins' },
     { label: editing ? t('purchase.editTitle') : t('card.addPurchase') },
   ];
 
@@ -95,8 +95,8 @@ export function PurchaseFormPage() {
         title={notFound ? t('purchase.instanceNotFound') : undefined}
         onRetry={notFound ? undefined : () => void instanceQuery.refetch()}
         actions={
-          <Link to="/collection">
-            <Button variant="secondary">{t('nav.collection')}</Button>
+          <Link to="/collection/coins">
+            <Button variant="secondary">{t('nav.coins')}</Button>
           </Link>
         }
       />

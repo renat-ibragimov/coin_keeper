@@ -96,7 +96,7 @@ describe('SeriesListPage', () => {
 
     expect(await screen.findByRole('link', { name: 'Almost' })).toHaveAttribute(
       'href',
-      '/series/2',
+      '/collection/series/2',
     );
     expect(screen.getByText('19 з 20')).toBeInTheDocument();
     expect(screen.getAllByText('100 ₴')).toHaveLength(4);

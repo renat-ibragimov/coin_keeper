@@ -67,7 +67,7 @@ export function DashboardPage() {
                 <Link to="/catalog">
                   <Button>{t('dashboard.emptyCatalog')}</Button>
                 </Link>
-                <Link to="/catalog/new">
+                <Link to="/collection/coins/new-position">
                   <Button variant="secondary">{t('dashboard.emptyCreate')}</Button>
                 </Link>
               </>
@@ -126,7 +126,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
           <Card>
             <div className={styles.cardHeader}>
               <h2 className={styles.cardTitle}>{t('dashboard.nearestTitle')}</h2>
-              <Link to="/series" className={styles.cardLink}>
+              <Link to="/collection/series" className={styles.cardLink}>
                 {t('dashboard.allSeries')} →
               </Link>
             </div>
@@ -143,7 +143,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                       {formatPercent(entry.ratio * 100, locale)}
                     </ProgressRing>
                     <div className={styles.seriesBody}>
-                      <Link to="/series" className={styles.seriesName}>
+                      <Link to="/collection/series" className={styles.seriesName}>
                         {entry.name}
                       </Link>
                       <div className={styles.seriesMeta}>

@@ -234,7 +234,7 @@ function CardBody({ card }: { card: CatalogCard }) {
             <h2 className={styles.sideTitle}>{t('card.actions')}</h2>
             <div className={styles.actions}>
               <Link
-                to={`/collection/new?catalogItemId=${card.id}`}
+                to={`/collection/coins/new?catalogItemId=${card.id}`}
                 state={{ from: `/catalog/${card.id}` }}
                 className={styles.actionLink}
               >

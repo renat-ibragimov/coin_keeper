@@ -186,7 +186,7 @@ describe('CoinCardPage', () => {
     expect(screen.getByText('✕ Не вистачає')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Додати покупку/ })).toHaveAttribute(
       'href',
-      '/collection/new?catalogItemId=7',
+      '/collection/coins/new?catalogItemId=7',
     );
   });
 

@@ -119,7 +119,7 @@ export function SeriesListPage() {
                 {formatPercent(summary.completionPercent, locale, 0)}
               </ProgressRing>
               <div className={styles.rowBody}>
-                <Link to={`/series/${series.id}`} className={styles.name}>
+                <Link to={`/collection/series/${series.id}`} className={styles.name}>
                   {series.name}
                 </Link>
                 <div className={styles.meta}>
