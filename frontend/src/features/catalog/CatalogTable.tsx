@@ -129,9 +129,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                         title={t('catalog.addToCollection')}
                       >
                         <span aria-hidden="true">+</span>
-                        <span className={styles.actionsLabel}>
-                          {t('catalog.addToCollection')}
-                        </span>
+                        <span className={styles.actionsLabel}>{t('catalog.addToCollection')}</span>
                       </Button>
                     </Link>
                   )}
