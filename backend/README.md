@@ -183,6 +183,29 @@ asyncio.run(main())
 
 The `-nobg` object itself is not deleted by this — it is simply no longer referenced.
 
+### Re-trimming photos cut before the margin trim existed
+
+The cut now ends by cropping to the alpha bbox (`app.services.media_background.trim_to_alpha`)
+so a coin fills its frame regardless of how much empty margin the source photo had — otherwise
+tiles show coins at different visible sizes. `--trim` re-applies that crop to rows already cut
+by an earlier run: it walks only `-nobg` rows, re-crops the stored object, and rewrites it at its
+own key (no new key is minted — the pre-cut original is still the rollback plan).
+
+```bash
+# dry run: computes old/new size for every -nobg row, writes nothing
+docker compose run --no-deps -v /home/deploy/coinkeeper/migration-reports:/app/migration-reports \
+  api python scripts/remove_photo_backgrounds.py --trim --dry-run
+
+# apply: re-encodes the trimmed object under its existing key
+docker compose run --no-deps -v /home/deploy/coinkeeper/migration-reports:/app/migration-reports \
+  api python scripts/remove_photo_backgrounds.py --trim --apply
+```
+
+`migration-reports/trim-review.csv` has the old/new pixel size and the trimmed fraction per row;
+`migration-reports/trim-review.html` is a before/after sheet on a sample of the trimmed rows.
+Idempotent the same way as the main mode: a row already trimmed to its bbox is reported unchanged
+and left alone, so a second `--trim --apply` over the same rows applies nothing.
+
 ## Ukrainian sources reconnaissance (stage 4.5, part A)
 
 Read-only survey of the three sources on Ukrainian coins (the NBU catalogue,

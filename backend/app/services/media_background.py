@@ -5,10 +5,12 @@ blister pack, a colored backdrop or a coin that touches the frame is left
 alone. See docs/06-media-storage.md, "Удаление фона", for the rule and the
 runbook. Pillow plus stdlib only, no opencv/rembg/numpy.
 
-`classify` decides; `cut_background` executes the decision. Both take and
-return Pillow images so the same two functions serve the batch script
-(backend/scripts/remove_photo_backgrounds.py) and the ingest path
-(app.core.images.process_image).
+`classify` decides; `cut_background` executes the decision, then trims the
+result to its alpha bbox with `trim_to_alpha` so every cut coin fills its
+frame at the same visible size regardless of the source photo's margins.
+All three take and return Pillow images so the same functions serve the
+batch script (backend/scripts/remove_photo_backgrounds.py) and the ingest
+path (app.core.images.process_image).
 """
 
 from __future__ import annotations
@@ -53,6 +55,16 @@ CIRCULARITY_MIN = 0.60
 
 # Edge softening on the final mask so the cut does not look scissored.
 FEATHER_RADIUS = 1.4
+
+# Bbox threshold for trim_to_alpha: low enough to keep the feathered rim
+# cut_background leaves (see FEATHER_RADIUS) inside the crop, high enough to
+# ignore stray near-zero alpha noise at the very edge of the frame.
+TRIM_ALPHA_THRESHOLD = 8
+
+# Padding added around that bbox, as a fraction of its own larger side, so
+# the coin does not end up touching the frame exactly.
+TRIM_PADDING_FRACTION = 0.02
+TRIM_PADDING_MIN_PX = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,13 +130,45 @@ def classify(img: Image.Image) -> Verdict:
 
 
 def cut_background(img: Image.Image, mask: Image.Image) -> Image.Image:
-    """RGBA copy of `img` with `mask` (255 = object) as alpha, edges feathered."""
+    """RGBA copy of `img` with `mask` (255 = object) as alpha, edges feathered.
+
+    Trimmed to the alpha bbox as a last step: source photos carry wildly
+    different empty margins around the coin, and leaving them in the frame is
+    what made cut coins render at different visible sizes in a grid of tiles.
+    """
     if mask.size != img.size:
         mask = mask.resize(img.size, Image.Resampling.BILINEAR)
     feathered = mask.filter(ImageFilter.GaussianBlur(FEATHER_RADIUS))
     rgba = img.convert("RGBA")
     rgba.putalpha(feathered)
-    return rgba
+    return trim_to_alpha(rgba)
+
+
+def trim_to_alpha(img: Image.Image, padding_fraction: float = TRIM_PADDING_FRACTION) -> Image.Image:
+    """Crop `img` to its non-transparent bbox, plus a uniform padding.
+
+    The bbox is taken at TRIM_ALPHA_THRESHOLD, not at fully opaque, so the
+    feathered rim `cut_background` leaves is never clipped. Padding is a
+    fraction of the bbox's own larger side (floored at TRIM_PADDING_MIN_PX)
+    and never pushes the crop past the original frame. An image with nothing
+    above the threshold has no object to crop to and is returned unchanged.
+    """
+    rgba = img if img.mode == "RGBA" else img.convert("RGBA")
+    alpha_mask = rgba.split()[3].point(lambda a: 255 if a > TRIM_ALPHA_THRESHOLD else 0)
+    bbox = alpha_mask.getbbox()
+    if bbox is None:
+        return img
+
+    x0, y0, x1, y1 = bbox
+    padding = max(TRIM_PADDING_MIN_PX, round(padding_fraction * max(x1 - x0, y1 - y0)))
+    width, height = img.size
+    crop_box = (
+        max(0, x0 - padding),
+        max(0, y0 - padding),
+        min(width, x1 + padding),
+        min(height, y1 + padding),
+    )
+    return img.crop(crop_box)
 
 
 def _corner_boxes(img: Image.Image) -> list[tuple[int, int, int, int]]:
