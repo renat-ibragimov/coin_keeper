@@ -52,6 +52,9 @@ class BreakdownRow:
     country: str | None
     count: int
     owned: int
+    # Only series_breakdown() sets this: the front end links a series row to
+    # its detail page, and countries have no such page.
+    id: int | None = None
 
 
 @dataclass
@@ -238,6 +241,7 @@ class DashboardRepository:
         owned = CollectionItem
         result = await self._session.execute(
             select(
+                CoinSeries.id,
                 self._series_name(),
                 self._country_name(),
                 func.count(CatalogItem.id.distinct()).label("count"),
@@ -256,7 +260,9 @@ class DashboardRepository:
             .limit(limit)
         )
         return [
-            BreakdownRow(name=row[0], country=row[1], count=int(row[2]), owned=int(row[3]))
+            BreakdownRow(
+                id=row[0], name=row[1], country=row[2], count=int(row[3]), owned=int(row[4])
+            )
             for row in result
         ]
 

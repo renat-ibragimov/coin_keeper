@@ -184,7 +184,19 @@ describe('CoinCardPage', () => {
     expect(await screen.findByText('Ще немає.')).toBeInTheDocument();
     expect(screen.queryByText('Куплено за')).toBeNull();
     expect(screen.getByText('✕ Не вистачає')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Додати покупку/ })).toHaveAttribute(
+    expect(screen.getByText('Цієї монети немає у вашій колекції')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Додати до колекції/ })).toHaveAttribute(
+      'href',
+      '/collection/coins/new?catalogItemId=7',
+    );
+  });
+
+  it('offers to add another copy when the coin is already in the collection', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ quantityOwned: 1 }));
+    renderPage();
+
+    expect(await screen.findByText('✓ Монета є у вашій колекції')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Додати ще екземпляр/ })).toHaveAttribute(
       'href',
       '/collection/coins/new?catalogItemId=7',
     );

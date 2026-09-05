@@ -34,12 +34,18 @@ export function MissingPage() {
   const { filters, update, reset } = useCatalogFilters();
   const query = { ...filters, owned: false as const, archived: false, scope: 'all' as const };
 
+  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const dashboard = bootstrapQuery.data?.dashboard;
+  // A user with no coins at all has nothing missing to show yet; skip the
+  // (potentially large) catalog fetch entirely until we know better.
+  const collectionEmpty = dashboard?.isEmpty === true;
+
   const itemsQuery = useQuery({
     queryKey: ['catalog', 'missing', query],
     queryFn: () => fetchCatalog(query),
     placeholderData: keepPreviousData,
+    enabled: dashboard !== undefined && !collectionEmpty,
   });
-  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
   const seriesQuery = useQuery({
     queryKey: ['series', 'list', filters.countryId],
@@ -49,7 +55,6 @@ export function MissingPage() {
   const page = itemsQuery.data;
   const total = page?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const dashboard = bootstrapQuery.data?.dashboard;
   const narrowed = Boolean(
     filters.countryId || filters.seriesId || filters.yearFrom || filters.yearTo,
   );
@@ -63,143 +68,157 @@ export function MissingPage() {
     <div className={styles.page}>
       <PageHeader title={t('missing.title')} subtitle={t('missing.subtitle')} />
 
-      <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
-        <StatTile
-          label={narrowed ? t('missing.tileFiltered') : t('missing.tileAll')}
-          value={page ? formatNumber(total, locale, 0) : <Skeleton width={60} />}
-          hint={
-            narrowed && dashboard
-              ? t('missing.tileAllHint', { count: dashboard.missingItems })
-              : undefined
-          }
-        />
-        <StatTile
-          label={t('missing.tileUnpriced')}
-          value={
-            dashboard ? (
-              formatNumber(dashboard.unpricedMissingItems, locale, 0)
-            ) : (
-              <Skeleton width={60} />
-            )
-          }
-          hint={t('missing.wholeCatalog')}
-        />
-        <StatTile
-          label={t('missing.tileBudget')}
-          value={
-            dashboard ? formatUah(dashboard.missingBudgetUah, locale) : <Skeleton width={90} />
-          }
-          hint={t('missing.wholeCatalog')}
-        />
-      </section>
-
-      <div className={styles.toolbar}>
-        <Select
-          aria-label={t('catalog.country')}
-          value={filters.countryId ?? ''}
-          onChange={(event) =>
-            update({ countryId: Number(event.target.value) || undefined, seriesId: undefined })
-          }
-        >
-          <option value="">{t('catalog.allCountries')}</option>
-          {(countriesQuery.data ?? []).map((country) => (
-            <option key={country.id} value={country.id}>
-              {country.name}
-            </option>
-          ))}
-        </Select>
-        <Select
-          aria-label={t('catalog.tableSeries')}
-          value={filters.seriesId ?? ''}
-          onChange={(event) => update({ seriesId: Number(event.target.value) || undefined })}
-        >
-          <option value="">{t('collection.allSeries')}</option>
-          {(seriesQuery.data ?? []).map((series) => (
-            <option key={series.id} value={series.id}>
-              {series.name}
-            </option>
-          ))}
-        </Select>
-        <div className={styles.years}>
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder={t('catalog.yearFrom')}
-            aria-label={t('catalog.yearFrom')}
-            value={filters.yearFrom ?? ''}
-            onChange={(event) => update({ yearFrom: numberOrUndefined(event.target.value) })}
-          />
-          <span className={styles.dash}>—</span>
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder={t('catalog.yearTo')}
-            aria-label={t('catalog.yearTo')}
-            value={filters.yearTo ?? ''}
-            onChange={(event) => update({ yearTo: numberOrUndefined(event.target.value) })}
-          />
-        </div>
-        {narrowed ? (
-          <Button variant="ghost" size="sm" onClick={reset}>
-            ↺ {t('catalog.resetFilters')}
-          </Button>
-        ) : null}
-      </div>
-
-      {itemsQuery.isError ? (
-        <ErrorState
-          detail={
-            itemsQuery.error instanceof ApiError && itemsQuery.error.status === 0
-              ? t('errors.network')
-              : undefined
-          }
-          onRetry={() => void itemsQuery.refetch()}
-        />
-      ) : null}
-      {itemsQuery.isPending ? (
-        <div className={styles.grid}>
-          {Array.from({ length: 8 }, (_, index) => (
-            <Skeleton key={index} height={300} />
-          ))}
-        </div>
-      ) : null}
-      {page && page.items.length === 0 ? (
+      {collectionEmpty ? (
         <EmptyState
-          icon="✓"
-          title={narrowed ? t('catalog.emptyTitle') : t('missing.emptyTitle')}
-          description={narrowed ? t('catalog.emptyText') : t('missing.emptyText')}
+          title={t('missing.emptyCollectionTitle')}
+          description={t('missing.emptyCollectionText')}
           actions={
             <Link to="/catalog">
-              <Button variant="secondary">{t('common.backToCatalog')}</Button>
+              <Button>{t('missing.emptyCollectionButton')}</Button>
             </Link>
           }
         />
-      ) : null}
-      {page && page.items.length > 0 ? (
-        <div className={styles.grid}>
-          {page.items.map((item) => (
-            <CoinCard
-              key={item.id}
-              item={item}
-              action={
-                <Link
-                  to={`/collection/coins/new?catalogItemId=${item.id}`}
-                  state={{ from: backTo }}
-                >
-                  <Button size="sm" variant="secondary">
-                    + {t('card.addPurchase')}
-                  </Button>
+      ) : (
+        <>
+          <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
+            <StatTile
+              label={narrowed ? t('missing.tileFiltered') : t('missing.tileAll')}
+              value={page ? formatNumber(total, locale, 0) : <Skeleton width={60} />}
+              hint={
+                narrowed && dashboard
+                  ? t('missing.tileAllHint', { count: dashboard.missingItems })
+                  : undefined
+              }
+            />
+            <StatTile
+              label={t('missing.tileUnpriced')}
+              value={
+                dashboard ? (
+                  formatNumber(dashboard.unpricedMissingItems, locale, 0)
+                ) : (
+                  <Skeleton width={60} />
+                )
+              }
+              hint={t('missing.wholeCatalog')}
+            />
+            <StatTile
+              label={t('missing.tileBudget')}
+              value={
+                dashboard ? formatUah(dashboard.missingBudgetUah, locale) : <Skeleton width={90} />
+              }
+              hint={t('missing.wholeCatalog')}
+            />
+          </section>
+
+          <div className={styles.toolbar}>
+            <Select
+              aria-label={t('catalog.country')}
+              value={filters.countryId ?? ''}
+              onChange={(event) =>
+                update({ countryId: Number(event.target.value) || undefined, seriesId: undefined })
+              }
+            >
+              <option value="">{t('catalog.allCountries')}</option>
+              {(countriesQuery.data ?? []).map((country) => (
+                <option key={country.id} value={country.id}>
+                  {country.name}
+                </option>
+              ))}
+            </Select>
+            <Select
+              aria-label={t('catalog.tableSeries')}
+              value={filters.seriesId ?? ''}
+              onChange={(event) => update({ seriesId: Number(event.target.value) || undefined })}
+            >
+              <option value="">{t('collection.allSeries')}</option>
+              {(seriesQuery.data ?? []).map((series) => (
+                <option key={series.id} value={series.id}>
+                  {series.name}
+                </option>
+              ))}
+            </Select>
+            <div className={styles.years}>
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder={t('catalog.yearFrom')}
+                aria-label={t('catalog.yearFrom')}
+                value={filters.yearFrom ?? ''}
+                onChange={(event) => update({ yearFrom: numberOrUndefined(event.target.value) })}
+              />
+              <span className={styles.dash}>—</span>
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder={t('catalog.yearTo')}
+                aria-label={t('catalog.yearTo')}
+                value={filters.yearTo ?? ''}
+                onChange={(event) => update({ yearTo: numberOrUndefined(event.target.value) })}
+              />
+            </div>
+            {narrowed ? (
+              <Button variant="ghost" size="sm" onClick={reset}>
+                ↺ {t('catalog.resetFilters')}
+              </Button>
+            ) : null}
+          </div>
+
+          {itemsQuery.isError ? (
+            <ErrorState
+              detail={
+                itemsQuery.error instanceof ApiError && itemsQuery.error.status === 0
+                  ? t('errors.network')
+                  : undefined
+              }
+              onRetry={() => void itemsQuery.refetch()}
+            />
+          ) : null}
+          {itemsQuery.isPending ? (
+            <div className={styles.grid}>
+              {Array.from({ length: 8 }, (_, index) => (
+                <Skeleton key={index} height={300} />
+              ))}
+            </div>
+          ) : null}
+          {page && page.items.length === 0 ? (
+            <EmptyState
+              icon="✓"
+              title={narrowed ? t('catalog.emptyTitle') : t('missing.emptyTitle')}
+              description={narrowed ? t('catalog.emptyText') : t('missing.emptyText')}
+              actions={
+                <Link to="/catalog">
+                  <Button variant="secondary">{t('common.backToCatalog')}</Button>
                 </Link>
               }
             />
-          ))}
-        </div>
-      ) : null}
-      <Pagination
-        page={filters.page}
-        pageCount={pageCount}
-        onChange={(next) => update({ page: next })}
-      />
+          ) : null}
+          {page && page.items.length > 0 ? (
+            <div className={styles.grid}>
+              {page.items.map((item) => (
+                <CoinCard
+                  key={item.id}
+                  item={item}
+                  action={
+                    <Link
+                      to={`/collection/coins/new?catalogItemId=${item.id}`}
+                      state={{ from: backTo }}
+                    >
+                      <Button size="sm" variant="secondary">
+                        + {t('card.addPurchase')}
+                      </Button>
+                    </Link>
+                  }
+                />
+              ))}
+            </div>
+          ) : null}
+          <Pagination
+            page={filters.page}
+            pageCount={pageCount}
+            onChange={(next) => update({ page: next })}
+          />
+        </>
+      )}
     </div>
   );
 }

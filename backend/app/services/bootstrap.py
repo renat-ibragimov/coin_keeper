@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
 from app.models import User, UserSettings
-from app.repositories.dashboard import DashboardRepository
+from app.repositories.dashboard import BreakdownRow, DashboardRepository
 from app.schemas.auth import UserOut
 from app.schemas.bootstrap import (
     BootstrapOut,
@@ -18,6 +18,13 @@ from app.schemas.bootstrap import (
     SeriesBreakdownEntry,
     SettingsOut,
 )
+
+
+def _series_breakdown_entry(row: BreakdownRow) -> SeriesBreakdownEntry:
+    assert row.id is not None  # series_breakdown() always sets it
+    return SeriesBreakdownEntry(
+        id=row.id, name=row.name, country=row.country or "", count=row.count, owned=row.owned
+    )
 
 
 class BootstrapService:
@@ -57,12 +64,7 @@ class BootstrapService:
             country_breakdown=[
                 BreakdownEntry(name=row.name, count=row.count, owned=row.owned) for row in countries
             ],
-            series_breakdown=[
-                SeriesBreakdownEntry(
-                    name=row.name, country=row.country or "", count=row.count, owned=row.owned
-                )
-                for row in series
-            ],
+            series_breakdown=[_series_breakdown_entry(row) for row in series],
             # Empty means "this user has nothing yet": no coins and no
             # personal items. The shared catalog alone does not make a
             # dashboard non-empty — a fresh user sees the empty state.

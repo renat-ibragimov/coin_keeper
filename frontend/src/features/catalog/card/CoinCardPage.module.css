@@ -171,6 +171,17 @@
   color: var(--color-text-muted);
 }
 
+.statusLine {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.statusLineOwned {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
 .money {
   margin: 0;
   display: flex;

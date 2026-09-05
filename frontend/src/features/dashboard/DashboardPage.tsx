@@ -89,36 +89,47 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
   const deltaTone = delta.diffUah > 0 ? 'success' : delta.diffUah < 0 ? 'danger' : 'neutral';
   const series = nearestToCompletion(dashboard.seriesBreakdown).slice(0, 6);
 
+  // The list is sorted closest-to-completion first, so the first entry is
+  // also the one the context CTA below points at.
+  const nearestSeries = series[0];
+
   return (
     <>
       <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
-        <StatTile
-          icon="◎"
-          label={t('dashboard.tileCoins')}
-          value={formatNumber(dashboard.collectionItems, locale, 0)}
-          hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
-        />
-        <StatTile
-          icon="◌"
-          label={t('dashboard.tileMissing')}
-          value={formatNumber(dashboard.missingItems, locale, 0)}
-          hint={t('dashboard.tileMissingHint', { count: dashboard.catalogItems })}
-        />
-        <StatTile
-          icon="◔"
-          label={t('dashboard.tileCompletion')}
-          value={formatPercent(dashboard.completionPercent, locale, 1)}
-          hint={t('dashboard.progress', {
-            owned: dashboard.completedItems,
-            count: dashboard.catalogItems,
-          })}
-        />
-        <StatTile
-          icon="⌖"
-          label={t('dashboard.tileCountries')}
-          value={formatNumber(dashboard.countries, locale, 0)}
-          hint={t('dashboard.tileCountriesHint')}
-        />
+        <Link to="/collection/coins" className={styles.tileLink}>
+          <StatTile
+            icon="◎"
+            label={t('dashboard.tileCoins')}
+            value={formatNumber(dashboard.collectionItems, locale, 0)}
+            hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
+          />
+        </Link>
+        <Link to="/collection/missing" className={styles.tileLink}>
+          <StatTile
+            icon="◌"
+            label={t('dashboard.tileMissing')}
+            value={formatNumber(dashboard.missingItems, locale, 0)}
+            hint={t('dashboard.tileMissingHint', { count: dashboard.catalogItems })}
+          />
+        </Link>
+        <Link to="/collection/series" className={styles.tileLink}>
+          <StatTile
+            icon="◔"
+            label={t('dashboard.tileCompletion')}
+            value={formatPercent(dashboard.completionPercent, locale, 1)}
+            hint={t('dashboard.progress', {
+              owned: dashboard.completedItems,
+              count: dashboard.catalogItems,
+            })}
+          />
+        </Link>
+        <Link to="/collection/money" className={styles.tileLink}>
+          <StatTile
+            icon="↗"
+            label={t('dashboard.marketValue')}
+            value={formatUah(dashboard.marketValueUah, locale)}
+          />
+        </Link>
       </section>
 
       <div className={styles.columns}>
@@ -135,7 +146,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
             ) : (
               <ul className={styles.seriesList}>
                 {series.map((entry) => (
-                  <li key={`${entry.country}/${entry.name}`} className={styles.seriesRow}>
+                  <li key={entry.id} className={styles.seriesRow}>
                     <ProgressRing
                       value={entry.ratio}
                       aria-label={formatPercent(entry.ratio * 100, locale) ?? ''}
@@ -143,7 +154,10 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                       {formatPercent(entry.ratio * 100, locale)}
                     </ProgressRing>
                     <div className={styles.seriesBody}>
-                      <Link to="/collection/series" className={styles.seriesName}>
+                      <Link
+                        to={`/collection/series/${entry.id}`}
+                        className={`${styles.seriesName} ${styles.seriesNameStretched}`}
+                      >
                         {entry.name}
                       </Link>
                       <div className={styles.seriesMeta}>
@@ -160,6 +174,19 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                 ))}
               </ul>
             )}
+            {nearestSeries ? (
+              <div className={styles.nearestCta}>
+                <p className={styles.nearestCtaText}>
+                  {t('dashboard.nearestCtaText', {
+                    name: nearestSeries.name,
+                    count: nearestSeries.missing,
+                  })}
+                </p>
+                <Link to={`/collection/missing?seriesId=${nearestSeries.id}`}>
+                  <Button variant="secondary">{t('dashboard.nearestCtaButton')}</Button>
+                </Link>
+              </div>
+            ) : null}
           </Card>
 
           <Card>

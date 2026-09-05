@@ -16,6 +16,7 @@ class BreakdownEntry(CamelModel):
 
 
 class SeriesBreakdownEntry(BreakdownEntry):
+    id: int
     country: str
 
 

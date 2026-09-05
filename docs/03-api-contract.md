@@ -96,7 +96,7 @@ GET /bootstrap
       coinSpendUah, relatedSpendUah, totalSpendUah,
       marketValueUah, missingBudgetUah, unpricedMissingItems,
       countryBreakdown: [{name, count, owned}],
-      seriesBreakdown:  [{name, country, count, owned}],
+      seriesBreakdown:  [{id, name, country, count, owned}],
       isEmpty
     },
     exchangeRates: [{code, rate, effectiveDate}],
@@ -109,6 +109,10 @@ GET /bootstrap
 
 Структура взята из legacy `BootstrapPayload` (`legacy/reference-code/types.ts`) — она
 проверена практикой и покрывает весь дашборд.
+
+`seriesBreakdown[].id` — id серии (`coin_series.id`), аддитивное поле: фронт использует
+его, чтобы сделать строку серии на Огляді ссылкой на `/collection/series/{id}` вместо
+общего списка серій.
 
 `isEmpty` в вебе означает «у пользователя ещё ничего нет»: ни экземпляров, ни личных
 позиций. Общий каталог сам по себе дашборд не «наполняет» — новый пользователь видит

@@ -24,6 +24,23 @@
   gap: var(--space-4);
 }
 
+.tileLink {
+  display: block;
+  border-radius: var(--radius-lg);
+  color: inherit;
+  text-decoration: none;
+}
+
+.tileLink:hover {
+  outline: 1px solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+.tileLink:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
 .columns {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
@@ -82,6 +99,7 @@
 }
 
 .seriesRow {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -110,10 +128,37 @@
   color: var(--color-accent);
 }
 
+/* Stretched-link pattern, same as the catalog cards: the pseudo-element
+ * covers the whole row so a click anywhere opens it, while a real anchor
+ * keeps keyboard, middle-click and the context menu working. */
+.seriesNameStretched::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+}
+
 .seriesMeta {
   font-size: 13.5px;
   color: var(--color-text-secondary);
   margin-top: 2px;
+}
+
+.nearestCta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-accent-soft);
+}
+
+.nearestCtaText {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
 }
 
 /* --- countries --- */

@@ -189,6 +189,9 @@ function CardBody({ card }: { card: CatalogCard }) {
                 {owned ? '✓' : '○'}
               </span>
             </div>
+            <p className={[styles.statusLine, owned ? styles.statusLineOwned : ''].join(' ')}>
+              {owned ? `✓ ${t('card.ownedStatement')}` : t('card.notOwnedStatement')}
+            </p>
             <PropertyList
               rows={[
                 {
@@ -238,7 +241,9 @@ function CardBody({ card }: { card: CatalogCard }) {
                 state={{ from: `/catalog/${card.id}` }}
                 className={styles.actionLink}
               >
-                <Button block>+ {t('card.addPurchase')}</Button>
+                <Button block>
+                  {owned ? t('catalog.addAnotherCopy') : `+ ${t('catalog.addToCollection')}`}
+                </Button>
               </Link>
               <Button block variant="secondary" disabled title={t('card.ownPriceSoon')}>
                 ⌂ {t('card.ownPrice')}

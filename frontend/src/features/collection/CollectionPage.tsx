@@ -79,7 +79,9 @@ export function CollectionPage() {
         ).length,
       }
     : null;
-  const collectionEmpty = page !== undefined && total === 0 && !hasActiveFilters(filters);
+  // docs/03-api-contract.md: emptiness is the server's isEmpty from bootstrap
+  // (no coins and no personal items), not a locally derived "zero rows" guess.
+  const collectionEmpty = dashboard?.isEmpty === true && !hasActiveFilters(filters);
 
   return (
     <div className={styles.page}>

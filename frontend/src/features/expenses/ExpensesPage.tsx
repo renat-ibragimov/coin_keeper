@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { fetchCurrencies } from '@/features/catalog/api';
+import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { ExpenseCategory, ExpenseOut } from '@/shared/api/types';
 import { formatDate, formatMoney, formatUah } from '@/shared/lib/format';
@@ -63,6 +64,8 @@ export function ExpensesPage() {
     queryFn: fetchExpensesSummary,
   });
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
+  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const collectionEmpty = bootstrapQuery.data?.dashboard.isEmpty === true;
 
   const invalidate = () =>
     Promise.all(DEPENDENT_KEYS.map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
@@ -180,7 +183,18 @@ export function ExpensesPage() {
         />
       ) : null}
       {listQuery.isPending ? <Skeleton height={280} /> : null}
-      {list && list.items.length === 0 ? (
+      {list && list.items.length === 0 && collectionEmpty ? (
+        <EmptyState
+          title={t('expenses.emptyCollectionTitle')}
+          description={t('expenses.emptyCollectionText')}
+          actions={
+            <Link to="/catalog">
+              <Button>{t('expenses.emptyCollectionButton')}</Button>
+            </Link>
+          }
+        />
+      ) : null}
+      {list && list.items.length === 0 && !collectionEmpty ? (
         <EmptyState
           title={t('expenses.emptyTitle')}
           description={t('expenses.emptyText')}

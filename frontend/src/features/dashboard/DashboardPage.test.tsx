@@ -42,8 +42,8 @@ function makeBootstrap(overrides: Partial<BootstrapOut['dashboard']> = {}): Boot
       unpricedMissingItems: 41,
       countryBreakdown: [{ name: 'Україна', count: 1200, owned: 590 }],
       seriesBreakdown: [
-        { name: 'Флора і фауна', country: 'Україна', count: 20, owned: 19 },
-        { name: 'Готово', country: 'Україна', count: 3, owned: 3 },
+        { id: 11, name: 'Флора і фауна', country: 'Україна', count: 20, owned: 19 },
+        { id: 12, name: 'Готово', country: 'Україна', count: 3, owned: 3 },
       ],
       isEmpty: false,
       ...overrides,
@@ -82,12 +82,50 @@ describe('DashboardPage', () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap({ isEmpty: true }));
     renderPage();
 
-    expect(await screen.findByText('Додайте першу монету')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
-      'href',
-      '/catalog',
-    );
+    expect(await screen.findByText('Ваша колекція поки порожня')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Знайти монету' })).toHaveAttribute('href', '/catalog');
     expect(screen.queryByText('Фінанси')).toBeNull();
+  });
+
+  it('links every KPI tile to its own section', async () => {
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
+    renderPage();
+
+    await screen.findByText(/Вітаємо, Renat/);
+    expect(screen.getByRole('link', { name: /Монет у колекції/ })).toHaveAttribute(
+      'href',
+      '/collection/coins',
+    );
+    expect(screen.getByRole('link', { name: /Не вистачає/ })).toHaveAttribute(
+      'href',
+      '/collection/missing',
+    );
+    expect(screen.getByRole('link', { name: /Комплектність/ })).toHaveAttribute(
+      'href',
+      '/collection/series',
+    );
+    expect(screen.getByRole('link', { name: /Поточна оцінка/ })).toHaveAttribute(
+      'href',
+      '/collection/money',
+    );
+  });
+
+  it('opens the series page from the nearest-series row and offers the context CTA', async () => {
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Флора і фауна' })).toHaveAttribute(
+      'href',
+      '/collection/series/11',
+    );
+
+    expect(
+      screen.getByText('До завершення серії «Флора і фауна» залишилася 1 монета'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Переглянути відсутні' })).toHaveAttribute(
+      'href',
+      '/collection/missing?seriesId=11',
+    );
   });
 
   it('renders the totals and the delta between valuation and spend', async () => {

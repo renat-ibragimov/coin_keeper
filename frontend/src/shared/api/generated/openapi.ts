@@ -1347,6 +1347,8 @@ export interface components {
             count: number;
             /** Owned */
             owned: number;
+            /** Id */
+            id: number;
             /** Country */
             country: string;
         };

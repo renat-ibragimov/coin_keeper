@@ -141,9 +141,11 @@ async def test_dashboard_figures(
     assert countries["Сполучені Штати"]["owned"] == 0
 
     series = {row["name"]: row for row in dashboard["seriesBreakdown"]}
+    assert series["Флора і фауна"]["id"] == refs.fauna.id
     assert series["Флора і фауна"]["count"] == 2
     assert series["Флора і фауна"]["owned"] == 1
     assert series["Флора і фауна"]["country"] == "Україна"
+    assert series["Міста України"]["id"] == refs.cities.id
     assert series["Міста України"]["owned"] == 1
 
 
@@ -184,6 +186,7 @@ async def test_dashboard_hides_a_deactivated_country_from_aggregates(
     assert countries["Сполучені Штати"]["owned"] == 1
 
     series = {row["name"]: row for row in dashboard["seriesBreakdown"]}
+    assert series["Standing Liberty"]["id"] == series_usa.id
     assert series["Standing Liberty"]["count"] == 1
     assert series["Standing Liberty"]["owned"] == 1
 
