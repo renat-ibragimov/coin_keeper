@@ -13,9 +13,18 @@ interface PaginationProps {
 export function Pagination({ page, pageCount, onChange }: PaginationProps) {
   const { t } = useTranslation();
   if (pageCount <= 1) return null;
+  // Every page-change goes through here, whatever the caller does with the
+  // number (a URL search param or, e.g. SeriesDetailPage, local state) — the
+  // page landing at the top of the new results is a property of pagination
+  // itself, not something each screen has to remember to wire up
+  // (docs/08-ui-map.md).
+  const goTo = (next: number) => {
+    onChange(next);
+    window.scrollTo({ top: 0 });
+  };
   return (
     <nav className={styles.pagination} aria-label={t('pagination.label')}>
-      <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+      <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => goTo(page - 1)}>
         ← {t('pagination.previous')}
       </Button>
       {pageItems(page, pageCount).map((item, index) =>
@@ -29,18 +38,13 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
             type="button"
             className={[styles.page, item === page ? styles.current : ''].join(' ')}
             aria-current={item === page ? 'page' : undefined}
-            onClick={() => onChange(item)}
+            onClick={() => goTo(item)}
           >
             {item}
           </button>
         ),
       )}
-      <Button
-        variant="secondary"
-        size="sm"
-        disabled={page >= pageCount}
-        onClick={() => onChange(page + 1)}
-      >
+      <Button variant="secondary" size="sm" disabled={page >= pageCount} onClick={() => goTo(page + 1)}>
         {t('pagination.next')} →
       </Button>
     </nav>

@@ -58,6 +58,20 @@ function LocaleCacheReset() {
   return null;
 }
 
+/**
+ * The app never restores scroll position across navigations — every route
+ * change (a new page, or a pagination query-string change on the same
+ * path) should land at the top, not wherever the previous page was scrolled
+ * to (docs/08-ui-map.md).
+ */
+function ScrollToTop() {
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname, search]);
+  return null;
+}
+
 /** Redirects a retired path to `to`, keeping the query string and hash. */
 function RedirectTo({ to }: { to: string }) {
   const location = useLocation();
@@ -100,6 +114,7 @@ export function App() {
         <ToastProvider>
           <AuthProvider>
             <BrowserRouter>
+              <ScrollToTop />
               <Routes>
                 <Route element={<AuthLayout />}>
                   <Route path="/login" element={<LoginPage />} />

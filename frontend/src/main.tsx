@@ -15,6 +15,13 @@ import '@/shared/theme/tokens.css';
 
 import { App } from './app/App';
 
+// The browser's own scroll restoration races with App.tsx's ScrollToTop and
+// is what made the coin card page land mid-scroll or at the bottom instead
+// of the top; App.tsx owns scroll position on every navigation instead.
+if ('scrollRestoration' in window.history) {
+  window.history.scrollRestoration = 'manual';
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />
