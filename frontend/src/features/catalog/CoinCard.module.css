@@ -25,11 +25,14 @@
   opacity: 0.72;
 }
 
+/* 2/1 so the obverse/reverse halves (each ~50% wide, full height, split by
+ * the 2px gap) come out square — a round coin then fills its half edge to
+ * edge instead of floating in a portrait box (docs/08-ui-map.md). */
 .media {
   position: relative;
   display: flex;
   gap: 2px;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 2 / 1;
   background:
     radial-gradient(
       circle at 30% 30%,
