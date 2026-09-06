@@ -77,6 +77,21 @@ BORDER_BACKGROUND_MIN = 0.75
 CIRCULARITY_MAX = 0.87
 CIRCULARITY_MIN = 0.60
 
+# A pixel this opaque or more does not count as "transparent" for the check
+# below -- a feathered rim left by a *previous* cut sits just under fully
+# opaque and must not itself trip the guard.
+ALREADY_TRANSPARENT_ALPHA_MAX = 250
+
+# If at least this fraction of an input's pixels are below that alpha, the
+# photo already had its background removed upstream (a subset of the NBU
+# originals ship this way, stored as alpha=0 over an arbitrary black matte).
+# Incident (2026-09): the dark-background branch read that matte's RGB as a
+# black backdrop, flood-filled it, and cut a fresh alpha from its own mask --
+# discarding the real transparency and exposing whatever the matte used to
+# hide (gradients, shadows, crop leftovers). See docs/06-media-storage.md,
+# "Удаление фона", and the `--revert-transparent-originals` runbook there.
+ALREADY_TRANSPARENT_FRACTION_MIN = 0.005
+
 # Edge softening on the final mask so the cut does not look scissored.
 FEATHER_RADIUS = 1.4
 
@@ -117,8 +132,16 @@ class _Component:
 def classify(img: Image.Image) -> Verdict:
     """Decide whether `img` is a coin on a uniform background worth cutting.
 
-    Two background kinds are recognized by their corners: white (the
-    original, by far the most common case) and dark -- proof coins shot
+    Checked before anything else: an input that already carries meaningful
+    alpha transparency (see `transparent_pixel_fraction`) has had its
+    background removed already, and any further cut can only damage it --
+    `skip:already_transparent`, no metrics computed. This must run on `img`
+    as given, before any `.convert("RGB")` throws the alpha away; a caller
+    that pre-flattens to RGB defeats the guard (see the `--revert-
+    transparent-originals` incident note on ALREADY_TRANSPARENT_FRACTION_MIN).
+
+    Otherwise, two background kinds are recognized by their corners: white
+    (the original, by far the most common case) and dark -- proof coins shot
     against black felt/velvet. Both run the same pipeline in
     `_classify_uniform_background`, differing only in flood-fill tolerance.
     Anything else -- textured, colored, or inconsistent corners -- is
@@ -131,6 +154,14 @@ def classify(img: Image.Image) -> Verdict:
     already computed; a rejection early on (not_white_bg) simply leaves the
     later metrics out rather than blank-filling them.
     """
+    transparent_fraction = transparent_pixel_fraction(img)
+    if transparent_fraction > ALREADY_TRANSPARENT_FRACTION_MIN:
+        return Verdict(
+            cut=False,
+            reason="skip:already_transparent",
+            metrics={"transparentFraction": transparent_fraction},
+        )
+
     rgb = img.convert("RGB")
     metrics: dict[str, float | str] = {"cornerWhiteness": _corner_whiteness(rgb)}
     if _corners_are_white(rgb):
@@ -238,6 +269,24 @@ def trim_to_alpha(img: Image.Image, padding_fraction: float = TRIM_PADDING_FRACT
         min(height, y1 + padding),
     )
     return img.crop(crop_box)
+
+
+def transparent_pixel_fraction(img: Image.Image) -> float:
+    """Fraction of pixels with alpha < ALREADY_TRANSPARENT_ALPHA_MAX; 0 for an opaque image.
+
+    Public so the `--revert-transparent-originals` runbook (backend/scripts/
+    remove_photo_backgrounds.py) can apply the exact same criterion to a
+    stored original as `classify` applies to its input, without duplicating
+    the histogram math.
+    """
+    if "A" not in img.getbands():
+        return 0.0
+    total = img.width * img.height
+    if total == 0:
+        return 0.0
+    alpha_histogram = img.getchannel("A").histogram()
+    below_max = sum(alpha_histogram[:ALREADY_TRANSPARENT_ALPHA_MAX])
+    return below_max / total
 
 
 def _corner_boxes(img: Image.Image) -> list[tuple[int, int, int, int]]:

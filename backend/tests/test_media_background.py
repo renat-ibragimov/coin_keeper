@@ -17,6 +17,7 @@ from app.services.media_background import (
     FLOOD_TOLERANCE_DARK,
     classify,
     cut_background,
+    transparent_pixel_fraction,
     trim_to_alpha,
 )
 
@@ -164,6 +165,44 @@ def test_circle_on_white_is_still_plain_cut() -> None:
     assert verdict.cut
     assert verdict.metrics is not None
     assert verdict.metrics["bgKind"] == "white"
+
+
+def test_transparent_corners_over_a_black_matte_are_left_alone() -> None:
+    """Regression guard for the 2026-09 incident (docs/06-media-storage.md).
+
+    An RGBA source whose corners are transparent (alpha=0) over an arbitrary
+    black matte must never reach the dark-background flood fill: its corners
+    read exactly like a legitimate black-felt photo once alpha is discarded,
+    and cutting it a second time would flood the matte and expose whatever it
+    was hiding.
+    """
+    img = Image.new("RGBA", (SIZE, SIZE), (*DARK, 0))
+    draw = ImageDraw.Draw(img)
+    margin = SIZE // 4
+    draw.ellipse((margin, margin, SIZE - margin, SIZE - margin), fill=(*COIN, 255))
+
+    verdict = classify(img)
+
+    assert not verdict.cut
+    assert verdict.reason == "skip:already_transparent"
+    assert verdict.mask is None
+
+
+def test_opaque_circle_on_black_still_cuts_dark() -> None:
+    """The dark branch itself must not regress: a genuinely opaque photo still cuts."""
+    img = Image.new("RGBA", (SIZE, SIZE), (*DARK, 255))
+    draw = ImageDraw.Draw(img)
+    margin = SIZE // 4
+    draw.ellipse((margin, margin, SIZE - margin, SIZE - margin), fill=(*COIN, 255))
+
+    assert transparent_pixel_fraction(img) == 0.0
+
+    verdict = classify(img)
+
+    assert verdict.cut
+    assert verdict.reason is None
+    assert verdict.metrics is not None
+    assert verdict.metrics["bgKind"] == "dark"
 
 
 def test_dark_gray_uneven_background_is_skipped() -> None:

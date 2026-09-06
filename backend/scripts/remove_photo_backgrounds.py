@@ -22,6 +22,19 @@ own key rather than minting a new one -- the pre-cut original is still the
 rollback plan.
 
     docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --trim --dry-run
+
+`--revert-transparent-originals` is the rollback for the 2026-09 incident: a
+run before classify() guarded against it flattened some already-transparent
+NBU originals to RGB, read their black matte as a dark background, and cut a
+fresh (wrong) alpha over whatever that matte was hiding. It walks the same
+already-`-nobg` rows as --trim, but downloads each row's ORIGINAL (the key
+without `-nobg`) and applies the same already-transparent criterion
+classify() now uses; a row whose original truly had no transparency is a
+legitimate white/dark cut and is left alone. See docs/06-media-storage.md,
+"Удаление фона", for the full runbook.
+
+    docker compose run --no-deps api python scripts/remove_photo_backgrounds.py \\
+        --revert-transparent-originals --dry-run
 """
 
 from __future__ import annotations
@@ -46,11 +59,18 @@ from sqlalchemy import Select, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.core.images import encode_variants
+from app.core.images import VARIANT_SIDES, encode_variants
 from app.core.media_keys import preview_key_of, primary_key_of, stored_variants, variant_key
 from app.core.storage import ObjectStorage
 from app.models import CatalogItem, CollectionItem, MediaFile
-from app.services.media_background import Verdict, classify, cut_background, trim_to_alpha
+from app.services.media_background import (
+    ALREADY_TRANSPARENT_FRACTION_MIN,
+    Verdict,
+    classify,
+    cut_background,
+    transparent_pixel_fraction,
+    trim_to_alpha,
+)
 
 EXIT_OK = 0
 EXIT_USAGE = 2
@@ -90,6 +110,28 @@ TRIM_CSV_COLUMNS = (
     "newHeight",
     "trimmedFraction",
     "oldKey",
+    "error",
+)
+
+# --revert-transparent-originals status values, in the order a row can reach
+# them: no surviving original to check at all, checked and legitimately not
+# transparent, checked and needs (or got) reverted, or a read/write failure.
+REVERT_STATUS_MISSING_ORIGINAL = "missing_original"
+REVERT_STATUS_NOT_NEEDED = "not_needed"
+REVERT_STATUS_NEEDS_REVERT = "needs_revert"
+REVERT_STATUS_REVERTED = "reverted"
+REVERT_STATUS_ERROR = "error"
+
+REVERT_CSV_COLUMNS = (
+    "mediaFileId",
+    "itemId",
+    "title",
+    "status",
+    "width",
+    "height",
+    "transparentFraction",
+    "nobgKey",
+    "originalBase",
     "error",
 )
 
@@ -165,6 +207,38 @@ class TrimOutcome:
         }
 
 
+@dataclass
+class RevertReviewRow:
+    candidate: Candidate  # source_key/old_key here are the current (-nobg) row
+    original_base: str
+    status: str = REVERT_STATUS_ERROR
+    width: int | None = None
+    height: int | None = None
+    transparent_fraction: float | None = None
+    error: str | None = None
+
+
+@dataclass
+class RevertOutcome:
+    candidates: int = 0
+    missing_original: int = 0
+    not_needed: int = 0
+    needs_revert: int = 0  # includes reverted, once --apply is used
+    reverted: int = 0
+    failed: list[dict[str, Any]] = field(default_factory=list)
+    rows: list[RevertReviewRow] = field(default_factory=list)
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "candidates": self.candidates,
+            "missingOriginal": self.missing_original,
+            "notNeeded": self.not_needed,
+            "needsRevert": self.needs_revert,
+            "reverted": self.reverted,
+            "failed": len(self.failed),
+        }
+
+
 def is_already_processed(storage_key: str) -> bool:
     return f"{NOBG_MARKER}_" in storage_key
 
@@ -172,6 +246,18 @@ def is_already_processed(storage_key: str) -> bool:
 def base_of(key: str) -> str:
     """The key without its trailing `_<side>.webp`."""
     return _VARIANT_SUFFIX.sub("", key)
+
+
+def original_base_of(nobg_key: str) -> str:
+    """The pre-cut base key, recovered from an already-cut row's own key.
+
+    Only meaningful for a key `is_already_processed` -- asserts the marker is
+    there rather than silently returning a nonsense base for one that never
+    had it.
+    """
+    base = base_of(nobg_key)
+    assert base.endswith(NOBG_MARKER), f"{nobg_key!r} is not an already-cut key"
+    return base[: -len(NOBG_MARKER)]
 
 
 def largest_variant_key(storage_key: str, variants: dict[str, str] | None) -> str:
@@ -304,7 +390,12 @@ async def process_candidates(
     for index, candidate in enumerate(candidates, start=1):
         try:
             payload = storage.get(candidate.source_key)
-            image = Image.open(io.BytesIO(payload)).convert("RGB")
+            # RGBA, not RGB: classify()'s already-transparent guard needs the
+            # source's real alpha channel intact. Flattening to RGB here (as
+            # this used to do) throws that away before classify ever sees it
+            # -- see the 2026-09 incident note on ALREADY_TRANSPARENT_FRACTION_MIN
+            # in app.services.media_background.
+            image = Image.open(io.BytesIO(payload)).convert("RGBA")
         except Exception as exc:  # a bad object or a storage error must not stop the run
             outcome.failed.append(
                 {"mediaFileId": candidate.media_id, "key": candidate.source_key, "error": str(exc)}
@@ -413,6 +504,164 @@ async def process_trim_candidates(
         if index % 50 == 0 or index == len(candidates):
             log(f"trim {index}/{len(candidates)}: {outcome.trimmed} trimmed so far")
     return outcome
+
+
+def _existing_original_variants(
+    storage: ObjectStorage, original_base: str
+) -> dict[int, tuple[str, int]]:
+    """Which of the original's 300/600/1200 variants still exist, keyed by side.
+
+    A HEAD per candidate side, not a GET: checking what survived must not
+    pull a possibly-large object over the wire before it is known a revert
+    is even needed. Value is (key, size in bytes) -- the size lets the row's
+    size_bytes be recomputed after --apply without a further download of a
+    variant this pass leaves untouched.
+    """
+    existing: dict[int, tuple[str, int]] = {}
+    for side in VARIANT_SIDES:
+        key = variant_key(original_base, side)
+        size = storage.head(key)
+        if size is not None:
+            existing[side] = (key, size)
+    return existing
+
+
+async def _apply_revert(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    candidate: Candidate,
+    original_base: str,
+    existing: dict[int, tuple[str, int]],
+    image: Image.Image,
+    payload: bytes,
+) -> None:
+    """Point the row back at the original key, regenerating only missing sides.
+
+    A side already present in `existing` is left untouched: re-encoding it
+    from the largest surviving variant risks a byte-for-byte mismatch with a
+    variant that was never actually broken, for no benefit. `-nobg` objects
+    are not deleted -- cleanup is a separate, later concern; the point here
+    is that the row stops pointing at them.
+    """
+    missing_sides = [side for side in VARIANT_SIDES if side not in existing]
+    final_keys = {side: key for side, (key, _size) in existing.items()}
+    size_bytes = sum(size for _key, size in existing.values())
+
+    if missing_sides:
+        sha256 = hashlib.sha256(payload).hexdigest()
+        processed = encode_variants(image, sha256=sha256)
+        for side in missing_sides:
+            if side not in processed.variants:
+                continue  # a small original legitimately never produced this side
+            key = variant_key(original_base, side)
+            storage.put(key, processed.variants[side], processed.mime_type)
+            final_keys[side] = key
+            size_bytes += len(processed.variants[side])
+
+    row = await session.get(MediaFile, candidate.media_id)
+    assert row is not None
+    row.storage_key = primary_key_of(final_keys)
+    row.thumbnail_key = preview_key_of(final_keys)
+    row.variants = stored_variants(final_keys)
+    row.size_bytes = size_bytes
+    row.width = image.width
+    row.height = image.height
+    await session.commit()
+
+
+async def process_revert_candidates(
+    session: AsyncSession,
+    storage: ObjectStorage,
+    candidates: Sequence[Candidate],
+    *,
+    apply: bool,
+    log: Callable[[str], None],
+) -> RevertOutcome:
+    """Check every already-cut row's original for the already-transparent bug, and fix it.
+
+    `candidates` is the same already-`-nobg` universe `--trim` walks
+    (`find_trim_candidates`); this reads the ORIGINAL (the key without
+    `-nobg`) for each, not the cut object itself.
+    """
+    outcome = RevertOutcome(candidates=len(candidates))
+    for index, candidate in enumerate(candidates, start=1):
+        original_base = original_base_of(candidate.old_key)
+        existing = _existing_original_variants(storage, original_base)
+        row = RevertReviewRow(candidate=candidate, original_base=original_base)
+
+        if not existing:
+            row.status = REVERT_STATUS_MISSING_ORIGINAL
+            row.error = f"no surviving original variant under {original_base}"
+            outcome.missing_original += 1
+            outcome.rows.append(row)
+            continue
+
+        largest_side = max(existing)
+        largest_key, _size = existing[largest_side]
+        try:
+            payload = storage.get(largest_key)
+            image = Image.open(io.BytesIO(payload)).convert("RGBA")
+        except Exception as exc:  # a bad object or a storage error must not stop the run
+            row.status = REVERT_STATUS_ERROR
+            row.error = str(exc)
+            outcome.failed.append({"mediaFileId": candidate.media_id, "error": str(exc)})
+            outcome.rows.append(row)
+            continue
+
+        fraction = transparent_pixel_fraction(image)
+        row.width, row.height = image.width, image.height
+        row.transparent_fraction = fraction
+
+        if fraction <= ALREADY_TRANSPARENT_FRACTION_MIN:
+            row.status = REVERT_STATUS_NOT_NEEDED
+            outcome.not_needed += 1
+            outcome.rows.append(row)
+            continue
+
+        row.status = REVERT_STATUS_NEEDS_REVERT
+        outcome.needs_revert += 1
+        if apply:
+            try:
+                await _apply_revert(
+                    session, storage, candidate, original_base, existing, image, payload
+                )
+                row.status = REVERT_STATUS_REVERTED
+                outcome.reverted += 1
+            except Exception as exc:  # one failure must not stop the run
+                await session.rollback()
+                row.error = str(exc)
+                outcome.failed.append({"mediaFileId": candidate.media_id, "error": str(exc)})
+
+        outcome.rows.append(row)
+        if index % 50 == 0 or index == len(candidates):
+            log(f"revert {index}/{len(candidates)}: {outcome.needs_revert} need reverting so far")
+    return outcome
+
+
+def write_revert_review_csv(path: Path, outcome: RevertOutcome) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8-sig", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=REVERT_CSV_COLUMNS)
+        writer.writeheader()
+        for row in outcome.rows:
+            writer.writerow(
+                {
+                    "mediaFileId": row.candidate.media_id,
+                    "itemId": row.candidate.item_id,
+                    "title": row.candidate.title,
+                    "status": row.status,
+                    "width": row.width if row.width is not None else "",
+                    "height": row.height if row.height is not None else "",
+                    "transparentFraction": (
+                        f"{row.transparent_fraction:.4f}"
+                        if row.transparent_fraction is not None
+                        else ""
+                    ),
+                    "nobgKey": row.candidate.old_key,
+                    "originalBase": row.original_base,
+                    "error": row.error or "",
+                }
+            )
 
 
 def write_review_csv(path: Path, outcome: Outcome) -> None:
@@ -603,6 +852,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "classifying new ones -- for photos cut before this margin trim existed"
         ),
     )
+    parser.add_argument(
+        "--revert-transparent-originals",
+        action="store_true",
+        help=(
+            "roll back already-cut rows whose ORIGINAL was itself already "
+            "transparent (the 2026-09 incident) -- checks every already-cut "
+            "row's original and points the row back at it, leaving a "
+            "legitimate white/dark cut untouched"
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -623,6 +882,36 @@ async def _run(args: argparse.Namespace, log: Progress) -> int:
     )
     settings = get_settings()
     storage = ObjectStorage(build_s3_client(settings), settings.s3_bucket)
+
+    if args.revert_transparent_originals:
+        try:
+            async with get_session_factory()() as session:
+                candidates = await find_trim_candidates(session, only_ids=only_ids)
+                batch = candidates if args.limit is None else candidates[: args.limit]
+                log(f"{len(candidates)} already-cut candidates, running {len(batch)}")
+                revert_outcome = await process_revert_candidates(
+                    session, storage, batch, apply=args.apply, log=log
+                )
+        finally:
+            await dispose_engine()
+
+        args.out_dir.mkdir(parents=True, exist_ok=True)
+        write_revert_review_csv(args.out_dir / "revert-review.csv", revert_outcome)
+        (args.out_dir / "revert-report.json").write_text(
+            json.dumps(revert_outcome.summary(), indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+
+        for line in (
+            f"candidates: {revert_outcome.candidates}",
+            f"missing original: {revert_outcome.missing_original}",
+            f"not needed (legitimate cut): {revert_outcome.not_needed}",
+            f"needs revert: {revert_outcome.needs_revert}",
+            f"reverted: {revert_outcome.reverted}",
+            f"failed: {len(revert_outcome.failed)}",
+        ):
+            print(line)
+        print(f"\nreports written to {args.out_dir}")
+        return EXIT_OK
 
     if args.trim:
         try:
@@ -691,6 +980,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     if args.apply and args.dry_run:
         print("--apply and --dry-run contradict each other", file=sys.stderr)
+        return EXIT_USAGE
+    if args.trim and args.revert_transparent_originals:
+        print("--trim and --revert-transparent-originals contradict each other", file=sys.stderr)
         return EXIT_USAGE
     return asyncio.run(_run(args, Progress()))
 

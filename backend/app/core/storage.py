@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import boto3
 from botocore.config import Config as BotoConfig
+from botocore.exceptions import ClientError
 
 from app.core.config import Settings
 
@@ -53,6 +54,20 @@ class ObjectStorage:
     def get(self, key: str) -> bytes:
         response = self._client.get_object(Bucket=self._bucket, Key=key)
         return response["Body"].read()
+
+    def head(self, key: str) -> int | None:
+        """Object size in bytes, or None if `key` does not exist.
+
+        A HEAD, not a GET -- checking whether a variant survived must not
+        pull its (possibly large) body over the wire just to answer that.
+        """
+        try:
+            response = self._client.head_object(Bucket=self._bucket, Key=key)
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") in {"404", "NoSuchKey", "NotFound"}:
+                return None
+            raise
+        return response["ContentLength"]
 
     def delete_many(self, keys: Iterable[str]) -> None:
         """Best-effort batch delete; a no-op for an empty sequence.
