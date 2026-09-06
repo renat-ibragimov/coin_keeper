@@ -200,7 +200,6 @@
   text-decoration: underline;
 }
 
-
 /* Elevated above the stretched title-link overlay (z-index:1, see
  * .titleLinkStretched below), same as .action — otherwise a click meant for
  * the source link would be swallowed by the card's own "open detail page"

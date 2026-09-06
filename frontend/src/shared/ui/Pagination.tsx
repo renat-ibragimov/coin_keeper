@@ -44,7 +44,12 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
           </button>
         ),
       )}
-      <Button variant="secondary" size="sm" disabled={page >= pageCount} onClick={() => goTo(page + 1)}>
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={page >= pageCount}
+        onClick={() => goTo(page + 1)}
+      >
         {t('pagination.next')} →
       </Button>
     </nav>

@@ -99,7 +99,9 @@ describe('CoinCard collection state (same footer everywhere: catalog, series, mi
         <Routes>
           <Route
             path="/missing"
-            element={<CoinCard item={makeItem({ quantityOwned: 0 })} backTo="/collection/missing" />}
+            element={
+              <CoinCard item={makeItem({ quantityOwned: 0 })} backTo="/collection/missing" />
+            }
           />
           <Route path="/collection/coins/new" element={<LocationState />} />
         </Routes>
@@ -144,7 +146,6 @@ describe('CoinCard images', () => {
     expect(container.querySelectorAll('img')).toHaveLength(1);
     expect(screen.getAllByTestId('coin-placeholder')).toHaveLength(1);
   });
-
 });
 
 describe('CoinCard series link', () => {
