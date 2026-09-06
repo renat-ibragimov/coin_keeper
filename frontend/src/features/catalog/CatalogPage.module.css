@@ -61,8 +61,9 @@
 .priceNote {
   margin: 0;
   padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-info-border);
   border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
+  background: var(--color-info-bg);
   color: var(--color-text-secondary);
   font-size: 14px;
 }

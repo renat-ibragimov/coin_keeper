@@ -1,9 +1,9 @@
 /* Design tokens extracted from docs/references mocks.
  *
- * Two equal themes. Light — warm archival paper, an old auction catalog;
- * dark — deep bottle-green collector's study with brass accents. Every
- * screen is built from these variables only: components never hardcode a
- * colour. The theme is switched by data-theme on <html>.
+ * Two equal themes. Light — old parchment, darker than plain archival paper;
+ * dark — near-black with a whisper of bottle green, brass accents in both.
+ * Every screen is built from these variables only: components never
+ * hardcode a colour. The theme is switched by data-theme on <html>.
  */
 
 :root {
@@ -41,85 +41,100 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --color-bg: #e6d8c0;
-  --color-surface: #f0e4d0;
-  --color-surface-raised: #f5ead8;
-  --color-surface-sunken: #ddcca8;
+  --color-bg: #dcccad;
+  --color-surface: #e7d8ba;
+  --color-surface-raised: #efe2c9;
+  --color-surface-sunken: #d2c093;
 
-  --color-text: #2b2117;
-  --color-text-secondary: #6b5844;
-  --color-text-muted: #8a7660;
+  --color-text: #2a2117;
+  --color-text-secondary: #675744;
+  --color-text-muted: #83715d;
 
-  --color-border: #ccb896;
-  --color-border-strong: #b59669;
+  --color-border: #bfa77d;
+  --color-border-strong: #a9895c;
   --color-border-hover: var(--color-border-strong);
 
-  --color-accent: #9a6f2e;
-  --color-accent-strong: #7e5823;
-  --color-accent-soft: #e4d0aa;
-  --color-on-accent: #faf1e3;
+  --color-accent: #96692a;
+  --color-accent-strong: #7c5520;
+  --color-accent-soft: #dcc6a0;
+  --color-on-accent: #f4e9d4;
 
-  --color-success: #52613e;
-  --color-success-soft: #e1e5d5;
-  --color-danger: #9d4638;
-  --color-danger-soft: #f0d5cd;
-  --color-warning: #866025;
-  --color-warning-soft: #eee0be;
+  --color-success: #4f5f3c;
+  --color-success-soft: #dde1cf;
+  --color-danger: #994336;
+  --color-danger-soft: #ebcfc6;
+  --color-warning: #805d26;
+  --color-warning-soft: #e8d8b4;
 
-  --gradient-accent: linear-gradient(180deg, #ab7f3e 0%, #7e5823 100%);
+  --color-info-bg: #e2d3b6;
+  --color-info-border: #c4ad85;
 
-  --shadow-sm: 0 1px 2px rgba(74, 52, 27, 0.08);
-  --shadow-md: 0 1px 2px rgba(74, 52, 27, 0.08), 0 6px 18px rgba(74, 52, 27, 0.06);
-  --shadow-lg: 0 2px 10px rgba(74, 52, 27, 0.06), 0 16px 36px rgba(74, 52, 27, 0.12);
+  --gradient-accent: linear-gradient(180deg, #a8793a 0%, #7c5520 100%);
 
-  --shadow-card: var(--shadow-sm);
-  --shadow-card-hover: 0 3px 8px rgba(74, 52, 27, 0.1), 0 10px 24px rgba(74, 52, 27, 0.1);
-  --shadow-panel: 0 2px 10px rgba(74, 52, 27, 0.05);
+  --shadow-sm: 0 1px 2px rgba(68, 47, 25, 0.09);
+  --shadow-md: 0 2px 4px rgba(68, 47, 25, 0.09), 0 8px 18px rgba(68, 47, 25, 0.07);
+  --shadow-lg: 0 2px 10px rgba(68, 47, 25, 0.06), 0 18px 40px rgba(68, 47, 25, 0.13);
 
-  --overlay: rgba(43, 33, 23, 0.45);
+  --shadow-card: 0 2px 4px rgba(68, 47, 25, 0.09), 0 8px 18px rgba(68, 47, 25, 0.07);
+  --shadow-card-hover: 0 4px 10px rgba(68, 47, 25, 0.13), 0 12px 24px rgba(68, 47, 25, 0.1);
+  --shadow-panel: 0 2px 10px rgba(68, 47, 25, 0.05);
+
+  /* Drop-shadow (not box-shadow) for the coin photo/placeholder itself: it
+   * traces the coin's own silhouette so it reads as an object resting on
+   * the redwood backing, not a floating panel (docs/08-ui-map.md). */
+  --shadow-coin: drop-shadow(0 3px 3px rgba(45, 23, 10, 0.22))
+    drop-shadow(0 8px 10px rgba(45, 23, 10, 0.14));
+
+  --overlay: rgba(42, 33, 23, 0.45);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --color-bg: #071b16;
-  --color-surface: #0d261f;
-  --color-surface-raised: #102b23;
-  --color-surface-sunken: #051310;
+  --color-bg: #050907;
+  --color-surface: #0a110e;
+  --color-surface-raised: #0e1713;
+  --color-surface-sunken: #030504;
 
-  --color-text: #f0e6d3;
-  --color-text-secondary: #c8b9a1;
-  --color-text-muted: #9e907c;
+  --color-text: #efe7d8;
+  --color-text-secondary: #c7baa5;
+  --color-text-muted: #958a78;
 
-  --color-border: #2a473b;
-  --color-border-strong: #5e6548;
-  --color-border-hover: rgba(184, 148, 69, 0.75);
+  --color-border: #25332b;
+  --color-border-strong: #4b594b;
+  --color-border-hover: rgba(181, 138, 58, 0.65);
 
-  --color-accent: #b89445;
-  --color-accent-strong: #c7a659;
-  --color-accent-soft: #2d3e29;
+  --color-accent: #b58a3a;
+  --color-accent-strong: #c39a4d;
+  --color-accent-soft: #282b1f;
   --color-on-accent: #1a1409;
 
-  --color-success: #93c49b;
-  --color-success-soft: #1d3d2d;
-  --color-danger: #e39b8c;
-  --color-danger-soft: #44241f;
-  --color-warning: #d2b46f;
-  --color-warning-soft: #3b3422;
+  --color-success: #8fbc98;
+  --color-success-soft: #1e3428;
+  --color-danger: #e09585;
+  --color-danger-soft: #3c211d;
+  --color-warning: #d0ae66;
+  --color-warning-soft: #352d1f;
 
-  --gradient-accent: linear-gradient(180deg, #c7a659 0%, #967a38 100%);
+  --color-info-bg: #20291f;
+  --color-info-border: #354335;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.18);
-  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.18), 0 8px 22px rgba(0, 0, 0, 0.16);
-  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.2), 0 18px 40px rgba(0, 0, 0, 0.32);
+  --gradient-accent: linear-gradient(180deg, #c39a4d 0%, #96742e 100%);
 
-  --shadow-card: var(--shadow-sm);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.22);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.22), 0 8px 20px rgba(0, 0, 0, 0.18);
+  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.22), 0 20px 44px rgba(0, 0, 0, 0.34);
+
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.22), 0 8px 20px rgba(0, 0, 0, 0.18);
   --shadow-card-hover:
-    0 4px 10px rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(184, 148, 69, 0.12);
-  --shadow-panel: 0 4px 18px rgba(0, 0, 0, 0.1);
+    0 4px 10px rgba(0, 0, 0, 0.3), 0 12px 26px rgba(0, 0, 0, 0.22),
+    0 0 0 1px rgba(181, 138, 58, 0.1);
+  --shadow-panel: 0 4px 18px rgba(0, 0, 0, 0.12);
 
-  --overlay: rgba(2, 8, 6, 0.7);
+  --shadow-coin: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.34))
+    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.26));
+
+  --overlay: rgba(1, 4, 3, 0.75);
 }
 
 /* ------------------------------------------------------------------ base */
