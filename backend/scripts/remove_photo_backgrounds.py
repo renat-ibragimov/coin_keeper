@@ -1,9 +1,12 @@
-"""Cut a white, round background out of already-stored coin photos.
+"""Cut a uniform (white or dark), round background out of stored coin photos.
 
 One-off cleanup over `media_files` rows that hold their own `storage_key`
 (NBU, ua-coins, manual — anything we host; an `external_url`-only uCoin
 hotlink is never touched). See docs/06-media-storage.md, "Удаление фона",
-and app.services.media_background for the classifier this calls.
+and app.services.media_background for the classifier this calls. Dark-branch
+cuts (proof coins on black felt/velvet) get their own `cut:dark` verdict and
+their own section in the HTML sheet -- that branch's flood-fill tolerance is
+deliberately tight, so its cuts are worth a closer look.
 
     docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --dry-run
 
@@ -68,6 +71,7 @@ CSV_COLUMNS = (
     "itemId",
     "title",
     "verdict",
+    "bgKind",
     "borderBackgroundFraction",
     "circularity",
     "cornerWhiteness",
@@ -113,6 +117,7 @@ class ReviewRow:
 class Outcome:
     already_processed: int = 0
     cut: int = 0
+    cut_dark: int = 0  # subset of `cut` classified against a dark background -- see verdict_label
     applied: int = 0
     skipped_by_reason: dict[str, int] = field(default_factory=dict)
     failed: list[dict[str, Any]] = field(default_factory=list)
@@ -122,6 +127,7 @@ class Outcome:
         return {
             "alreadyProcessed": self.already_processed,
             "cut": self.cut,
+            "cutDark": self.cut_dark,
             "applied": self.applied,
             "skippedByReason": dict(sorted(self.skipped_by_reason.items())),
             "failed": len(self.failed),
@@ -234,6 +240,22 @@ async def find_trim_candidates(
     return candidates
 
 
+def is_dark_cut(verdict: Verdict) -> bool:
+    return verdict.cut and (verdict.metrics or {}).get("bgKind") == "dark"
+
+
+def verdict_label(verdict: Verdict) -> str:
+    """The CSV/console verdict string: `cut`, `cut:dark`, or a `skip:*` reason.
+
+    `Verdict.cut` alone does not distinguish the two -- both classify() and
+    Verdict itself treat white and dark uniformly, and the split only exists
+    for review purposes (dark cuts get their own CSV/HTML/console line).
+    """
+    if not verdict.cut:
+        return verdict.reason or "skip:unknown"
+    return "cut:dark" if is_dark_cut(verdict) else "cut"
+
+
 def _preview_data_uri(image: Image.Image) -> str:
     preview = image.copy()
     preview.thumbnail((PREVIEW_SIDE, PREVIEW_SIDE), Image.Resampling.LANCZOS)
@@ -294,6 +316,8 @@ async def process_candidates(
 
         if verdict.cut and verdict.mask is not None:
             outcome.cut += 1
+            if is_dark_cut(verdict):
+                outcome.cut_dark += 1
             cut_image = cut_background(image, verdict.mask)
             review_row.before_preview = _preview_data_uri(image)
             review_row.after_preview = _preview_data_uri(cut_image)
@@ -403,7 +427,8 @@ def write_review_csv(path: Path, outcome: Outcome) -> None:
                     "mediaFileId": row.candidate.media_id,
                     "itemId": row.candidate.item_id,
                     "title": row.candidate.title,
-                    "verdict": "cut" if row.verdict.cut else row.verdict.reason,
+                    "verdict": verdict_label(row.verdict),
+                    "bgKind": metrics.get("bgKind", ""),
                     "borderBackgroundFraction": metrics.get("borderBackgroundFraction", ""),
                     "circularity": metrics.get("circularity", ""),
                     "cornerWhiteness": metrics.get("cornerWhiteness", ""),
@@ -418,13 +443,8 @@ def _escape(value: object) -> str:
     return html.escape(str(value))
 
 
-def write_review_html(path: Path, outcome: Outcome) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    cut_rows = [row for row in outcome.rows if row.verdict.cut]
-    skipped_rows = [row for row in outcome.rows if not row.verdict.cut]
-    summary = outcome.summary()
-
-    cards = "\n".join(
+def _cut_cards(rows: list[ReviewRow]) -> str:
+    return "\n".join(
         f"""
         <figure class="pair">
           <figcaption>#{row.candidate.media_id} — {_escape(row.candidate.title)}</figcaption>
@@ -433,8 +453,19 @@ def write_review_html(path: Path, outcome: Outcome) -> None:
             <div class="checker"><img src="{row.after_preview}" alt="after"></div>
           </div>
         </figure>"""
-        for row in cut_rows
+        for row in rows
     )
+
+
+def write_review_html(path: Path, outcome: Outcome) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    cut_rows = [row for row in outcome.rows if row.verdict.cut and not is_dark_cut(row.verdict)]
+    cut_dark_rows = [row for row in outcome.rows if is_dark_cut(row.verdict)]
+    skipped_rows = [row for row in outcome.rows if not row.verdict.cut]
+    summary = outcome.summary()
+
+    cards = _cut_cards(cut_rows)
+    dark_cards = _cut_cards(cut_dark_rows)
 
     skip_rows_html = "\n".join(
         f"<tr><td>{row.candidate.media_id}</td><td>{_escape(row.candidate.title)}</td>"
@@ -467,6 +498,11 @@ td, th {{ border: 1px solid #ccc; padding: 0.25rem 0.5rem; }}
 <div class="summary"><pre>{_escape(json.dumps(summary, indent=2, ensure_ascii=False))}</pre></div>
 <h2>Cut ({len(cut_rows)})</h2>
 {cards}
+<h2>Cut, dark background ({len(cut_dark_rows)})</h2>
+<p>Reviewed separately: the dark branch's flood-fill tolerance is deliberately
+tight (mirrored proof fields), so a false negative is expected sooner here
+than a false positive -- still worth a closer look per docs/06-media-storage.md.</p>
+{dark_cards}
 <h2>Skipped ({len(skipped_rows)})</h2>
 <table>
 <tr><th>mediaFileId</th><th>title</th><th>reason</th></tr>
@@ -641,6 +677,7 @@ async def _run(args: argparse.Namespace, log: Progress) -> int:
     for line in (
         f"already processed: {outcome.already_processed}",
         f"cut: {outcome.cut}",
+        f"  of which cut:dark: {outcome.cut_dark}",
         f"applied: {outcome.applied}",
         f"failed: {len(outcome.failed)}",
         *(f"  {reason}: {count}" for reason, count in sorted(outcome.skipped_by_reason.items())),

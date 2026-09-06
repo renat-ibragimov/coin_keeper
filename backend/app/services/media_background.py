@@ -1,6 +1,7 @@
-"""Classic (non-ML) white-background removal for round coin photos.
+"""Classic (non-ML) background removal for round coin photos.
 
-Only a genuinely white background and a genuinely round object are cut; a
+Only a genuinely uniform background (white or, since proof coins are often
+shot against black felt, dark) and a genuinely round object are cut; a
 blister pack, a colored backdrop or a coin that touches the frame is left
 alone. See docs/06-media-storage.md, "Удаление фона", for the rule and the
 runbook. Pillow plus stdlib only, no opencv/rembg/numpy.
@@ -27,10 +28,26 @@ CORNER_WHITE_MIN = 235
 CORNER_CHANNEL_SPREAD_MAX = 12
 CORNER_SAMPLE_PX = 12
 
+# "Almost black": every channel darker than this, with the same tint check
+# (CORNER_CHANNEL_SPREAD_MAX) as the white corners. Proof coins in the
+# ua-coins set are commonly shot against black felt/velvet, and that
+# background is exactly as recognizable by its corners as white is.
+CORNER_DARK_MAX = 30
+
 # The flood fill grows from the border while a pixel stays within this
 # distance (per channel) of the sampled background color -- wide enough for
 # a mild vignette or JPEG noise, narrow enough to stop at a metal coin edge.
 FLOOD_TOLERANCE = 28
+
+# The dark branch gets a much tighter tolerance than FLOOD_TOLERANCE. A proof
+# coin shot against black studio lighting reflects that same black in its
+# mirrored field, so the tonal boundary between coin and background can be
+# muddy right where they meet; a loose tolerance risks the flood fill eating
+# into that mirrored rim and clipping part of the disc. Better to leave a
+# genuinely ambiguous dark photo as a border/fragment skip than to bite off
+# part of the coin -- reviewed separately as cut:dark, this branch is meant
+# to be conservative.
+FLOOD_TOLERANCE_DARK = 14
 
 # Classification runs on a shrunk copy: a pure-Python flood fill over a
 # 1200x1200 source is slow, and a coin's silhouette does not need per-pixel
@@ -76,12 +93,18 @@ TRIM_PADDING_MIN_PX = 2
 
 @dataclass(frozen=True, slots=True)
 class Verdict:
-    """A classification outcome; `mask` and `metrics` are set only when `cut`."""
+    """A classification outcome; `mask` is set only when `cut`.
+
+    `metrics["bgKind"]` ("white" or "dark") tells apart the two backgrounds
+    `cut_background` treats identically -- callers that want to review dark
+    cuts separately (see backend/scripts/remove_photo_backgrounds.py) key off
+    that rather than a distinct `cut` value.
+    """
 
     cut: bool
     reason: str | None
     mask: Image.Image | None = None  # mode "L", same size as the input image
-    metrics: dict[str, float] | None = None
+    metrics: dict[str, float | str] | None = None
 
 
 @dataclass(slots=True)
@@ -92,7 +115,16 @@ class _Component:
 
 
 def classify(img: Image.Image) -> Verdict:
-    """Decide whether `img` is a coin on a white background worth cutting.
+    """Decide whether `img` is a coin on a uniform background worth cutting.
+
+    Two background kinds are recognized by their corners: white (the
+    original, by far the most common case) and dark -- proof coins shot
+    against black felt/velvet. Both run the same pipeline in
+    `_classify_uniform_background`, differing only in flood-fill tolerance.
+    Anything else -- textured, colored, or inconsistent corners -- is
+    `skip:not_white_bg` regardless of brightness; that reason string predates
+    the dark branch and is kept as-is so past and future runs stay
+    comparable.
 
     `metrics` is populated as far as classification gets before a verdict is
     reached, so every row -- cut or skipped -- carries whatever numbers were
@@ -100,10 +132,32 @@ def classify(img: Image.Image) -> Verdict:
     later metrics out rather than blank-filling them.
     """
     rgb = img.convert("RGB")
-    metrics: dict[str, float] = {"cornerWhiteness": _corner_whiteness(rgb)}
-    if not _corners_are_white(rgb):
-        return Verdict(cut=False, reason="skip:not_white_bg", metrics=metrics)
+    metrics: dict[str, float | str] = {"cornerWhiteness": _corner_whiteness(rgb)}
+    if _corners_are_white(rgb):
+        return _classify_uniform_background(
+            rgb, metrics, bg_kind="white", flood_tolerance=FLOOD_TOLERANCE
+        )
+    if _corners_are_dark(rgb):
+        return _classify_uniform_background(
+            rgb, metrics, bg_kind="dark", flood_tolerance=FLOOD_TOLERANCE_DARK
+        )
+    return Verdict(cut=False, reason="skip:not_white_bg", metrics=metrics)
 
+
+def _classify_uniform_background(
+    rgb: Image.Image,
+    metrics: dict[str, float | str],
+    *,
+    bg_kind: str,
+    flood_tolerance: int,
+) -> Verdict:
+    """The shared pipeline once the background is known to be uniform.
+
+    Flood fill, border containment, single-component and circularity checks
+    are identical for white and dark; only `flood_tolerance` varies between
+    the two callers in `classify`.
+    """
+    metrics["bgKind"] = bg_kind
     scale = min(1.0, CLASSIFY_MAX_SIDE / max(rgb.size))
     small = (
         rgb
@@ -113,7 +167,7 @@ def classify(img: Image.Image) -> Verdict:
             Image.Resampling.BILINEAR,
         )
     )
-    background = _flood_fill_background(small, _sample_background_color(small))
+    background = _flood_fill_background(small, _sample_background_color(small), flood_tolerance)
 
     border_fraction = _border_background_fraction(background, small.size)
     metrics["borderBackgroundFraction"] = border_fraction
@@ -222,6 +276,16 @@ def _corners_are_white(img: Image.Image) -> bool:
     return True
 
 
+def _corners_are_dark(img: Image.Image) -> bool:
+    for box in _corner_boxes(img):
+        r, g, b = _average_color(img.crop(box))
+        if max(r, g, b) > CORNER_DARK_MAX:
+            return False
+        if max(r, g, b) - min(r, g, b) > CORNER_CHANNEL_SPREAD_MAX:
+            return False
+    return True
+
+
 def _sample_background_color(img: Image.Image) -> tuple[float, float, float]:
     corners = [_average_color(img.crop(box)) for box in _corner_boxes(img)]
     return (
@@ -231,8 +295,10 @@ def _sample_background_color(img: Image.Image) -> tuple[float, float, float]:
     )
 
 
-def _flood_fill_background(img: Image.Image, bg: tuple[float, float, float]) -> bytearray:
-    """1 = background, reached from the border within FLOOD_TOLERANCE; 0 = object."""
+def _flood_fill_background(
+    img: Image.Image, bg: tuple[float, float, float], tolerance: float
+) -> bytearray:
+    """1 = background, reached from the border within `tolerance` per channel; 0 = object."""
     width, height = img.size
     pixels = img.load()
     visited = bytearray(width * height)
@@ -241,9 +307,9 @@ def _flood_fill_background(img: Image.Image, bg: tuple[float, float, float]) -> 
     def is_background(x: int, y: int) -> bool:
         r, g, b = pixels[x, y]  # type: ignore[index, misc]
         return bool(
-            abs(r - bg[0]) <= FLOOD_TOLERANCE
-            and abs(g - bg[1]) <= FLOOD_TOLERANCE
-            and abs(b - bg[2]) <= FLOOD_TOLERANCE
+            abs(r - bg[0]) <= tolerance
+            and abs(g - bg[1]) <= tolerance
+            and abs(b - bg[2]) <= tolerance
         )
 
     def seed(x: int, y: int) -> None:

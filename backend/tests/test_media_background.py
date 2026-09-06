@@ -8,10 +8,13 @@ work happens, and a circle touching the frame must fail on containment.
 
 from __future__ import annotations
 
+import math
+
 from PIL import Image, ImageDraw
 
 from app.services.media_background import (
     BORDER_BACKGROUND_MIN,
+    FLOOD_TOLERANCE_DARK,
     classify,
     cut_background,
     trim_to_alpha,
@@ -21,6 +24,7 @@ SIZE = 240
 WHITE = (255, 255, 255)
 GRAY = (200, 200, 200)
 COIN = (150, 120, 40)
+DARK = (20, 20, 20)
 
 
 def _canvas(background: tuple[int, int, int] = WHITE) -> Image.Image:
@@ -131,6 +135,81 @@ def test_circle_clipped_by_two_opposite_edges_is_not_round() -> None:
     assert verdict.reason == "skip:not_round"
     assert verdict.metrics is not None
     assert verdict.metrics["borderBackgroundFraction"] >= BORDER_BACKGROUND_MIN
+
+
+def test_circle_on_black_is_cut_dark() -> None:
+    img = _canvas(DARK)
+    draw = ImageDraw.Draw(img)
+    margin = SIZE // 4
+    draw.ellipse((margin, margin, SIZE - margin, SIZE - margin), fill=COIN)
+
+    verdict = classify(img)
+
+    assert verdict.cut
+    assert verdict.reason is None
+    assert verdict.mask is not None
+    assert verdict.metrics is not None
+    assert verdict.metrics["bgKind"] == "dark"
+
+
+def test_circle_on_white_is_still_plain_cut() -> None:
+    """Regression guard: the white branch must not pick up a bgKind-related change."""
+    img = _canvas()
+    draw = ImageDraw.Draw(img)
+    margin = SIZE // 4
+    draw.ellipse((margin, margin, SIZE - margin, SIZE - margin), fill=COIN)
+
+    verdict = classify(img)
+
+    assert verdict.cut
+    assert verdict.metrics is not None
+    assert verdict.metrics["bgKind"] == "white"
+
+
+def test_dark_gray_uneven_background_is_skipped() -> None:
+    """Mid-gray corners are neither white nor dark enough -- same skip as before."""
+    img = _canvas((60, 60, 60))
+    draw = ImageDraw.Draw(img)
+    # Break corner uniformity so this cannot pass either the white or dark check.
+    draw.rectangle((0, 0, 20, 20), fill=(95, 60, 60))
+    margin = SIZE // 4
+    draw.ellipse((margin, margin, SIZE - margin, SIZE - margin), fill=COIN)
+
+    verdict = classify(img)
+
+    assert not verdict.cut
+    assert verdict.reason == "skip:not_white_bg"
+
+
+def test_dark_cut_keeps_a_mirror_field_ring_close_to_background() -> None:
+    """A proof coin's rim reflects the black studio, staying close to the background color.
+
+    The ring sits at exactly 2x FLOOD_TOLERANCE_DARK away from the sampled
+    background -- clearly outside the dark branch's tight tolerance, so the
+    flood fill must not swallow it into the background and clip the disc.
+    """
+    img = _canvas(DARK)
+    draw = ImageDraw.Draw(img)
+    margin = SIZE // 4
+    ring_width = 15
+    ring_color = tuple(channel + 2 * FLOOD_TOLERANCE_DARK for channel in DARK)
+    inner = margin + ring_width
+    draw.ellipse((margin, margin, SIZE - margin, SIZE - margin), fill=ring_color)
+    draw.ellipse((inner, inner, SIZE - inner, SIZE - inner), fill=COIN)
+
+    verdict = classify(img)
+    assert verdict.cut
+    assert verdict.mask is not None
+
+    # The mask must cover the full outer disc (including the ring), not just
+    # the inner COIN-colored core -- comparing areas catches a swallowed ring
+    # that a single circularity number would not (both are still circles).
+    mask_area = sum(1 for value in verdict.mask.get_flattened_data() if value > 128)
+    outer_radius = (SIZE - 2 * margin) / 2
+    inner_radius = outer_radius - ring_width
+    outer_area = math.pi * outer_radius**2
+    inner_area = math.pi * inner_radius**2
+    assert abs(mask_area - outer_area) < abs(mask_area - inner_area)
 
 
 def test_cut_background_trims_wide_margins_to_the_coin() -> None:
