@@ -44,8 +44,15 @@ CLASSIFY_MAX_SIDE = 400
 NOISE_AREA_FRACTION = 0.0008
 
 # The background must reach at least this fraction of the frame's own
-# border pixels; an object cut off by the edge cannot be a whole coin.
-BORDER_BACKGROUND_MIN = 0.97
+# border pixels. A coin touching the edge is not itself a problem: the
+# flood fill still seeds from the whole frame and the mask stays valid, and
+# the source photo already has a flat chord wherever the coin was cropped
+# tight against its edge. What this threshold actually guards against is a
+# rectangular pack photographed edge-to-edge, where the object hugs the
+# border on most or all sides -- and that shape is caught twice over, since
+# losing the border on opposite sides also pushes circularity above
+# CIRCULARITY_MAX.
+BORDER_BACKGROUND_MIN = 0.75
 
 # Circularity = object area / its own bounding-box area. A disc is ~0.785,
 # a square 1.0 -- the upper bound is what actually screens out rectangular
@@ -85,10 +92,17 @@ class _Component:
 
 
 def classify(img: Image.Image) -> Verdict:
-    """Decide whether `img` is a coin on a white background worth cutting."""
+    """Decide whether `img` is a coin on a white background worth cutting.
+
+    `metrics` is populated as far as classification gets before a verdict is
+    reached, so every row -- cut or skipped -- carries whatever numbers were
+    already computed; a rejection early on (not_white_bg) simply leaves the
+    later metrics out rather than blank-filling them.
+    """
     rgb = img.convert("RGB")
+    metrics: dict[str, float] = {"cornerWhiteness": _corner_whiteness(rgb)}
     if not _corners_are_white(rgb):
-        return Verdict(cut=False, reason="skip:not_white_bg")
+        return Verdict(cut=False, reason="skip:not_white_bg", metrics=metrics)
 
     scale = min(1.0, CLASSIFY_MAX_SIDE / max(rgb.size))
     small = (
@@ -102,8 +116,9 @@ def classify(img: Image.Image) -> Verdict:
     background = _flood_fill_background(small, _sample_background_color(small))
 
     border_fraction = _border_background_fraction(background, small.size)
+    metrics["borderBackgroundFraction"] = border_fraction
     if border_fraction < BORDER_BACKGROUND_MIN:
-        return Verdict(cut=False, reason="skip:object_touches_border")
+        return Verdict(cut=False, reason="skip:object_touches_border", metrics=metrics)
 
     frame_area = small.width * small.height
     components = [
@@ -112,20 +127,20 @@ def classify(img: Image.Image) -> Verdict:
         if component.area >= NOISE_AREA_FRACTION * frame_area
     ]
     if len(components) != 1:
-        return Verdict(cut=False, reason="skip:fragments")
+        return Verdict(cut=False, reason="skip:fragments", metrics=metrics)
 
     component = components[0]
     x0, y0, x1, y1 = component.bbox
     bbox_area = (x1 - x0 + 1) * (y1 - y0 + 1)
     circularity = component.area / bbox_area if bbox_area else 0.0
+    metrics["circularity"] = circularity
     if circularity > CIRCULARITY_MAX:
-        return Verdict(cut=False, reason="skip:not_round")
+        return Verdict(cut=False, reason="skip:not_round", metrics=metrics)
     if circularity < CIRCULARITY_MIN:
-        return Verdict(cut=False, reason="skip:odd_shape")
+        return Verdict(cut=False, reason="skip:odd_shape", metrics=metrics)
 
     small_mask = _component_mask(component, small.size)
     mask = small_mask if scale == 1.0 else small_mask.resize(rgb.size, Image.Resampling.BILINEAR)
-    metrics = {"borderBackgroundFraction": border_fraction, "circularity": circularity}
     return Verdict(cut=True, reason=None, mask=mask, metrics=metrics)
 
 
@@ -185,6 +200,16 @@ def _corner_boxes(img: Image.Image) -> list[tuple[int, int, int, int]]:
 def _average_color(patch: Image.Image) -> tuple[float, float, float]:
     r, g, b = ImageStat.Stat(patch).mean
     return r, g, b
+
+
+def _corner_whiteness(img: Image.Image) -> float:
+    """Worst-case corner brightness: the darkest channel across all four corners.
+
+    A single number for the review CSV, on the same scale as CORNER_WHITE_MIN.
+    The pass/fail check in `_corners_are_white` additionally screens the
+    per-channel spread (a tint), which this metric does not capture.
+    """
+    return min(min(_average_color(img.crop(box))) for box in _corner_boxes(img))
 
 
 def _corners_are_white(img: Image.Image) -> bool:

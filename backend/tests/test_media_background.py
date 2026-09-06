@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from PIL import Image, ImageDraw
 
-from app.services.media_background import classify, cut_background, trim_to_alpha
+from app.services.media_background import (
+    BORDER_BACKGROUND_MIN,
+    classify,
+    cut_background,
+    trim_to_alpha,
+)
 
 SIZE = 240
 WHITE = (255, 255, 255)
@@ -60,16 +65,72 @@ def test_circle_on_gray_is_not_white_background() -> None:
     assert verdict.reason == "skip:not_white_bg"
 
 
-def test_circle_touching_the_border_is_rejected() -> None:
+def test_border_mostly_covered_by_a_foreign_mark_is_rejected() -> None:
+    """A well-formed round coin, but a border-hugging mark on all four edges.
+
+    Stands in for heavy vignetting or a scanner/tray edge in the source photo:
+    the round object itself is untouched, but the background no longer
+    "embraces" the frame, and that must still fail before circularity is
+    even considered.
+    """
     img = _canvas()
     draw = ImageDraw.Draw(img)
-    # Wide enough to reach past the left and right edges of the frame.
-    draw.ellipse((-20, SIZE // 4, SIZE + 20, SIZE - SIZE // 4), fill=COIN)
+    margin = SIZE // 4
+    draw.ellipse((margin, margin, SIZE - margin, SIZE - margin), fill=COIN)
+    band, thickness = 190, 6
+    x0 = (SIZE - band) // 2
+    draw.rectangle((x0, 0, x0 + band, thickness), fill=COIN)
+    draw.rectangle((x0, SIZE - thickness, x0 + band, SIZE), fill=COIN)
+    draw.rectangle((0, x0, thickness, x0 + band), fill=COIN)
+    draw.rectangle((SIZE - thickness, x0, SIZE, x0 + band), fill=COIN)
 
     verdict = classify(img)
 
     assert not verdict.cut
     assert verdict.reason == "skip:object_touches_border"
+    assert verdict.metrics is not None
+    assert verdict.metrics["borderBackgroundFraction"] < BORDER_BACKGROUND_MIN
+
+
+def test_circle_clipped_by_one_edge_is_still_cut() -> None:
+    """A coin cropped tight against one side of the frame: a single flat chord.
+
+    This is the common ua-coins shape BORDER_BACKGROUND_MIN was relaxed for --
+    the flood fill still seeds fine and the flat chord is already baked into
+    the source photo, so it must not be rejected as object_touches_border.
+    """
+    img = _canvas()
+    draw = ImageDraw.Draw(img)
+    margin = SIZE // 4
+    draw.ellipse((margin - 80, margin, SIZE - margin, SIZE - margin), fill=COIN)
+
+    verdict = classify(img)
+
+    assert verdict.cut
+    assert verdict.reason is None
+    assert verdict.metrics is not None
+    assert verdict.metrics["borderBackgroundFraction"] < 0.97  # would have failed the old cutoff
+
+
+def test_circle_clipped_by_two_opposite_edges_is_not_round() -> None:
+    """A coin cropped on both left and right, flattened into a near-rectangle.
+
+    Losing two opposite chords pushes bbox fill past CIRCULARITY_MAX even
+    though the border-background fraction alone would still pass -- this is
+    what actually screens out a border-hugging blister pack now that touching
+    one edge is allowed.
+    """
+    img = _canvas()
+    draw = ImageDraw.Draw(img)
+    margin = SIZE // 4
+    draw.ellipse((margin - 100, margin, SIZE - margin + 100, SIZE - margin), fill=COIN)
+
+    verdict = classify(img)
+
+    assert not verdict.cut
+    assert verdict.reason == "skip:not_round"
+    assert verdict.metrics is not None
+    assert verdict.metrics["borderBackgroundFraction"] >= BORDER_BACKGROUND_MIN
 
 
 def test_cut_background_trims_wide_margins_to_the_coin() -> None:
