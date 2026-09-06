@@ -214,7 +214,6 @@
     "deltaHint": "оцінка − витрачено",
     "missingBudget": "Бюджет на відсутнє",
     "unpriced": "без ціни: {{count}}",
-    "sourcesNote": "Ціни — UA-Coins і НБУ, курси — НБУ. Оцінка враховує лише видимі вам ціни.",
     "ratesTitle": "Курси НБУ",
     "ratesAsOf": "на {{date}}",
     "rateMissing": "немає даних",

@@ -214,7 +214,6 @@
     "deltaHint": "valuation − spent",
     "missingBudget": "Budget for the missing",
     "unpriced": "no price: {{count}}",
-    "sourcesNote": "Prices come from UA-Coins and the NBU, rates from the NBU. The valuation counts only prices visible to you.",
     "ratesTitle": "NBU rates",
     "ratesAsOf": "as of {{date}}",
     "rateMissing": "no data",

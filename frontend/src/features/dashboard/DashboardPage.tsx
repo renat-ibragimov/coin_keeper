@@ -144,6 +144,8 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                   <li key={entry.id} className={styles.seriesRow}>
                     <ProgressRing
                       value={entry.ratio}
+                      size={46}
+                      stroke={4}
                       aria-label={formatPercent(entry.ratio * 100, locale) ?? ''}
                     >
                       {formatPercent(entry.ratio * 100, locale)}
@@ -170,18 +172,10 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
               </ul>
             )}
           </Card>
-
-          <Card>
-            <div className={styles.cardHeader}>
-              <h2 className={styles.cardTitle}>{t('dashboard.countriesTitle')}</h2>
-              <span className={styles.muted}>{t('dashboard.countriesHint')}</span>
-            </div>
-            <CountryBreakdown entries={dashboard.countryBreakdown} />
-          </Card>
         </div>
 
         <div className={styles.stack}>
-          <Card className={styles.stackCardGrow}>
+          <Card>
             <h2 className={styles.cardTitle}>{t('dashboard.financeTitle')}</h2>
             <dl className={styles.finance}>
               <FinanceRow
@@ -227,15 +221,22 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                 value={formatUah(dashboard.missingBudgetUah, locale)}
               />
             </dl>
-            <p className={styles.sourcesNote}>{t('dashboard.sourcesNote')}</p>
           </Card>
 
-          <Card>
+          <Card className={styles.stackCardGrow}>
             <h2 className={styles.cardTitle}>{t('dashboard.ratesTitle')}</h2>
             <ExchangeRates rates={exchangeRates} />
           </Card>
         </div>
       </div>
+
+      <Card>
+        <div className={styles.cardHeader}>
+          <h2 className={styles.cardTitle}>{t('dashboard.countriesTitle')}</h2>
+          <span className={styles.muted}>{t('dashboard.countriesHint')}</span>
+        </div>
+        <CountryBreakdown entries={dashboard.countryBreakdown} />
+      </Card>
     </>
   );
 }
@@ -332,13 +333,13 @@ function DashboardSkeleton() {
       <div className={styles.columns}>
         <div className={styles.stack}>
           <Skeleton height={320} />
-          <Skeleton height={240} />
         </div>
         <div className={styles.stack}>
-          <Skeleton height={300} />
-          <Skeleton height={140} />
+          <Skeleton height={240} />
+          <Skeleton height={100} />
         </div>
       </div>
+      <Skeleton height={100} />
     </div>
   );
 }
