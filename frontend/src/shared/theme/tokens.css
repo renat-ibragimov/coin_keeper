@@ -1,9 +1,10 @@
 /* Design tokens extracted from docs/references mocks.
  *
  * Two equal themes. Light — old parchment, darker than plain archival paper;
- * dark — near-black with a whisper of bottle green, brass accents in both.
- * Every screen is built from these variables only: components never
- * hardcode a colour. The theme is switched by data-theme on <html>.
+ * dark — a strict black-and-gold catalogue surface, near-black with muted
+ * brass accents. Every screen is built from these variables only:
+ * components never hardcode a colour. The theme is switched by data-theme
+ * on <html>.
  */
 
 :root {
@@ -30,12 +31,6 @@
      inset (viewport-fit=cover in index.html makes env() non-zero on iOS). */
   --bottom-nav-height: 56px;
   --bottom-nav-inset: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
-
-  /* Coin photo plaque: fixed in both themes, not redefined per data-theme.
-   * NBU/uCoin photos are shot on a white backdrop, and metal reads better on
-   * light (docs/08-ui-map.md) — a real photo always sits on this light
-   * backing, even in the dark theme. Same value as light's --color-surface-raised. */
-  --color-photo-plaque: #f5ead8;
 }
 
 :root[data-theme='light'] {
@@ -61,6 +56,11 @@
 
   --color-success: #4f5f3c;
   --color-success-soft: #dde1cf;
+  /* A solid fill for the "in collection" state row — bolder than
+   * --color-success-soft (a badge tint), matching the visual weight of the
+   * gold CTA it replaces (docs/08-ui-map.md). */
+  --color-success-strong: #4f5f3c;
+  --color-on-success: #f4ecd8;
   --color-danger: #994336;
   --color-danger-soft: #ebcfc6;
   --color-warning: #805d26;
@@ -81,7 +81,7 @@
 
   /* Drop-shadow (not box-shadow) for the coin photo/placeholder itself: it
    * traces the coin's own silhouette so it reads as an object resting on
-   * the redwood backing, not a floating panel (docs/08-ui-map.md). */
+   * its plaque, not a floating panel (docs/08-ui-map.md). */
   --shadow-coin: drop-shadow(0 3px 3px rgba(45, 23, 10, 0.22))
     drop-shadow(0 8px 10px rgba(45, 23, 10, 0.14));
 
@@ -91,50 +91,52 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --color-bg: #050907;
-  --color-surface: #0a110e;
-  --color-surface-raised: #0e1713;
-  --color-surface-sunken: #030504;
+  --color-bg: #0a0908;
+  --color-surface: #110f0d;
+  --color-surface-raised: #171411;
+  --color-surface-sunken: #060504;
 
-  --color-text: #efe7d8;
-  --color-text-secondary: #c7baa5;
-  --color-text-muted: #958a78;
+  --color-text: #f2e9d9;
+  --color-text-secondary: #cdbea7;
+  --color-text-muted: #9d8c74;
 
-  --color-border: #25332b;
-  --color-border-strong: #4b594b;
-  --color-border-hover: rgba(181, 138, 58, 0.65);
+  --color-border: #322a22;
+  --color-border-strong: #5a4730;
+  --color-border-hover: rgba(195, 154, 74, 0.55);
 
-  --color-accent: #b58a3a;
-  --color-accent-strong: #c39a4d;
-  --color-accent-soft: #282b1f;
-  --color-on-accent: #1a1409;
+  --color-accent: #c39a4a;
+  --color-accent-strong: #d2ac62;
+  --color-accent-soft: #2b241b;
+  --color-on-accent: #1c140b;
 
-  --color-success: #8fbc98;
-  --color-success-soft: #1e3428;
-  --color-danger: #e09585;
-  --color-danger-soft: #3c211d;
-  --color-warning: #d0ae66;
-  --color-warning-soft: #352d1f;
+  --color-success: #a8c0a2;
+  --color-success-soft: #243126;
+  --color-success-strong: #2f4a34;
+  --color-on-success: #eef2e9;
+  --color-danger: #e4a39a;
+  --color-danger-soft: #472826;
+  --color-warning: #d4b06a;
+  --color-warning-soft: #3d3120;
 
-  --color-info-bg: #20291f;
-  --color-info-border: #354335;
+  --color-info-bg: #221b14;
+  --color-info-border: #3d3120;
 
-  --gradient-accent: linear-gradient(180deg, #c39a4d 0%, #96742e 100%);
+  --gradient-accent: linear-gradient(180deg, #d2ac62 0%, #c39a4a 100%);
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.22);
-  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.22), 0 8px 20px rgba(0, 0, 0, 0.18);
-  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.22), 0 20px 44px rgba(0, 0, 0, 0.34);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.22);
+  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.3), 0 20px 44px rgba(0, 0, 0, 0.4);
 
-  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.22), 0 8px 20px rgba(0, 0, 0, 0.18);
+  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.24), 0 8px 20px rgba(0, 0, 0, 0.2);
   --shadow-card-hover:
-    0 4px 10px rgba(0, 0, 0, 0.3), 0 12px 26px rgba(0, 0, 0, 0.22),
-    0 0 0 1px rgba(181, 138, 58, 0.1);
-  --shadow-panel: 0 4px 18px rgba(0, 0, 0, 0.12);
+    0 4px 10px rgba(0, 0, 0, 0.32), 0 12px 26px rgba(0, 0, 0, 0.24),
+    0 0 0 1px rgba(195, 154, 74, 0.1);
+  --shadow-panel: 0 4px 18px rgba(0, 0, 0, 0.16);
 
   --shadow-coin: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.34))
     drop-shadow(0 8px 12px rgba(0, 0, 0, 0.26));
 
-  --overlay: rgba(1, 4, 3, 0.75);
+  --overlay: rgba(4, 3, 2, 0.78);
 }
 
 /* ------------------------------------------------------------------ base */
