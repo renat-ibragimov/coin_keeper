@@ -114,7 +114,8 @@
   --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.2), 0 18px 40px rgba(0, 0, 0, 0.32);
 
   --shadow-card: var(--shadow-sm);
-  --shadow-card-hover: 0 4px 10px rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.2),
+  --shadow-card-hover:
+    0 4px 10px rgba(0, 0, 0, 0.24), 0 12px 28px rgba(0, 0, 0, 0.2),
     0 0 0 1px rgba(184, 148, 69, 0.12);
   --shadow-panel: 0 4px 18px rgba(0, 0, 0, 0.1);
 
