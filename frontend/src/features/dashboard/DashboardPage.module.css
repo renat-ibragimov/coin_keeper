@@ -7,6 +7,8 @@
 .pageHeader {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  text-align: center;
 }
 
 .title {
@@ -45,7 +47,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
 }
 
 .stack {
@@ -53,6 +55,14 @@
   flex-direction: column;
   gap: var(--space-5);
   min-width: 0;
+}
+
+/* The first card in each column absorbs the difference in natural height
+ * between the two columns, so both stacks end at the same line and the
+ * card below (countries / rates) never looks knocked out of alignment.
+ * Its own content stays pinned to the top; the extra space lands below it. */
+.stackCardGrow {
+  flex: 1 1 auto;
 }
 
 .cardHeader {

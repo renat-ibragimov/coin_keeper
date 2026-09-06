@@ -91,7 +91,7 @@ describe('DashboardPage', () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
     renderPage();
 
-    await screen.findByText(/Вітаємо, Renat/);
+    await screen.findByText('Усі важливі цифри та прогрес вашої колекції в одному місці.');
     expect(screen.getByRole('link', { name: /Монет у колекції/ })).toHaveAttribute(
       'href',
       '/collection/coins',
@@ -110,7 +110,7 @@ describe('DashboardPage', () => {
     );
   });
 
-  it('opens the series page from the nearest-series row and offers the context CTA', async () => {
+  it('opens the series page from the nearest-series row', async () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
     renderPage();
 
@@ -118,22 +118,14 @@ describe('DashboardPage', () => {
       'href',
       '/collection/series/11',
     );
-
-    expect(
-      screen.getByText('До завершення серії «Флора і фауна» залишилася 1 монета'),
-    ).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Переглянути відсутні' })).toHaveAttribute(
-      'href',
-      '/collection/missing?seriesId=11',
-    );
+    expect(screen.queryByRole('link', { name: 'Переглянути відсутні' })).toBeNull();
   });
 
   it('renders the totals and the delta between valuation and spend', async () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
     renderPage();
 
-    expect(await screen.findByText(/Вітаємо, Renat/)).toBeInTheDocument();
-    expect(screen.getByText('42 765,66 ₴')).toBeInTheDocument();
+    expect(await screen.findByText('42 765,66 ₴')).toBeInTheDocument();
     expect(screen.getByTestId('dashboard-delta')).toHaveTextContent('+7 234,34 ₴');
     expect(screen.getByTestId('dashboard-delta')).toHaveTextContent('+16,9 %');
     expect(screen.getByText('без ціни: 41')).toBeInTheDocument();

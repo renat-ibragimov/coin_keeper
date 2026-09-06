@@ -47,13 +47,12 @@ export function DashboardPage() {
   if (query.isPending) return <DashboardSkeleton />;
 
   const data = query.data;
-  const name = data.user.displayName || data.user.email;
 
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
         <h1 className={styles.title}>{t('dashboard.title')}</h1>
-        <p className={styles.subtitle}>{t('dashboard.greeting', { name })}</p>
+        <p className={styles.subtitle}>{t('dashboard.subtitle')}</p>
       </header>
 
       {data.dashboard.isEmpty ? (
@@ -88,10 +87,6 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
   const delta = valueDelta(dashboard.totalSpendUah, dashboard.marketValueUah);
   const deltaTone = delta.diffUah > 0 ? 'success' : delta.diffUah < 0 ? 'danger' : 'neutral';
   const series = nearestToCompletion(dashboard.seriesBreakdown).slice(0, 6);
-
-  // The list is sorted closest-to-completion first, so the first entry is
-  // also the one the context CTA below points at.
-  const nearestSeries = series[0];
 
   return (
     <>
@@ -134,7 +129,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
 
       <div className={styles.columns}>
         <div className={styles.stack}>
-          <Card>
+          <Card className={styles.stackCardGrow}>
             <div className={styles.cardHeader}>
               <h2 className={styles.cardTitle}>{t('dashboard.nearestTitle')}</h2>
               <Link to="/collection/series" className={styles.cardLink}>
@@ -174,19 +169,6 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                 ))}
               </ul>
             )}
-            {nearestSeries ? (
-              <div className={styles.nearestCta}>
-                <p className={styles.nearestCtaText}>
-                  {t('dashboard.nearestCtaText', {
-                    name: nearestSeries.name,
-                    count: nearestSeries.missing,
-                  })}
-                </p>
-                <Link to={`/collection/missing?seriesId=${nearestSeries.id}`}>
-                  <Button variant="secondary">{t('dashboard.nearestCtaButton')}</Button>
-                </Link>
-              </div>
-            ) : null}
           </Card>
 
           <Card>
@@ -199,7 +181,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
         </div>
 
         <div className={styles.stack}>
-          <Card>
+          <Card className={styles.stackCardGrow}>
             <h2 className={styles.cardTitle}>{t('dashboard.financeTitle')}</h2>
             <dl className={styles.finance}>
               <FinanceRow

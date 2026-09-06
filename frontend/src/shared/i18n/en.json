@@ -190,7 +190,7 @@
   },
   "dashboard": {
     "title": "Your collection",
-    "greeting": "Welcome, {{name}}. Your collection in detail.",
+    "subtitle": "All the key numbers and the progress of your collection in one place.",
     "tilesLabel": "Key figures",
     "tileCoins": "Coins in collection",
     "tileCoinsHint": "{{count}} catalog items",
@@ -201,9 +201,6 @@
     "nearestTitle": "Closest to completion",
     "nearestEmpty": "Every series in the overview is already complete.",
     "nearestMissing": "{{count}} missing",
-    "nearestCtaText_one": "{{count}} coin left to complete the \"{{name}}\" series",
-    "nearestCtaText_other": "{{count}} coins left to complete the \"{{name}}\" series",
-    "nearestCtaButton": "View missing coins",
     "allSeries": "All series",
     "countriesTitle": "By country",
     "countriesHint": "collected of those in the catalog",
