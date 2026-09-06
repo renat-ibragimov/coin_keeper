@@ -240,6 +240,8 @@ media-archive/
 node_modules/
 frontend/dist/
 frontend/.vite/
+# Скретч-папка с визуальными референсами для текущей сессии, не артефакт проекта
+frontend/current_ref/
 
 # Инфраструктура
 docker-compose.override.yml
