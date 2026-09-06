@@ -1,6 +1,6 @@
 import { fireEvent, render as renderBare, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import '@/shared/i18n';
@@ -71,19 +71,42 @@ describe('CoinCard', () => {
   });
 });
 
-describe('CoinCard catalog CTA', () => {
-  it('offers to add the coin to the collection when it is missing', () => {
-    render(<CoinCard item={makeItem({ quantityOwned: 0 })} catalogCta />);
+describe('CoinCard collection state (same footer everywhere: catalog, series, missing)', () => {
+  it('offers to add the coin to the collection when it is missing, with no negative badge', () => {
+    render(<CoinCard item={makeItem({ quantityOwned: 0 })} />);
+    expect(screen.queryByText(/Не вистачає/)).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: /Додати до колекції/ });
     expect(link).toHaveAttribute('href', '/collection/coins/new?catalogItemId=1');
   });
 
-  it('shows a status and an "add another copy" link when already owned', () => {
-    render(<CoinCard item={makeItem({ quantityOwned: 2 })} catalogCta />);
+  it('shows a status row with a "+1" action when already owned, and no missing badge', () => {
+    render(<CoinCard item={makeItem({ quantityOwned: 2 })} />);
     expect(screen.getAllByText(/У моїй колекції/).length).toBeGreaterThan(0);
     expect(screen.queryByRole('link', { name: /Додати до колекції/ })).not.toBeInTheDocument();
-    const link = screen.getByRole('link', { name: 'Додати ще екземпляр' });
+    expect(screen.queryByText(/Не вистачає/)).not.toBeInTheDocument();
+    const link = screen.getByRole('link', { name: 'Додати ще один екземпляр' });
+    expect(link).toHaveTextContent('+1');
     expect(link).toHaveAttribute('href', '/collection/coins/new?catalogItemId=1');
+  });
+
+  it('carries backTo through as router state, so the purchase form can return to it', () => {
+    function LocationState() {
+      const location = useLocation();
+      return <output>{(location.state as { from?: string } | null)?.from ?? 'none'}</output>;
+    }
+    renderBare(
+      <MemoryRouter initialEntries={['/missing']}>
+        <Routes>
+          <Route
+            path="/missing"
+            element={<CoinCard item={makeItem({ quantityOwned: 0 })} backTo="/collection/missing" />}
+          />
+          <Route path="/collection/coins/new" element={<LocationState />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole('link', { name: /Додати до колекції/ }));
+    expect(screen.getByText('/collection/missing')).toBeInTheDocument();
   });
 });
 
@@ -122,13 +145,47 @@ describe('CoinCard images', () => {
     expect(screen.getAllByTestId('coin-placeholder')).toHaveLength(1);
   });
 
-  it('renders sourceUrl as a link, never as an image', () => {
-    const { container } = render(
-      <CoinCard item={makeItem({ sourceUrl: 'https://ucoin.net/coin/ua-5uah-2021' })} />,
-    );
+});
 
-    const link = screen.getByRole('link', { name: /Джерело/ });
+describe('CoinCard series link', () => {
+  it('links the series name to its page when a matching id is passed in', () => {
+    render(
+      <CoinCard
+        item={makeItem({ seriesName: 'Видатні особистості України' })}
+        seriesIdByName={{ 'Видатні особистості України': 7 }}
+      />,
+    );
+    const link = screen.getByRole('link', { name: 'Видатні особистості України' });
+    expect(link).toHaveAttribute('href', '/collection/series/7');
+  });
+
+  it('falls back to plain text when there is no matching series id', () => {
+    render(<CoinCard item={makeItem({ seriesName: 'Видатні особистості України' })} />);
+    expect(
+      screen.queryByRole('link', { name: 'Видатні особистості України' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('Видатні особистості України')).toBeInTheDocument();
+  });
+});
+
+describe('CoinCard price source', () => {
+  it('shows the source name as a link to sourceUrl in the footer, next to the price', () => {
+    render(
+      <CoinCard
+        item={makeItem({
+          priceSource: 'ucoin',
+          sourceUrl: 'https://ucoin.net/coin/ua-5uah-2021',
+        })}
+      />,
+    );
+    const link = screen.getByRole('link', { name: /uCoin/ });
     expect(link).toHaveAttribute('href', 'https://ucoin.net/coin/ua-5uah-2021');
-    expect(container.querySelector('img')).toBeNull();
+    expect(link).toHaveAttribute('target', '_blank');
+  });
+
+  it('shows the source name as plain muted text when there is no sourceUrl', () => {
+    render(<CoinCard item={makeItem({ priceSource: 'ucoin', sourceUrl: null })} />);
+    expect(screen.queryByRole('link', { name: /uCoin/ })).not.toBeInTheDocument();
+    expect(screen.getByText('uCoin')).toBeInTheDocument();
   });
 });

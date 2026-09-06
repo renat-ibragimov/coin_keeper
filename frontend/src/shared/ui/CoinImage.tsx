@@ -47,7 +47,7 @@ export function CoinImage({ src, srcSet, alt, className, fit = 'contain' }: Coin
   }
 
   return (
-    <span className={`${frame} ${styles.framePhoto}`}>
+    <span className={frame}>
       <img
         src={src}
         srcSet={srcSet}

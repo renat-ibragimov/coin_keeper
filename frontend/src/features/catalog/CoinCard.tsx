@@ -1,4 +1,3 @@
-import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -30,23 +29,41 @@ function CoinImages({ item }: { item: CatalogListItem }) {
 
 interface CoinCardProps {
   item: CatalogListItem;
-  /** Optional call to action under the price, e.g. "Add a purchase". */
-  action?: ReactNode;
   /**
-   * Catalog listing mode: stretches the title link over the whole card
-   * (keyboard, middle-click and context menu all keep working) and shows the
-   * "add to collection" CTA instead of `action`.
+   * Where "add to collection" / "+1" return to after the purchase form is
+   * saved or cancelled (router state, read back by PurchaseFormPage).
+   * Without it, the form falls back to the coin's own detail page — fine
+   * from the catalog itself, but a series or missing-coins listing wants
+   * the visitor back where they were, not bounced to `/catalog/:id`.
    */
-  catalogCta?: boolean;
+  backTo?: string;
+  /**
+   * Series id lookup by display name. `CatalogListItem` only carries the
+   * series' name (already resolved to the interface locale, docs/03-api-contract.md),
+   * not its id — the caller builds this from the series list it already
+   * fetches for the filters panel, so the series line can link to the full
+   * series page without a new request or a made-up field. Absent (or no
+   * match) just falls back to plain text, unchanged.
+   */
+  seriesIdByName?: Record<string, number>;
 }
 
-export function CoinCard({ item, action, catalogCta = false }: CoinCardProps) {
+/**
+ * The tile card for a catalog item: the one shared shape for a coin in a
+ * grid, used identically by the catalog, a series and the missing-coins
+ * list — same image treatment, same fixed-height title, same collection
+ * state footer, so all three never drift apart into subtly different cards
+ * again (docs/08-ui-map.md).
+ */
+export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
   const { t, i18n } = useTranslation();
   const price = formatUah(item.marketPriceUah, i18n.language);
   const owned = item.quantityOwned > 0;
   const title = coinTitle(item, i18n.language);
   const cardUrl = `/catalog/${item.id}`;
   const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
+  const addState = backTo ? { from: backTo } : undefined;
+  const sourceLabel = priceSourceLabel(item.priceSource, t);
 
   return (
     <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
@@ -63,70 +80,72 @@ export function CoinCard({ item, action, catalogCta = false }: CoinCardProps) {
         {item.denomination ? (
           <div className={styles.denomination}>{item.denomination.label}</div>
         ) : null}
-        <h3 className={styles.title}>
-          <Link
-            to={cardUrl}
-            className={[styles.titleLink, catalogCta ? styles.titleLinkStretched : ''].join(' ')}
-          >
+        {/* Fixed two-line window (CSS): every card's meta line starts at the
+         * same height regardless of title length (docs/08-ui-map.md). */}
+        <h3 className={styles.title} title={title}>
+          <Link to={cardUrl} className={`${styles.titleLink} ${styles.titleLinkStretched}`}>
             {title}
           </Link>
         </h3>
         <div className={styles.meta}>
           {item.country} · <span className="tabular">{item.year}</span>
         </div>
-        {item.seriesName ? <div className={styles.series}>{item.seriesName}</div> : null}
-        <div className={styles.availability}>
-          {owned ? (
-            <Badge tone="success">
-              ✓ {t('catalog.badgeInCollection')}
-              {item.quantityOwned > 1 ? ` · ${item.quantityOwned}` : ''}
-            </Badge>
+        {item.seriesName ? (
+          seriesIdByName?.[item.seriesName] != null ? (
+            <Link
+              to={`/collection/series/${seriesIdByName[item.seriesName]}`}
+              className={styles.seriesLink}
+            >
+              {item.seriesName}
+            </Link>
           ) : (
-            <Badge tone="danger">✕ {t('catalog.badgeMissing')}</Badge>
-          )}
-        </div>
-        {/* sourceUrl points at the uCoin page, not at a file: a link, never an image. */}
-        {item.sourceUrl ? (
-          <a className={styles.source} href={item.sourceUrl} target="_blank" rel="noreferrer">
-            {t('catalog.sourceLink')} ↗
-          </a>
+            <div className={styles.series}>{item.seriesName}</div>
+          )
         ) : null}
+        {/* No negative "missing" badge: the footer below already says it —
+         * the gold CTA for a coin that's missing, the green row for one
+         * that isn't (docs/08-ui-map.md). */}
       </div>
       <div className={styles.footer}>
         {price ? (
-          <span
-            className={`${styles.price} tabular`}
-            title={priceSourceLabel(item.priceSource, t) || undefined}
-          >
-            {price}
-          </span>
+          <span className={`${styles.price} tabular`}>{price}</span>
         ) : (
           <span className={styles.noPrice}>{t('catalog.noPrice')}</span>
         )}
-        {item.priceSource ? (
-          <span className={styles.priceSource}>
-            {t('catalog.priceSource', { source: priceSourceLabel(item.priceSource, t) })}
-          </span>
+        {sourceLabel ? (
+          item.sourceUrl ? (
+            <a
+              className={styles.priceSourceLink}
+              href={item.sourceUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              {sourceLabel} ↗
+            </a>
+          ) : (
+            <span className={styles.priceSource}>{sourceLabel}</span>
+          )
         ) : null}
       </div>
-      {catalogCta ? (
-        <div className={styles.action}>
-          {owned ? (
-            <div className={styles.collectionStatus}>
-              <span className={styles.statusOwned}>✓ {t('catalog.badgeInCollection')}</span>
-              <Link to={addUrl} className={styles.addAnother}>
-                {t('catalog.addAnotherCopy')}
-              </Link>
-            </div>
-          ) : (
-            <Link to={addUrl}>
-              <Button size="sm">+ {t('catalog.addToCollection')}</Button>
+      <div className={styles.action}>
+        {owned ? (
+          <div className={styles.ownedRow}>
+            <span className={styles.ownedStatus}>✓ {t('catalog.badgeInCollection')}</span>
+            <Link
+              to={addUrl}
+              state={addState}
+              className={styles.addOneMore}
+              aria-label={t('catalog.addOneMore')}
+            >
+              +1
             </Link>
-          )}
-        </div>
-      ) : action ? (
-        <div className={styles.action}>{action}</div>
-      ) : null}
+          </div>
+        ) : (
+          <Link to={addUrl} state={addState}>
+            <Button block>+ {t('catalog.addToCollection')}</Button>
+          </Link>
+        )}
+      </div>
     </article>
   );
 }

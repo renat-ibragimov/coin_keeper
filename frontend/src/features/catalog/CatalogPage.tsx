@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '@/shared/api/client';
@@ -46,6 +46,14 @@ export function CatalogPage() {
     queryKey: ['series', 'catalog', filters.countryId],
     queryFn: () => fetchSeries(filters.countryId),
   });
+
+  // The same series list already fetched for the "Серія" filter, keyed by
+  // its display name so the card's series line can link to it without a
+  // seriesId field on CatalogListItem or an extra request per card.
+  const seriesIdByName = useMemo(
+    () => Object.fromEntries((seriesQuery.data ?? []).map((series) => [series.name, series.id])),
+    [seriesQuery.data],
+  );
 
   const page = catalogQuery.data;
   const total = page?.total ?? 0;
@@ -152,7 +160,7 @@ export function CatalogPage() {
           filters.view === 'cards' ? (
             <div className={styles.grid}>
               {page.items.map((item) => (
-                <CoinCard key={item.id} item={item} catalogCta />
+                <CoinCard key={item.id} item={item} seriesIdByName={seriesIdByName} />
               ))}
             </div>
           ) : (

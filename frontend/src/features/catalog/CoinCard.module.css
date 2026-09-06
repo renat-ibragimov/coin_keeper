@@ -25,38 +25,41 @@
   opacity: 0.72;
 }
 
-/* 2/1 so the obverse/reverse halves (each ~50% wide, full height, split by
- * the 2px gap) come out square — a round coin then fills its half edge to
- * edge instead of floating in a portrait box (docs/08-ui-map.md). */
-/* Redwood backing (existing asset, docs/08-ui-map.md): a faint theme tint
- * over the same texture keeps it from fighting the coin for attention. */
+/* No background of its own: the coins sit directly on the card's own
+ * surface (var(--color-surface-raised) from .card) so the tile reads as one
+ * piece instead of an image plaque stacked on a content block
+ * (docs/08-ui-map.md). 2/1 so the obverse/reverse pair comes out roughly
+ * square per side, and generous padding gives --shadow-coin room to read as
+ * the coins resting on the card rather than floating edge-to-edge. */
 .media {
   position: relative;
   display: flex;
-  gap: 2px;
   aspect-ratio: 2 / 1;
-  background-image:
-    linear-gradient(rgba(255, 245, 225, 0.08), rgba(255, 245, 225, 0.08)),
-    url('/textures/coin-card-redwood.webp');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  /* A flex item's default min-height:auto lets a photo's own intrinsic size
+   * push this taller than aspect-ratio dictates; a placeholder glyph has no
+   * such intrinsic size, so single-photo/placeholder cards ended up with a
+   * shorter media area than two-photo ones, throwing off row alignment
+   * lower in the card. Pinning it to 0 makes aspect-ratio the only input
+   * (docs/08-ui-map.md). */
+  min-height: 0;
+  padding: var(--space-2) var(--space-2) var(--space-1);
   align-items: center;
   justify-content: center;
 }
 
-:root[data-theme='dark'] .media {
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.1)), url('/textures/coin-card-redwood.webp');
-}
-
-/* The whole media area opens the card; the badges stay on top of it.
- * position+z-index lift it above the title's stretched-link overlay. */
+/* The whole media area opens the card, same destination as the title link
+ * below — no z-index tug-of-war needed between them any more. It used to
+ * carry position+z-index to win clicks over the title's stretched-link
+ * overlay, but that also boxed every coin photo into its own stacking
+ * context, which quietly breaks mix-blend-mode on real (not-yet-processed)
+ * photos: the blend can only erase a photo's white studio backdrop into
+ * whatever is painted within ITS OWN stacking context, and a context
+ * boundary here cuts it off from the card's actual background, leaving the
+ * white square from the source photo visible instead. Plain, unstacked
+ * elements all the way up to .card is what makes that backdrop reachable
+ * (docs/08-ui-map.md). */
 .mediaLink {
-  position: relative;
-  z-index: 2;
   display: flex;
-  gap: 2px;
   width: 100%;
   height: 100%;
   align-items: center;
@@ -65,11 +68,35 @@
 
 /* Frames for CoinImage: it fills them with a photo or with the placeholder.
  * The padding gives --shadow-coin room to fall outside the coin itself
- * instead of being clipped at the frame's own edge. */
+ * instead of being clipped at the frame's own edge. A second frame right
+ * after the first (the two-photo case in CoinImages, obverse then reverse)
+ * is pulled left to overlap it slightly — a light touch, not a collage;
+ * z-index puts the obverse on top, reverse behind, matching how a coin
+ * reads left-to-right (docs/08-ui-map.md).
+ *
+ * isolation:isolate gives each side its own blending boundary — without it,
+ * mix-blend-mode: multiply (CoinImage.module.css) doesn't stop at this
+ * frame: in the strip where the two photos overlap, the back one blends
+ * against the front photo's own pixels instead of the card behind them,
+ * muddying both into a visible dark lens. Isolating trades away the white-
+ * backdrop erasure for an unprocessed photo *in that overlap strip only*
+ * (it shows its real background there instead) — an already-accepted,
+ * temporary gap (see CoinImage.module.css) — for a clean, un-muddied
+ * overlap on every photo that's already been through the pipeline. Since
+ * isolation (not z-index) is what scopes the blend now, the z-index below
+ * is free to set paint order without reopening that bug. */
 .image {
-  width: 50%;
+  position: relative;
+  z-index: 2;
+  width: 64%;
   height: 100%;
-  padding: var(--space-2);
+  padding: 1px;
+  isolation: isolate;
+}
+
+.image + .image {
+  z-index: 1;
+  margin-left: -30%;
 }
 
 .imageSingle {
@@ -78,8 +105,13 @@
   padding: var(--space-2);
 }
 
+/* Explicit z-index (higher than .image's, above) so it stays above the coin
+ * photos — the bigger, overlapping coins reach far
+ * enough into the top-left corner that the badge would otherwise sit
+ * half-hidden behind them (docs/08-ui-map.md). */
 .mediaBadges {
   position: absolute;
+  z-index: 3;
   top: var(--space-2);
   left: var(--space-2);
   display: flex;
@@ -99,9 +131,20 @@
   color: var(--color-text-secondary);
 }
 
+/* Fixed two-line window regardless of title length: short titles leave the
+ * gap below unfilled instead of collapsing, long ones clamp with an ellipsis
+ * instead of pushing the meta line down. Font-size stays constant on
+ * purpose — a title that shrinks to fit would still misalign the row next
+ * to a card whose (differently long) title fits at full size
+ * (docs/08-ui-map.md). */
 .title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-size: 18px;
   line-height: 1.3;
+  min-height: 2.6em;
 }
 
 .titleLink {
@@ -132,27 +175,44 @@
 .series {
   font-size: 13px;
   color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.availability {
-  margin-top: var(--space-2);
-}
-
-.source {
+/* Elevated above the stretched title-link overlay (z-index:1) so a click
+ * actually reaches the series page instead of the coin's own detail page
+ * (docs/08-ui-map.md). */
+.seriesLink {
   position: relative;
   z-index: 2;
-  align-self: flex-start;
-  margin-top: var(--space-2);
-  font-size: 12.5px;
+  display: block;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+.seriesLink:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+
+/* Elevated above the stretched title-link overlay (z-index:1, see
+ * .titleLinkStretched below), same as .action — otherwise a click meant for
+ * the source link would be swallowed by the card's own "open detail page"
+ * overlay instead of reaching the external URL (docs/08-ui-map.md). */
 .footer {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-top: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-4);
 }
 
 .price {
@@ -169,6 +229,20 @@
   font-size: 12px;
   color: var(--color-text-muted);
   text-align: right;
+  white-space: nowrap;
+}
+
+.priceSourceLink {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  text-align: right;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.priceSourceLink:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
 }
 
 .action {
@@ -181,18 +255,46 @@
   width: 100%;
 }
 
-.collectionStatus {
+/* Same footprint as the "add to collection" button below it (42px), so the
+ * footer never changes height between the owned and not-owned states
+ * (docs/08-ui-map.md). */
+.ownedRow {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: center;
-}
-
-.statusOwned {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: 42px;
+  padding-left: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-success-strong);
+  color: var(--color-on-success);
   font-weight: 600;
-  color: var(--color-success);
+  font-size: 14.5px;
 }
 
-.addAnother {
-  font-size: 13px;
+.ownedStatus {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addOneMore {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  margin: 4px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .addOneMore:hover {
+    background: color-mix(in srgb, currentColor 26%, transparent);
+  }
 }

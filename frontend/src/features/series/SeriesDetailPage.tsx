@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
@@ -49,6 +49,10 @@ export function SeriesDetailPage() {
   });
 
   const series = seriesQuery.data?.find((row) => row.id === seriesId);
+  const seriesIdByName = useMemo(
+    () => Object.fromEntries((seriesQuery.data ?? []).map((row) => [row.name, row.id])),
+    [seriesQuery.data],
+  );
   const country = countriesQuery.data?.find((row) => row.id === series?.countryId);
   const notFound =
     !valid ||
@@ -155,18 +159,8 @@ export function SeriesDetailPage() {
             <CoinCard
               key={item.id}
               item={item}
-              action={
-                item.quantityOwned === 0 ? (
-                  <Link
-                    to={`/collection/coins/new?catalogItemId=${item.id}`}
-                    state={{ from: `/collection/series/${seriesId}` }}
-                  >
-                    <Button size="sm" variant="secondary">
-                      + {t('card.addPurchase')}
-                    </Button>
-                  </Link>
-                ) : undefined
-              }
+              backTo={`/collection/series/${seriesId}`}
+              seriesIdByName={seriesIdByName}
             />
           ))}
         </div>

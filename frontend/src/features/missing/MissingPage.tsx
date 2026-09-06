@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -63,6 +64,10 @@ export function MissingPage() {
     return Number.isFinite(value) && value > 0 ? value : undefined;
   };
   const backTo = `${location.pathname}${location.search}`;
+  const seriesIdByName = useMemo(
+    () => Object.fromEntries((seriesQuery.data ?? []).map((row) => [row.name, row.id])),
+    [seriesQuery.data],
+  );
 
   return (
     <div className={styles.page}>
@@ -198,16 +203,8 @@ export function MissingPage() {
                 <CoinCard
                   key={item.id}
                   item={item}
-                  action={
-                    <Link
-                      to={`/collection/coins/new?catalogItemId=${item.id}`}
-                      state={{ from: backTo }}
-                    >
-                      <Button size="sm" variant="secondary">
-                        + {t('card.addPurchase')}
-                      </Button>
-                    </Link>
-                  }
+                  backTo={backTo}
+                  seriesIdByName={seriesIdByName}
                 />
               ))}
             </div>
