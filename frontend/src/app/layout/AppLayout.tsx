@@ -60,11 +60,11 @@ export function AppLayout() {
       <header className={styles.header}>
         <Brand to="/collection" />
         <nav className={styles.nav} aria-label={t('nav.label')}>
-          <NavLink to="/collection" className={navClass(styles.navLink, styles.navLinkActive)}>
-            {t('nav.myCollection')}
-          </NavLink>
           <NavLink to="/catalog" className={navClass(styles.navLink, styles.navLinkActive)}>
             {t('nav.catalog')}
+          </NavLink>
+          <NavLink to="/collection" className={navClass(styles.navLink, styles.navLinkActive)}>
+            {t('nav.myCollection')}
           </NavLink>
           {isAdmin ? (
             <>

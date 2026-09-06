@@ -32,8 +32,8 @@ describe('PurchaseForm', () => {
   it('starts with today, one piece, hryvnia and the default grade', () => {
     renderForm();
     expect(screen.getByLabelText('Кількість')).toHaveValue(1);
-    expect(screen.getByLabelText('Валюта')).toHaveValue('UAH');
-    expect(screen.getByLabelText('Стан')).toHaveValue('UNC');
+    expect(screen.getByLabelText('Валюта')).toHaveTextContent('UAH');
+    expect(screen.getByLabelText('Стан')).toHaveTextContent('UNC');
     expect((screen.getByLabelText('Дата покупки') as HTMLInputElement).value).toMatch(
       /^\d{4}-\d{2}-\d{2}$/,
     );

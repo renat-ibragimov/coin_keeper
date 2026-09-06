@@ -10,6 +10,7 @@
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-5);
   padding: 0 var(--space-5);
   height: var(--header-height);
@@ -20,11 +21,17 @@
   z-index: 20;
 }
 
+/* Centered on the header's own box, not on the leftover space between the
+   logo and the account controls — those two are rarely the same width, and
+   centering in the gap between them drifts from the page content's true
+   center below (docs/08-ui-map.md). */
 .nav {
   display: flex;
   gap: var(--space-2);
-  flex: 1;
-  justify-content: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .navLink {
@@ -160,7 +167,7 @@
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-5) calc(var(--space-7) + 56px);
+  padding: var(--space-4) var(--space-5) calc(var(--space-7) + 56px);
 }
 
 .bottomNav {
@@ -178,13 +185,9 @@
     display: none;
   }
 
-  .header {
-    justify-content: space-between;
-  }
-
   .main {
     /* Room for the fixed bar and the safe area, so the last card never hides. */
-    padding: var(--space-5) var(--space-4) calc(var(--space-6) + var(--bottom-nav-inset));
+    padding: var(--space-3) var(--space-4) calc(var(--space-6) + var(--bottom-nav-inset));
   }
 
   .bottomNav {

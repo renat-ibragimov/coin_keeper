@@ -6,13 +6,35 @@ import { ApiError } from '@/shared/api/client';
 import { useDismissable } from '@/shared/lib/useDismissable';
 import { Button, EmptyState, ErrorState, Pagination, Select, Skeleton, Tabs } from '@/shared/ui';
 
-import { fetchCatalog, fetchCountries, fetchDenominations, fetchSeries, PAGE_SIZE } from './api';
+import { fetchCatalog, fetchCountries, fetchDenominations, fetchSeries } from './api';
 import { CatalogTable } from './CatalogTable';
 import { CoinCard } from './CoinCard';
 import { FiltersPanel } from './FiltersPanel';
+import type { ActiveFilterChip } from './FiltersPanel';
 import { SORT_FIELDS, useCatalogFilters } from './useCatalogFilters';
-import type { CatalogView, SortField } from './useCatalogFilters';
+import type { CatalogFilters, CatalogView, SortField } from './useCatalogFilters';
 import styles from './CatalogPage.module.css';
+
+function GridIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
+    </svg>
+  );
+}
+
+function TableIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <rect x="1" y="1" width="12" height="12" rx="1.2" stroke="currentColor" strokeWidth="1.3" />
+      <line x1="1" y1="5.3" x2="13" y2="5.3" stroke="currentColor" strokeWidth="1.1" />
+      <line x1="1" y1="9.3" x2="13" y2="9.3" stroke="currentColor" strokeWidth="1.1" />
+    </svg>
+  );
+}
 
 const SORT_LABELS: Record<SortField, string> = {
   country: 'catalog.sortCountry',
@@ -25,6 +47,24 @@ const SORT_LABELS: Record<SortField, string> = {
   price: 'catalog.sortPrice',
 };
 
+const GROUP_LABELS: Record<NonNullable<CatalogFilters['group']>, string> = {
+  circulation: 'catalog.typeCirculation',
+  commemorative: 'catalog.typeCommemorative',
+  collector: 'catalog.typeCollector',
+  other: 'catalog.typeOther',
+};
+
+const METAL_LABELS: Record<NonNullable<CatalogFilters['metalKind']>, string> = {
+  precious: 'catalog.metalPrecious',
+  base: 'catalog.metalBase',
+  unknown: 'catalog.metalUnknown',
+};
+
+// A multiple of every column count the grid uses (1/2/3/5, see
+// CatalogPage.module.css), so a full page always fills complete rows instead
+// of stranding a short one before the pager.
+const GRID_PAGE_SIZE = 30;
+
 export function CatalogPage() {
   const { t } = useTranslation();
   const { filters, update, reset } = useCatalogFilters();
@@ -33,8 +73,8 @@ export function CatalogPage() {
   useDismissable(drawerOpen, () => setDrawerOpen(false));
 
   const catalogQuery = useQuery({
-    queryKey: ['catalog', filters],
-    queryFn: () => fetchCatalog(filters),
+    queryKey: ['catalog', filters, GRID_PAGE_SIZE],
+    queryFn: () => fetchCatalog(filters, GRID_PAGE_SIZE),
     placeholderData: keepPreviousData,
   });
   const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
@@ -57,8 +97,77 @@ export function CatalogPage() {
 
   const page = catalogQuery.data;
   const total = page?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const shown = page ? page.items.length + (page.page - 1) * PAGE_SIZE : 0;
+  const pageCount = Math.max(1, Math.ceil(total / GRID_PAGE_SIZE));
+  const shown = page ? page.items.length + (page.page - 1) * GRID_PAGE_SIZE : 0;
+
+  const activeChips = useMemo(() => {
+    const chips: ActiveFilterChip[] = [];
+    if (filters.q) {
+      chips.push({ key: 'q', label: filters.q, onRemove: () => update({ q: '' }) });
+    }
+    if (filters.countryId !== undefined) {
+      const country = (countriesQuery.data ?? []).find((c) => c.id === filters.countryId);
+      if (country) {
+        chips.push({
+          key: 'country',
+          label: country.name,
+          onRemove: () =>
+            update({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
+        });
+      }
+    }
+    if (filters.seriesId !== undefined) {
+      const series = (seriesQuery.data ?? []).find((s) => s.id === filters.seriesId);
+      if (series) {
+        chips.push({
+          key: 'series',
+          label: series.name,
+          onRemove: () => update({ seriesId: undefined }),
+        });
+      }
+    }
+    if (filters.yearFrom !== undefined || filters.yearTo !== undefined) {
+      chips.push({
+        key: 'years',
+        label: `${t('catalog.years')}: ${filters.yearFrom ?? '…'}–${filters.yearTo ?? '…'}`,
+        onRemove: () => update({ yearFrom: undefined, yearTo: undefined }),
+      });
+    }
+    if (filters.denominationId !== undefined) {
+      const denomination = (denominationsQuery.data ?? []).find(
+        (d) => d.id === filters.denominationId,
+      );
+      if (denomination) {
+        chips.push({
+          key: 'denomination',
+          label: denomination.label,
+          onRemove: () => update({ denominationId: undefined }),
+        });
+      }
+    }
+    if (filters.group) {
+      chips.push({
+        key: 'group',
+        label: t(GROUP_LABELS[filters.group]),
+        onRemove: () => update({ group: undefined }),
+      });
+    }
+    if (filters.metalKind) {
+      chips.push({
+        key: 'metal',
+        label: t(METAL_LABELS[filters.metalKind]),
+        onRemove: () => update({ metalKind: undefined }),
+      });
+    }
+    if (filters.owned !== undefined) {
+      chips.push({
+        key: 'owned',
+        label: t(filters.owned ? 'catalog.availabilityOwned' : 'catalog.availabilityMissing'),
+        onRemove: () => update({ owned: undefined }),
+      });
+    }
+    return chips;
+  }, [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t]);
 
   const filtersPanel = (
     <FiltersPanel
@@ -71,16 +180,15 @@ export function CatalogPage() {
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
+      activeFilters={activeChips}
     />
   );
 
   return (
     <div className={styles.page}>
       <header className={styles.pageHeader}>
-        <div>
-          <h1 className={styles.title}>{t('catalog.title')}</h1>
-          <p className={styles.subtitle}>{t('catalog.subtitle')}</p>
-        </div>
+        <h1 className={styles.title}>{t('catalog.title')}</h1>
+        <p className={styles.subtitle}>{t('catalog.subtitle')}</p>
       </header>
 
       <div className={styles.filtersBar}>{filtersPanel}</div>
@@ -101,8 +209,24 @@ export function CatalogPage() {
           <Tabs<CatalogView>
             aria-label={t('catalog.viewLabel')}
             options={[
-              { value: 'cards', label: t('catalog.viewCards') },
-              { value: 'table', label: t('catalog.viewTable') },
+              {
+                value: 'cards',
+                label: (
+                  <>
+                    <GridIcon />
+                    {t('catalog.viewCards')}
+                  </>
+                ),
+              },
+              {
+                value: 'table',
+                label: (
+                  <>
+                    <TableIcon />
+                    {t('catalog.viewTable')}
+                  </>
+                ),
+              },
             ]}
             value={filters.view}
             onChange={(view) => update({ view, page: filters.page })}
@@ -130,8 +254,6 @@ export function CatalogPage() {
             </Button>
           </span>
         </div>
-
-        <p className={styles.priceNote}>ⓘ {t('catalog.priceNote')}</p>
 
         {catalogQuery.isError ? (
           <ErrorState

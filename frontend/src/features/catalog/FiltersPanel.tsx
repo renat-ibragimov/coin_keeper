@@ -2,10 +2,16 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CountryOut, DenominationOut, SeriesOut } from '@/shared/api/types';
-import { Button, Input, Select, Toggle } from '@/shared/ui';
+import { Button, Input, Select } from '@/shared/ui';
 
 import type { CatalogFilters } from './useCatalogFilters';
 import styles from './FiltersPanel.module.css';
+
+export interface ActiveFilterChip {
+  key: string;
+  label: string;
+  onRemove: () => void;
+}
 
 interface FiltersPanelProps {
   filters: CatalogFilters;
@@ -15,32 +21,7 @@ interface FiltersPanelProps {
   series: SeriesOut[];
   seriesLoading: boolean;
   denominations: DenominationOut[];
-}
-
-function Chips<T>({
-  options,
-  value,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className={styles.chips}>
-      {options.map((option, index) => (
-        <button
-          key={index}
-          type="button"
-          className={[styles.chip, option.value === value ? styles.chipActive : ''].join(' ')}
-          aria-pressed={option.value === value}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
+  activeFilters: ActiveFilterChip[];
 }
 
 export function FiltersPanel({
@@ -51,6 +32,7 @@ export function FiltersPanel({
   series,
   seriesLoading,
   denominations,
+  activeFilters,
 }: FiltersPanelProps) {
   const { t } = useTranslation();
 
@@ -63,16 +45,6 @@ export function FiltersPanel({
     return () => clearTimeout(timer);
   }, [search, filters.q, update]);
 
-  // Second row starts open when a filter it holds is already active, so it is
-  // never invisible right after a shared link or F5 restores the URL.
-  const [expanded, setExpanded] = useState(
-    () =>
-      filters.denominationId !== undefined ||
-      filters.metalKind !== undefined ||
-      filters.scope !== 'all' ||
-      filters.archived,
-  );
-
   const numberOrUndefined = (raw: string) => {
     const value = Number.parseInt(raw, 10);
     return Number.isFinite(value) && value > 0 ? value : undefined;
@@ -80,7 +52,7 @@ export function FiltersPanel({
 
   return (
     <div className={styles.panel}>
-      <div className={styles.mainRow}>
+      <div className={styles.fields}>
         <div className={styles.search}>
           <Input
             type="search"
@@ -94,6 +66,7 @@ export function FiltersPanel({
         <div className={styles.field}>
           <Select
             label={t('catalog.country')}
+            centerLabel
             value={filters.countryId ?? ''}
             onChange={(event) => {
               const countryId = numberOrUndefined(event.target.value);
@@ -113,9 +86,12 @@ export function FiltersPanel({
         <div className={styles.field}>
           <Select
             label={t('catalog.tableSeries')}
+            centerLabel
             value={filters.seriesId ?? ''}
             disabled={seriesLoading}
             onChange={(event) => update({ seriesId: numberOrUndefined(event.target.value) })}
+            searchable
+            searchPlaceholder={t('catalog.seriesSearchPlaceholder')}
           >
             <option value="">{t('catalog.allSeries')}</option>
             {series.map((item) => (
@@ -151,7 +127,24 @@ export function FiltersPanel({
 
         <div className={styles.field}>
           <Select
+            label={t('catalog.denomination')}
+            centerLabel
+            value={filters.denominationId ?? ''}
+            onChange={(event) => update({ denominationId: numberOrUndefined(event.target.value) })}
+          >
+            <option value="">{t('catalog.anyDenomination')}</option>
+            {denominations.map((denomination) => (
+              <option key={denomination.id} value={denomination.id}>
+                {denomination.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div className={styles.field}>
+          <Select
             label={t('catalog.type')}
+            centerLabel
             value={filters.group ?? ''}
             onChange={(event) =>
               update({ group: (event.target.value || undefined) as CatalogFilters['group'] })
@@ -166,7 +159,26 @@ export function FiltersPanel({
 
         <div className={styles.field}>
           <Select
+            label={t('catalog.metal')}
+            centerLabel
+            value={filters.metalKind ?? ''}
+            onChange={(event) =>
+              update({
+                metalKind: (event.target.value || undefined) as CatalogFilters['metalKind'],
+              })
+            }
+          >
+            <option value="">{t('catalog.all')}</option>
+            <option value="precious">{t('catalog.metalPrecious')}</option>
+            <option value="base">{t('catalog.metalBase')}</option>
+            <option value="unknown">{t('catalog.metalUnknown')}</option>
+          </Select>
+        </div>
+
+        <div className={styles.field}>
+          <Select
             label={t('catalog.availability')}
+            centerLabel
             value={filters.owned === undefined ? '' : String(filters.owned)}
             onChange={(event) => {
               const raw = event.target.value;
@@ -178,81 +190,28 @@ export function FiltersPanel({
             <option value="false">{t('catalog.availabilityMissing')}</option>
           </Select>
         </div>
-
-        <Button variant="secondary" onClick={reset} className={styles.resetButton}>
-          ↺ {t('catalog.resetFilters')}
-        </Button>
       </div>
 
-      <button
-        type="button"
-        className={styles.moreToggle}
-        aria-expanded={expanded}
-        onClick={() => setExpanded((current) => !current)}
-      >
-        {t('catalog.moreFilters')} {expanded ? '▲' : '▼'}
-      </button>
-
-      {expanded ? (
-        <div className={styles.secondaryRow}>
-          <div className={styles.group}>
-            <div className={styles.groupTitle}>{t('catalog.denomination')}</div>
-            <Select
-              value={filters.denominationId ?? ''}
-              onChange={(event) =>
-                update({ denominationId: numberOrUndefined(event.target.value) })
-              }
-              aria-label={t('catalog.denomination')}
-            >
-              <option value="">{t('catalog.anyDenomination')}</option>
-              {denominations.map((denomination) => (
-                <option key={denomination.id} value={denomination.id}>
-                  {denomination.label}
-                </option>
-              ))}
-            </Select>
+      {activeFilters.length > 0 ? (
+        <div className={styles.activeRow}>
+          <span className={styles.activeLabel}>{t('catalog.activeFilters')}</span>
+          <div className={styles.chips}>
+            {activeFilters.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                className={styles.chip}
+                onClick={chip.onRemove}
+                aria-label={`${chip.label} — ${t('catalog.removeFilter')}`}
+              >
+                {chip.label}
+                <span aria-hidden="true">×</span>
+              </button>
+            ))}
           </div>
-
-          <div className={styles.group}>
-            <div className={styles.groupTitle}>{t('catalog.metal')}</div>
-            <Chips
-              options={[
-                {
-                  value: 'precious' as CatalogFilters['metalKind'],
-                  label: t('catalog.metalPrecious'),
-                },
-                { value: 'base' as CatalogFilters['metalKind'], label: t('catalog.metalBase') },
-                {
-                  value: 'unknown' as CatalogFilters['metalKind'],
-                  label: t('catalog.metalUnknown'),
-                },
-                { value: undefined, label: t('catalog.all') },
-              ]}
-              value={filters.metalKind}
-              onChange={(metalKind) => update({ metalKind })}
-            />
-          </div>
-
-          <div className={styles.group}>
-            <div className={styles.groupTitle}>{t('catalog.scope')}</div>
-            <Chips
-              options={[
-                { value: 'all' as CatalogFilters['scope'], label: t('catalog.scopeAll') },
-                { value: 'shared' as CatalogFilters['scope'], label: t('catalog.scopeShared') },
-                { value: 'own' as CatalogFilters['scope'], label: t('catalog.scopeOwn') },
-              ]}
-              value={filters.scope}
-              onChange={(scope) => update({ scope })}
-            />
-          </div>
-
-          <div className={styles.group}>
-            <Toggle
-              checked={filters.archived}
-              onChange={(archived) => update({ archived })}
-              label={t('catalog.showArchived')}
-            />
-          </div>
+          <Button variant="secondary" size="sm" onClick={reset} className={styles.resetButton}>
+            ↺ {t('catalog.resetFilters')}
+          </Button>
         </div>
       ) : null}
     </div>

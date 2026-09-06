@@ -14,7 +14,7 @@
 
 .fullImage {
   display: block;
-  height: 52px;
+  height: 60px;
   width: auto;
 }
 
@@ -27,6 +27,6 @@
   /* The same full logo, scaled to the slimmer mobile header. */
   .fullImage,
   .brand.hero .fullImage {
-    height: 44px;
+    height: 50px;
   }
 }

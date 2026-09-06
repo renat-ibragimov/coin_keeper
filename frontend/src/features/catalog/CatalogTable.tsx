@@ -15,16 +15,26 @@ interface CatalogTableProps {
   update: (changes: Partial<CatalogFilters>) => void;
 }
 
-const COLUMNS: { key: string; sort?: SortField }[] = [
-  { key: 'tableCoin', sort: 'title' },
-  { key: 'tableCountry', sort: 'country' },
-  { key: 'tableSeries', sort: 'series' },
-  { key: 'tableYear', sort: 'year' },
-  { key: 'tableDenomination', sort: 'denomination' },
-  { key: 'tableAvailability', sort: 'owned' },
-  { key: 'tablePurchase', sort: 'purchase' },
-  { key: 'tablePrice', sort: 'price' },
-  { key: 'tableActions' },
+type Align = 'left' | 'center' | 'right';
+
+const ALIGN_CLASS: Record<Align, string> = {
+  left: styles.alignLeft!,
+  center: styles.alignCenter!,
+  right: styles.alignRight!,
+};
+
+// The coin name is the row's anchor, so its header stays left with the
+// thumbnail below it; every other column reads as a calm, centered strip
+// even where its own values are right-aligned for scanning (docs/08-ui-map.md).
+const COLUMNS: { key: string; sort?: SortField; align: Align }[] = [
+  { key: 'tableCoin', sort: 'title', align: 'left' },
+  { key: 'tableCountry', sort: 'country', align: 'center' },
+  { key: 'tableSeries', sort: 'series', align: 'center' },
+  { key: 'tableYear', sort: 'year', align: 'center' },
+  { key: 'tableDenomination', sort: 'denomination', align: 'center' },
+  { key: 'tablePurchase', sort: 'purchase', align: 'right' },
+  { key: 'tablePrice', sort: 'price', align: 'right' },
+  { key: 'tableActions', align: 'center' },
 ];
 
 export function CatalogTable({ items, filters, update }: CatalogTableProps) {
@@ -43,31 +53,36 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
       <table className={styles.table}>
         <thead>
           <tr>
-            {COLUMNS.map((column) => (
-              <th key={column.key}>
-                {column.sort ? (
-                  <button
-                    type="button"
-                    className={styles.sortButton}
-                    onClick={() => toggleSort(column.sort!)}
-                    aria-sort={
-                      filters.sort === column.sort
-                        ? filters.order === 'asc'
-                          ? 'ascending'
-                          : 'descending'
-                        : undefined
-                    }
-                  >
-                    {t(`catalog.${column.key}`)}
-                    {filters.sort === column.sort ? (
-                      <span aria-hidden="true">{filters.order === 'asc' ? ' ↑' : ' ↓'}</span>
-                    ) : null}
-                  </button>
-                ) : (
-                  t(`catalog.${column.key}`)
-                )}
-              </th>
-            ))}
+            {COLUMNS.map((column) => {
+              // The header itself is centered from "Країна" on — only the coin
+              // name keeps a left header, matching its left-aligned content.
+              const headerAlign = column.align === 'left' ? 'left' : 'center';
+              return (
+                <th key={column.key} className={ALIGN_CLASS[headerAlign]}>
+                  {column.sort ? (
+                    <button
+                      type="button"
+                      className={styles.sortButton}
+                      onClick={() => toggleSort(column.sort!)}
+                      aria-sort={
+                        filters.sort === column.sort
+                          ? filters.order === 'asc'
+                            ? 'ascending'
+                            : 'descending'
+                          : undefined
+                      }
+                    >
+                      {t(`catalog.${column.key}`)}
+                      <span className={styles.sortIcon} aria-hidden="true">
+                        {filters.sort === column.sort ? (filters.order === 'asc' ? '↑' : '↓') : '⇅'}
+                      </span>
+                    </button>
+                  ) : (
+                    t(`catalog.${column.key}`)
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
@@ -76,60 +91,57 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
             const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
             return (
               <tr key={item.id} className={item.isArchived ? styles.archivedRow : undefined}>
-                <td>
+                <td className={ALIGN_CLASS.left}>
                   <div className={styles.coinCell}>
                     <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
-                    <span>
+                    <span className={styles.coinInfo}>
                       <Link
                         to={`/catalog/${item.id}`}
                         className={`${styles.coinTitle} ${styles.rowLink}`}
                       >
                         {coinTitle(item, i18n.language)}
                       </Link>
-                      <span className={styles.coinBadges}>
-                        {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
-                        {item.isArchived ? (
-                          <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
-                        ) : null}
-                      </span>
+                      {item.isOwn || item.isArchived ? (
+                        <span className={styles.coinBadges}>
+                          {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
+                          {item.isArchived ? (
+                            <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
+                          ) : null}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
                 </td>
-                <td>{item.country}</td>
-                <td>{item.seriesName ?? '—'}</td>
-                <td className="tabular">{item.year}</td>
-                <td>{item.denomination?.label ?? '—'}</td>
-                <td>
-                  {owned ? (
-                    <Badge tone="success">
-                      {t('catalog.badgeInCollection')}
-                      {item.quantityOwned > 1 ? ` · ${item.quantityOwned}` : ''}
-                    </Badge>
-                  ) : (
-                    <Badge tone="danger">{t('catalog.badgeMissing')}</Badge>
-                  )}
+                <td className={`${ALIGN_CLASS.center} ${styles.secondary}`}>{item.country}</td>
+                <td className={`${ALIGN_CLASS.center} ${styles.secondary}`}>
+                  {item.seriesName ?? '—'}
                 </td>
-                <td className="tabular">
+                <td className={`${ALIGN_CLASS.center} tabular`}>{item.year}</td>
+                <td className={ALIGN_CLASS.center}>{item.denomination?.label ?? '—'}</td>
+                <td className={`${ALIGN_CLASS.right} tabular`}>
                   {owned ? (formatUah(item.purchaseTotalUah, i18n.language) ?? '—') : '—'}
                 </td>
-                <td className="tabular">
+                <td className={`${ALIGN_CLASS.right} tabular`}>
                   {formatUah(item.marketPriceUah, i18n.language) ?? (
                     <span className={styles.muted}>{t('catalog.noPrice')}</span>
                   )}
                 </td>
-                <td className={styles.actionsCell}>
+                <td className={`${ALIGN_CLASS.center} ${styles.actionsCell}`}>
                   {owned ? (
-                    <span className={styles.actionsStatus}>✓ {t('catalog.badgeInCollection')}</span>
+                    <div className={styles.ownedPill}>
+                      <span className={styles.ownedStatus}>✓ {t('catalog.badgeInCollection')}</span>
+                      <Link
+                        to={addUrl}
+                        className={styles.addOneMore}
+                        aria-label={t('catalog.addOneMore')}
+                      >
+                        +1
+                      </Link>
+                    </div>
                   ) : (
                     <Link to={addUrl}>
-                      <Button
-                        size="sm"
-                        className={styles.actionsButton}
-                        aria-label={t('catalog.addToCollection')}
-                        title={t('catalog.addToCollection')}
-                      >
-                        <span aria-hidden="true">+</span>
-                        <span className={styles.actionsLabel}>{t('catalog.addToCollection')}</span>
+                      <Button size="sm" className={styles.addButton}>
+                        + {t('catalog.addToCollection')}
                       </Button>
                     </Link>
                   )}

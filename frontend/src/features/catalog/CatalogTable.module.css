@@ -13,18 +13,19 @@
 }
 
 .table th {
-  text-align: left;
-  padding: var(--space-3) var(--space-4);
+  padding: 10px var(--space-4);
   border-bottom: 1px solid var(--color-border-strong);
+  background: var(--color-surface-raised);
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: 12.5px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
 .table td {
-  padding: var(--space-3) var(--space-4);
+  padding: 8px var(--space-4);
   border-bottom: 1px solid var(--color-border);
   vertical-align: middle;
 }
@@ -33,8 +34,10 @@
   border-bottom: none;
 }
 
-.table tbody tr:hover {
-  background: var(--color-accent-soft);
+@media (hover: hover) and (pointer: fine) {
+  .table tbody tr:hover {
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-raised));
+  }
 }
 
 /* Stretched-link pattern applied to a row: position:relative on modern
@@ -51,7 +54,22 @@
   z-index: 1;
 }
 
+.alignLeft {
+  text-align: left;
+}
+
+.alignCenter {
+  text-align: center;
+}
+
+.alignRight {
+  text-align: right;
+}
+
 .sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   border: none;
   background: none;
   font: inherit;
@@ -66,6 +84,15 @@
   color: var(--color-accent);
 }
 
+.sortIcon {
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.sortButton[aria-sort] .sortIcon {
+  color: var(--color-accent);
+}
+
 .archivedRow {
   opacity: 0.65;
 }
@@ -77,11 +104,13 @@
 }
 
 .thumb {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   border-radius: 50%;
   flex: none;
   background: var(--color-surface-sunken);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
 /* The frame is round and small, so the placeholder coin may fill nearly all of
@@ -89,6 +118,10 @@
 .thumb svg {
   width: 82%;
   height: 82%;
+}
+
+.coinInfo {
+  min-width: 0;
 }
 
 .coinTitle {
@@ -110,6 +143,12 @@
   margin-top: 2px;
 }
 
+/* Country and series read as context for the coin name, not competition
+ * for it — a quieter tone than the primary text (docs/08-ui-map.md). */
+.secondary {
+  color: var(--color-text-secondary);
+}
+
 .muted {
   color: var(--color-text-muted);
 }
@@ -120,19 +159,51 @@
   white-space: nowrap;
 }
 
-.actionsStatus {
-  font-weight: 600;
-  color: var(--color-success);
+.addButton {
+  min-height: 34px;
+  padding: 6px 14px;
 }
 
-.actionsButton {
+/* Same shape as the grid card's owned footer, scaled down for a table row:
+ * one pill, "+1" felt as an inset action on it rather than a second button
+ * (docs/08-ui-map.md). */
+.ownedPill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  height: 32px;
+  padding-left: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-success-strong);
+  color: var(--color-on-success);
+  font-weight: 600;
+  font-size: 13.5px;
 }
 
-@media (max-width: 900px) {
-  .actionsLabel {
-    display: none;
+.ownedStatus {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addOneMore {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  margin: 3px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, currentColor 16%, transparent);
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .addOneMore:hover {
+    background: color-mix(in srgb, currentColor 26%, transparent);
   }
 }

@@ -15,10 +15,13 @@ import type { CatalogFilters } from './useCatalogFilters';
 
 export const PAGE_SIZE = 24;
 
-export function fetchCatalog(filters: CatalogFilters): Promise<CatalogPage> {
+export function fetchCatalog(
+  filters: CatalogFilters,
+  pageSize: number = PAGE_SIZE,
+): Promise<CatalogPage> {
   const query = toQuery({
     page: filters.page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     q: filters.q,
     countryId: filters.countryId,
     seriesId: filters.seriesId,
