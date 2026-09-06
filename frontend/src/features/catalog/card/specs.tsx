@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 
-import type { CatalogCard } from '@/shared/api/types';
+import type { CatalogCard, CollectionGroup } from '@/shared/api/types';
 import { formatDate, formatNumber } from '@/shared/lib/format';
 import type { PropertyRow } from '@/shared/ui';
 
@@ -10,74 +10,118 @@ const METAL_LABELS = {
   unknown: 'catalog.metalUnknown',
 } as const;
 
-/** Catalog numbers in one line: "KM# 123 · UC# 45 · Numista 678". */
-export function catalogNumbers(card: CatalogCard): string | null {
-  const parts = [
-    card.catalogKm ? `KM# ${card.catalogKm}` : null,
-    card.catalogUc ? `UC# ${card.catalogUc}` : null,
-    card.catalogNumista ? `Numista ${card.catalogNumista}` : null,
-  ].filter(Boolean);
-  // The generic number is shown only when it is not one of the named ones.
-  if (card.catalogNumber && !parts.some((part) => part?.includes(card.catalogNumber!))) {
-    parts.unshift(card.catalogNumber);
-  }
-  return parts.length ? parts.join(' · ') : null;
+/* catalog.type* is phrased as a filter option ("Пам'ятні"), an adjective
+ * agreeing with a plural "монети" — wrong grammar for a single coin's own
+ * chip, which needs the singular noun phrase instead. */
+const COLLECTION_GROUP_LABELS: Record<CollectionGroup, string> = {
+  circulation: 'card.collectionGroupCirculation',
+  commemorative: 'card.collectionGroupCommemorative',
+  collector: 'card.collectionGroupCollector',
+  other: 'card.collectionGroupOther',
+};
+
+/** The category chip next to the title: "Пам'ятна монета", "Обігова" и т.д. */
+export function collectionGroupLabel(group: CollectionGroup, t: TFunction): string {
+  return t(COLLECTION_GROUP_LABELS[group]);
 }
 
-/** The "Характеристики" rows; PropertyList drops the empty ones. */
-export function specRows(card: CatalogCard, t: TFunction, locale: string): PropertyRow[] {
-  const mintage = card.mintageActual ?? card.mintageAnnounced;
-  const unit = (value: string | null, suffix: string) => {
-    const formatted = formatNumber(value, locale, 3);
-    return formatted === null ? null : `${formatted} ${suffix}`;
-  };
+/** "Нейзильбер" — the composition dictionary name, the free-text material, or the metal kind. */
+function metalMaterial(card: CatalogCard, t: TFunction): string | null {
+  if (card.composition?.name) return card.composition.name;
+  if (card.material) return card.material;
+  return card.metalKind === 'unknown' ? null : t(METAL_LABELS[card.metalKind]);
+}
+
+/** "Основна інформація": the coin's identity — country, series, category, year, denomination. */
+export function identitySpecRows(card: CatalogCard, t: TFunction): PropertyRow[] {
   return [
     { key: 'country', label: t('card.specCountry'), value: card.country },
     { key: 'series', label: t('card.specSeries'), value: card.seriesName },
+    {
+      key: 'category',
+      label: t('card.specCategory'),
+      value: collectionGroupLabel(card.collectionGroup, t),
+    },
     { key: 'year', label: t('card.specYear'), value: <span className="tabular">{card.year}</span> },
+    {
+      key: 'denomination',
+      label: t('card.specDenomination'),
+      value: card.denomination?.label ?? null,
+    },
+  ];
+}
+
+/** "Випуск": the release facts. */
+export function issueSpecRows(card: CatalogCard, t: TFunction, locale: string): PropertyRow[] {
+  return [
     {
       key: 'issueDate',
       label: t('card.specIssueDate'),
       value: formatDate(card.issueDate, locale),
     },
     {
-      key: 'denomination',
-      label: t('card.specDenomination'),
-      value: card.denomination?.label ?? null,
+      key: 'mintageAnnounced',
+      label: t('card.specMintageAnnounced'),
+      value: formatNumber(card.mintageAnnounced, locale, 0),
     },
     {
-      key: 'metal',
-      label: t('card.specMetal'),
-      value:
-        card.metalKind === 'unknown' && !card.composition && !card.material
-          ? null
-          : t(METAL_LABELS[card.metalKind]),
-    },
-    {
-      key: 'material',
-      label: t('card.specMaterial'),
-      // The dictionary name when the composition was recognised; otherwise
-      // whatever text the source gave us.
-      value: card.composition?.name ?? card.material,
+      key: 'mintageActual',
+      label: t('card.specMintageActual'),
+      value: formatNumber(card.mintageActual, locale, 0),
     },
     { key: 'variety', label: t('card.specVariety'), value: card.variety },
     { key: 'subtype', label: t('card.specSubtype'), value: card.subtype },
-    { key: 'catalogNumbers', label: t('card.specCatalogNumbers'), value: catalogNumbers(card) },
-    {
-      key: 'mintage',
-      label:
-        mintage === card.mintageActual ? t('card.specMintage') : t('card.specMintageAnnounced'),
-      value: mintage === null ? null : formatNumber(mintage, locale, 0),
-    },
-    { key: 'diameter', label: t('card.specDiameter'), value: unit(card.diameterMm, t('units.mm')) },
+  ];
+}
+
+/** "Технічні характеристики": the coin's physical properties. */
+export function technicalSpecRows(card: CatalogCard, t: TFunction, locale: string): PropertyRow[] {
+  const unit = (value: string | null, suffix: string) => {
+    const formatted = formatNumber(value, locale, 3);
+    return formatted === null ? null : `${formatted} ${suffix}`;
+  };
+  return [
+    { key: 'metalMaterial', label: t('card.specMetalMaterial'), value: metalMaterial(card, t) },
     { key: 'weight', label: t('card.specWeight'), value: unit(card.weightGrams, t('units.g')) },
+    { key: 'diameter', label: t('card.specDiameter'), value: unit(card.diameterMm, t('units.mm')) },
     {
       key: 'thickness',
       label: t('card.specThickness'),
       value: unit(card.thicknessMm, t('units.mm')),
     },
-    { key: 'shape', label: t('card.specShape'), value: card.shape },
     { key: 'edge', label: t('card.specEdge'), value: card.edge },
+    { key: 'shape', label: t('card.specShape'), value: card.shape },
     { key: 'orientation', label: t('card.specOrientation'), value: card.orientation },
+  ];
+}
+
+/**
+ * Who to credit for the photos — moved here (out of an overlay on the photo
+ * itself) so the attribution text never sits on top of the coin. One row
+ * when both sides share a source, two when they don't.
+ */
+function imageSourceRows(card: CatalogCard, t: TFunction): PropertyRow[] {
+  const obverse = card.obverseImage?.attribution ?? null;
+  const reverse = card.reverseImage?.attribution ?? null;
+  if (obverse && obverse === reverse) {
+    return [{ key: 'imageSource', label: t('card.specImageSource'), value: obverse }];
+  }
+  return [
+    { key: 'obverseImageSource', label: t('card.specObverseImageSource'), value: obverse },
+    { key: 'reverseImageSource', label: t('card.specReverseImageSource'), value: reverse },
+  ];
+}
+
+/** "Каталожна інформація": catalog reference numbers and photo attribution. */
+export function catalogSpecRows(card: CatalogCard, t: TFunction): PropertyRow[] {
+  const namedNumbers = [card.catalogKm, card.catalogUc, card.catalogNumista];
+  const genericNumber =
+    card.catalogNumber && !namedNumbers.includes(card.catalogNumber) ? card.catalogNumber : null;
+  return [
+    { key: 'catalogKm', label: t('card.specCatalogKm'), value: card.catalogKm },
+    { key: 'catalogUc', label: t('card.specCatalogUc'), value: card.catalogUc },
+    { key: 'catalogNumista', label: t('card.specCatalogNumista'), value: card.catalogNumista },
+    { key: 'catalogNumber', label: t('card.specCatalogNumber'), value: genericNumber },
+    ...imageSourceRows(card, t),
   ];
 }

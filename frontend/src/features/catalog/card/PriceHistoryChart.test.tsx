@@ -48,7 +48,10 @@ describe('PriceHistoryChart', () => {
     // three trend points → two segments, the suspect one never joined
     const line = screen.getByTestId('trend-line').getAttribute('d') ?? '';
     expect(line.split('L')).toHaveLength(3);
-    expect(screen.getByText('підозріла ціна')).toBeInTheDocument();
+    // The suspect marker still names itself in its hover tooltip.
+    expect(screen.getByTestId('suspect-point').querySelector('title')).toHaveTextContent(
+      'підозріла ціна',
+    );
   });
 
   it('says there are no prices for an empty history', () => {

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import type { CatalogCollectionItem } from '@/shared/api/types';
 import {
@@ -8,17 +9,19 @@ import {
   formatNumber,
   formatUah,
 } from '@/shared/lib/format';
-import { Badge, Skeleton } from '@/shared/ui';
+import { Badge, Button, EmptyState, Skeleton } from '@/shared/ui';
 
 import styles from './InstancesList.module.css';
 
 interface InstancesListProps {
   items: CatalogCollectionItem[] | undefined;
   loading: boolean;
+  /** Where the "add to collection" CTA in the empty state should lead. */
+  addHref: string;
 }
 
-/** "Мої екземпляри та покупки": one row per purchase of the current user. */
-export function InstancesList({ items, loading }: InstancesListProps) {
+/** "Мої екземпляри": one row per purchase of the current user. */
+export function InstancesList({ items, loading, addHref }: InstancesListProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
 
@@ -31,7 +34,16 @@ export function InstancesList({ items, loading }: InstancesListProps) {
     );
   }
   if (!items || items.length === 0) {
-    return <p className={styles.empty}>{t('card.instancesEmpty')}</p>;
+    return (
+      <EmptyState
+        title={t('card.instancesEmpty')}
+        actions={
+          <Link to={addHref}>
+            <Button variant="secondary">{t('catalog.addToCollection')}</Button>
+          </Link>
+        }
+      />
+    );
   }
 
   return (

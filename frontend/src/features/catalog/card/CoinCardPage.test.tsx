@@ -1,11 +1,13 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
 import { ApiError } from '@/shared/api/client';
-import type { CatalogCard, CatalogCollectionItem } from '@/shared/api/types';
+import type { CatalogCard, CatalogCollectionItem, PriceHistoryItem } from '@/shared/api/types';
+import type { CoinImageOut } from '@/shared/lib/coinImage';
 
 import { fetchCard, fetchOwnInstances, fetchPrices } from '../api';
 import { CoinCardPage } from './CoinCardPage';
@@ -108,6 +110,22 @@ const INSTANCES: CatalogCollectionItem[] = [
   },
 ];
 
+function priceSnapshot(overrides: Partial<PriceHistoryItem> = {}): PriceHistoryItem {
+  return {
+    id: 1,
+    source: 'ua-coins',
+    grade: null,
+    price: '460.00',
+    currencyCode: 'UAH',
+    priceUah: '460.00',
+    observedAt: '2024-05-18T00:00:00Z',
+    sourceUrl: null,
+    isOwn: false,
+    isSuspect: false,
+    ...overrides,
+  };
+}
+
 function renderPage(path = '/catalog/7') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -128,26 +146,249 @@ describe('CoinCardPage', () => {
     vi.mocked(fetchOwnInstances).mockReset().mockResolvedValue([]);
   });
 
-  it('shows the title, specs and the owner purchases with the rate per unit', async () => {
+  it('shows the title and the identity fields in the specs table', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    renderPage();
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Дельфін' })).toBeInTheDocument();
+    expect(screen.getByText('Країна')).toBeInTheDocument();
+    expect(screen.getByText('Україна')).toBeInTheDocument();
+    expect(screen.getByText('Серія')).toBeInTheDocument();
+    expect(screen.getByText('Флора і фауна України')).toBeInTheDocument();
+    expect(screen.getByText('Категорія')).toBeInTheDocument();
+    expect(screen.getByText("Пам'ятна монета")).toBeInTheDocument();
+    expect(screen.getByText('Рік')).toBeInTheDocument();
+    expect(screen.getByText('2017')).toBeInTheDocument();
+    expect(screen.getByText('Номінал')).toBeInTheDocument();
+    expect(screen.getByText('2 гривні')).toBeInTheDocument();
+  });
+
+  it('shows the status, quantity and current price in the sidebar when owned', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'У моїй колекції' })).toBeInTheDocument();
+    expect(screen.getByText('2 екземпляри')).toBeInTheDocument();
+    expect(screen.getByText('460 ₴')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Додати ще екземпляр' })).toHaveAttribute(
+      'href',
+      '/collection/coins/new?catalogItemId=7',
+    );
+    // The visitor's own purchase price, valuation and profit live on "Мої екземпляри" instead.
+    expect(screen.queryByText('Куплено загалом')).toBeNull();
+    expect(screen.queryByText('Поточна вартість колекції')).toBeNull();
+  });
+
+  it('shows a compact empty state with a call to action when not owned', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({ quantityOwned: 0, purchaseTotalUah: '0.00' }),
+    );
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Немає у колекції' })).toBeInTheDocument();
+    expect(screen.queryByText(/Кількість/)).toBeNull();
+    expect(screen.getByRole('link', { name: /Додати до колекції/ })).toHaveAttribute(
+      'href',
+      '/collection/coins/new?catalogItemId=7',
+    );
+    // Nothing to show on "Мої екземпляри" for a coin the visitor doesn't own.
+    expect(screen.queryByRole('tab', { name: 'Мої екземпляри' })).toBeNull();
+  });
+
+  it('shows a calm empty state for the current price when there is none', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ marketPriceUah: null }));
+    renderPage();
+
+    expect(await screen.findByText('Актуальна ціна поки відсутня')).toBeInTheDocument();
+  });
+
+  it('links to the source for the current price', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ sourceUrl: 'https://ua-coins.info/coin/7' }));
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: /Відкрити на/ })).toHaveAttribute(
+      'href',
+      'https://ua-coins.info/coin/7',
+    );
+  });
+
+  it('shows a compact summary instead of a chart for a single price point', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    vi.mocked(fetchPrices).mockResolvedValue([priceSnapshot()]);
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Історія цін' }));
+
+    expect(screen.queryByTestId('trend-line')).toBeNull();
+    expect(screen.getAllByText('460 ₴').length).toBeGreaterThan(0);
+  });
+
+  it('renders the trend line for two or more price points', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    vi.mocked(fetchPrices).mockResolvedValue([
+      priceSnapshot({ id: 1, observedAt: '2024-01-10T00:00:00Z', priceUah: '400.00' }),
+      priceSnapshot({ id: 2, observedAt: '2024-05-18T00:00:00Z', priceUah: '460.00' }),
+    ]);
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Історія цін' }));
+
+    expect(await screen.findByTestId('trend-line')).toBeInTheDocument();
+  });
+
+  it('shows the empty state when there is no price history', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Історія цін' }));
+
+    expect(await screen.findByText('Цін ще немає.')).toBeInTheDocument();
+  });
+
+  it('shows the purchase/valuation summary and reveals the instances behind the disclosure', async () => {
     vi.mocked(fetchCard).mockResolvedValue(makeCard());
     vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
     renderPage();
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'Дельфін' })).toBeInTheDocument();
-    expect(screen.getByText('2 гривні · Україна · 2017')).toBeInTheDocument();
-    expect(screen.getByText('KM# 123')).toBeInTheDocument();
-    expect(screen.getByText('Тираж (заявлений)')).toBeInTheDocument();
-    expect(screen.getByText('31 мм')).toBeInTheDocument();
-    expect(screen.queryByText('Товщина')).toBeNull();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
 
-    // owned twice: purchase total and the valuation = price × quantity
-    expect(screen.getByText('640 ₴')).toBeInTheDocument();
+    expect(await screen.findByText('640 ₴')).toBeInTheDocument();
+    // current value = 460 × 2 = 920
     expect(screen.getByText('920 ₴')).toBeInTheDocument();
+    // change = 920 − 640 = +280, +43,8 %
+    expect(screen.getByText('+280 ₴')).toBeInTheDocument();
+    expect(screen.getByText('(+43,8 %)')).toBeInTheDocument();
+
+    await user.click(await screen.findByText('Показати всі екземпляри (2)'));
 
     expect(await screen.findAllByTestId('instance-row')).toHaveLength(2);
     expect(screen.getByText('Аукціон Violity')).toBeInTheDocument();
     expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
-    expect(screen.getByText('Цін ще немає.')).toBeInTheDocument();
+  });
+
+  it('scrolls the newly revealed instances into view when the disclosure opens', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
+    await user.click(await screen.findByText('Показати всі екземпляри (2)'));
+
+    await waitFor(() =>
+      expect(scrollIntoView).toHaveBeenCalledWith(
+        expect.objectContaining({ behavior: 'smooth', block: 'end' }),
+      ),
+    );
+  });
+
+  it('skips the value-change percent when nothing was paid for the coin', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ purchaseTotalUah: '0.00' }));
+    vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
+
+    expect(await screen.findByText('+920 ₴')).toBeInTheDocument();
+    expect(screen.queryByText(/%/)).toBeNull();
+  });
+
+  it('shows a compact empty state with a call to action on the instances tab when empty', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard());
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
+
+    expect(await screen.findByText('У вас ще немає екземплярів цієї монети.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Додати до колекції' })).toHaveAttribute(
+      'href',
+      '/collection/coins/new?catalogItemId=7',
+    );
+    // No purchase/valuation summary without any instances.
+    expect(screen.queryByText('Куплено загалом')).toBeNull();
+  });
+
+  it('hides a spec group entirely when none of its fields are present', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ catalogKm: null }));
+    renderPage();
+
+    await screen.findByRole('heading', { level: 1, name: 'Дельфін' });
+    expect(screen.getByText('Технічні характеристики')).toBeInTheDocument();
+    expect(screen.queryByText('Каталожна інформація')).toBeNull();
+    expect(screen.queryByText('Товщина')).toBeNull();
+  });
+
+  it('puts the archive banner with its reason above an archived item', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({ isArchived: true, archiveReason: 'знято з випуску НБУ' }),
+    );
+    renderPage();
+
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      'Позицію архівовано: знято з випуску НБУ',
+    );
+  });
+
+  it('opens the lightbox with the enlarged image', async () => {
+    const image: CoinImageOut = {
+      preview: 'https://cdn.example/dolphin-preview.jpg',
+      medium: 'https://cdn.example/dolphin-medium.jpg',
+      large: 'https://cdn.example/dolphin-large.jpg',
+      attribution: 'uCoin',
+    };
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ obverseImage: image }));
+    renderPage();
+
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /Збільшити — Аверс/ }));
+
+    const lightbox = await screen.findByTestId('lightbox');
+    expect(lightbox).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /Аверс — Дельфін/ })).toHaveAttribute(
+      'src',
+      image.large,
+    );
+  });
+
+  it('credits the photo source in specs as one row when both sides share it', async () => {
+    const image: CoinImageOut = {
+      preview: null,
+      medium: null,
+      large: null,
+      attribution: 'Національний банк України',
+    };
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ obverseImage: image, reverseImage: image }));
+    renderPage();
+
+    await screen.findByRole('heading', { level: 1, name: 'Дельфін' });
+    expect(screen.getByText('Джерело зображень')).toBeInTheDocument();
+    expect(screen.getByText('Національний банк України')).toBeInTheDocument();
+    expect(screen.queryByText('Джерело зображення аверсу')).toBeNull();
+  });
+
+  it('credits each side separately when their photo sources differ', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({
+        obverseImage: { preview: null, medium: null, large: null, attribution: 'НБУ' },
+        reverseImage: { preview: null, medium: null, large: null, attribution: 'uCoin' },
+      }),
+    );
+    renderPage();
+
+    await screen.findByRole('heading', { level: 1, name: 'Дельфін' });
+    expect(screen.getByText('Джерело зображення аверсу')).toBeInTheDocument();
+    expect(screen.getByText('НБУ')).toBeInTheDocument();
+    expect(screen.getByText('Джерело зображення реверсу')).toBeInTheDocument();
+    expect(screen.getByText('uCoin')).toBeInTheDocument();
+    expect(screen.queryByText('Джерело зображень')).toBeNull();
   });
 
   it('shows what the issuer calls the coin when the reader sees a translation', async () => {
@@ -165,52 +406,6 @@ describe('CoinCardPage', () => {
       await screen.findByRole('heading', { level: 1, name: 'Карбованець' }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Оригінал: Рубль/)).toBeInTheDocument();
-  });
-
-  it('leaves the original line out when the name shown is the original', async () => {
-    vi.mocked(fetchCard).mockResolvedValue(makeCard());
-    renderPage();
-
-    expect(await screen.findByRole('heading', { level: 1, name: 'Дельфін' })).toBeInTheDocument();
-    expect(screen.queryByText(/Оригінал:/)).toBeNull();
-  });
-
-  it('hides the money block and says there is nothing yet without instances', async () => {
-    vi.mocked(fetchCard).mockResolvedValue(
-      makeCard({ quantityOwned: 0, purchaseTotalUah: '0.00' }),
-    );
-    renderPage();
-
-    expect(await screen.findByText('Ще немає.')).toBeInTheDocument();
-    expect(screen.queryByText('Куплено за')).toBeNull();
-    expect(screen.getByText('✕ Не вистачає')).toBeInTheDocument();
-    expect(screen.getByText('Цієї монети немає у вашій колекції')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Додати до колекції/ })).toHaveAttribute(
-      'href',
-      '/collection/coins/new?catalogItemId=7',
-    );
-  });
-
-  it('offers to add another copy when the coin is already in the collection', async () => {
-    vi.mocked(fetchCard).mockResolvedValue(makeCard({ quantityOwned: 1 }));
-    renderPage();
-
-    expect(await screen.findByText('✓ Монета є у вашій колекції')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Додати ще екземпляр/ })).toHaveAttribute(
-      'href',
-      '/collection/coins/new?catalogItemId=7',
-    );
-  });
-
-  it('puts the archive banner with its reason above an archived item', async () => {
-    vi.mocked(fetchCard).mockResolvedValue(
-      makeCard({ isArchived: true, archiveReason: 'знято з випуску НБУ' }),
-    );
-    renderPage();
-
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      'Позицію архівовано: знято з випуску НБУ',
-    );
   });
 
   it('shows "not found" for a foreign personal item or a missing id', async () => {

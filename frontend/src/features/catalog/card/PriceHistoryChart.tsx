@@ -9,14 +9,17 @@ import { toChartPoints } from './chartData';
 
 import styles from './PriceHistoryChart.module.css';
 
-/* Two drawing boxes: a wide one for desktop and a narrow one for phones, so
-   the labels keep a readable size instead of being scaled down with the SVG. */
+/* Two drawing boxes: a wide one for desktop and a narrow one for phones. The
+ * viewBox is close to the box's actual rendered width (the bottom panel now
+ * spans nearly the full page) so text and strokes given in SVG user units
+ * come out close to their real size instead of being scaled up along with
+ * the rest of the coordinate system. */
 const LAYOUTS = {
-  wide: { width: 640, height: 220, pad: { top: 14, right: 18, bottom: 30, left: 56 }, xLabels: 5 },
+  wide: { width: 1200, height: 200, pad: { top: 14, right: 20, bottom: 30, left: 56 }, xLabels: 5 },
   narrow: {
     width: 340,
-    height: 220,
-    pad: { top: 12, right: 12, bottom: 28, left: 46 },
+    height: 180,
+    pad: { top: 12, right: 12, bottom: 26, left: 46 },
     xLabels: 3,
   },
 };
@@ -78,16 +81,22 @@ export function PriceHistoryChart({ items }: { items: PriceHistoryItem[] }) {
 
   const yTicks = Array.from({ length: Y_TICKS + 1 }, (_, index) => (yMax / Y_TICKS) * index);
   const xLabelCount = Math.min(xLabels, Math.max(2, points.length));
-  const xTicks =
+  const rawXTicks =
     timeMax === timeMin
       ? [timeMin]
       : Array.from(
           { length: xLabelCount },
           (_, index) => timeMin + ((timeMax - timeMin) / (xLabelCount - 1)) * index,
         );
-
-  const hasOwn = points.some((point) => point.source.isOwn);
-  const hasSuspect = points.some((point) => point.source.isSuspect);
+  // A short history can put two evenly-spaced ticks in the same month; a
+  // repeated "серп. 2026" label reads as a mistake, so only the first of a
+  // run survives.
+  const xTicks = rawXTicks.filter(
+    (tick, index) =>
+      index === 0 ||
+      formatMonthYear(new Date(tick), locale) !==
+        formatMonthYear(new Date(rawXTicks[index - 1]!), locale),
+  );
 
   return (
     <figure className={styles.figure}>
@@ -178,24 +187,6 @@ export function PriceHistoryChart({ items }: { items: PriceHistoryItem[] }) {
           );
         })}
       </svg>
-      <figcaption className={styles.legend}>
-        <span>
-          <i className={`${styles.swatch} ${styles.swatchTrend}`} aria-hidden="true" />
-          {t('card.legendTrend')}
-        </span>
-        {hasOwn ? (
-          <span>
-            <i className={`${styles.swatch} ${styles.swatchOwn}`} aria-hidden="true" />
-            {t('card.legendOwn')}
-          </span>
-        ) : null}
-        {hasSuspect ? (
-          <span>
-            <i className={`${styles.swatch} ${styles.swatchSuspect}`} aria-hidden="true" />
-            {t('card.legendSuspect')}
-          </span>
-        ) : null}
-      </figcaption>
     </figure>
   );
 }

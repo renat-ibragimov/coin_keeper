@@ -6,11 +6,6 @@
   flex-direction: column;
 }
 
-.empty {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
 .row {
   display: grid;
   grid-template-columns: 1.1fr 1.2fr 1fr 1fr 0.7fr 1.6fr;

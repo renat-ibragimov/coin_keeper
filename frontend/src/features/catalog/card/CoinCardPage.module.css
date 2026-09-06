@@ -4,13 +4,6 @@
   gap: var(--space-4);
 }
 
-.topBar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
 .archiveBanner {
   display: flex;
   flex-direction: column;
@@ -26,116 +19,200 @@
 .header {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
-.badges {
+/* 1fr/auto/1fr: the back button sits at the start of the first track
+ * without changing that track's width, so it stays equal to the empty
+ * third track and the title cell lands exactly centred between them. */
+.titleBar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.backButton {
+  justify-self: start;
+}
+
+.titleCell {
   display: flex;
-  gap: var(--space-1);
-}
-
-.badges:empty {
-  display: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
 }
 
 .title {
-  font-size: 40px;
+  font-size: 34px;
   line-height: 1.15;
-}
-
-.attribution {
-  color: var(--color-text-muted);
-  font-weight: 400;
+  text-align: center;
 }
 
 .original {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  font-size: 13.5px;
+  text-align: center;
 }
 
-.subtitle {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 19px;
-  color: var(--color-text-secondary);
-}
+/* ------------------------------------------------------------------ hero */
 
-.lead {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-muted);
-}
-
-.layout {
+/* Three equal columns — obverse, reverse, the ownership/price card — so the
+ * row spans exactly the same width as the full-width cards below it instead
+ * of a narrower block centred inside extra whitespace. aspect-ratio alone
+ * makes each one square: the column width already is the constraint, so
+ * there is no separate height cap fighting it into a rectangle. */
+.hero {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 340px;
-  grid-template-areas:
-    'photos side'
-    'specs side'
-    'prices side'
-    'instances side';
-  gap: var(--space-4) var(--space-5);
-  align-items: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
 }
 
-.photos {
-  grid-area: photos;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+.photosGroup {
+  display: contents;
 }
 
 .photo {
-  position: relative;
   margin: 0;
-  aspect-ratio: 1 / 1;
-  max-height: 440px;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  border: 1px solid var(--color-border);
-  background:
-    radial-gradient(
-      circle at 35% 30%,
-      color-mix(in srgb, var(--color-accent) 10%, transparent),
-      transparent 70%
-    ),
-    var(--color-surface-sunken);
 }
 
 .photoFrame {
+  /* A private, page-scoped token (not a shared one — this one shape of
+   * highlight belongs to this frame only): a bright inner edge in light
+   * theme reads as glass/plaque sheen, but the same brightness on a dark
+   * surface reads as a milky smear, so dark theme dims it to a whisper
+   * instead of dropping it. */
+  --photo-highlight: rgb(255 255 255 / 0.22);
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-border) 85%, var(--color-accent) 15%);
+  /* A vitrine, not a flat plaque: a faint spotlight pooling behind where the
+   * coin sits, fading to the same surface the other hero cards use. */
+  background: radial-gradient(
+    circle at 50% 42%,
+    color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-raised)),
+    var(--color-surface-raised) 68%
+  );
+  box-shadow:
+    inset 0 1px 0 var(--photo-highlight),
+    var(--shadow-sm);
+  font: inherit;
+  transition:
+    transform 180ms ease,
+    border-color 160ms ease,
+    box-shadow 180ms ease;
+}
+
+:root[data-theme='dark'] .photoFrame {
+  --photo-highlight: rgb(255 255 255 / 0.05);
+}
+
+/* CoinImage normally erases a photo's white studio backdrop by blending it
+ * onto whatever sits behind it (mix-blend-mode: multiply — white is that
+ * blend's identity colour, so it dissolves invisibly into a white surface).
+ * Our own surface tones are warm, not white, so that same blend would
+ * multiply onto the coin's real colours too and tint the whole photo (the
+ * sepia cast reported on this page). These two large, colour-accurate
+ * photos matter more here than hiding a leftover white backdrop on the
+ * rare photo the background-removal pipeline hasn't reached yet
+ * (docs/06-media-storage.md), so this frame keeps the cream surface and
+ * turns the blend off instead — same trade-off dark theme already makes
+ * (CoinImage.module.css). */
+.photoImage img {
+  mix-blend-mode: normal;
+}
+
+button.photoFrame {
+  cursor: zoom-in;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* A small lift, not a zoom: the whole plaque rises a couple of pixels,
+   * the coin doesn't grow. */
+  button.photoFrame:hover,
+  button.photoFrame:focus-visible {
+    transform: translateY(-2px) scale(1.008);
+    border-color: var(--color-border-hover);
+    box-shadow:
+      inset 0 1px 0 var(--photo-highlight),
+      var(--shadow-md);
+  }
+
+  button.photoFrame:hover .magnify,
+  button.photoFrame:focus-visible .magnify {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .photoFrame {
+    transition: none;
+  }
+
+  button.photoFrame:hover,
+  button.photoFrame:focus-visible {
+    transform: none;
+  }
+}
+
+.photoImage {
   width: 100%;
   height: 100%;
-  padding: var(--space-4);
+  padding: var(--space-3);
 }
 
-.photoLabel {
+.magnify {
   position: absolute;
-  top: var(--space-3);
-  left: var(--space-3);
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
-  border: 1px solid var(--color-border);
-  font-size: 12.5px;
-  color: var(--color-text-secondary);
-}
-
-.zoom {
-  position: absolute;
-  right: var(--space-3);
-  bottom: var(--space-3);
-  padding: 5px 12px;
-  border-radius: var(--radius-sm);
+  top: 50%;
+  left: 50%;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   border: 1px solid var(--color-border-strong);
   background: color-mix(in srgb, var(--color-surface) 85%, transparent);
   color: var(--color-text);
-  font-size: 13px;
-  cursor: pointer;
+  font-size: 18px;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.85);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
 }
 
-.zoom:hover {
-  background: var(--color-surface);
+/* A vitrine caption, not a button: quieter weight, a hair of letter-spacing,
+ * glassy rather than solid. */
+.photoLabel {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-surface) 74%, transparent);
+  backdrop-filter: blur(6px);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.06);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+/* Kept for when the photo attribution line returns (see CoinCardPage.tsx). */
+.attribution {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 
 .lightboxImage {
@@ -143,133 +220,211 @@
   height: min(70vh, 760px);
 }
 
-.side {
-  grid-area: side;
+/* Same warm-surface-vs-multiply-blend conflict as .photoImage above — the
+ * lightbox's own backdrop (Lightbox.module.css) is the same sunken tone. */
+.lightboxImage img {
+  mix-blend-mode: normal;
+}
+
+/* --------------------------------------------------------- sidebar card */
+
+/* One question only: do I have it, and what does it cost right now? Same
+ * square footprint as a photo; content stacks from the top so any extra
+ * room lands as quiet space at the bottom, not wedged between rows. */
+.sidebarCard {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
+  gap: var(--space-3);
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: var(--space-4);
+  overflow: auto;
 }
 
-.sideHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-2);
-}
-
-.sideTitle {
-  font-size: 18px;
-}
-
-.ownedMark {
-  color: var(--color-success);
-  font-weight: 700;
-}
-
-.missingMark {
-  color: var(--color-text-muted);
-}
-
-.statusLine {
+.statusHeading {
   margin: 0;
-  font-size: 14px;
+  font-size: 20px;
+}
+
+.statusOwned {
+  color: var(--color-success);
+}
+
+.quantityLine {
+  margin: 0;
+  font-size: 13.5px;
   color: var(--color-text-secondary);
 }
 
-.statusLineOwned {
+.quantityLine strong {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* A quiet band, not a card-in-a-card: two hairline rules instead of a
+ * bordered, radiused box around the number that matters most here. */
+.priceBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: var(--space-1);
+  padding: var(--space-3) 0;
+  border-top: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.priceLabel {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.cardActions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.positive {
   color: var(--color-success);
   font-weight: 600;
 }
 
-.money {
-  margin: 0;
-  display: flex;
-  flex-direction: column;
+.negative {
+  color: var(--color-danger);
+  font-weight: 600;
 }
 
-.moneyRow {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-3);
-  padding: var(--space-2) 0;
-  border-top: 1px solid var(--color-border);
+.changePercent {
+  font-weight: 400;
+  color: var(--color-text-muted);
 }
 
-.moneyRow:first-child {
-  border-top: none;
-  padding-top: 0;
-}
-
-.moneyRow dt {
-  color: var(--color-text-secondary);
-}
-
-.moneyRow dd {
+.priceValue {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 34px;
+  line-height: 1.05;
+  color: var(--color-text);
 }
 
-.actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-3);
-}
-
-.actionLink {
-  text-decoration: none;
-}
-
-.actionNote {
+.priceMeta {
+  margin: 0;
   font-size: 12.5px;
   color: var(--color-text-muted);
-  text-align: center;
 }
 
-.infoBox {
-  display: flex;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--color-info-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-info-bg);
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  line-height: 1.45;
+/* A touch more physical than a plain link: a firmer underline on hover,
+ * eased in rather than snapping. */
+.sourceLink {
+  font-size: 13.5px;
+  transition:
+    color 140ms ease,
+    text-decoration-color 140ms ease;
 }
 
-.specs {
-  grid-area: specs;
+.sourceLink:hover {
+  text-decoration-thickness: 2px;
 }
 
-.prices {
-  grid-area: prices;
+/* The one primary action on the page gets a bit of that catalogue-button
+ * physicality: a glassy top edge, a small lift on hover, a press on click.
+ * Targets the shared Button's own <button> by DOM position instead of
+ * touching Button.module.css, which every page's primary actions share. */
+.cardActions button {
+  --cta-highlight: rgb(255 255 255 / 0.22);
+  position: relative;
+  box-shadow:
+    inset 0 1px 0 var(--cta-highlight),
+    var(--shadow-sm);
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    filter 140ms ease;
 }
 
-.instances {
-  grid-area: instances;
+:root[data-theme='dark'] .cardActions button {
+  --cta-highlight: rgb(255 255 255 / 0.08);
 }
 
-.sectionTitle {
-  font-size: 19px;
-  margin-bottom: var(--space-3);
+@media (hover: hover) and (pointer: fine) {
+  .cardActions button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 var(--cta-highlight),
+      var(--shadow-md);
+  }
 }
 
-.sectionHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+.cardActions button:active:not(:disabled) {
+  transform: translateY(0);
 }
 
-.priceCaption {
-  font-size: 13px;
+@media (prefers-reduced-motion: reduce) {
+  .cardActions button {
+    transition: none;
+  }
+
+  .cardActions button:hover:not(:disabled),
+  .cardActions button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+.muted {
+  margin: 0;
   color: var(--color-text-muted);
-  margin-bottom: var(--space-3);
+  font-size: 14px;
+}
+
+/* --------------------------------------------------------- characteristics */
+
+/* auto-fit collapses a group's track to zero width when it has nothing to
+ * show (e.g. no catalog numbers at all) instead of leaving an empty column,
+ * and it thins from 3 columns to 2 or 1 as the row gets too narrow — no
+ * breakpoint has to know how many groups actually rendered. */
+.specGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4) var(--space-5);
+}
+
+.specGroup {
+  min-width: 0;
+}
+
+.specGroupTitle {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+/* Editorial property rows, not a DataTable: a muted label, a slightly
+ * heavier value, one soft rule between rows and none after the last one.
+ * Targets the shared PropertyList's rendered <dl>/<dt>/<dd> by element
+ * instead of touching PropertyList.module.css, which other pages use too. */
+.bottomPanel dt {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+.bottomPanel dd {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.bottomPanel dl > div {
+  padding: 11px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+}
+
+.bottomPanel dl > div:last-child {
+  border-bottom: none;
 }
 
 .notes {
@@ -279,42 +434,111 @@
   white-space: pre-line;
 }
 
-.sourceLink {
-  display: inline-block;
-  margin-top: var(--space-3);
-  font-size: 13.5px;
+/* ------------------------------------------------------------- instances */
+
+.instancesSummary {
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.muted {
-  margin: 0;
-  color: var(--color-text-muted);
+.instancesDisclosure summary {
+  cursor: pointer;
+  padding: var(--space-2) 0;
   font-size: 14px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.instancesDisclosure summary:hover {
+  text-decoration: underline;
+}
+
+.instancesDisclosure[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+/* Lighter tabs for this page only: a hairline under the whole row instead
+ * of a boxed pill-container, the active tab picked out by colour and an
+ * underline instead of a filled capsule. Selects the shared Tabs
+ * component's own rendered output by role/aria attributes — stable,
+ * unscoped by CSS Modules — rather than touching Tabs.module.css, which
+ * four other pages use as-is. */
+.tabsWrapper [role='tablist'] {
+  display: flex;
+  gap: var(--space-4);
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tabsWrapper [role='tab'] {
+  position: relative;
+  padding: var(--space-2) var(--space-1) var(--space-3);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tabsWrapper [role='tab'][aria-selected='true'] {
+  background: transparent;
+  box-shadow: none;
+  color: var(--color-accent);
+}
+
+.tabsWrapper [role='tab'][aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  bottom: -1px;
+  height: 2px;
+  background: var(--color-accent);
+  border-radius: 2px;
+}
+
+/* ------------------------------------------------------------- bottom panel */
+
+.bottomCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+/* A floor, not a fixed height: switching tabs shouldn't visibly shrink the
+ * panel for a short one (a single price point, an empty state) even though
+ * a data-heavy one (many spec rows) can still grow past it. */
+.bottomPanel {
+  min-width: 0;
+  min-height: 220px;
+}
+
+.singlePrice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 @media (max-width: 1020px) {
-  .layout {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      'photos'
-      'side'
-      'specs'
-      'prices'
-      'instances';
+  .hero {
+    grid-template-columns: minmax(0, 420px);
+    justify-content: center;
   }
 
   .title {
-    font-size: 30px;
+    font-size: 28px;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .subtitle {
-    font-size: 17px;
-  }
-
-  .photos {
-    gap: var(--space-2);
-  }
-
-  .photoFrame {
-    padding: var(--space-3);
+  .specGrid {
+    grid-template-columns: 1fr;
   }
 }
