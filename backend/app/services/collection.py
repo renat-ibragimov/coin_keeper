@@ -20,6 +20,7 @@ from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogRepository
 from app.repositories.collection import (
     CollectionFilters,
+    CollectionPositionRow,
     CollectionRepository,
     CollectionRow,
 )
@@ -29,6 +30,7 @@ from app.schemas.collection import (
     CollectionItemCreate,
     CollectionItemOut,
     CollectionItemUpdate,
+    CollectionPositionOut,
 )
 from app.services.catalog import display_title
 from app.services.media_urls import CatalogImages, MediaUrlBuilder
@@ -76,13 +78,14 @@ class CollectionService:
         self._media = MediaRepository(session, user_id=user.id)
         self._urls = MediaUrlBuilder()
 
-    async def list_collection(
+    async def list_positions(
         self, filters: CollectionFilters, *, limit: int, offset: int
-    ) -> tuple[list[CollectionItemOut], int]:
-        rows, total = await self._repo.list_page(filters, limit=limit, offset=offset)
+    ) -> tuple[list[CollectionPositionOut], int]:
+        rows, total = await self._repo.list_positions(filters, limit=limit, offset=offset)
         images = await self._images_for([row.catalog_item.id for row in rows])
         return [
-            self._row_out(row, images.get(row.catalog_item.id, CatalogImages())) for row in rows
+            self._position_out(row, images.get(row.catalog_item.id, CatalogImages()))
+            for row in rows
         ], total
 
     async def get(self, item_id: int) -> CollectionItemOut:
@@ -215,6 +218,31 @@ class CollectionService:
         expense.rate_uah = instance.purchase_rate_uah
         expense.expense_date = instance.acquisition_date
         expense.vendor = instance.seller
+
+    def _position_out(
+        self, row: CollectionPositionRow, images: CatalogImages
+    ) -> CollectionPositionOut:
+        item = row.catalog_item
+        return CollectionPositionOut(
+            catalog_item_id=item.id,
+            title=display_title(item, self._locale),
+            country=row.country,
+            series_name=row.series_name,
+            denomination=(
+                None
+                if row.denomination is None
+                else render_label(row.denomination.value, row.denomination.unit, self._locale)
+            ),
+            year=item.issue_year,
+            is_archived=item.is_archived,
+            archive_reason=item.archive_reason,
+            total_quantity=row.total_quantity,
+            total_spend_uah=row.total_spend_uah,
+            market_value_uah=row.market_value_uah,
+            last_acquisition_date=row.last_acquisition_date,
+            grades=row.grades,
+            thumbnail_url=images.thumbnail_url,
+        )
 
     def _row_out(self, row: CollectionRow, images: CatalogImages) -> CollectionItemOut:
         instance = row.instance

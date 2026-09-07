@@ -330,19 +330,42 @@ DELETE /catalog/{id}
 ## Коллекция
 
 ```
-GET    /collection?page&pageSize&countryId&seriesId&q&sort&order
+GET    /collection?page&pageSize&countryId&seriesId&year&yearFrom&yearTo&denominationId
+                   &group&metalKind&grade&q&sort&order
 GET    /collection/{id}
 POST   /collection    {catalogItemId, quantity, price, currency, purchaseDate, seller?, notes?, grade?}
 PATCH  /collection/{id}
 DELETE /collection/{id}
 ```
 
-Строка коллекции несёт контекст позиции каталога, чтобы экран «Моя колекція» не ходил за
-каждой монетой отдельно: `thumbnailUrl` (по тем же правилам видимости, что в каталоге)
-и `marketPriceUah` — последний видимый пользователю неподозрительный снимок цены.
+`GET /collection` — список позиций: одна строка на каталожную монету,
+все покупки этой монеты пользователем схлопнуты в одну позицию. Детали отдельных покупок —
+только через `GET/PATCH/DELETE /collection/{id}` (id покупки, `CollectionItem`) и
+`GET /catalog/{id}/collection-items` («Мої екземпляри» на карточке монеты).
 
-При создании: сервер подтягивает курс НБУ на `purchaseDate`, пишет `purchase_rate_uah`
-и в той же транзакции создаёт расход категории `coin_purchase`. См. `04-business-rules.md`.
+Фильтры `countryId`, `seriesId`, `year`, `yearFrom`, `yearTo`, `denominationId`, `group`,
+`metalKind`, `q` — зеркально `GET /catalog`, работают по атрибутам каталожной монеты.
+`grade` — свой для коллекции: позиция попадает в выдачу, если **хотя бы одна** её покупка
+имеет такой стан; агрегаты при этом считаются по **всем** покупкам позиции, не только по
+совпавшей — грейд-фильтр показывает позицию целиком, а не отфильтрованный кусок.
+
+Форма позиции — контекст каталожной монеты (как сейчас) плюс агрегаты по покупкам:
+
+- `totalQuantity` — сумма `quantity` всех покупок;
+- `totalSpendUah` — сумма покупок в гривне (по курсу на дату каждой);
+- `marketValueUah` — последняя видимая пользователю неподозрительная цена монеты ×
+  `totalQuantity` (`null`, если цены нет);
+- `lastAcquisitionDate` — максимальная дата покупки (`null`, если ни у одной нет даты);
+- `grades` — отсортированный список различных станов покупок, без `null`;
+- `thumbnailUrl` — как раньше, по тем же правилам видимости, что в каталоге.
+
+Сортировки: `date` — по `lastAcquisitionDate`, `title` — по названию, `total` — по
+`totalSpendUah`. Пагинация — по позициям, не по покупкам.
+
+При создании покупки (`POST /collection`): сервер подтягивает курс НБУ на `purchaseDate`,
+пишет `purchase_rate_uah` и в той же транзакции создаёт расход категории `coin_purchase`.
+См. `04-business-rules.md`. `GET/PATCH/DELETE /collection/{id}` и ответ `POST /collection`
+остаются в форме одной покупки (`CollectionItemOut`) — не позиции.
 
 До этапа 5 курсы берутся только из таблицы `exchange_rates` (HTTP-клиента НБУ ещё нет):
 покупка не в гривне с датой, на которую нет курса ≤ `purchaseDate`, отклоняется с `422`.

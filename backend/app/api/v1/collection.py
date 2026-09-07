@@ -8,11 +8,13 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
 from app.api.errors import ProblemError
+from app.models.enums import CollectionGroup, MetalKind
 from app.repositories.collection import CollectionFilters
 from app.schemas.collection import (
     CollectionItemCreate,
     CollectionItemOut,
     CollectionItemUpdate,
+    CollectionPositionOut,
 )
 from app.schemas.common import Page
 from app.services.collection import (
@@ -45,13 +47,31 @@ async def list_collection(
     q: Annotated[str | None, Query(max_length=200)] = None,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
     series_id: Annotated[int | None, Query(alias="seriesId")] = None,
+    year: Annotated[int | None, Query()] = None,
+    year_from: Annotated[int | None, Query(alias="yearFrom")] = None,
+    year_to: Annotated[int | None, Query(alias="yearTo")] = None,
+    denomination_id: Annotated[int | None, Query(alias="denominationId")] = None,
+    group: Annotated[CollectionGroup | None, Query()] = None,
+    metal_kind: Annotated[MetalKind | None, Query(alias="metalKind")] = None,
+    grade: Annotated[str | None, Query(max_length=50)] = None,
     sort: Annotated[Literal["date", "title", "total"], Query()] = "date",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
-) -> Page[CollectionItemOut]:
+) -> Page[CollectionPositionOut]:
     filters = CollectionFilters(
-        q=q, country_id=country_id, series_id=series_id, sort=sort, order=order
+        q=q,
+        country_id=country_id,
+        series_id=series_id,
+        year=year,
+        year_from=year_from,
+        year_to=year_to,
+        denomination_id=denomination_id,
+        group=group,
+        metal_kind=metal_kind,
+        grade=grade,
+        sort=sort,
+        order=order,
     )
-    items, total = await CollectionService(session, user, locale).list_collection(
+    items, total = await CollectionService(session, user, locale).list_positions(
         filters, limit=pagination.page_size, offset=pagination.offset
     )
     return Page(items=items, total=total, page=pagination.page, page_size=pagination.page_size)

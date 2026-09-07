@@ -13,9 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
 from app.models import CatalogItem, CollectionItem, Expense
-from app.models.enums import ExpenseCategory
+from app.models.enums import CollectionGroup, ExpenseCategory, MetalKind
 from tests.helpers import register_and_verify
 from tests.seed import (
+    add_collection_item,
     add_rate,
     add_snapshot,
     make_catalog_item,
@@ -307,7 +308,7 @@ async def test_collection_is_isolated_between_users(
     # A's own row is intact.
     listing_a = await client.get("/api/v1/collection", headers=headers_a)
     assert listing_a.json()["total"] == 1
-    assert listing_a.json()["items"][0]["quantity"] == 1
+    assert listing_a.json()["items"][0]["totalQuantity"] == 1
 
 
 async def test_listing_filters_and_sorting(
@@ -315,7 +316,13 @@ async def test_listing_filters_and_sorting(
 ) -> None:
     refs = ctx.refs
     cent = await make_catalog_item(
-        db_session, country=refs.usa, title="Lincoln cent", year=2009, denomination=refs.cent_1
+        db_session,
+        country=refs.usa,
+        title="Lincoln cent",
+        year=2009,
+        denomination=refs.cent_1,
+        group=CollectionGroup.CIRCULATION,
+        metal_kind=MetalKind.PRECIOUS,
     )
     headers = auth(ctx.token_a)
 
@@ -349,6 +356,30 @@ async def test_listing_filters_and_sorting(
     assert by_q.json()["total"] == 1
     assert by_q.json()["items"][0]["title"] == "Lincoln cent"
 
+    by_year = await client.get("/api/v1/collection?year=2018", headers=headers)
+    assert by_year.json()["total"] == 1
+    assert by_year.json()["items"][0]["title"] == "Дельфін"
+
+    by_year_range = await client.get(
+        "/api/v1/collection?yearFrom=2010&yearTo=2020", headers=headers
+    )
+    assert by_year_range.json()["total"] == 1
+    assert by_year_range.json()["items"][0]["title"] == "Дельфін"
+
+    by_denomination = await client.get(
+        f"/api/v1/collection?denominationId={refs.cent_1.id}", headers=headers
+    )
+    assert by_denomination.json()["total"] == 1
+    assert by_denomination.json()["items"][0]["title"] == "Lincoln cent"
+
+    by_group = await client.get("/api/v1/collection?group=circulation", headers=headers)
+    assert by_group.json()["total"] == 1
+    assert by_group.json()["items"][0]["title"] == "Lincoln cent"
+
+    by_metal = await client.get("/api/v1/collection?metalKind=precious", headers=headers)
+    assert by_metal.json()["total"] == 1
+    assert by_metal.json()["items"][0]["title"] == "Lincoln cent"
+
     newest_first = await client.get("/api/v1/collection?sort=date", headers=headers)
     assert [row["title"] for row in newest_first.json()["items"]] == [
         "Lincoln cent",
@@ -356,7 +387,7 @@ async def test_listing_filters_and_sorting(
     ]
 
     by_total = await client.get("/api/v1/collection?sort=total&order=desc", headers=headers)
-    assert [row["totalUah"] for row in by_total.json()["items"]] == ["300.00", "20.00"]
+    assert [row["totalSpendUah"] for row in by_total.json()["items"]] == ["300.00", "20.00"]
 
 
 async def test_get_single_instance_is_owner_only(client: AsyncClient, ctx: SimpleNamespace) -> None:
@@ -409,5 +440,91 @@ async def test_listing_carries_catalog_context(
     await add_snapshot(db_session, item, "450.00")
 
     listed = (await client.get("/api/v1/collection", headers=headers)).json()
-    assert listed["items"][0]["marketPriceUah"] == "450.00"
+    # Two of them, so the position's market value is price x totalQuantity.
+    assert listed["items"][0]["marketValueUah"] == "900.00"
     assert "thumbnailUrl" in listed["items"][0]
+
+
+async def test_two_purchases_of_the_same_coin_group_into_one_position(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    item = await db_session.get(CatalogItem, ctx.item_id)
+    assert item is not None
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="500.00",
+        acquisition_date=date(2024, 1, 10),
+        grade="UNC",
+    )
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="600.00",
+        acquisition_date=date(2024, 3, 5),
+        grade="XF",
+    )
+
+    listed = (await client.get("/api/v1/collection", headers=auth(ctx.token_a))).json()
+    assert listed["total"] == 1
+    position = listed["items"][0]
+    assert position["totalQuantity"] == 2
+    assert position["totalSpendUah"] == "1100.00"
+    assert position["lastAcquisitionDate"] == "2024-03-05"
+    assert position["grades"] == ["UNC", "XF"]
+
+
+async def test_grade_filter_matches_the_whole_position(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """A position with any purchase of the grade shows up whole: its
+    aggregates still cover every purchase, not just the matching one."""
+    refs = ctx.refs
+    item = await db_session.get(CatalogItem, ctx.item_id)
+    assert item is not None
+    other = await make_catalog_item(
+        db_session, country=refs.usa, title="Lincoln cent", year=2009, denomination=refs.cent_1
+    )
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="500.00",
+        acquisition_date=date(2024, 1, 10),
+        grade="UNC",
+    )
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="600.00",
+        acquisition_date=date(2024, 3, 5),
+        grade="XF",
+    )
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=other,
+        quantity=1,
+        price="20.00",
+        acquisition_date=date(2024, 2, 1),
+        grade="VF",
+    )
+
+    matched = await client.get("/api/v1/collection?grade=UNC", headers=auth(ctx.token_a))
+    assert matched.json()["total"] == 1
+    position = matched.json()["items"][0]
+    assert position["title"] == "Дельфін"
+    # Aggregates cover both purchases, not just the UNC one.
+    assert position["totalQuantity"] == 2
+    assert position["totalSpendUah"] == "1100.00"
+    assert position["grades"] == ["UNC", "XF"]
+
+    unmatched = await client.get("/api/v1/collection?grade=PROOF", headers=auth(ctx.token_a))
+    assert unmatched.json()["total"] == 0

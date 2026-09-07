@@ -208,6 +208,7 @@ async def add_collection_item(
     currency: str = "UAH",
     rate_uah: str = "1",
     acquisition_date: date | None = None,
+    grade: str | None = None,
     with_expense: bool = True,
 ) -> CollectionItem:
     """Insert an instance the way the purchase transaction would have."""
@@ -219,6 +220,7 @@ async def add_collection_item(
         purchase_currency=currency,
         purchase_rate_uah=Decimal(rate_uah),
         acquisition_date=acquisition_date or date(2024, 1, 15),
+        grade=grade,
     )
     session.add(row)
     await session.flush()

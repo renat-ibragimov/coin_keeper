@@ -11,6 +11,30 @@ from app.schemas.base import CamelModel
 from app.schemas.common import Money, Rate
 
 
+class CollectionPositionOut(CamelModel):
+    """One catalog item grouped from all of the owner's purchases of it.
+
+    The grid and table listing shows positions, not individual purchases —
+    those live in the per-purchase CollectionItemOut, reachable one at a
+    time via GET/PATCH/DELETE /collection/{id} (docs/03-api-contract.md).
+    """
+
+    catalog_item_id: int
+    title: str
+    country: str
+    series_name: str | None
+    denomination: str | None
+    year: int
+    is_archived: bool
+    archive_reason: str | None
+    total_quantity: int
+    total_spend_uah: Money
+    market_value_uah: Money | None
+    last_acquisition_date: date | None
+    grades: list[str]
+    thumbnail_url: str | None = None
+
+
 class CollectionItemOut(CamelModel):
     id: int
     catalog_item_id: int
