@@ -108,6 +108,11 @@
   --color-owned: #1e3c28;
   --color-absent: #7a1315;
 
+  /* A whisper of green over the raised surface, for the owned catalog tile
+   * and table row: catches the eye scanning the grid without competing with
+   * the coin photo itself for attention (docs/08-ui-map.md). */
+  --color-owned-surface: color-mix(in srgb, var(--color-owned) 5%, var(--color-surface-raised));
+
   /* The firmer lower/outer edge of a solid semantic fill — the danger button,
    * the "in collection" row — so it reads as a control with a rim rather
    * than a flat patch of colour.
@@ -244,6 +249,10 @@
 
   --color-owned: #bcd0bb;
   --color-absent: #f4938e;
+
+  /* Same idea as the light theme: a faint lift of green over the raised
+   * surface, never loud enough to fight the coin photo for attention. */
+  --color-owned-surface: color-mix(in srgb, var(--color-owned) 5%, var(--color-surface-raised));
 
   --color-row-hover: #181818;
   --color-selected: #2b2519;

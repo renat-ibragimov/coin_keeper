@@ -49,6 +49,19 @@
   .table tbody tr:hover {
     background: var(--color-row-hover);
   }
+
+  /* A blended tone, not plain --color-row-hover: an owned row must still
+   * visibly answer a hover, but without losing its own green tint entirely. */
+  .table tbody tr.ownedRow:hover {
+    background: color-mix(in srgb, var(--color-owned-surface), var(--color-row-hover) 60%);
+  }
+}
+
+/* Owned rows catch the eye scanning the table, same tint as the catalog's
+ * card grid; the leading icon column below carries the same information as
+ * text/icon, not colour alone (docs/08-ui-map.md). */
+.ownedRow {
+  background: var(--color-owned-surface);
 }
 
 /* Stretched-link pattern applied to a row: position:relative on modern
@@ -115,6 +128,24 @@
 
 .archivedRow {
   opacity: 0.65;
+}
+
+/* Narrow leading column, icon-only: no header label of its own, the meaning
+ * lives in each row's icon and its aria-label. */
+.ownedHeader {
+  width: 1%;
+  padding: 10px 0 10px var(--space-3);
+}
+
+.ownedCell {
+  width: 1%;
+  padding: 8px 0 8px var(--space-3);
+  white-space: nowrap;
+}
+
+.ownedIcon {
+  display: block;
+  color: var(--color-owned);
 }
 
 .coinCell {

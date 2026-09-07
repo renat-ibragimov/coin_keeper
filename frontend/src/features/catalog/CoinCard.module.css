@@ -75,6 +75,17 @@
   opacity: 0.72;
 }
 
+/* Owned coins catch the eye scanning the grid: a faint green tint on the
+ * card's own surface plus a matching border, on top of the existing footer
+ * status row (never colour alone, docs/08-ui-map.md). Only the resting
+ * border changes — .card:hover above already restyles it to the same brass
+ * used everywhere else, so the hover lift stays exactly as noticeable as on
+ * any other card. */
+.owned {
+  background: var(--color-owned-surface);
+  border-color: var(--color-owned);
+}
+
 /* No background of its own: the coins sit directly on the card's own
  * surface (var(--color-surface-raised) from .card) so the tile reads as one
  * piece instead of an image plaque stacked on a content block

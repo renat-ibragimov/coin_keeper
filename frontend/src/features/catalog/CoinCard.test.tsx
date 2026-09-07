@@ -89,6 +89,14 @@ describe('CoinCard collection state (same footer everywhere: catalog, series)', 
     expect(link).toHaveAttribute('href', '/collection/coins/new?catalogItemId=1');
   });
 
+  it('tints the card when the coin is owned, plain otherwise', () => {
+    const { container: missing } = render(<CoinCard item={makeItem({ quantityOwned: 0 })} />);
+    expect(missing.querySelector('article')?.className ?? '').not.toMatch(/_owned_/);
+
+    const { container: owned } = render(<CoinCard item={makeItem({ quantityOwned: 1 })} />);
+    expect(owned.querySelector('article')?.className ?? '').toMatch(/_owned_/);
+  });
+
   it('carries backTo through as router state, so the purchase form can return to it', () => {
     function LocationState() {
       const location = useLocation();

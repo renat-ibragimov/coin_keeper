@@ -67,7 +67,11 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
   const sourceLabel = priceSourceLabel(item.priceSource, t);
 
   return (
-    <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
+    <article
+      className={[styles.card, owned ? styles.owned : '', item.isArchived ? styles.archived : '']
+        .filter(Boolean)
+        .join(' ')}
+    >
       <div className={styles.media}>
         <Link to={cardUrl} className={styles.mediaLink} aria-label={title} tabIndex={-1}>
           <CoinImages item={item} />

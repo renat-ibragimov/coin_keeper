@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown, CircleCheck, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -54,6 +54,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
       <table className={styles.table}>
         <thead>
           <tr>
+            <th aria-hidden="true" className={styles.ownedHeader} />
             {COLUMNS.map((column) => {
               // The header itself is centered from "Країна" on — only the coin
               // name keeps a left header, matching its left-aligned content.
@@ -99,7 +100,23 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
             const owned = item.quantityOwned > 0;
             const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
             return (
-              <tr key={item.id} className={item.isArchived ? styles.archivedRow : undefined}>
+              <tr
+                key={item.id}
+                className={[owned ? styles.ownedRow : '', item.isArchived ? styles.archivedRow : '']
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                <td className={styles.ownedCell}>
+                  {owned ? (
+                    <CircleCheck
+                      size={16}
+                      strokeWidth={1.75}
+                      className={styles.ownedIcon}
+                      role="img"
+                      aria-label={t('catalog.badgeInCollection')}
+                    />
+                  ) : null}
+                </td>
                 <td className={ALIGN_CLASS.left}>
                   <div className={styles.coinCell}>
                     <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
