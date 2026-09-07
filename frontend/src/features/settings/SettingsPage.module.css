@@ -11,8 +11,9 @@
   align-items: start;
 }
 
+/* Settings headings name interface areas: body face, UI-panel size. */
 .sectionTitle {
-  font-size: 20px;
+  font-size: 18px;
   margin-bottom: var(--space-4);
 }
 
@@ -21,8 +22,9 @@
 }
 
 .label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
+  color: var(--color-text-secondary);
   margin-bottom: var(--space-2);
 }
 
@@ -32,11 +34,14 @@
   color: var(--color-text-muted);
 }
 
+/* An inset block inside a raised card: below the card's own surface, with
+ * an inset top shadow and a smaller radius. */
 .adminBox {
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-control);
+  box-shadow: var(--shadow-inset);
 }
 
 .adminBox .note {

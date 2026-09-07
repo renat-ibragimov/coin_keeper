@@ -40,6 +40,9 @@
   gap: var(--space-3);
 }
 
+/* A raised row, not a padded rectangle: the progress ring anchors it on the
+ * left, the name and metrics align tightly against it, and the whole thing
+ * lifts by a single pixel on hover (docs/08-ui-map.md). */
 .row {
   display: grid;
   grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 2fr);
@@ -49,7 +52,23 @@
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    inset 0 1px 0 var(--highlight-inset),
+    var(--shadow-sm);
+  transition:
+    transform var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .row:hover {
+    transform: translateY(-1px);
+    border-color: var(--color-border-hover);
+    box-shadow:
+      inset 0 1px 0 var(--highlight-inset),
+      var(--shadow-card);
+  }
 }
 
 .rowBody {
@@ -62,6 +81,10 @@
   font-weight: 600;
   color: var(--color-text);
   text-decoration: none;
+}
+
+.name {
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .name:hover {
@@ -81,8 +104,9 @@
 }
 
 .stats dt {
-  font-size: 11.5px;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
@@ -90,6 +114,7 @@
 .stats dd {
   margin: 2px 0 0;
   font-size: 15px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 

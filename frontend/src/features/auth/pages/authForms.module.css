@@ -1,6 +1,6 @@
 .title {
   font-family: var(--font-display);
-  font-size: 32px;
+  font-size: clamp(26px, 3vw, 32px);
 }
 
 .subtitle {

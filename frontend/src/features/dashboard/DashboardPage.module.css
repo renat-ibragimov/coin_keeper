@@ -31,13 +31,15 @@
   text-decoration: none;
 }
 
-.tileLink:hover {
-  outline: 1px solid var(--color-border-strong);
-  outline-offset: 2px;
+@media (hover: hover) and (pointer: fine) {
+  .tileLink:hover {
+    outline: 1px solid var(--color-border-hover);
+    outline-offset: 2px;
+  }
 }
 
 .tileLink:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -55,9 +57,9 @@
   min-width: 0;
 }
 
-/* Cards are shared with other screens at their default padding — this
- * trims it down for every card in the two dense overview columns instead
- * of changing the shared component. */
+/* The two overview columns are one analytical composition, not a row of
+ * separate boxes: every card in them is a structural panel (variant="panel"
+ * in DashboardPage.tsx) at a tighter padding than the shared default. */
 .stack > div {
   padding: var(--space-2) var(--space-3);
 }
@@ -81,8 +83,10 @@
   margin-bottom: var(--space-2);
 }
 
+/* A widget heading names an interface area, so it stays in the body face at
+ * UI-panel size (docs/08-ui-map.md). */
 .cardTitle {
-  font-size: 20px;
+  font-size: 18px;
   margin-bottom: var(--space-2);
 }
 
@@ -91,6 +95,9 @@
 }
 
 .cardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 14px;
   text-decoration: none;
 }
@@ -121,7 +128,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-1) 0;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .seriesRow:first-child {
@@ -139,6 +146,10 @@
   font-size: 17px;
   color: var(--color-text);
   text-decoration: none;
+}
+
+.seriesName {
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .seriesName:hover {
@@ -177,6 +188,7 @@
   align-items: center;
   gap: var(--space-3);
   font-size: 14px;
+  font-variant-numeric: tabular-nums;
 }
 
 .countryName {
@@ -185,11 +197,14 @@
   white-space: nowrap;
 }
 
+/* A muted track with restrained brass on it, same reading as the progress
+ * rings elsewhere in the cabinet. */
 .countryBar {
   display: block;
   height: 6px;
   border-radius: 3px;
-  background: var(--color-surface-sunken);
+  background: var(--color-surface-control);
+  box-shadow: inset 0 0 0 1px var(--color-border-subtle);
   overflow: hidden;
 }
 
@@ -224,7 +239,7 @@
   align-items: baseline;
   gap: var(--space-3);
   padding: var(--space-1) 0;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .financeRow:first-child {
@@ -247,6 +262,7 @@
 .financeValue {
   margin: 0;
   font-size: 17px;
+  font-variant-numeric: tabular-nums;
   text-align: right;
   white-space: nowrap;
 }
@@ -307,6 +323,7 @@
 .rateValue {
   font-family: var(--font-display);
   font-size: 19px;
+  font-variant-numeric: tabular-nums;
 }
 
 .rateDate {

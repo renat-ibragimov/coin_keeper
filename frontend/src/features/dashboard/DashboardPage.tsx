@@ -1,5 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
-import { CircleDashed, Coins, LayoutDashboard, PieChart, TrendingUp } from 'lucide-react';
+import {
+  ArrowRight,
+  CircleDashed,
+  Coins,
+  LayoutDashboard,
+  PieChart,
+  TrendingUp,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -152,11 +159,12 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
 
       <div className={styles.columns}>
         <div className={styles.stack}>
-          <Card className={styles.stackCardGrow}>
+          <Card variant="panel" className={styles.stackCardGrow}>
             <div className={styles.cardHeader}>
               <h2 className={styles.cardTitle}>{t('dashboard.nearestTitle')}</h2>
               <Link to="/collection/series" className={styles.cardLink}>
-                {t('dashboard.allSeries')} →
+                {t('dashboard.allSeries')}
+                <ArrowRight size={14} aria-hidden="true" />
               </Link>
             </div>
             {series.length === 0 ? (
@@ -198,7 +206,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
         </div>
 
         <div className={styles.stack}>
-          <Card>
+          <Card variant="panel">
             <h2 className={styles.cardTitle}>{t('dashboard.financeTitle')}</h2>
             <dl className={styles.finance}>
               <FinanceRow
@@ -246,14 +254,14 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
             </dl>
           </Card>
 
-          <Card className={styles.stackCardGrow}>
+          <Card variant="panel" className={styles.stackCardGrow}>
             <h2 className={styles.cardTitle}>{t('dashboard.ratesTitle')}</h2>
             <ExchangeRates rates={exchangeRates} />
           </Card>
         </div>
       </div>
 
-      <Card>
+      <Card variant="panel">
         <div className={styles.cardHeader}>
           <h2 className={styles.cardTitle}>{t('dashboard.countriesTitle')}</h2>
           <span className={styles.muted}>{t('dashboard.countriesHint')}</span>

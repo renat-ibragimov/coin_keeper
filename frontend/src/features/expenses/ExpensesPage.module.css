@@ -16,6 +16,7 @@
   gap: var(--space-4);
 }
 
+/* A chart heading names an interface area: body face, UI-panel weight. */
 .chartTitle {
   margin: 0 0 var(--space-3);
   font-size: 15px;
@@ -29,25 +30,36 @@
   gap: var(--space-2);
 }
 
+/* A compact filter, not a call to action: pill-shaped but on the control
+ * surface, at filter weight and filter size (docs/08-ui-map.md). */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-radius: 999px;
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-control);
   color: var(--color-text-secondary);
   font-family: inherit;
   font-size: 13.5px;
   cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
 
-.chip:hover {
-  color: var(--color-text);
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border-strong);
+    color: var(--color-text);
+  }
 }
 
-.chipActive {
+.chipActive,
+.chipActive:hover {
   background: var(--color-accent-soft);
   border-color: var(--color-accent);
   color: var(--color-accent-strong);
@@ -63,17 +75,20 @@
   color: var(--color-text-muted);
 }
 
+/* Same structural-panel treatment as the other two tables. */
 .scroll {
   overflow-x: auto;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
   min-width: 760px;
 }
 
@@ -81,17 +96,27 @@
 .table td {
   padding: 10px 14px;
   text-align: left;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
   vertical-align: middle;
 }
 
 .table th {
-  font-size: 12.5px;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-text-secondary);
   font-weight: 600;
-  background: var(--color-surface);
+  border-bottom-color: var(--color-border-strong);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .table tbody tr {
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  .table tbody tr:hover {
+    background: var(--color-row-hover);
+  }
 }
 
 .table tbody tr:last-child td {

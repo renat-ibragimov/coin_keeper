@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Coins, Layers, SearchX, TrendingUp, Wallet } from 'lucide-react';
+import { Coins, Layers, SearchX, TrendingUp, Wallet, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -373,7 +373,7 @@ export function CollectionPage() {
                 onClick={() => setDrawerOpen(false)}
                 aria-label={t('catalog.closeFilters')}
               >
-                ✕
+                <X size={20} aria-hidden="true" />
               </button>
             </div>
             {filtersPanel}

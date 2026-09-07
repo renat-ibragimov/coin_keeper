@@ -30,7 +30,7 @@
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  background: var(--color-surface-sunken);
+  background: var(--color-surface-control);
   flex: none;
 }
 
@@ -51,6 +51,10 @@
   font-weight: 600;
   color: var(--color-text);
   text-decoration: none;
+}
+
+.itemTitle {
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .itemTitle:hover {
