@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { Coins, Layers, TrendingUp, Wallet } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -105,13 +106,13 @@ export function CollectionPage() {
         {dashboard ? (
           <>
             <StatTile
-              icon="◎"
+              icon={<Coins strokeWidth={1.75} />}
               label={t('collection.tileCoins')}
               value={formatNumber(dashboard.collectionItems, locale, 0)}
               hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
             />
             <StatTile
-              icon="◇"
+              icon={<Wallet strokeWidth={1.75} />}
               label={t('collection.tileSpent')}
               value={formatUah(dashboard.coinSpendUah, locale)}
               hint={t('collection.tileSpentHint', {
@@ -119,13 +120,13 @@ export function CollectionPage() {
               })}
             />
             <StatTile
-              icon="↗"
+              icon={<TrendingUp strokeWidth={1.75} />}
               label={t('collection.tileValue')}
               value={formatUah(dashboard.marketValueUah, locale)}
               hint={t('collection.tileValueHint')}
             />
             <StatTile
-              icon="◔"
+              icon={<Layers strokeWidth={1.75} />}
               label={t('collection.tileSeries')}
               value={
                 seriesStats ? (
@@ -148,7 +149,7 @@ export function CollectionPage() {
 
       {collectionEmpty ? (
         <EmptyState
-          icon="◎"
+          icon={<Coins strokeWidth={1.75} />}
           title={t('collection.emptyTitle')}
           description={t('collection.emptyText')}
           actions={

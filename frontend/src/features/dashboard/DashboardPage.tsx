@@ -57,7 +57,7 @@ export function DashboardPage() {
       {data.dashboard.isEmpty ? (
         <Card>
           <EmptyState
-            icon="◎"
+            icon={<Coins strokeWidth={1.75} />}
             title={t('dashboard.emptyTitle')}
             description={t('dashboard.emptyText')}
             actions={

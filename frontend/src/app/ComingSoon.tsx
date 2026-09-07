@@ -1,3 +1,4 @@
+import { Hourglass } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -9,7 +10,7 @@ export function ComingSoon({ titleKey }: { titleKey: string }) {
     <EmptyState
       title={t(titleKey)}
       description={t('common.comingSoon')}
-      icon="⏳"
+      icon={<Hourglass strokeWidth={1.75} />}
       actions={
         <Link to="/catalog">
           <Button variant="secondary">{t('common.backToCatalog')}</Button>

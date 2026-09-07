@@ -35,13 +35,6 @@
   outline-offset: 2px;
 }
 
-/* StatTile is shared with other screens, so its own padding stays put —
- * this trims it back down for the overview's denser KPI row instead of
- * changing the shared component. */
-.tileLink > div {
-  padding: var(--space-3);
-}
-
 .columns {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);

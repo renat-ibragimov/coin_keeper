@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { CircleCheck } from 'lucide-react';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
@@ -187,7 +188,7 @@ export function MissingPage() {
           ) : null}
           {page && page.items.length === 0 ? (
             <EmptyState
-              icon="✓"
+              icon={<CircleCheck strokeWidth={1.75} />}
               title={narrowed ? t('catalog.emptyTitle') : t('missing.emptyTitle')}
               description={narrowed ? t('catalog.emptyText') : t('missing.emptyText')}
               actions={
