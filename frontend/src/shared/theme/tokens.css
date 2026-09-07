@@ -7,11 +7,19 @@
  * rather than a surface colour. Dark — charcoal and warm graphite, with a
  * restrained old gold that never glows.
  *
- * Surfaces are a ladder, and the rungs are meant to be visible:
- *   bg < sunken < surface < surface-control < surface-raised < surface-hover
- * (light theme; dark inverts the lightness but keeps the same order of
- * separation). Shadow marks elevation only where elevation is meaningful —
- * colour and border do the rest of the work.
+ * Surfaces are a ladder, and the rungs are meant to be visible. By
+ * lightness, in the light theme:
+ *   sunken < bg < surface < surface-control < surface-raised < surface-hover
+ * — the page ground sits below every panel on it, and only a genuinely
+ * recessed area goes below the ground. The dark theme inverts the direction
+ * (everything rises from near-black) but keeps the same order of separation.
+ * Shadow marks elevation only where elevation is meaningful — colour and
+ * border do the rest of the work.
+ *
+ * The palette is checked against WCAG: every text token clears 4.5:1 on the
+ * surfaces it is used on, and every border that carries state (hover,
+ * selected, invalid, focus) clears 3:1. The plain --color-border is
+ * decorative separation, not state, and stays deliberately quiet.
  */
 
 :root {
@@ -67,15 +75,15 @@
   --color-surface-hover: #f2ece2;
 
   --color-text: #211e1a;
-  --color-text-secondary: #5d564c;
-  --color-text-muted: #786f62;
+  --color-text-secondary: #524b43;
+  --color-text-muted: #635a4e;
 
   --color-border: #a49782;
   --color-border-strong: #756853;
   --color-border-subtle: rgba(66, 56, 44, 0.16);
   --color-border-hover: #8a6228;
 
-  --color-accent: #8a6228;
+  --color-accent: #7a5622;
   --color-accent-strong: #5f421d;
   --color-accent-soft: #d6c6aa;
   --color-on-accent: #fbf6ec;
@@ -91,7 +99,7 @@
   --color-danger: #8f3f30;
   --color-danger-soft: #e6cbc2;
   --color-danger-edge: #6b2e23;
-  --color-warning: #7b5822;
+  --color-warning: #6f4e1e;
   --color-warning-soft: #e2d4b2;
 
   --color-info-bg: #e0d9cb;
@@ -111,7 +119,7 @@
   --color-row-hover: #e5ded1;
   --color-selected: #ddd0b6;
 
-  --color-focus-ring: #8a6228;
+  --color-focus-ring: #7a5622;
 
   /* The bright inner top edge that makes a raised card or a button read as a
    * material with a lit edge rather than a flat fill. Light theme can carry
@@ -121,7 +129,7 @@
 
   /* Primary button: a very shallow vertical gradient plus a firmer bottom
    * edge — material depth, not a glossy pill. */
-  --color-button-primary-top: #97702f;
+  --color-button-primary-top: #8d672a;
   --color-button-primary-bottom: #6f4d1f;
   --color-button-primary-border: #543a19;
 
@@ -155,7 +163,7 @@
    * of series 1 — a muted olive, not a lighter beige derived from gold,
    * which was indistinguishable from it in a stacked bar. */
   --color-chart-grid: #b4a892;
-  --color-chart-axis: #786f62;
+  --color-chart-axis: #635a4e;
   --color-chart-series-1: #8a6228;
   --color-chart-series-2: #6c7050;
 }
@@ -175,7 +183,7 @@
   --color-text-muted: #938777;
 
   --color-border: #332d25;
-  --color-border-strong: #665238;
+  --color-border-strong: #7b6547;
   --color-border-subtle: rgba(226, 205, 168, 0.1);
   --color-border-hover: #a98039;
 
