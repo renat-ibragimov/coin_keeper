@@ -33,6 +33,25 @@
   border-bottom: none;
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .table tbody tr:hover {
+    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-raised));
+  }
+}
+
+/* Stretched-link pattern: the whole row (there are no per-row actions
+ * anymore) opens the coin's page, same as the catalog table. */
+.table tbody tr {
+  position: relative;
+}
+
+.rowLink::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 .number {
   text-align: right;
 }
@@ -77,11 +96,10 @@
   margin-top: 2px;
 }
 
-.muted {
-  color: var(--color-text-muted);
+.secondary {
+  color: var(--color-text-secondary);
 }
 
-.actions {
-  white-space: nowrap;
-  text-align: right;
+.muted {
+  color: var(--color-text-muted);
 }

@@ -1005,6 +1005,44 @@ export interface components {
             /** Grade */
             grade?: string | null;
         };
+        /**
+         * CollectionPositionOut
+         * @description One catalog item grouped from all of the owner's purchases of it.
+         *
+         *     The grid and table listing shows positions, not individual purchases —
+         *     those live in the per-purchase CollectionItemOut, reachable one at a
+         *     time via GET/PATCH/DELETE /collection/{id} (docs/03-api-contract.md).
+         */
+        CollectionPositionOut: {
+            /** Catalogitemid */
+            catalogItemId: number;
+            /** Title */
+            title: string;
+            /** Country */
+            country: string;
+            /** Seriesname */
+            seriesName: string | null;
+            /** Denomination */
+            denomination: string | null;
+            /** Year */
+            year: number;
+            /** Isarchived */
+            isArchived: boolean;
+            /** Archivereason */
+            archiveReason: string | null;
+            /** Totalquantity */
+            totalQuantity: number;
+            /** Totalspenduah */
+            totalSpendUah: string;
+            /** Marketvalueuah */
+            marketValueUah: string | null;
+            /** Lastacquisitiondate */
+            lastAcquisitionDate: string | null;
+            /** Grades */
+            grades: string[];
+            /** Thumbnailurl */
+            thumbnailUrl?: string | null;
+        };
         /** ComponentHealth */
         ComponentHealth: {
             /**
@@ -1270,10 +1308,10 @@ export interface components {
             /** Pagesize */
             pageSize: number;
         };
-        /** Page[CollectionItemOut] */
-        Page_CollectionItemOut_: {
+        /** Page[CollectionPositionOut] */
+        Page_CollectionPositionOut_: {
             /** Items */
-            items: components["schemas"]["CollectionItemOut"][];
+            items: components["schemas"]["CollectionPositionOut"][];
             /** Total */
             total: number;
             /** Page */
@@ -2196,6 +2234,13 @@ export interface operations {
                 q?: string | null;
                 countryId?: number | null;
                 seriesId?: number | null;
+                year?: number | null;
+                yearFrom?: number | null;
+                yearTo?: number | null;
+                denominationId?: number | null;
+                group?: components["schemas"]["CollectionGroup"] | null;
+                metalKind?: components["schemas"]["MetalKind"] | null;
+                grade?: string | null;
                 sort?: "date" | "title" | "total";
                 order?: "asc" | "desc";
                 locale?: string | null;
@@ -2214,7 +2259,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Page_CollectionItemOut_"];
+                    "application/json": components["schemas"]["Page_CollectionPositionOut_"];
                 };
             };
             /** @description Validation Error */

@@ -30,7 +30,8 @@ export type CatalogCollectionItem = components['schemas']['CatalogCollectionItem
 export type CollectionItem = components['schemas']['CollectionItemOut'];
 export type CollectionItemCreate = components['schemas']['CollectionItemCreate'];
 export type CollectionItemUpdate = components['schemas']['CollectionItemUpdate'];
-export type CollectionPage = components['schemas']['Page_CollectionItemOut_'];
+export type CollectionPosition = components['schemas']['CollectionPositionOut'];
+export type CollectionPage = components['schemas']['Page_CollectionPositionOut_'];
 
 export type CatalogItemCreate = components['schemas']['CatalogItemCreate'];
 

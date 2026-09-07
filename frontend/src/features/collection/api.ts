@@ -17,6 +17,12 @@ export function fetchCollection(filters: CollectionFilters): Promise<CollectionP
     q: filters.q,
     countryId: filters.countryId,
     seriesId: filters.seriesId,
+    yearFrom: filters.yearFrom,
+    yearTo: filters.yearTo,
+    denominationId: filters.denominationId,
+    group: filters.group,
+    metalKind: filters.metalKind,
+    grade: filters.grade,
     sort: filters.sort,
     order: filters.order,
   });

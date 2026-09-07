@@ -1,4 +1,5 @@
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
   background: var(--color-surface-raised);
@@ -67,6 +68,16 @@
   color: var(--color-accent);
 }
 
+/* Stretched-link pattern, same as the catalog cards: a click anywhere on
+ * the card (outside the footer button) opens the coin's page, while a real
+ * anchor keeps keyboard, middle-click and the context menu working. */
+.titleLinkStretched::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
 .series {
   font-size: 13px;
   color: var(--color-text-muted);
@@ -109,19 +120,18 @@
   font-size: 13px;
 }
 
-.notes {
-  margin: var(--space-2) 0 0;
-  font-size: 13.5px;
-  color: var(--color-text-secondary);
-  white-space: pre-line;
-}
-
+/* Elevated above the stretched title-link overlay (z-index:1) so the "add
+ * another" button stays clickable instead of the click being swallowed by
+ * the card's own "open detail page" overlay. */
 .footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
+  position: relative;
+  z-index: 2;
   padding: var(--space-2) var(--space-3);
   border-top: 1px solid var(--color-border);
+}
+
+.addLink {
+  display: block;
 }
 
 @media (max-width: 600px) {

@@ -1,34 +1,35 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Coins, Layers, TrendingUp, Wallet } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { fetchCountries, fetchSeries } from '@/features/catalog/api';
+import { fetchCountries, fetchDenominations, fetchSeries } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { fetchSeriesProgress } from '@/features/series/api';
 import { ApiError } from '@/shared/api/client';
-import type { CollectionItem } from '@/shared/api/types';
+import { useDismissable } from '@/shared/lib/useDismissable';
 import { formatNumber, formatPercent, formatUah } from '@/shared/lib/format';
+import type { ActiveFilterChip } from '@/shared/ui';
 import {
   Button,
   EmptyState,
   ErrorState,
-  Input,
+  FiltersToolbar,
+  GridIcon,
   PageHeader,
   Pagination,
-  Select,
   Skeleton,
   StatTile,
-  Tabs,
+  TableIcon,
 } from '@/shared/ui';
 
 import { fetchCollection, PAGE_SIZE } from './api';
-import { DeleteInstanceDialog } from './DeleteInstanceDialog';
-import { InstanceCard } from './InstanceCard';
-import { InstanceTable } from './InstanceTable';
+import { CollectionFiltersPanel } from './CollectionFiltersPanel';
+import { PositionCard } from './PositionCard';
+import { PositionTable } from './PositionTable';
 import { COLLECTION_SORTS, hasActiveFilters, useCollectionFilters } from './useCollectionFilters';
-import type { CollectionSort, CollectionView } from './useCollectionFilters';
+import type { CollectionFilters, CollectionSort, CollectionView } from './useCollectionFilters';
 import styles from './CollectionPage.module.css';
 
 const SORT_LABELS: Record<CollectionSort, string> = {
@@ -37,11 +38,25 @@ const SORT_LABELS: Record<CollectionSort, string> = {
   total: 'collection.sortTotal',
 };
 
+const GROUP_LABELS: Record<NonNullable<CollectionFilters['group']>, string> = {
+  circulation: 'catalog.typeCirculation',
+  commemorative: 'catalog.typeCommemorative',
+  collector: 'catalog.typeCollector',
+  other: 'catalog.typeOther',
+};
+
+const METAL_LABELS: Record<NonNullable<CollectionFilters['metalKind']>, string> = {
+  precious: 'catalog.metalPrecious',
+  base: 'catalog.metalBase',
+  unknown: 'catalog.metalUnknown',
+};
+
 export function CollectionPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { filters, update, reset } = useCollectionFilters();
-  const [deleting, setDeleting] = useState<CollectionItem | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  useDismissable(drawerOpen, () => setDrawerOpen(false));
 
   const collectionQuery = useQuery({
     queryKey: ['collection', filters],
@@ -58,19 +73,15 @@ export function CollectionPage() {
     queryKey: ['series', 'list', filters.countryId],
     queryFn: () => fetchSeries(filters.countryId),
   });
-
-  // Search is debounced before it touches the URL.
-  const [search, setSearch] = useState(filters.q);
-  useEffect(() => setSearch(filters.q), [filters.q]);
-  useEffect(() => {
-    if (search === filters.q) return;
-    const timer = setTimeout(() => update({ q: search }), 400);
-    return () => clearTimeout(timer);
-  }, [search, filters.q, update]);
+  const denominationsQuery = useQuery({
+    queryKey: ['denominations', filters.countryId],
+    queryFn: () => fetchDenominations(filters.countryId),
+  });
 
   const page = collectionQuery.data;
   const total = page?.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const shown = page ? page.items.length + (page.page - 1) * PAGE_SIZE : 0;
   const dashboard = bootstrapQuery.data?.dashboard;
   const seriesStats = seriesProgressQuery.data
     ? {
@@ -83,6 +94,88 @@ export function CollectionPage() {
   // docs/03-api-contract.md: emptiness is the server's isEmpty from bootstrap
   // (no coins and no personal items), not a locally derived "zero rows" guess.
   const collectionEmpty = dashboard?.isEmpty === true && !hasActiveFilters(filters);
+
+  const activeChips = useMemo(() => {
+    const chips: ActiveFilterChip[] = [];
+    if (filters.q) {
+      chips.push({ key: 'q', label: filters.q, onRemove: () => update({ q: '' }) });
+    }
+    if (filters.countryId !== undefined) {
+      const country = (countriesQuery.data ?? []).find((c) => c.id === filters.countryId);
+      if (country) {
+        chips.push({
+          key: 'country',
+          label: country.name,
+          onRemove: () =>
+            update({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
+        });
+      }
+    }
+    if (filters.seriesId !== undefined) {
+      const series = (seriesQuery.data ?? []).find((s) => s.id === filters.seriesId);
+      if (series) {
+        chips.push({
+          key: 'series',
+          label: series.name,
+          onRemove: () => update({ seriesId: undefined }),
+        });
+      }
+    }
+    if (filters.yearFrom !== undefined || filters.yearTo !== undefined) {
+      chips.push({
+        key: 'years',
+        label: `${t('catalog.years')}: ${filters.yearFrom ?? '…'}–${filters.yearTo ?? '…'}`,
+        onRemove: () => update({ yearFrom: undefined, yearTo: undefined }),
+      });
+    }
+    if (filters.denominationId !== undefined) {
+      const denomination = (denominationsQuery.data ?? []).find(
+        (d) => d.id === filters.denominationId,
+      );
+      if (denomination) {
+        chips.push({
+          key: 'denomination',
+          label: denomination.label,
+          onRemove: () => update({ denominationId: undefined }),
+        });
+      }
+    }
+    if (filters.group) {
+      chips.push({
+        key: 'group',
+        label: t(GROUP_LABELS[filters.group]),
+        onRemove: () => update({ group: undefined }),
+      });
+    }
+    if (filters.metalKind) {
+      chips.push({
+        key: 'metal',
+        label: t(METAL_LABELS[filters.metalKind]),
+        onRemove: () => update({ metalKind: undefined }),
+      });
+    }
+    if (filters.grade) {
+      chips.push({
+        key: 'grade',
+        label: filters.grade,
+        onRemove: () => update({ grade: undefined }),
+      });
+    }
+    return chips;
+  }, [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t]);
+
+  const filtersPanel = (
+    <CollectionFiltersPanel
+      filters={filters}
+      update={update}
+      reset={reset}
+      countries={countriesQuery.data ?? []}
+      series={seriesQuery.data ?? []}
+      seriesLoading={seriesQuery.isLoading}
+      denominations={denominationsQuery.data ?? []}
+      activeFilters={activeChips}
+    />
+  );
 
   return (
     <div className={styles.page}>
@@ -165,87 +258,43 @@ export function CollectionPage() {
         />
       ) : (
         <>
-          <div className={styles.toolbar}>
-            <Input
-              type="search"
-              placeholder={t('collection.searchPlaceholder')}
-              aria-label={t('collection.searchPlaceholder')}
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              className={styles.search}
-            />
-            <Select
-              aria-label={t('catalog.country')}
-              value={filters.countryId ?? ''}
-              onChange={(event) => update({ countryId: Number(event.target.value) || undefined })}
-            >
-              <option value="">{t('catalog.allCountries')}</option>
-              {(countriesQuery.data ?? []).map((country) => (
-                <option key={country.id} value={country.id}>
-                  {country.name}
-                </option>
-              ))}
-            </Select>
-            <Select
-              aria-label={t('catalog.tableSeries')}
-              value={filters.seriesId ?? ''}
-              onChange={(event) => update({ seriesId: Number(event.target.value) || undefined })}
-            >
-              <option value="">{t('collection.allSeries')}</option>
-              {(seriesQuery.data ?? []).map((series) => (
-                <option key={series.id} value={series.id}>
-                  {series.name}
-                </option>
-              ))}
-            </Select>
-            <span className={styles.sortControls}>
-              <Select
-                aria-label={t('catalog.sort')}
-                value={filters.sort}
-                onChange={(event) => update({ sort: event.target.value as CollectionSort })}
-              >
-                {COLLECTION_SORTS.map((sort) => (
-                  <option key={sort} value={sort}>
-                    {t(SORT_LABELS[sort])}
-                  </option>
-                ))}
-              </Select>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
-                aria-label={
-                  filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')
-                }
-                title={filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
-              >
-                {filters.order === 'asc' ? '↑' : '↓'}
-              </Button>
-            </span>
-            <Tabs<CollectionView>
-              aria-label={t('catalog.viewLabel')}
-              options={[
-                { value: 'cards', label: t('catalog.viewCards') },
-                { value: 'list', label: t('collection.viewList') },
-              ]}
-              value={filters.view}
-              onChange={(view) => update({ view, page: filters.page })}
-            />
-          </div>
+          <div className={styles.filtersBar}>{filtersPanel}</div>
 
-          <div className={styles.counter}>
-            <span className="tabular">
-              {t('pagination.shown', {
-                shown: page ? page.items.length + (page.page - 1) * PAGE_SIZE : 0,
-                total,
-              })}
-            </span>
-            {hasActiveFilters(filters) ? (
-              <Button variant="ghost" size="sm" onClick={reset}>
-                ↺ {t('catalog.resetFilters')}
-              </Button>
-            ) : null}
-          </div>
+          <FiltersToolbar<CollectionView>
+            shown={shown}
+            total={total}
+            view={filters.view}
+            viewOptions={[
+              {
+                value: 'cards',
+                label: (
+                  <>
+                    <GridIcon />
+                    {t('catalog.viewCards')}
+                  </>
+                ),
+              },
+              {
+                value: 'table',
+                label: (
+                  <>
+                    <TableIcon />
+                    {t('catalog.viewTable')}
+                  </>
+                ),
+              },
+            ]}
+            onViewChange={(view) => update({ view, page: filters.page })}
+            sort={filters.sort}
+            sortOptions={COLLECTION_SORTS.map((sort) => ({
+              value: sort,
+              label: t(SORT_LABELS[sort]),
+            }))}
+            onSortChange={(sort) => update({ sort: sort as CollectionSort })}
+            order={filters.order}
+            onOrderChange={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
+            onOpenFilters={() => setDrawerOpen(true)}
+          />
 
           {collectionQuery.isError ? (
             <ErrorState
@@ -274,11 +323,11 @@ export function CollectionPage() {
             filters.view === 'cards' ? (
               <div className={styles.grid}>
                 {page.items.map((item) => (
-                  <InstanceCard key={item.id} item={item} onDelete={setDeleting} />
+                  <PositionCard key={item.catalogItemId} item={item} />
                 ))}
               </div>
             ) : (
-              <InstanceTable items={page.items} onDelete={setDeleting} />
+              <PositionTable items={page.items} />
             )
           ) : null}
 
@@ -290,7 +339,31 @@ export function CollectionPage() {
         </>
       )}
 
-      <DeleteInstanceDialog item={deleting} onClose={() => setDeleting(null)} />
+      {drawerOpen ? (
+        <div className={styles.drawerOverlay} onClick={() => setDrawerOpen(false)}>
+          <div
+            className={styles.drawer}
+            role="dialog"
+            aria-label={t('catalog.filters')}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className={styles.drawerHeader}>
+              <button
+                type="button"
+                className={styles.drawerClose}
+                onClick={() => setDrawerOpen(false)}
+                aria-label={t('catalog.closeFilters')}
+              >
+                ✕
+              </button>
+            </div>
+            {filtersPanel}
+            <Button block onClick={() => setDrawerOpen(false)}>
+              {t('catalog.applyFilters')}
+            </Button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
