@@ -62,16 +62,7 @@
 }
 
 /* The whole media area opens the card, same destination as the title link
- * below — no z-index tug-of-war needed between them any more. It used to
- * carry position+z-index to win clicks over the title's stretched-link
- * overlay, but that also boxed every coin photo into its own stacking
- * context, which quietly breaks mix-blend-mode on real (not-yet-processed)
- * photos: the blend can only erase a photo's white studio backdrop into
- * whatever is painted within ITS OWN stacking context, and a context
- * boundary here cuts it off from the card's actual background, leaving the
- * white square from the source photo visible instead. Plain, unstacked
- * elements all the way up to .card is what makes that backdrop reachable
- * (docs/08-ui-map.md). */
+ * below — no z-index tug-of-war needed between them any more. */
 .mediaLink {
   display: flex;
   width: 100%;
@@ -86,26 +77,13 @@
  * after the first (the two-photo case in CoinImages, obverse then reverse)
  * is pulled left to overlap it slightly — a light touch, not a collage;
  * z-index puts the obverse on top, reverse behind, matching how a coin
- * reads left-to-right (docs/08-ui-map.md).
- *
- * isolation:isolate gives each side its own blending boundary — without it,
- * mix-blend-mode: multiply (CoinImage.module.css) doesn't stop at this
- * frame: in the strip where the two photos overlap, the back one blends
- * against the front photo's own pixels instead of the card behind them,
- * muddying both into a visible dark lens. Isolating trades away the white-
- * backdrop erasure for an unprocessed photo *in that overlap strip only*
- * (it shows its real background there instead) — an already-accepted,
- * temporary gap (see CoinImage.module.css) — for a clean, un-muddied
- * overlap on every photo that's already been through the pipeline. Since
- * isolation (not z-index) is what scopes the blend now, the z-index below
- * is free to set paint order without reopening that bug. */
+ * reads left-to-right (docs/08-ui-map.md). */
 .image {
   position: relative;
   z-index: 2;
   width: 64%;
   height: 100%;
   padding: 1px;
-  isolation: isolate;
   transition: transform var(--duration-normal) var(--ease-standard);
 }
 
@@ -287,7 +265,7 @@
   min-height: 42px;
   padding-left: var(--space-4);
   border-radius: var(--radius-md);
-  border: 1px solid color-mix(in srgb, var(--color-success-strong) 72%, #000);
+  border: 1px solid var(--color-success-edge);
   background: var(--color-success-strong);
   color: var(--color-on-success);
   font-weight: 600;

@@ -104,21 +104,6 @@
     box-shadow var(--duration-normal) var(--ease-standard);
 }
 
-/* CoinImage normally erases a photo's white studio backdrop by blending it
- * onto whatever sits behind it (mix-blend-mode: multiply — white is that
- * blend's identity colour, so it dissolves invisibly into a white surface).
- * Our own surface tones are warm, not white, so that same blend would
- * multiply onto the coin's real colours too and tint the whole photo (the
- * sepia cast reported on this page). These two large, colour-accurate
- * photos matter more here than hiding a leftover white backdrop on the
- * rare photo the background-removal pipeline hasn't reached yet
- * (docs/06-media-storage.md), so this frame keeps the cream surface and
- * turns the blend off instead — same trade-off dark theme already makes
- * (CoinImage.module.css). */
-.photoImage img {
-  mix-blend-mode: normal;
-}
-
 button.photoFrame {
   cursor: zoom-in;
 }
@@ -202,12 +187,6 @@ button.photoFrame {
 .lightboxImage {
   width: min(88vw, 760px);
   height: min(70vh, 760px);
-}
-
-/* Same warm-surface-vs-multiply-blend conflict as .photoImage above — the
- * lightbox's own backdrop (Lightbox.module.css) is the same sunken tone. */
-.lightboxImage img {
-  mix-blend-mode: normal;
 }
 
 /* --------------------------------------------------------- sidebar card */

@@ -1,10 +1,16 @@
-/* overflow stays visible: the coin now fills nearly all of its frame (tile
- * cards size it for maximum coin size, docs/08-ui-map.md), leaving no room
- * inside the frame for --shadow-coin to fall without being clipped into a
- * hard rectangular edge. Left visible, the shadow fades out naturally past
- * the frame's own box; nothing else here can overflow it (object-fit always
+/* overflow stays visible: the coin fills nearly all of its frame (tile cards
+ * size it for maximum coin size, docs/08-ui-map.md), leaving no room inside
+ * the frame for --shadow-coin to fall without being clipped into a hard
+ * rectangular edge. Left visible, the shadow fades out naturally past the
+ * frame's own box; nothing else here can overflow it (object-fit always
  * keeps the photo within its box, and the placeholder glyph is capped well
- * under the frame size). */
+ * under the frame size).
+ *
+ * No blending: a photo that still carries a white studio backdrop shows it,
+ * and on the new, less pale light surface it shows more than before. That is
+ * a known, accepted gap for the photos the background-removal pipeline has
+ * not reached yet (docs/06-media-storage.md) — masking it with
+ * mix-blend-mode tinted every colour-accurate photo instead. */
 .frame {
   display: flex;
   align-items: center;

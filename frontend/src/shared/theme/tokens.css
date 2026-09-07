@@ -86,9 +86,11 @@
    * --color-success-soft (a badge tint), matching the visual weight of the
    * brass CTA it replaces (docs/08-ui-map.md). */
   --color-success-strong: #47563a;
+  --color-success-edge: #333f29;
   --color-on-success: #f3f0e5;
   --color-danger: #8f3f30;
   --color-danger-soft: #e6cbc2;
+  --color-danger-edge: #6b2e23;
   --color-warning: #7b5822;
   --color-warning-soft: #e2d4b2;
 
@@ -97,6 +99,11 @@
 
   --color-owned: #1e3c28;
   --color-absent: #7a1315;
+
+  /* The firmer lower/outer edge of a solid semantic fill — the danger button,
+   * the "in collection" row — so it reads as a control with a rim rather
+   * than a flat patch of colour.
+   */
 
   /* Interactive state surfaces. Row hover and the "selected" tint stay a
    * shade of the surface they sit on, so a hovered row never reads as a
@@ -180,9 +187,11 @@
   --color-success: #a8c0a2;
   --color-success-soft: #212b23;
   --color-success-strong: #2f4a34;
+  --color-success-edge: #223526;
   --color-on-success: #eef2e9;
   --color-danger: #e4a39a;
   --color-danger-soft: #3f2422;
+  --color-danger-edge: #b57a72;
   --color-warning: #d4b06a;
   --color-warning-soft: #352a1b;
 
