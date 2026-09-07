@@ -15,6 +15,7 @@ docstring.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -26,6 +27,7 @@ from sqlalchemy import (
     and_,
     case,
     exists,
+    false,
     func,
     not_,
     or_,
@@ -196,6 +198,25 @@ def has_visible_price(item_id_col: Any, user_id: int) -> ColumnElement[bool]:
     )
 
 
+_SEARCH_WORD = re.compile(r"\w+", re.UNICODE)
+
+
+def _title_prefix_condition(term: str) -> ColumnElement[bool]:
+    """Every word in `term` matched as a *prefix* against the title tsvector,
+    so "Одес" already finds "Одеса" — a search box shouldn't demand the whole
+    word (owner's call 2026-09-07, many Ukrainian commemoratives name a city).
+
+    Words come from a plain regex, not `to_tsquery(term)` directly: that
+    function raises on tsquery operator syntax, so a stray "&" or "(" typed
+    into the search box would 500 instead of just matching nothing.
+    """
+    words = _SEARCH_WORD.findall(term)
+    if not words:
+        return false()
+    prefix_query = " & ".join(f"{word}:*" for word in words)
+    return _search_vector().op("@@")(func.to_tsquery("simple", prefix_query))
+
+
 def catalog_search_condition(q: str) -> ColumnElement[bool]:
     """Full text over titles, plus catalog numbers, country and year.
 
@@ -206,7 +227,7 @@ def catalog_search_condition(q: str) -> ColumnElement[bool]:
     term = q.strip()
     pattern = f"%{term}%"
     alternatives: list[ColumnElement[bool]] = [
-        _search_vector().op("@@")(func.plainto_tsquery("simple", term)),
+        _title_prefix_condition(term),
         CatalogItem.catalog_km.ilike(pattern),
         CatalogItem.catalog_uc.ilike(pattern),
         CatalogItem.catalog_numista.ilike(pattern),

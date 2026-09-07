@@ -179,6 +179,15 @@ async def test_search(client: AsyncClient, db_session: AsyncSession, ctx: Simple
     by_title = await client.get("/api/v1/catalog?q=дельфін", headers=headers)
     assert [i["id"] for i in by_title.json()["items"]] == [dolphin.id]
 
+    # A prefix of the word is enough — no need to type it out in full.
+    by_prefix = await client.get("/api/v1/catalog?q=дельф", headers=headers)
+    assert [i["id"] for i in by_prefix.json()["items"]] == [dolphin.id]
+
+    # tsquery operator characters typed into the box are noise, not syntax: no 500.
+    with_tsquery_syntax = await client.get("/api/v1/catalog?q=дельф%26%28", headers=headers)
+    assert with_tsquery_syntax.status_code == 200
+    assert [i["id"] for i in with_tsquery_syntax.json()["items"]] == [dolphin.id]
+
     by_number = await client.get("/api/v1/catalog?q=KM%23%20123", headers=headers)
     assert [i["id"] for i in by_number.json()["items"]] == [dolphin.id]
 
