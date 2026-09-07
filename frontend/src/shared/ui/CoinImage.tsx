@@ -46,6 +46,11 @@ export function CoinImage({ src, srcSet, alt, className, fit = 'contain' }: Coin
     );
   }
 
+  const processed = src.includes('-nobg');
+  const imageClasses = [styles.image, fit === 'contain' ? styles.contain : null, processed ? styles.processed : null]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <span className={frame}>
       <img
@@ -54,7 +59,7 @@ export function CoinImage({ src, srcSet, alt, className, fit = 'contain' }: Coin
         alt={alt}
         loading="lazy"
         decoding="async"
-        className={fit === 'contain' ? `${styles.image} ${styles.contain}` : styles.image}
+        className={imageClasses}
         onError={() => setFailedSrc(src)}
       />
     </span>

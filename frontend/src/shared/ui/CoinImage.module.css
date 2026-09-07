@@ -12,8 +12,8 @@
   color: var(--color-text-muted);
 }
 
-/* A real photo — not the placeholder — has no background of its own: with
- * mix-blend-mode: multiply below, white is the identity colour, so the
+/* An unprocessed photo — not the placeholder — has no background of its own:
+ * with mix-blend-mode: multiply below, white is the identity colour, so the
  * photo's white studio backdrop dissolves into whatever surface it actually
  * sits on (the card, the media area, a table row) instead of a separately
  * painted plaque that would show as its own rectangle once photos overlap
@@ -28,7 +28,13 @@
  * background already, so the dark theme below drops the blend too —
  * multiply against a dark surface would darken the coin itself. A photo the
  * pipeline skipped still carries its own white/gray background in the dark
- * theme; that is accepted until the next pipeline pass processes it. */
+ * theme; that is accepted until the next pipeline pass processes it.
+ * Photos the pipeline already processed carry a `-nobg` suffix in their
+ * storage key (and therefore in `src`): CoinImage flags those as
+ * `.processed`, which forces `mix-blend-mode: normal` in both themes, since
+ * multiplying an already-transparent coin against the surface beneath it
+ * would tint the coin itself instead of dissolving a backdrop that no
+ * longer exists. */
 .image {
   display: block;
   width: 100%;
@@ -39,6 +45,10 @@
 }
 
 :root[data-theme='dark'] .image {
+  mix-blend-mode: normal;
+}
+
+.processed {
   mix-blend-mode: normal;
 }
 

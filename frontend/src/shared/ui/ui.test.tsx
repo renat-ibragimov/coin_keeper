@@ -7,6 +7,7 @@ import '@/shared/i18n';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { CoinImage } from './CoinImage';
+import styles from './CoinImage.module.css';
 import { Input } from './Input';
 import { pageItems } from './pageItems';
 import { Pagination } from './Pagination';
@@ -64,6 +65,20 @@ describe('CoinImage', () => {
 
     rerender(<CoinImage src="/media/b.jpg" alt="" />);
     expect(container.querySelector('img')).toHaveAttribute('src', '/media/b.jpg');
+  });
+
+  it('skips the multiply blend for a background-removed photo', () => {
+    const { container } = render(
+      <CoinImage src="catalog/42/obverse/ab12cd34-nobg_1200.webp" alt="" />,
+    );
+    expect(container.querySelector('img')).toHaveClass(styles.processed!);
+  });
+
+  it('keeps the multiply blend for an untouched photo', () => {
+    const { container } = render(
+      <CoinImage src="catalog/42/obverse/ab12cd34_1200.webp" alt="" />,
+    );
+    expect(container.querySelector('img')).not.toHaveClass(styles.processed!);
   });
 });
 
