@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CountryOut, DenominationOut, SeriesOut } from '@/shared/api/types';
+import { buildYearGroups, clampYear, computeYearBounds } from '@/shared/lib/yearRange';
 import type { ActiveFilterChip } from '@/shared/ui';
 import { FiltersShell, Input, Select } from '@/shared/ui';
 
@@ -45,6 +46,20 @@ export function FiltersPanel({
     return Number.isFinite(value) && value > 0 ? value : undefined;
   };
 
+  // Bounds for the year dropdowns: the selected country's own range, or the
+  // whole loaded catalog directory when none is selected (docs/03). Each
+  // field additionally narrows against the other's current value, so "до"
+  // never offers a year before "від" and vice versa.
+  const yearBounds = computeYearBounds(countries, filters.countryId);
+  const yearFromGroups = buildYearGroups({
+    min: yearBounds.min,
+    max: filters.yearTo ?? yearBounds.max,
+  });
+  const yearToGroups = buildYearGroups({
+    min: filters.yearFrom ?? yearBounds.min,
+    max: yearBounds.max,
+  });
+
   return (
     <FiltersShell activeFilters={activeFilters} onReset={reset}>
       <div className={styles.search}>
@@ -64,8 +79,16 @@ export function FiltersPanel({
           value={filters.countryId ?? ''}
           onChange={(event) => {
             const countryId = numberOrUndefined(event.target.value);
-            // A new country invalidates the series and denomination chosen under the old one.
-            update({ countryId, seriesId: undefined, denominationId: undefined });
+            const newBounds = computeYearBounds(countries, countryId);
+            update({
+              countryId,
+              // A new country invalidates the series and denomination chosen under the old one.
+              seriesId: undefined,
+              denominationId: undefined,
+              // Out-of-range years follow the country instead of silently clearing.
+              yearFrom: clampYear(filters.yearFrom, newBounds),
+              yearTo: clampYear(filters.yearTo, newBounds),
+            });
           }}
         >
           <option value="">{t('catalog.allCountries')}</option>
@@ -99,23 +122,41 @@ export function FiltersPanel({
       <div className={styles.yearField}>
         <div className={styles.groupTitle}>{t('catalog.years')}</div>
         <div className={styles.yearRow}>
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder={t('catalog.yearFrom')}
+          <Select
+            className={styles.yearSelect}
             value={filters.yearFrom ?? ''}
             onChange={(event) => update({ yearFrom: numberOrUndefined(event.target.value) })}
             aria-label={t('catalog.yearFrom')}
-          />
+          >
+            <option value="">—</option>
+            {yearFromGroups.map((group) => (
+              <optgroup key={group.decade} label={t('catalog.decade', { decade: group.decade })}>
+                {group.years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
           <span className={styles.yearDash}>—</span>
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder={t('catalog.yearTo')}
+          <Select
+            className={styles.yearSelect}
             value={filters.yearTo ?? ''}
             onChange={(event) => update({ yearTo: numberOrUndefined(event.target.value) })}
             aria-label={t('catalog.yearTo')}
-          />
+          >
+            <option value="">—</option>
+            {yearToGroups.map((group) => (
+              <optgroup key={group.decade} label={t('catalog.decade', { decade: group.decade })}>
+                {group.years.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
         </div>
       </div>
 
