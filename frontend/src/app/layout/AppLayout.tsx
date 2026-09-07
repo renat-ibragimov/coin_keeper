@@ -13,7 +13,6 @@ const COLLECTION_TABS = [
   { to: '/collection', key: 'nav.dashboard', end: true },
   { to: '/collection/coins', key: 'nav.coins', end: false },
   { to: '/collection/series', key: 'nav.series', end: false },
-  { to: '/collection/missing', key: 'nav.missing', end: false },
   { to: '/collection/money', key: 'nav.expenses', end: false },
 ] as const;
 
@@ -26,7 +25,6 @@ const MOBILE_PRIMARY = [
 
 const MOBILE_MORE = [
   { to: '/collection/series', key: 'nav.series' },
-  { to: '/collection/missing', key: 'nav.missing' },
   { to: '/collection/money', key: 'nav.expenses' },
   { to: '/settings', key: 'nav.settings' },
 ] as const;

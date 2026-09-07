@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { parseFilters, serializeFilters } from '@/features/catalog/useCatalogFilters';
 import { ApiError } from '@/shared/api/client';
 import type { BootstrapOut, BreakdownEntry, ExchangeRateOut } from '@/shared/api/types';
 import {
@@ -29,6 +30,12 @@ import {
 import { fetchBootstrap } from './api';
 import { nearestToCompletion, valueDelta } from './finance';
 import styles from './DashboardPage.module.css';
+
+// The "missing" page is gone (docs/08-ui-map.md): the catalog's own "немає
+// в колекції" filter replaces it. Built through the catalog's own filter
+// serializer so this never drifts from what that filter actually writes to
+// the URL.
+const MISSING_CATALOG_URL = `/catalog?${serializeFilters({ ...parseFilters(new URLSearchParams()), owned: false }).toString()}`;
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -98,7 +105,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
             hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
           />
         </Link>
-        <Link to="/collection/missing" className={styles.tileLink}>
+        <Link to={MISSING_CATALOG_URL} className={styles.tileLink}>
           <StatTile
             icon={<CircleDashed strokeWidth={1.75} />}
             label={t('dashboard.tileMissing')}

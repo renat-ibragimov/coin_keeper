@@ -33,8 +33,8 @@ describe('i18n', () => {
 
   it('switches to English at runtime', async () => {
     await i18n.changeLanguage('en');
-    expect(i18n.t('nav.missing')).toBe('Missing');
+    expect(i18n.t('nav.series')).toBe('Series');
     await i18n.changeLanguage('uk');
-    expect(i18n.t('nav.missing')).toBe('Не вистачає');
+    expect(i18n.t('nav.series')).toBe('Серії');
   });
 });

@@ -13,11 +13,11 @@ import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
 import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
 import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
+import { parseFilters, serializeFilters } from '@/features/catalog/useCatalogFilters';
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { ExpensesPage } from '@/features/expenses/ExpensesPage';
-import { MissingPage } from '@/features/missing/MissingPage';
 import { SeriesDetailPage } from '@/features/series/SeriesDetailPage';
 import { SeriesListPage } from '@/features/series/SeriesListPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
@@ -105,6 +105,28 @@ function RedirectCollectionEdit() {
   );
 }
 
+/**
+ * The "missing" page is retired: the catalog's own "немає в колекції"
+ * filter takes its place (docs/08-ui-map.md). Any filters bookmarked on the
+ * old page (country, series, years — the page used the catalog's own filter
+ * hook) share the catalog's query param vocabulary, so they carry over as-is;
+ * `owned` is forced through the catalog's own serializer rather than a
+ * hardcoded string, so it can never drift from what the catalog itself writes.
+ */
+function RedirectMissingToCatalog() {
+  const location = useLocation();
+  const params = serializeFilters({
+    ...parseFilters(new URLSearchParams(location.search)),
+    owned: false,
+  });
+  return (
+    <Navigate
+      to={{ pathname: '/catalog', search: `?${params.toString()}`, hash: location.hash }}
+      replace
+    />
+  );
+}
+
 export function App() {
   return (
     <ThemeProvider>
@@ -131,7 +153,6 @@ export function App() {
                     <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
                     <Route path="/collection/series" element={<SeriesListPage />} />
                     <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
-                    <Route path="/collection/missing" element={<MissingPage />} />
                     <Route path="/collection/money" element={<ExpensesPage />} />
                     <Route path="/catalog" element={<CatalogPage />} />
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
@@ -144,10 +165,8 @@ export function App() {
                     <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
                     <Route path="/series" element={<Navigate to="/collection/series" replace />} />
                     <Route path="/series/:id" element={<RedirectSeriesDetail />} />
-                    <Route
-                      path="/missing"
-                      element={<Navigate to="/collection/missing" replace />}
-                    />
+                    <Route path="/missing" element={<RedirectMissingToCatalog />} />
+                    <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
                     <Route path="/expenses" element={<Navigate to="/collection/money" replace />} />
                     <Route
                       path="/collection/new"

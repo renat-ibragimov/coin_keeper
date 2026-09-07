@@ -98,7 +98,7 @@ describe('DashboardPage', () => {
     );
     expect(screen.getByRole('link', { name: /Не вистачає/ })).toHaveAttribute(
       'href',
-      '/collection/missing',
+      '/catalog?owned=false',
     );
     expect(screen.getByRole('link', { name: /Комплектність/ })).toHaveAttribute(
       'href',

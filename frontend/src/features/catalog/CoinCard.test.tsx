@@ -71,7 +71,7 @@ describe('CoinCard', () => {
   });
 });
 
-describe('CoinCard collection state (same footer everywhere: catalog, series, missing)', () => {
+describe('CoinCard collection state (same footer everywhere: catalog, series)', () => {
   it('offers to add the coin to the collection when it is missing, with no negative badge', () => {
     render(<CoinCard item={makeItem({ quantityOwned: 0 })} />);
     expect(screen.queryByText(/Не вистачає/)).not.toBeInTheDocument();

@@ -10,7 +10,6 @@
     "series": "Series",
     "myCollection": "My collection",
     "coins": "Coins",
-    "missing": "Missing",
     "settings": "Settings",
     "admin": "Administration",
     "more": "More",
@@ -387,21 +386,6 @@
     "openInCatalog": "Open in the catalog",
     "noItemsTitle": "No items in this series yet",
     "noItemsText": "Items appear once the catalog is filled in."
-  },
-  "missing": {
-    "title": "Missing",
-    "subtitle": "Catalog items the collection does not have yet.",
-    "tileAll": "Missing in total",
-    "tileFiltered": "In the current filter",
-    "tileAllHint": "missing in total: {{count}}",
-    "tileUnpriced": "Without a price",
-    "tileBudget": "Budget for the missing",
-    "wholeCatalog": "across the whole visible catalog",
-    "emptyTitle": "All collected!",
-    "emptyText": "No item in the catalog you can see is without an instance.",
-    "emptyCollectionTitle": "Add the first coins",
-    "emptyCollectionText": "Start by adding a few coins to the collection. After that we'll show which items are missing to complete the series.",
-    "emptyCollectionButton": "Find a first coin"
   },
   "expenses": {
     "title": "Money",
