@@ -55,6 +55,11 @@
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
+  /* Without this, a grid item's content-based ("max-content") size wins the
+   * row's auto height regardless of align-items: stretch, and the scrolling
+   * series list below never gets to cap itself against the sibling column —
+   * the row just grows to fit every row instead (docs/08-ui-map.md). */
+  min-height: 0;
 }
 
 /* The two overview columns are one analytical composition, not a row of
@@ -72,6 +77,9 @@
  * below it. */
 .stackCardGrow {
   flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .cardHeader {
@@ -114,19 +122,48 @@
 
 /* --- series in progress --- */
 
-/* Fixed at roughly six rows' worth of height: with fewer started series the
- * list simply falls short of it (no scrollbar), and with more, the max-height
- * doesn't land on a row boundary on purpose — the last visible row gets cut
- * off by the container's edge as a visual invitation to scroll
- * (docs/08-ui-map.md). */
+/* Fills whatever height the card itself has grown to (stackCardGrow, above)
+ * instead of stopping at a fixed height and leaving the rest of the card
+ * blank: with fewer started series it just ends up taller than its content,
+ * with more it scrolls within that height. The max-height is a safety cap,
+ * not a target — CSS Grid's auto row sizing has no way to bound this column
+ * by its sibling's own (unconstrained) height, so without a cap a very long
+ * list would just grow the whole row instead of scrolling (docs/08-ui-map.md,
+ * owner's call 2026-09-07: the previous 300px cap sat well under the finance
+ * column's usual height and left a gap below it; this one comfortably clears
+ * it in the common case, so scrolling only kicks in for an unusually long
+ * list). */
 .seriesList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  max-height: 300px;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 520px;
   overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+.seriesList::-webkit-scrollbar {
+  width: 8px;
+}
+
+.seriesList::-webkit-scrollbar-thumb {
+  background-color: var(--color-border-strong);
+  border-radius: 4px;
+}
+
+.seriesList::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* The default up/down arrow buttons read as a stray native control on an
+ * otherwise custom-styled track — a plain thin thumb reads calmer. */
+.seriesList::-webkit-scrollbar-button {
+  display: none;
 }
 
 .seriesRow {
