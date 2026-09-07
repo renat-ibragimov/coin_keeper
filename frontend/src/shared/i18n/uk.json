@@ -291,7 +291,7 @@
     "instances": "Мої екземпляри",
     "instancesEmpty": "У вас ще немає екземплярів цієї монети.",
     "showAllInstances": "Показати всі екземпляри ({{count}})",
-    "instanceQuantity": "Кількість",
+    "instanceDate": "Дата покупки",
     "instanceSeller": "Продавець",
     "instancePrice": "Ціна покупки",
     "instanceRate": "Курс",

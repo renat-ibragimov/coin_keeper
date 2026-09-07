@@ -289,7 +289,7 @@
     "instances": "My instances",
     "instancesEmpty": "You don't have any instances of this coin yet.",
     "showAllInstances": "Show all instances ({{count}})",
-    "instanceQuantity": "Quantity",
+    "instanceDate": "Purchase date",
     "instanceSeller": "Seller",
     "instancePrice": "Purchase price",
     "instanceRate": "Rate",

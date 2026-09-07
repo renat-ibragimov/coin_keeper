@@ -54,14 +54,12 @@ export function InstancesList({ items, loading, addHref }: InstancesListProps) {
         return (
           <li key={item.id} className={styles.row} data-testid="instance-row">
             <div className={styles.cell}>
-              <span className={styles.cellLabel}>{t('card.instanceQuantity')}</span>
-              <span className={styles.cellValue}>
-                {t('card.pieces', { count: item.quantity })}
-                {item.acquisitionDate ? (
-                  <span className={`${styles.date} tabular`}>
-                    {formatDate(item.acquisitionDate, locale)}
-                  </span>
-                ) : null}
+              <span className={styles.cellLabel}>{t('card.instanceDate')}</span>
+              <span className={`${styles.cellValue} tabular`}>
+                {item.acquisitionDate ? formatDate(item.acquisitionDate, locale) : '—'}
+                <span className={styles.secondary}>
+                  {t('card.pieces', { count: item.quantity })}
+                </span>
               </span>
             </div>
             <div className={styles.cell}>

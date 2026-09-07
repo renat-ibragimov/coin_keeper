@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -265,9 +265,20 @@ describe('CoinCardPage', () => {
 
     await user.click(await screen.findByText('Показати всі екземпляри (2)'));
 
-    expect(await screen.findAllByTestId('instance-row')).toHaveLength(2);
+    const rows = await screen.findAllByTestId('instance-row');
+    expect(rows).toHaveLength(2);
     expect(screen.getByText('Аукціон Violity')).toBeInTheDocument();
     expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
+
+    // The purchase date is the primary value of the first cell, quantity a
+    // secondary line under it — shown even though every instance here owns 1.
+    const [firstRow, secondRow] = rows;
+    expect(within(firstRow!).getByText('Дата покупки')).toBeInTheDocument();
+    expect(within(firstRow!).queryByText('Кількість')).toBeNull();
+    expect(within(firstRow!).getByText('02.04.2025')).toBeInTheDocument();
+    expect(within(firstRow!).getByText('1 екземпляр')).toBeInTheDocument();
+    expect(within(secondRow!).getByText('15.11.2023')).toBeInTheDocument();
+    expect(within(secondRow!).getByText('1 екземпляр')).toBeInTheDocument();
   });
 
   it('scrolls the newly revealed instances into view when the disclosure opens', async () => {
