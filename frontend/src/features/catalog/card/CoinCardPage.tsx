@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
+import { CircleCheck, CircleMinus } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -337,9 +338,23 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
 
   return (
     <Card className={styles.sidebarCard} padded={false}>
-      <h2 className={[styles.statusHeading, owned ? styles.statusOwned : ''].join(' ')}>
-        {owned ? t('card.inCollection') : t('card.notInCollection')}
-      </h2>
+      <div className={styles.statusRow}>
+        <span
+          className={[styles.statusIcon, owned ? styles.statusIconOwned : styles.statusIconAbsent].join(
+            ' ',
+          )}
+          aria-hidden="true"
+        >
+          {owned ? <CircleCheck strokeWidth={1.75} /> : <CircleMinus strokeWidth={1.75} />}
+        </span>
+        <h2
+          className={[styles.statusHeading, owned ? styles.statusOwned : styles.statusAbsent].join(
+            ' ',
+          )}
+        >
+          {owned ? t('card.inCollection') : t('card.notInCollection')}
+        </h2>
+      </div>
       {owned ? (
         <p className={styles.quantityLine}>
           {t('card.quantity')}:{' '}
