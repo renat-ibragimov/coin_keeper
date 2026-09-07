@@ -1,3 +1,4 @@
+import { ChevronDown } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
@@ -86,7 +87,9 @@ export function AppLayout() {
               aria-label={t('account.menuLabel')}
             >
               <span className={styles.accountName}>{user?.displayName || user?.email}</span>
-              <span aria-hidden="true">▾</span>
+              <span className={styles.accountChevron} aria-hidden="true">
+                <ChevronDown size={15} />
+              </span>
             </button>
             {accountOpen ? (
               <div ref={accountMenu} className={styles.accountMenu} role="menu">

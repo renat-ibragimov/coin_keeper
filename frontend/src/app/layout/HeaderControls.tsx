@@ -1,3 +1,4 @@
+import { Moon, Sun } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { setLocale } from '@/shared/i18n';
@@ -39,7 +40,11 @@ export function ThemeToggle() {
       aria-label={t('header.themeToggle')}
       title={t('header.themeToggle')}
     >
-      {theme === 'light' ? '☾' : '☀'}
+      {theme === 'light' ? (
+        <Moon size={17} aria-hidden="true" />
+      ) : (
+        <Sun size={17} aria-hidden="true" />
+      )}
     </button>
   );
 }
