@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -139,89 +139,9 @@ export function ExpensesPage() {
         }
       />
 
-      <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
-        {summary ? (
-          <>
-            <StatTile label={t('expenses.tileTotal')} value={formatUah(summary.totalUah, locale)} />
-            <StatTile
-              label={t('expenses.tileCoins')}
-              value={formatUah(coins?.totalUah ?? '0', locale)}
-              hint={t('expenses.count', { count: coins?.count ?? 0 })}
-            />
-            <StatTile
-              label={t('expenses.tileRelated')}
-              value={formatUah(relatedUah, locale)}
-              hint={t('expenses.count', {
-                count: summary.categories
-                  .filter((row) => row.category !== 'coin_purchase')
-                  .reduce((sum, row) => sum + row.count, 0),
-              })}
-            />
-            <StatTile
-              icon={<CalendarDays strokeWidth={1.75} />}
-              label={t('expenses.tileThisMonth')}
-              value={formatUah(summary.thisMonthUah, locale)}
-              hint={thisMonthHint}
-            />
-          </>
-        ) : (
-          Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={96} />)
-        )}
-      </section>
-
-      {summary && summary.categories.length > 0 ? (
-        <div className={styles.charts}>
-          <Card aria-label={t('expenses.chartByMonthTitle')}>
-            <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
-            <ExpensesByMonthChart data={summary.byMonth} locale={locale} palette={palette} />
-          </Card>
-          <Card aria-label={t('expenses.chartByCategoryTitle')}>
-            <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
-            <ExpensesByCategoryChart data={summary.byCategory} locale={locale} palette={palette} />
-          </Card>
-        </div>
-      ) : null}
-
-      {summary && summary.categories.length > 0 ? (
-        <div className={styles.chips} role="group" aria-label={t('expenses.category')}>
-          <button
-            type="button"
-            className={[styles.chip, category === undefined ? styles.chipActive : ''].join(' ')}
-            onClick={() => setFilter({ category: undefined })}
-            aria-pressed={category === undefined}
-          >
-            {t('expenses.allCategories')}
-          </button>
-          {summary.categories.map((row) => (
-            <button
-              key={row.category}
-              type="button"
-              className={[styles.chip, category === row.category ? styles.chipActive : ''].join(
-                ' ',
-              )}
-              onClick={() => setFilter({ category: row.category })}
-              aria-pressed={category === row.category}
-            >
-              {t(`expenses.categories.${row.category}`)}
-              <span className={`${styles.chipCount} tabular`}>{row.count}</span>
-            </button>
-          ))}
-        </div>
-      ) : null}
-
-      {listQuery.isError ? (
-        <ErrorState
-          detail={
-            listQuery.error instanceof ApiError && listQuery.error.status === 0
-              ? t('errors.network')
-              : undefined
-          }
-          onRetry={() => void listQuery.refetch()}
-        />
-      ) : null}
-      {listQuery.isPending ? <Skeleton height={280} /> : null}
-      {list && list.items.length === 0 && collectionEmpty ? (
+      {collectionEmpty ? (
         <EmptyState
+          icon={<Wallet strokeWidth={1.75} />}
           title={t('expenses.emptyCollectionTitle')}
           description={t('expenses.emptyCollectionText')}
           actions={
@@ -230,91 +150,187 @@ export function ExpensesPage() {
             </Link>
           }
         />
-      ) : null}
-      {list && list.items.length === 0 && !collectionEmpty ? (
-        <EmptyState
-          title={t('expenses.emptyTitle')}
-          description={t('expenses.emptyText')}
-          actions={
-            <Button variant="secondary" onClick={() => setEditor({ mode: 'create' })}>
-              + {t('expenses.add')}
-            </Button>
-          }
-        />
-      ) : null}
-      {list && list.items.length > 0 ? (
-        <div className={styles.scroll}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>{t('expenses.date')}</th>
-                <th>{t('expenses.category')}</th>
-                <th>{t('expenses.description')}</th>
-                <th>{t('expenses.vendor')}</th>
-                <th className={styles.number}>{t('expenses.amountHeader')}</th>
-                <th className={styles.number}>₴</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {list.items.map((expense) => {
-                const fromPurchase = expense.category === 'coin_purchase';
-                return (
-                  <tr key={expense.id}>
-                    <td className="tabular">{formatDate(expense.expenseDate, locale)}</td>
-                    <td>
-                      <Badge tone={fromPurchase ? 'accent' : 'neutral'}>
-                        {t(`expenses.categories.${expense.category}`)}
-                      </Badge>
-                    </td>
-                    <td>
-                      {fromPurchase && expense.catalogItemId ? (
-                        <Link to={`/catalog/${expense.catalogItemId}`}>
-                          {expense.coinTitle || t('expenses.fromPurchase')}
-                        </Link>
-                      ) : (
-                        expense.description || '—'
-                      )}
-                    </td>
-                    <td>{expense.vendor || '—'}</td>
-                    <td className={`${styles.number} tabular`}>
-                      {formatMoney(expense.amount, expense.currencyCode, locale)}
-                    </td>
-                    <td className={`${styles.number} tabular`}>
-                      {formatUah(expense.amountUah, locale)}
-                    </td>
-                    <td className={styles.actions}>
-                      {fromPurchase ? (
-                        <span className={styles.managed} title={t('expenses.managedNote')}>
-                          —
-                        </span>
-                      ) : (
-                        <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setEditor({ mode: 'edit', expense })}
-                          >
-                            {t('common.edit')}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setDeleting(expense)}>
-                            {t('common.delete')}
-                          </Button>
-                        </>
-                      )}
-                    </td>
+      ) : (
+        <>
+          <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
+            {summary ? (
+              <>
+                <StatTile
+                  label={t('expenses.tileTotal')}
+                  value={formatUah(summary.totalUah, locale)}
+                />
+                <StatTile
+                  label={t('expenses.tileCoins')}
+                  value={formatUah(coins?.totalUah ?? '0', locale)}
+                  hint={t('expenses.count', { count: coins?.count ?? 0 })}
+                />
+                <StatTile
+                  label={t('expenses.tileRelated')}
+                  value={formatUah(relatedUah, locale)}
+                  hint={t('expenses.count', {
+                    count: summary.categories
+                      .filter((row) => row.category !== 'coin_purchase')
+                      .reduce((sum, row) => sum + row.count, 0),
+                  })}
+                />
+                <StatTile
+                  icon={<CalendarDays strokeWidth={1.75} />}
+                  label={t('expenses.tileThisMonth')}
+                  value={formatUah(summary.thisMonthUah, locale)}
+                  hint={thisMonthHint}
+                />
+              </>
+            ) : (
+              Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={96} />)
+            )}
+          </section>
+
+          {summary && summary.categories.length > 0 ? (
+            <div className={styles.charts}>
+              <Card aria-label={t('expenses.chartByMonthTitle')}>
+                <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
+                <ExpensesByMonthChart data={summary.byMonth} locale={locale} palette={palette} />
+              </Card>
+              <Card aria-label={t('expenses.chartByCategoryTitle')}>
+                <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
+                <ExpensesByCategoryChart
+                  data={summary.byCategory}
+                  locale={locale}
+                  palette={palette}
+                />
+              </Card>
+            </div>
+          ) : null}
+
+          {summary && summary.categories.length > 0 ? (
+            <div className={styles.chips} role="group" aria-label={t('expenses.category')}>
+              <button
+                type="button"
+                className={[styles.chip, category === undefined ? styles.chipActive : ''].join(' ')}
+                onClick={() => setFilter({ category: undefined })}
+                aria-pressed={category === undefined}
+              >
+                {t('expenses.allCategories')}
+              </button>
+              {summary.categories.map((row) => (
+                <button
+                  key={row.category}
+                  type="button"
+                  className={[styles.chip, category === row.category ? styles.chipActive : ''].join(
+                    ' ',
+                  )}
+                  onClick={() => setFilter({ category: row.category })}
+                  aria-pressed={category === row.category}
+                >
+                  {t(`expenses.categories.${row.category}`)}
+                  <span className={`${styles.chipCount} tabular`}>{row.count}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          {listQuery.isError ? (
+            <ErrorState
+              detail={
+                listQuery.error instanceof ApiError && listQuery.error.status === 0
+                  ? t('errors.network')
+                  : undefined
+              }
+              onRetry={() => void listQuery.refetch()}
+            />
+          ) : null}
+          {listQuery.isPending ? <Skeleton height={280} /> : null}
+          {list && list.items.length === 0 ? (
+            <EmptyState
+              icon={<Wallet strokeWidth={1.75} />}
+              title={t('expenses.emptyTitle')}
+              description={t('expenses.emptyText')}
+              actions={
+                <Button variant="secondary" onClick={() => setEditor({ mode: 'create' })}>
+                  + {t('expenses.add')}
+                </Button>
+              }
+            />
+          ) : null}
+          {list && list.items.length > 0 ? (
+            <div className={styles.scroll}>
+              <table className={styles.table}>
+                <thead>
+                  <tr>
+                    <th>{t('expenses.date')}</th>
+                    <th>{t('expenses.category')}</th>
+                    <th>{t('expenses.description')}</th>
+                    <th>{t('expenses.vendor')}</th>
+                    <th className={styles.number}>{t('expenses.amountHeader')}</th>
+                    <th className={styles.number}>₴</th>
+                    <th />
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      ) : null}
-      <Pagination
-        page={page}
-        pageCount={pageCount}
-        onChange={(next) => setFilter({ page: next })}
-      />
+                </thead>
+                <tbody>
+                  {list.items.map((expense) => {
+                    const fromPurchase = expense.category === 'coin_purchase';
+                    return (
+                      <tr key={expense.id}>
+                        <td className="tabular">{formatDate(expense.expenseDate, locale)}</td>
+                        <td>
+                          <Badge tone={fromPurchase ? 'accent' : 'neutral'}>
+                            {t(`expenses.categories.${expense.category}`)}
+                          </Badge>
+                        </td>
+                        <td>
+                          {fromPurchase && expense.catalogItemId ? (
+                            <Link to={`/catalog/${expense.catalogItemId}`}>
+                              {expense.coinTitle || t('expenses.fromPurchase')}
+                            </Link>
+                          ) : (
+                            expense.description || '—'
+                          )}
+                        </td>
+                        <td>{expense.vendor || '—'}</td>
+                        <td className={`${styles.number} tabular`}>
+                          {formatMoney(expense.amount, expense.currencyCode, locale)}
+                        </td>
+                        <td className={`${styles.number} tabular`}>
+                          {formatUah(expense.amountUah, locale)}
+                        </td>
+                        <td className={styles.actions}>
+                          {fromPurchase ? (
+                            <span className={styles.managed} title={t('expenses.managedNote')}>
+                              —
+                            </span>
+                          ) : (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditor({ mode: 'edit', expense })}
+                              >
+                                {t('common.edit')}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setDeleting(expense)}
+                              >
+                                {t('common.delete')}
+                              </Button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+          <Pagination
+            page={page}
+            pageCount={pageCount}
+            onChange={(next) => setFilter({ page: next })}
+          />
+        </>
+      )}
 
       <Modal
         open={editor.mode !== 'closed'}

@@ -140,6 +140,9 @@ describe('CollectionPage', () => {
       '/catalog',
     );
     expect(screen.queryByPlaceholderText('Пошук у колекції…')).toBeNull();
+    // No zero-value KPI tiles or filters above the empty state.
+    expect(screen.queryByText('Монет у колекції')).toBeNull();
+    expect(screen.queryByText('Поточна оцінка')).toBeNull();
   });
 
   it('shows the filters panel once the collection has coins', async () => {

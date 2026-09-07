@@ -12,6 +12,12 @@
 .icon {
   font-size: 34px;
   line-height: 1;
+  color: var(--color-text-muted);
+}
+
+.icon svg {
+  width: 34px;
+  height: 34px;
 }
 
 .title {

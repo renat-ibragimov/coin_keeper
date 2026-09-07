@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Layers } from 'lucide-react';
+import { Layers, SearchX } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -102,6 +102,7 @@ export function SeriesListPage() {
 
       {collectionEmpty ? (
         <EmptyState
+          icon={<Layers strokeWidth={1.75} />}
           title={t('series.emptyCollectionTitle')}
           description={t('series.emptyCollectionText')}
           actions={
@@ -194,7 +195,11 @@ export function SeriesListPage() {
           ) : null}
 
           {nothingFound ? (
-            <EmptyState title={t('catalog.emptyTitle')} description={t('catalog.emptyText')} />
+            <EmptyState
+              icon={<SearchX strokeWidth={1.75} />}
+              title={t('catalog.emptyTitle')}
+              description={t('catalog.emptyText')}
+            />
           ) : null}
 
           {rows.length > 0 ? (

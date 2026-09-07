@@ -1,3 +1,4 @@
+import { CircleAlert, CircleDashed } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,7 +12,12 @@ interface StateProps {
   icon?: ReactNode;
 }
 
-export function EmptyState({ title, description, actions, icon = '◎' }: StateProps) {
+export function EmptyState({
+  title,
+  description,
+  actions,
+  icon = <CircleDashed strokeWidth={1.75} />,
+}: StateProps) {
   return (
     <div className={styles.state}>
       <div className={styles.icon} aria-hidden="true">
@@ -37,7 +43,7 @@ export function ErrorState({ title, detail, onRetry, actions }: ErrorStateProps)
   return (
     <div className={styles.state} role="alert">
       <div className={styles.icon} aria-hidden="true">
-        ⚠
+        <CircleAlert strokeWidth={1.75} />
       </div>
       <div className={styles.title}>{title ?? t('errors.title')}</div>
       <p className={styles.description}>{detail ?? t('errors.generic')}</p>

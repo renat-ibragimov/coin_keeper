@@ -176,6 +176,10 @@ describe('ExpensesPage', () => {
       'href',
       '/catalog',
     );
+    // No zero-value KPI tiles, charts or category chips above the empty state.
+    expect(screen.queryByText('Разом на хобі')).toBeNull();
+    expect(screen.queryByText('Витрати за місяцями')).toBeNull();
+    expect(screen.queryByText('Усі категорії')).toBeNull();
   });
 
   it('offers to add an expense by hand once the collection has coins', async () => {

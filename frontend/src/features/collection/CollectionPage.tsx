@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Coins, Layers, TrendingUp, Wallet } from 'lucide-react';
+import { Coins, Layers, SearchX, TrendingUp, Wallet } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -206,51 +206,6 @@ export function CollectionPage() {
         }
       />
 
-      <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
-        {dashboard ? (
-          <>
-            <StatTile
-              icon={<Coins strokeWidth={1.75} />}
-              label={t('collection.tileCoins')}
-              value={formatNumber(dashboard.collectionItems, locale, 0)}
-              hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
-            />
-            <StatTile
-              icon={<Wallet strokeWidth={1.75} />}
-              label={t('collection.tileSpent')}
-              value={formatUah(dashboard.coinSpendUah, locale)}
-              hint={t('collection.tileSpentHint', {
-                total: formatUah(dashboard.totalSpendUah, locale),
-              })}
-            />
-            <StatTile
-              icon={<TrendingUp strokeWidth={1.75} />}
-              label={t('collection.tileValue')}
-              value={formatUah(dashboard.marketValueUah, locale)}
-              hint={t('collection.tileValueHint')}
-            />
-            <StatTile
-              icon={<Layers strokeWidth={1.75} />}
-              label={t('collection.tileSeries')}
-              value={
-                seriesStats ? (
-                  `${seriesStats.completed} / ${seriesStats.started}`
-                ) : (
-                  <Skeleton width={60} />
-                )
-              }
-              hint={
-                seriesStats && seriesStats.started > 0
-                  ? formatPercent((seriesStats.completed / seriesStats.started) * 100, locale)
-                  : t('collection.tileSeriesHint')
-              }
-            />
-          </>
-        ) : (
-          Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={96} />)
-        )}
-      </section>
-
       {collectionEmpty ? (
         <EmptyState
           icon={<Coins strokeWidth={1.75} />}
@@ -269,6 +224,51 @@ export function CollectionPage() {
         />
       ) : (
         <>
+          <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
+            {dashboard ? (
+              <>
+                <StatTile
+                  icon={<Coins strokeWidth={1.75} />}
+                  label={t('collection.tileCoins')}
+                  value={formatNumber(dashboard.collectionItems, locale, 0)}
+                  hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
+                />
+                <StatTile
+                  icon={<Wallet strokeWidth={1.75} />}
+                  label={t('collection.tileSpent')}
+                  value={formatUah(dashboard.coinSpendUah, locale)}
+                  hint={t('collection.tileSpentHint', {
+                    total: formatUah(dashboard.totalSpendUah, locale),
+                  })}
+                />
+                <StatTile
+                  icon={<TrendingUp strokeWidth={1.75} />}
+                  label={t('collection.tileValue')}
+                  value={formatUah(dashboard.marketValueUah, locale)}
+                  hint={t('collection.tileValueHint')}
+                />
+                <StatTile
+                  icon={<Layers strokeWidth={1.75} />}
+                  label={t('collection.tileSeries')}
+                  value={
+                    seriesStats ? (
+                      `${seriesStats.completed} / ${seriesStats.started}`
+                    ) : (
+                      <Skeleton width={60} />
+                    )
+                  }
+                  hint={
+                    seriesStats && seriesStats.started > 0
+                      ? formatPercent((seriesStats.completed / seriesStats.started) * 100, locale)
+                      : t('collection.tileSeriesHint')
+                  }
+                />
+              </>
+            ) : (
+              Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={96} />)
+            )}
+          </section>
+
           <div className={styles.filtersBar}>{filtersPanel}</div>
 
           <FiltersToolbar<CollectionView>
@@ -327,7 +327,11 @@ export function CollectionPage() {
           ) : null}
 
           {page && page.items.length === 0 ? (
-            <EmptyState title={t('catalog.emptyTitle')} description={t('catalog.emptyText')} />
+            <EmptyState
+              icon={<SearchX strokeWidth={1.75} />}
+              title={t('catalog.emptyTitle')}
+              description={t('catalog.emptyText')}
+            />
           ) : null}
 
           {page && page.items.length > 0 ? (

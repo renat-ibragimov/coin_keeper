@@ -11,6 +11,7 @@ import { FiltersShell, FiltersToolbar } from './FiltersShell';
 import { Input } from './Input';
 import { pageItems } from './pageItems';
 import { Pagination } from './Pagination';
+import { EmptyState, ErrorState } from './States';
 import { Toggle } from './Toggle';
 
 describe('Button', () => {
@@ -194,5 +195,28 @@ describe('Input with a trailing control', () => {
   it('renders no extra wrapper without a trailing control', () => {
     render(<Input label="Email" hint="hint" />);
     expect(screen.queryByTestId('input-control')).toBeNull();
+  });
+});
+
+describe('EmptyState', () => {
+  it('defaults to a lucide icon, not a text glyph', () => {
+    const { container } = render(<EmptyState title="Nothing here" />);
+    const icon = container.querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(container.textContent).not.toMatch(/[◎⚠]/);
+  });
+
+  it('renders a custom icon when given one', () => {
+    render(<EmptyState title="Nothing here" icon={<span data-testid="custom-icon" />} />);
+    expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
+  });
+});
+
+describe('ErrorState', () => {
+  it('defaults to a lucide icon, not a text glyph', () => {
+    const { container } = render(<ErrorState />);
+    const icon = container.querySelector('svg');
+    expect(icon).not.toBeNull();
+    expect(container.textContent).not.toMatch(/[◎⚠]/);
   });
 });

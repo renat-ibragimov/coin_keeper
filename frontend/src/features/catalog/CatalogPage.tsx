@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { SearchX } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -233,7 +234,11 @@ export function CatalogPage() {
         ) : null}
 
         {page && page.items.length === 0 ? (
-          <EmptyState title={t('catalog.emptyTitle')} description={t('catalog.emptyText')} />
+          <EmptyState
+            icon={<SearchX strokeWidth={1.75} />}
+            title={t('catalog.emptyTitle')}
+            description={t('catalog.emptyText')}
+          />
         ) : null}
 
         {page && page.items.length > 0 ? (
