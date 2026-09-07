@@ -13,8 +13,17 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.locale import DEFAULT_LOCALE
-from app.models import CollectionItem, Currency, Expense, MediaFile, User
+from app.core.locale import DEFAULT_LOCALE, pick_name
+from app.models import (
+    CoinSeries,
+    CollectionItem,
+    Country,
+    Currency,
+    Denomination,
+    Expense,
+    MediaFile,
+    User,
+)
 from app.models.enums import ExpenseCategory, UserRole
 from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogRepository
@@ -32,8 +41,56 @@ from app.schemas.collection import (
     CollectionItemUpdate,
     CollectionPositionOut,
 )
+from app.schemas.reference import CountryOut, DenominationOut
+from app.schemas.series import SeriesOut
 from app.services.catalog import display_title
 from app.services.media_urls import CatalogImages, MediaUrlBuilder
+
+
+def _country_out(country: Country, locale: str) -> CountryOut:
+    return CountryOut(
+        id=country.id,
+        code=country.code,
+        name=pick_name(
+            locale, uk=country.name_uk, en=country.name_en, original=country.name_original
+        ),
+        name_original=country.name_original,
+        original_lang=country.original_lang,
+        name_uk=country.name_uk,
+        name_en=country.name_en,
+        collect_variants=country.collect_variants,
+        is_active=country.is_active,
+        sort_order=country.sort_order,
+    )
+
+
+def _series_out(series: CoinSeries, locale: str) -> SeriesOut:
+    return SeriesOut(
+        id=series.id,
+        country_id=series.country_id,
+        name=pick_name(locale, uk=series.name_uk, en=series.name_en, original=series.name_original),
+        name_original=series.name_original,
+        original_lang=series.original_lang,
+        name_uk=series.name_uk,
+        name_uk_source=series.name_uk_source,
+        name_en=series.name_en,
+        name_en_source=series.name_en_source,
+        description=series.description,
+        start_year=series.start_year,
+        end_year=series.end_year,
+    )
+
+
+def _denomination_out(denomination: Denomination, locale: str) -> DenominationOut:
+    return DenominationOut(
+        id=denomination.id,
+        country_id=denomination.country_id,
+        currency_code=denomination.currency_code,
+        value=denomination.value,
+        unit=denomination.unit,
+        label=render_label(denomination.value, denomination.unit, locale),
+        sort_order=denomination.sort_order,
+    )
 
 
 class CollectionError(Exception):
@@ -87,6 +144,18 @@ class CollectionService:
             self._position_out(row, images.get(row.catalog_item.id, CatalogImages()))
             for row in rows
         ], total
+
+    async def list_owned_countries(self) -> list[CountryOut]:
+        countries = await self._repo.list_owned_countries()
+        return [_country_out(country, self._locale) for country in countries]
+
+    async def list_owned_series(self, country_id: int | None) -> list[SeriesOut]:
+        series = await self._repo.list_owned_series(country_id)
+        return [_series_out(item, self._locale) for item in series]
+
+    async def list_owned_denominations(self, country_id: int | None) -> list[DenominationOut]:
+        denominations = await self._repo.list_owned_denominations(country_id)
+        return [_denomination_out(item, self._locale) for item in denominations]
 
     async def get(self, item_id: int) -> CollectionItemOut:
         if await self._repo.get_row(item_id) is None:

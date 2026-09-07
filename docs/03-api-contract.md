@@ -370,6 +370,23 @@ DELETE /collection/{id}
 До этапа 5 курсы берутся только из таблицы `exchange_rates` (HTTP-клиента НБУ ещё нет):
 покупка не в гривне с датой, на которую нет курса ≤ `purchaseDate`, отклоняется с `422`.
 
+### Справочники, отфильтрованные по своей коллекции
+
+```
+GET /collection/countries
+GET /collection/series?countryId
+GET /collection/denominations?countryId
+```
+
+Те же схемы, что у общих `GET /countries` / `GET /series` / `GET /denominations`
+(`CountryOut` / `SeriesOut` / `DenominationOut`), но список — только те страны/серії/
+номінали, по которым у пользователя есть хотя бы одна покупка. Панель фільтрів
+«Мої монети» использует именно их (не общий каталожный список): не имеет смысла
+предлагать выбрать страну, монет которой у пользователя нет. Каталог продолжает
+дёргать общие `/countries`, `/series`, `/denominations` — эти ручки его не касаются.
+Порядок регистрации маршрутов важен: `/collection/countries` и соседние объявлены
+раньше `/collection/{id}`, иначе FastAPI пытается распарсить `"countries"` как id.
+
 ## Серии
 
 ```

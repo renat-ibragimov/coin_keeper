@@ -528,3 +528,51 @@ async def test_grade_filter_matches_the_whole_position(
 
     unmatched = await client.get("/api/v1/collection?grade=PROOF", headers=auth(ctx.token_a))
     assert unmatched.json()["total"] == 0
+
+
+async def test_owned_countries_series_denominations_are_scoped_to_purchases(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The filters panel on "Мої монети" offers only what the owner could
+    possibly match, not the whole shared reference list."""
+    refs = ctx.refs
+    cent = await make_catalog_item(
+        db_session, country=refs.usa, title="Lincoln cent", year=2009, denomination=refs.cent_1
+    )
+    headers_a = auth(ctx.token_a)
+
+    # Before any purchase, every owned reference list is empty.
+    empty = await client.get("/api/v1/collection/countries", headers=headers_a)
+    assert empty.json() == []
+
+    # ctx.item_id: Ukraine, uah_2, fauna series.
+    item = await db_session.get(CatalogItem, ctx.item_id)
+    assert item is not None
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=item)
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=cent)
+
+    countries = (await client.get("/api/v1/collection/countries", headers=headers_a)).json()
+    assert {country["code"] for country in countries} == {"UA", "US"}
+
+    series = (await client.get("/api/v1/collection/series", headers=headers_a)).json()
+    assert [row["id"] for row in series] == [refs.fauna.id]
+
+    series_by_country = (
+        await client.get(f"/api/v1/collection/series?countryId={refs.usa.id}", headers=headers_a)
+    ).json()
+    assert series_by_country == []
+
+    denominations = (await client.get("/api/v1/collection/denominations", headers=headers_a)).json()
+    assert {row["id"] for row in denominations} == {refs.uah_2.id, refs.cent_1.id}
+
+    denominations_ua = (
+        await client.get(
+            f"/api/v1/collection/denominations?countryId={refs.ukraine.id}", headers=headers_a
+        )
+    ).json()
+    assert [row["id"] for row in denominations_ua] == [refs.uah_2.id]
+
+    # User B never bought anything: everything stays empty for them.
+    for path in ("countries", "series", "denominations"):
+        response = await client.get(f"/api/v1/collection/{path}", headers=auth(ctx.token_b))
+        assert response.json() == []

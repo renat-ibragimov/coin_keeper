@@ -17,6 +17,8 @@ from app.schemas.collection import (
     CollectionPositionOut,
 )
 from app.schemas.common import Page
+from app.schemas.reference import CountryOut, DenominationOut
+from app.schemas.series import SeriesOut
 from app.services.collection import (
     CatalogItemNotFoundError,
     CollectionItemNotFoundError,
@@ -91,6 +93,38 @@ async def create_item(
         raise _unprocessable("exchange-rate-missing", exc.detail) from exc
 
 
+@router.get("/countries")
+async def list_owned_countries(
+    session: DbSession, user: CurrentUser, locale: RequestLocale
+) -> list[CountryOut]:
+    """Countries the owner holds at least one purchase from — narrower than
+    `GET /countries`, for the "Мої монети" filters panel (docs/03)."""
+    return await CollectionService(session, user, locale).list_owned_countries()
+
+
+@router.get("/series")
+async def list_owned_series(
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    country_id: Annotated[int | None, Query(alias="countryId")] = None,
+) -> list[SeriesOut]:
+    return await CollectionService(session, user, locale).list_owned_series(country_id)
+
+
+@router.get("/denominations")
+async def list_owned_denominations(
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    country_id: Annotated[int | None, Query(alias="countryId")] = None,
+) -> list[DenominationOut]:
+    return await CollectionService(session, user, locale).list_owned_denominations(country_id)
+
+
+# NOTE: these three literal routes must stay registered before /{item_id} —
+# otherwise FastAPI tries to parse "countries"/"series"/"denominations" as
+# item_id and 422s instead of matching the routes above.
 @router.get("/{item_id}")
 async def get_item(
     session: DbSession, user: CurrentUser, locale: RequestLocale, item_id: int

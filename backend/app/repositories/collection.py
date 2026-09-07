@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, exists, func, select, true
+from sqlalchemy import ColumnElement, and_, exists, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
@@ -217,6 +217,69 @@ class CollectionRepository:
             last_acquisition_date=row.last_acquisition_date,
             grades=sorted(set(row.grades or [])),
         )
+
+    # ------------------------------------------------- owned reference lists
+
+    def _owns_via(self, catalog_condition: ColumnElement[bool]) -> ColumnElement[bool]:
+        """EXISTS a purchase of a catalog item matching `catalog_condition`
+        (e.g. its country_id, series_id or denomination_id) — a correlated
+        subquery, so it works as a plain WHERE clause without DISTINCT
+        (which Postgres refuses to combine with an ORDER BY expression)."""
+        return exists(
+            select(CollectionItem.id)
+            .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+            .where(catalog_condition, CollectionItem.owner_id == self._owner_id)
+        )
+
+    async def list_owned_countries(self) -> Sequence[Country]:
+        """Countries the owner holds at least one purchase from — the
+        filters panel on "Мої монети" offers only what could possibly match,
+        not the whole shared reference list (docs/03-api-contract.md)."""
+        query = (
+            select(Country)
+            .where(self._owns_via(CatalogItem.country_id == Country.id))
+            .order_by(
+                Country.sort_order,
+                localized(
+                    self._locale,
+                    uk=Country.name_uk,
+                    en=Country.name_en,
+                    original=Country.name_original,
+                ),
+            )
+        )
+        return (await self._session.execute(query)).scalars().all()
+
+    async def list_owned_series(self, country_id: int | None = None) -> Sequence[CoinSeries]:
+        catalog_condition = CatalogItem.series_id == CoinSeries.id
+        if country_id is not None:
+            catalog_condition = and_(catalog_condition, CatalogItem.country_id == country_id)
+        query = (
+            select(CoinSeries)
+            .where(self._owns_via(catalog_condition))
+            .order_by(
+                localized(
+                    self._locale,
+                    uk=CoinSeries.name_uk,
+                    en=CoinSeries.name_en,
+                    original=CoinSeries.name_original,
+                ),
+            )
+        )
+        return (await self._session.execute(query)).scalars().all()
+
+    async def list_owned_denominations(
+        self, country_id: int | None = None
+    ) -> Sequence[Denomination]:
+        catalog_condition = CatalogItem.denomination_id == Denomination.id
+        if country_id is not None:
+            catalog_condition = and_(catalog_condition, CatalogItem.country_id == country_id)
+        query = (
+            select(Denomination)
+            .where(self._owns_via(catalog_condition))
+            .order_by(Denomination.sort_order, Denomination.value, Denomination.unit)
+        )
+        return (await self._session.execute(query)).scalars().all()
 
     # ------------------------------------------------------- single items
 
