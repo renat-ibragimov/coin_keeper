@@ -12,8 +12,23 @@
   flex-wrap: wrap;
 }
 
-.toolbar > :first-child {
-  min-width: 220px;
+.filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1 1 auto;
+}
+
+.search {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .list {

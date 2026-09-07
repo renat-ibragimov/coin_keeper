@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -8,7 +9,7 @@ import type { SeriesProgress } from '@/shared/api/types';
 
 import { fetchCountries } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
-import type { BootstrapOut } from '@/shared/api/types';
+import type { BootstrapOut, CountryOut } from '@/shared/api/types';
 
 import { fetchSeriesProgress } from './api';
 import { SeriesListPage } from './SeriesListPage';
@@ -62,6 +63,19 @@ function makeBootstrap(isEmpty: boolean): BootstrapOut {
   };
 }
 
+const COUNTRY: CountryOut = {
+  id: 1,
+  code: 'UA',
+  name: 'Україна',
+  nameOriginal: 'Україна',
+  originalLang: 'uk',
+  nameUk: 'Україна',
+  nameEn: 'Ukraine',
+  collectVariants: false,
+  isActive: true,
+  sortOrder: 0,
+};
+
 function progress(id: number, name: string, owned: number, total: number): SeriesProgress {
   return {
     series: {
@@ -114,57 +128,83 @@ describe('sortSeries', () => {
   });
 });
 
+function renderPage(initialEntries: string[] = ['/']) {
+  return render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <MemoryRouter initialEntries={initialEntries}>
+        <SeriesListPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe('SeriesListPage', () => {
-  it('renders every series with its progress, spend and valuation', async () => {
+  it('defaults to "Мої": started series only, hiding the zeroed-out one', async () => {
     vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
-    vi.mocked(fetchCountries).mockResolvedValue([
-      {
-        id: 1,
-        code: 'UA',
-        name: 'Україна',
-        nameOriginal: 'Україна',
-        originalLang: 'uk',
-        nameUk: 'Україна',
-        nameEn: 'Ukraine',
-        collectVariants: false,
-        isActive: true,
-        sortOrder: 0,
-      },
-    ]);
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <MemoryRouter>
-          <SeriesListPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage();
 
     expect(await screen.findByRole('link', { name: 'Almost' })).toHaveAttribute(
       'href',
       '/collection/series/2',
     );
     expect(screen.getByText('19 з 20')).toBeInTheDocument();
+    expect(screen.getAllByText('100 ₴')).toHaveLength(3);
+    expect(screen.getAllByText('250 ₴')).toHaveLength(3);
+    expect(screen.queryByText('Empty')).toBeNull();
+  });
+
+  it('switches to "Усі" and shows every series, including unstarted ones', async () => {
+    vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage();
+
+    await screen.findByText('Almost');
+    expect(screen.queryByText('Empty')).toBeNull();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Усі' }));
+    expect(await screen.findByText('Empty')).toBeInTheDocument();
     expect(screen.getAllByText('100 ₴')).toHaveLength(4);
-    expect(screen.getAllByText('250 ₴')).toHaveLength(4);
-    expect(screen.getAllByText('Україна').length).toBeGreaterThan(0);
+  });
+
+  it('filters the visible series by name as the user types', async () => {
+    vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage();
+
+    await screen.findByText('Almost');
+    await userEvent.type(screen.getByPlaceholderText('Пошук серії…'), 'alm');
+
+    await waitFor(() => expect(screen.queryByText('Half')).toBeNull());
+    expect(screen.getByText('Almost')).toBeInTheDocument();
+    expect(screen.queryByText('Done')).toBeNull();
+  });
+
+  it('shows a placeholder with a scope switch when nothing is started yet', async () => {
+    const notStarted = [progress(1, 'Half', 0, 10), progress(2, 'Almost', 0, 20)];
+    vi.mocked(fetchSeriesProgress).mockResolvedValue(notStarted);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage();
+
+    expect(await screen.findByText('Ще не почато жодної серії')).toBeInTheDocument();
+    expect(screen.queryByText('Half')).toBeNull();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Показати всі серії' }));
+    expect(await screen.findByText('Half')).toBeInTheDocument();
+    expect(screen.getByText('Almost')).toBeInTheDocument();
   });
 
   it('shows an onboarding empty state instead of a zeroed-out list', async () => {
     vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(true));
     vi.mocked(fetchCountries).mockResolvedValue([]);
-    render(
-      <QueryClientProvider
-        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
-      >
-        <MemoryRouter>
-          <SeriesListPage />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderPage();
 
     expect(await screen.findByText('Серій ще немає')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
