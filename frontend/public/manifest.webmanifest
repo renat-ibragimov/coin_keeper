@@ -8,8 +8,8 @@
   "display": "standalone",
   "orientation": "portrait",
   "lang": "uk",
-  "background_color": "#f2ecdf",
-  "theme_color": "#faf6ec",
+  "background_color": "#c8bfaf",
+  "theme_color": "#c8bfaf",
   "icons": [
     { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png" },

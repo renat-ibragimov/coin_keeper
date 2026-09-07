@@ -166,31 +166,58 @@
   --color-chart-axis: #635a4e;
   --color-chart-series-1: #8a6228;
   --color-chart-series-2: #6c7050;
+
+  /* Page-background microtexture: a 256px seamless tile, drawn once by the
+   * body::before layer far below. Not a colour token — nothing else may
+   * consume it (see "page texture" below). */
+  --page-texture-image: url('../../assets/textures/surface-noise-light.webp');
+  /* Higher than a "barely there" value on purpose (owner's call, 2026-09-07:
+   * the grain was invisible at 0.055). Safe for the approved palette: the
+   * tile's own channel means are 198.7/190.2/177.2 against this theme's
+   * ground of 200/191/175, so the mix stays #c8bfaf at any opacity and only
+   * the amplitude of the grain changes. */
+  --page-texture-opacity: 0.28;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --color-bg: #080807;
-  --color-surface: #11100e;
-  --color-surface-raised: #191713;
-  --color-surface-sunken: #050504;
-  --color-surface-control: #15130f;
-  --color-surface-hover: #201c16;
+  /* Stone and metal, not wood. Every large surface is near-neutral with
+   * green and blue at or just above red, so the fill reads as anthracite,
+   * graphite and blackened steel; the warmth in this theme comes from the
+   * brass hardware (accents, focus, primary buttons, active navigation) and
+   * from the coins themselves, never from the fill of a card or a panel.
+   * Hierarchy is built from lightness, not from more red. */
+  /* --color-bg is set below the ground the visitor actually sees: the texture
+   * tile's own mean (≈32/32/30) sits well above near-black, so at the opacity
+   * below it lifts the page by about five levels. #040505 plus the grain
+   * lands on ≈#090a0a — near-black with a grey cast, which is the point. */
+  --color-bg: #040505;
+  --color-surface: #0c0e0f;
+  --color-surface-raised: #131618;
+  --color-surface-sunken: #070808;
+  --color-surface-control: #0e1012;
+  --color-surface-hover: #191d20;
 
-  --color-text: #eee8dc;
-  --color-text-secondary: #bdb3a3;
-  --color-text-muted: #938777;
+  --color-text: #eeeae2;
+  --color-text-secondary: #b7b5af;
+  --color-text-muted: #888b89;
 
-  --color-border: #332d25;
-  --color-border-strong: #7b6547;
-  --color-border-subtle: rgba(226, 205, 168, 0.1);
-  --color-border-hover: #a98039;
+  /* Ordinary edges are steel and stone. Brass is the hover/focus/selected
+   * edge only — never the resting border of every card. */
+  --color-border: #30363a;
+  /* #616c73 rather than the #505a60 of the brief: this is the border that
+   * outlines a secondary button and rules a table header, so it has to clear
+   * 3:1 against the control and card surfaces it sits on (WCAG 1.4.11) —
+   * #505a60 measured 2.4–2.7:1. Same blackened steel, two steps lighter. */
+  --color-border-strong: #616c73;
+  --color-border-subtle: rgba(211, 220, 224, 0.09);
+  --color-border-hover: #9d7c3e;
 
   --color-accent: #c29a4b;
   --color-accent-strong: #d4af67;
-  --color-accent-soft: #292218;
-  --color-on-accent: #1b1409;
+  --color-accent-soft: #24221d;
+  --color-on-accent: #17140e;
 
   --color-success: #a8c0a2;
   --color-success-soft: #212b23;
@@ -203,18 +230,18 @@
   --color-warning: #d4b06a;
   --color-warning-soft: #352a1b;
 
-  --color-info-bg: #1b1712;
-  --color-info-border: #352d21;
+  --color-info-bg: #14181a;
+  --color-info-border: #2b3236;
 
   --color-owned: #bcd0bb;
   --color-absent: #f4938e;
 
-  --color-row-hover: #201c16;
-  --color-selected: #2b2318;
+  --color-row-hover: #202427;
+  --color-selected: #2b2519;
 
   --color-focus-ring: #c29a4b;
 
-  --highlight-inset: rgba(255, 255, 255, 0.06);
+  --highlight-inset: rgba(220, 228, 232, 0.045);
 
   --color-button-primary-top: #c69f52;
   --color-button-primary-bottom: #ab8339;
@@ -226,24 +253,27 @@
     var(--color-button-primary-bottom) 100%
   );
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.42), 0 8px 20px rgba(0, 0, 0, 0.34);
-  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.44), 0 20px 44px rgba(0, 0, 0, 0.52);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.42);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.46), 0 8px 20px rgba(0, 0, 0, 0.28);
+  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.5), 0 20px 44px rgba(0, 0, 0, 0.5);
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.44), 0 7px 18px rgba(0, 0, 0, 0.34);
-  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 12px 24px rgba(0, 0, 0, 0.4);
-  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.52), 0 8px 20px rgba(0, 0, 0, 0.28);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.58), 0 12px 26px rgba(0, 0, 0, 0.34);
+  --shadow-panel: 0 4px 16px rgba(0, 0, 0, 0.2);
   --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.5);
 
   --shadow-coin: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.48))
     drop-shadow(0 10px 14px rgba(0, 0, 0, 0.34));
 
-  --overlay: rgba(4, 3, 2, 0.78);
+  --overlay: rgba(5, 6, 6, 0.78);
 
-  --color-chart-grid: #332d25;
-  --color-chart-axis: #938777;
+  --color-chart-grid: #30363a;
+  --color-chart-axis: #888b89;
   --color-chart-series-1: #c29a4b;
   --color-chart-series-2: #8b8f62;
+
+  --page-texture-image: url('../../assets/textures/surface-noise-dark.webp');
+  --page-texture-opacity: 0.16;
 }
 
 /* ------------------------------------------------------------------ base */
@@ -258,13 +288,76 @@ body {
   padding: 0;
 }
 
+/* html carries the ground colour too, so overscroll past the top or bottom
+   of a short page shows the page colour rather than white. */
+html {
+  min-height: 100%;
+  background: var(--color-bg);
+}
+
 body {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Its own stacking context, so the texture layer below can sit at z-index 0
+     without competing with anything the app puts on the page. */
+  isolation: isolate;
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.5;
   color: var(--color-text);
   background-color: var(--color-bg);
   -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------- page texture */
+
+/* One fixed layer for the whole application: every route inherits it, no
+ * screen adds a texture of its own, and switching data-theme swaps the tile
+ * immediately because the file is behind a custom property.
+ *
+ * It sits BEHIND #root (z-index 0 against #root's 1), not at z-index -1 —
+ * a negative index would drop it behind the body's own background and it
+ * would never be seen — and never above the app, which would put grain over
+ * text, cards and coin photographs. The tile repeats at its native 256px:
+ * no cover, no scaling, no animation, no filter.
+ *
+ * Only the page ground is textured. Cards, panels, tables, controls, the
+ * header and the bottom bar all paint their own opaque surfaces on top and
+ * stay clean. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--page-texture-image);
+  background-repeat: repeat;
+  background-position: 0 0;
+  background-size: 256px 256px;
+  opacity: var(--page-texture-opacity);
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: transparent;
+}
+
+/* Decoration, and the first thing to drop when the visitor has asked for
+   less data or for the system's own high-contrast colours. */
+@media (prefers-reduced-data: reduce) {
+  body::before {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  body::before {
+    display: none;
+  }
 }
 
 /* The display serif is opt-in per element, not a blanket rule on headings:
