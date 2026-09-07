@@ -4,37 +4,25 @@ import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '@/shared/api/client';
 import { useDismissable } from '@/shared/lib/useDismissable';
-import { Button, EmptyState, ErrorState, Pagination, Select, Skeleton, Tabs } from '@/shared/ui';
+import type { ActiveFilterChip } from '@/shared/ui';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  FiltersToolbar,
+  GridIcon,
+  Pagination,
+  Skeleton,
+  TableIcon,
+} from '@/shared/ui';
 
 import { fetchCatalog, fetchCountries, fetchDenominations, fetchSeries } from './api';
 import { CatalogTable } from './CatalogTable';
 import { CoinCard } from './CoinCard';
 import { FiltersPanel } from './FiltersPanel';
-import type { ActiveFilterChip } from './FiltersPanel';
 import { SORT_FIELDS, useCatalogFilters } from './useCatalogFilters';
 import type { CatalogFilters, CatalogView, SortField } from './useCatalogFilters';
 import styles from './CatalogPage.module.css';
-
-function GridIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
-}
-
-function TableIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="12" height="12" rx="1.2" stroke="currentColor" strokeWidth="1.3" />
-      <line x1="1" y1="5.3" x2="13" y2="5.3" stroke="currentColor" strokeWidth="1.1" />
-      <line x1="1" y1="9.3" x2="13" y2="9.3" stroke="currentColor" strokeWidth="1.1" />
-    </svg>
-  );
-}
 
 const SORT_LABELS: Record<SortField, string> = {
   country: 'catalog.sortCountry',
@@ -194,66 +182,38 @@ export function CatalogPage() {
       <div className={styles.filtersBar}>{filtersPanel}</div>
 
       <section className={styles.content}>
-        <div className={styles.toolbar}>
-          <span className={`${styles.counter} tabular`}>
-            {t('pagination.shown', { shown, total })}
-          </span>
-          <Button
-            variant="secondary"
-            size="sm"
-            className={styles.filtersButton}
-            onClick={() => setDrawerOpen(true)}
-          >
-            ☰ {t('catalog.filters')}
-          </Button>
-          <Tabs<CatalogView>
-            aria-label={t('catalog.viewLabel')}
-            options={[
-              {
-                value: 'cards',
-                label: (
-                  <>
-                    <GridIcon />
-                    {t('catalog.viewCards')}
-                  </>
-                ),
-              },
-              {
-                value: 'table',
-                label: (
-                  <>
-                    <TableIcon />
-                    {t('catalog.viewTable')}
-                  </>
-                ),
-              },
-            ]}
-            value={filters.view}
-            onChange={(view) => update({ view, page: filters.page })}
-          />
-          <span className={styles.sortControls}>
-            <Select
-              value={filters.sort}
-              onChange={(event) => update({ sort: event.target.value as SortField })}
-              aria-label={t('catalog.sort')}
-            >
-              {SORT_FIELDS.map((field) => (
-                <option key={field} value={field}>
-                  {t(SORT_LABELS[field])}
-                </option>
-              ))}
-            </Select>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
-              aria-label={filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
-              title={filters.order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
-            >
-              {filters.order === 'asc' ? '↑' : '↓'}
-            </Button>
-          </span>
-        </div>
+        <FiltersToolbar<CatalogView>
+          shown={shown}
+          total={total}
+          view={filters.view}
+          viewOptions={[
+            {
+              value: 'cards',
+              label: (
+                <>
+                  <GridIcon />
+                  {t('catalog.viewCards')}
+                </>
+              ),
+            },
+            {
+              value: 'table',
+              label: (
+                <>
+                  <TableIcon />
+                  {t('catalog.viewTable')}
+                </>
+              ),
+            },
+          ]}
+          onViewChange={(view) => update({ view, page: filters.page })}
+          sort={filters.sort}
+          sortOptions={SORT_FIELDS.map((field) => ({ value: field, label: t(SORT_LABELS[field]) }))}
+          onSortChange={(sort) => update({ sort: sort as SortField })}
+          order={filters.order}
+          onOrderChange={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
+          onOpenFilters={() => setDrawerOpen(true)}
+        />
 
         {catalogQuery.isError ? (
           <ErrorState

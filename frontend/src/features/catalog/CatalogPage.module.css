@@ -21,41 +21,11 @@
   margin: 0;
 }
 
-.filtersBar {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-}
-
 .content {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
   min-width: 0;
-}
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-.counter {
-  color: var(--color-text-secondary);
-  font-size: 14px;
-  margin-right: auto;
-}
-
-.filtersButton {
-  display: none;
-}
-
-.sortControls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
 }
 
 /* Fixed column counts (1/2/3/5) rather than an auto-fill fluid grid: each one
@@ -92,10 +62,6 @@
 @media (max-width: 900px) {
   .filtersBar {
     display: none;
-  }
-
-  .filtersButton {
-    display: inline-flex;
   }
 
   .title {
