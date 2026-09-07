@@ -90,9 +90,7 @@ export function FiltersToolbar<View extends string>({
   const { t } = useTranslation();
   return (
     <div className={styles.toolbar}>
-      <span className={`${styles.counter} tabular`}>
-        {t('pagination.shown', { shown, total })}
-      </span>
+      <span className={`${styles.counter} tabular`}>{t('pagination.shown', { shown, total })}</span>
       {onOpenFilters ? (
         <Button
           variant="secondary"

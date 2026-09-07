@@ -64,9 +64,7 @@ describe('collection filters', () => {
   });
 
   it('knows whether anything narrows the listing', () => {
-    expect(hasActiveFilters(parseCollectionFilters(new URLSearchParams('view=table')))).toBe(
-      false,
-    );
+    expect(hasActiveFilters(parseCollectionFilters(new URLSearchParams('view=table')))).toBe(false);
     expect(hasActiveFilters(parseCollectionFilters(new URLSearchParams('seriesId=2')))).toBe(true);
     expect(hasActiveFilters(parseCollectionFilters(new URLSearchParams('grade=UNC')))).toBe(true);
   });

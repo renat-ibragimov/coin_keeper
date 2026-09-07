@@ -31,7 +31,10 @@ export function PositionTable({ items }: PositionTableProps) {
         </thead>
         <tbody>
           {items.map((item) => (
-            <tr key={item.catalogItemId} className={item.isArchived ? styles.archivedRow : undefined}>
+            <tr
+              key={item.catalogItemId}
+              className={item.isArchived ? styles.archivedRow : undefined}
+            >
               <td>
                 <div className={styles.coinCell}>
                   <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
@@ -58,7 +61,9 @@ export function PositionTable({ items }: PositionTableProps) {
               <td className={`${styles.number} tabular`}>
                 {t('catalog.quantity', { count: item.totalQuantity })}
               </td>
-              <td className={`${styles.number} tabular`}>{formatUah(item.totalSpendUah, locale)}</td>
+              <td className={`${styles.number} tabular`}>
+                {formatUah(item.totalSpendUah, locale)}
+              </td>
               <td className={`${styles.number} tabular`}>
                 {item.marketValueUah !== null ? (
                   formatUah(item.marketValueUah, locale)

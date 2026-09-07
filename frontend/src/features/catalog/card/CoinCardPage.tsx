@@ -342,9 +342,10 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
     <Card className={styles.sidebarCard} padded={false}>
       <div className={styles.statusRow}>
         <span
-          className={[styles.statusIcon, owned ? styles.statusIconOwned : styles.statusIconAbsent].join(
-            ' ',
-          )}
+          className={[
+            styles.statusIcon,
+            owned ? styles.statusIconOwned : styles.statusIconAbsent,
+          ].join(' ')}
           aria-hidden="true"
         >
           {owned ? <CircleCheck strokeWidth={1.75} /> : <CircleMinus strokeWidth={1.75} />}

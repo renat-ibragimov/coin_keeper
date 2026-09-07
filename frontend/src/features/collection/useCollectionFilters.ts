@@ -82,14 +82,14 @@ export function serializeCollectionFilters(filters: CollectionFilters): URLSearc
 export function hasActiveFilters(filters: CollectionFilters): boolean {
   return Boolean(
     filters.q ||
-      filters.countryId ||
-      filters.seriesId ||
-      filters.yearFrom ||
-      filters.yearTo ||
-      filters.denominationId ||
-      filters.group ||
-      filters.metalKind ||
-      filters.grade,
+    filters.countryId ||
+    filters.seriesId ||
+    filters.yearFrom ||
+    filters.yearTo ||
+    filters.denominationId ||
+    filters.group ||
+    filters.metalKind ||
+    filters.grade,
   );
 }
 
