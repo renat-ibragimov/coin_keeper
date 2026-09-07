@@ -116,6 +116,7 @@ export function SeriesListPage() {
               </Link>
             </>
           }
+          note={<Link to="/import">{t('catalog.importUcoin')}</Link>}
         />
       ) : (
         <>

@@ -1,3 +1,6 @@
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -219,6 +222,25 @@ describe('EmptyState', () => {
   it('sits on a card surface with variant="card", for whole-page empty states', () => {
     const { container } = render(<EmptyState title="Nothing here" variant="card" />);
     expect(container.firstElementChild?.className).toMatch(/card/i);
+  });
+
+  it('gives the card variant a definite width, not a shrink-to-fit one', async () => {
+    // Regression guard: as a flex item with auto margins, the card would
+    // otherwise size to its own content and end up a different width on
+    // every page depending on the text — max-width alone isn't enough.
+    // vitest runs with css:false, so this checks the source rule directly
+    // rather than a (here-unavailable) computed style.
+    const css = await readFile(
+      path.resolve(process.cwd(), 'src/shared/ui/States.module.css'),
+      'utf-8',
+    );
+    const rule = css.match(/\.cardVariant\s*{([^}]*)}/)?.[1] ?? '';
+    expect(rule).toMatch(/width:\s*100%/);
+  });
+
+  it('renders the note below the actions', () => {
+    render(<EmptyState title="Nothing here" note={<a href="/import">Import</a>} />);
+    expect(screen.getByRole('link', { name: 'Import' })).toHaveAttribute('href', '/import');
   });
 });
 

@@ -380,7 +380,7 @@
     "emptyMineText": "The collection doesn't have a coin from a catalog series yet.",
     "showAllSeries": "Show all series",
     "emptyCollectionTitle": "No series yet",
-    "emptyCollectionText": "Series will appear here once you add the first coins. We'll count completeness automatically and show how many items are left to collect.",
+    "emptyCollectionText": "Series will appear here once you add your first coins — we'll track completeness automatically.",
     "notFound": "Series not found",
     "openInCatalog": "Open in the catalog",
     "noItemsTitle": "No items in this series yet",

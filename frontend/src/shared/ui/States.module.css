@@ -1,6 +1,10 @@
 /* Whole-page empty states (Огляд, Мої монети, Серії, Гроші) share this
- * exact width and centering — see docs/08-ui-map.md, "Загальні рішення". */
+ * exact width and centering — see docs/08-ui-map.md, "Загальні рішення".
+ * width (not just max-width) is load-bearing: as a flex item with auto
+ * margins, "stretch" is off and it would otherwise shrink to fit its own
+ * content — a different width on every page depending on its text. */
 .cardVariant {
+  width: 100%;
   max-width: 480px;
   margin: 0 auto;
 }
@@ -43,6 +47,21 @@
   gap: var(--space-3);
   flex-wrap: wrap;
   justify-content: center;
+}
+
+.note {
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.note a,
+.note a:visited {
+  color: inherit;
+}
+
+.note a:hover {
+  color: var(--color-text-secondary);
+  text-decoration: underline;
 }
 
 .skeleton {

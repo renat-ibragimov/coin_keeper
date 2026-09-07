@@ -157,6 +157,7 @@ export function ExpensesPage() {
               </Link>
             </>
           }
+          note={<Link to="/import">{t('catalog.importUcoin')}</Link>}
         />
       ) : (
         <>

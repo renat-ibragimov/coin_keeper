@@ -215,20 +215,16 @@ export function CollectionPage() {
           title={t('collection.emptyTitle')}
           description={t('collection.emptyText')}
           actions={
-            <div className={styles.emptyActions}>
-              <div className={styles.emptyButtons}>
-                <Link to="/catalog">
-                  <Button>{t('common.backToCatalog')}</Button>
-                </Link>
-                <Link to="/collection/coins/new">
-                  <Button variant="secondary">{t('card.addPurchase')}</Button>
-                </Link>
-              </div>
-              <Link to="/import" className={styles.emptyImportLink}>
-                {t('catalog.importUcoin')}
+            <>
+              <Link to="/catalog">
+                <Button>{t('common.backToCatalog')}</Button>
               </Link>
-            </div>
+              <Link to="/collection/coins/new">
+                <Button variant="secondary">{t('card.addPurchase')}</Button>
+              </Link>
+            </>
           }
+          note={<Link to="/import">{t('catalog.importUcoin')}</Link>}
         />
       ) : (
         <>

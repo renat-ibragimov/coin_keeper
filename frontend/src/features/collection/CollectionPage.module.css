@@ -16,30 +16,6 @@
   gap: var(--space-4);
 }
 
-.emptyActions {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.emptyButtons {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-  justify-content: center;
-}
-
-.emptyImportLink {
-  font-size: 13.5px;
-  color: var(--color-text-muted);
-}
-
-.emptyImportLink:hover {
-  color: var(--color-text-secondary);
-  text-decoration: underline;
-}
-
 @media (max-width: 900px) {
   .tiles {
     grid-template-columns: repeat(2, minmax(0, 1fr));

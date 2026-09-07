@@ -215,6 +215,10 @@ describe('SeriesListPage', () => {
       'href',
       '/collection/coins/new',
     );
+    expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
+      'href',
+      '/import',
+    );
     expect(screen.queryByText('Almost')).toBeNull();
     expect(screen.queryByText('0 %')).toBeNull();
   });

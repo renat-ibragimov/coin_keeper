@@ -11,6 +11,9 @@ interface StateProps {
   description?: ReactNode;
   actions?: ReactNode;
   icon?: ReactNode;
+  /** A quiet text link below the actions — the "Імпортувати з uCoin" line
+   *  on every whole-page empty state (docs/08-ui-map.md, "Загальні рішення"). */
+  note?: ReactNode;
   /** "card" puts the state on a surface-raised card — the whole-page empty
    *  states (Огляд, Мої монети, Серії, Гроші). In-content states (nothing
    *  found after a filter/search) stay "plain", the default. */
@@ -22,6 +25,7 @@ export function EmptyState({
   description,
   actions,
   icon = <CircleDashed strokeWidth={1.75} />,
+  note,
   variant = 'plain',
 }: StateProps) {
   const content = (
@@ -32,6 +36,7 @@ export function EmptyState({
       <div className={styles.title}>{title}</div>
       {description ? <p className={styles.description}>{description}</p> : null}
       {actions ? <div className={styles.actions}>{actions}</div> : null}
+      {note ? <div className={styles.note}>{note}</div> : null}
     </div>
   );
   // padded={false}: .state already carries its own (roomier, vertically
