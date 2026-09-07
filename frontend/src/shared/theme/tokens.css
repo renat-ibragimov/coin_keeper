@@ -1,10 +1,17 @@
-/* Design tokens extracted from docs/references mocks.
+/* Design tokens. The single source of colour, shape, elevation and motion:
+ * components consume semantic variables and never hardcode a theme colour.
+ * The theme is switched by data-theme on <html>.
  *
- * Two equal themes. Light — old parchment, darker than plain archival paper;
- * dark — a strict black-and-gold catalogue surface, near-black with muted
- * brass accents. Every screen is built from these variables only:
- * components never hardcode a colour. The theme is switched by data-theme
- * on <html>.
+ * Two equal themes, one system. Light — archival stone: a desaturated warm
+ * mineral ground, ivory-grey paper for raised cards, aged brass as an accent
+ * rather than a surface colour. Dark — charcoal and warm graphite, with a
+ * restrained old gold that never glows.
+ *
+ * Surfaces are a ladder, and the rungs are meant to be visible:
+ *   bg < sunken < surface < surface-control < surface-raised < surface-hover
+ * (light theme; dark inverts the lightness but keeps the same order of
+ * separation). Shadow marks elevation only where elevation is meaningful —
+ * colour and border do the rest of the work.
  */
 
 :root {
@@ -13,9 +20,9 @@
   --font-body: 'Source Sans 3', 'Segoe UI', system-ui, sans-serif;
 
   /* Shape */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 5px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -25,6 +32,12 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 48px;
+
+  /* Motion. Short, linear-out easing: the interface answers a pointer, it
+   * does not perform. No spring, no bounce, no continuous animation. */
+  --duration-fast: 120ms;
+  --duration-normal: 170ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
 
   --header-height: 68px;
   /* Mobile bottom navigation: its own height plus the phone's home-indicator
@@ -46,113 +59,174 @@
 :root[data-theme='light'] {
   color-scheme: light;
 
-  --color-bg: #dcccad;
-  --color-surface: #e7d8ba;
-  --color-surface-raised: #efe2c9;
-  --color-surface-sunken: #d2c093;
+  --color-bg: #c8bfaf;
+  --color-surface: #ddd5c8;
+  --color-surface-raised: #eee8dd;
+  --color-surface-sunken: #b7aa96;
+  --color-surface-control: #e7dfd2;
+  --color-surface-hover: #f2ece2;
 
-  --color-text: #2a2117;
-  --color-text-secondary: #675744;
-  --color-text-muted: #83715d;
+  --color-text: #211e1a;
+  --color-text-secondary: #5d564c;
+  --color-text-muted: #786f62;
 
-  --color-border: #bfa77d;
-  --color-border-strong: #a9895c;
-  --color-border-hover: var(--color-border-strong);
+  --color-border: #a49782;
+  --color-border-strong: #756853;
+  --color-border-subtle: rgba(66, 56, 44, 0.16);
+  --color-border-hover: #8a6228;
 
-  --color-accent: #96692a;
-  --color-accent-strong: #7c5520;
-  --color-accent-soft: #dcc6a0;
-  --color-on-accent: #f4e9d4;
+  --color-accent: #8a6228;
+  --color-accent-strong: #5f421d;
+  --color-accent-soft: #d6c6aa;
+  --color-on-accent: #fbf6ec;
 
-  --color-success: #4f5f3c;
-  --color-success-soft: #dde1cf;
+  --color-success: #47563a;
+  --color-success-soft: #d4dac6;
   /* A solid fill for the "in collection" state row — bolder than
    * --color-success-soft (a badge tint), matching the visual weight of the
-   * gold CTA it replaces (docs/08-ui-map.md). */
-  --color-success-strong: #4f5f3c;
-  --color-on-success: #f4ecd8;
-  --color-danger: #994336;
-  --color-danger-soft: #ebcfc6;
-  --color-warning: #805d26;
-  --color-warning-soft: #e8d8b4;
+   * brass CTA it replaces (docs/08-ui-map.md). */
+  --color-success-strong: #47563a;
+  --color-on-success: #f3f0e5;
+  --color-danger: #8f3f30;
+  --color-danger-soft: #e6cbc2;
+  --color-warning: #7b5822;
+  --color-warning-soft: #e2d4b2;
 
-  --color-info-bg: #e2d3b6;
-  --color-info-border: #c4ad85;
+  --color-info-bg: #e0d9cb;
+  --color-info-border: #b6a892;
 
   --color-owned: #1e3c28;
   --color-absent: #7a1315;
 
-  --gradient-accent: linear-gradient(180deg, #a8793a 0%, #7c5520 100%);
+  /* Interactive state surfaces. Row hover and the "selected" tint stay a
+   * shade of the surface they sit on, so a hovered row never reads as a
+   * differently coloured card. */
+  --color-row-hover: #e5ded1;
+  --color-selected: #ddd0b6;
 
-  --shadow-sm: 0 1px 2px rgba(68, 47, 25, 0.09);
-  --shadow-md: 0 2px 4px rgba(68, 47, 25, 0.09), 0 8px 18px rgba(68, 47, 25, 0.07);
-  --shadow-lg: 0 2px 10px rgba(68, 47, 25, 0.06), 0 18px 40px rgba(68, 47, 25, 0.13);
+  --color-focus-ring: #8a6228;
 
-  --shadow-card: 0 2px 4px rgba(68, 47, 25, 0.09), 0 8px 18px rgba(68, 47, 25, 0.07);
-  --shadow-card-hover: 0 4px 10px rgba(68, 47, 25, 0.13), 0 12px 24px rgba(68, 47, 25, 0.1);
-  --shadow-panel: 0 2px 10px rgba(68, 47, 25, 0.05);
+  /* The bright inner top edge that makes a raised card or a button read as a
+   * material with a lit edge rather than a flat fill. Light theme can carry
+   * real white; dark theme (below) drops it to a whisper — the same value on
+   * a dark surface reads as a milky smear. */
+  --highlight-inset: rgba(255, 255, 255, 0.5);
+
+  /* Primary button: a very shallow vertical gradient plus a firmer bottom
+   * edge — material depth, not a glossy pill. */
+  --color-button-primary-top: #97702f;
+  --color-button-primary-bottom: #6f4d1f;
+  --color-button-primary-border: #543a19;
+
+  --gradient-accent: linear-gradient(
+    180deg,
+    var(--color-button-primary-top) 0%,
+    var(--color-button-primary-bottom) 100%
+  );
+
+  --shadow-sm: 0 1px 2px rgba(48, 39, 27, 0.14);
+  --shadow-md: 0 1px 3px rgba(48, 39, 27, 0.16), 0 8px 18px rgba(48, 39, 27, 0.12);
+  --shadow-lg: 0 2px 8px rgba(48, 39, 27, 0.14), 0 18px 40px rgba(48, 39, 27, 0.22);
+
+  /* Raised card: a tight contact shadow plus a soft ambient one. No halo. */
+  --shadow-card: 0 1px 2px rgba(48, 39, 27, 0.16), 0 7px 18px rgba(48, 39, 27, 0.11);
+  --shadow-card-hover: 0 2px 4px rgba(48, 39, 27, 0.2), 0 12px 24px rgba(48, 39, 27, 0.15);
+  /* Structural panel: built into the page, barely detached from it. */
+  --shadow-panel: 0 1px 2px rgba(48, 39, 27, 0.07);
+  /* Inset surface: a hairline of shade under its own top edge. */
+  --shadow-inset: inset 0 1px 2px rgba(48, 39, 27, 0.12);
 
   /* Drop-shadow (not box-shadow) for the coin photo/placeholder itself: it
    * traces the coin's own silhouette so it reads as an object resting on
    * its plaque, not a floating panel (docs/08-ui-map.md). */
-  --shadow-coin: drop-shadow(0 3px 3px rgba(45, 23, 10, 0.22))
-    drop-shadow(0 8px 10px rgba(45, 23, 10, 0.14));
+  --shadow-coin: drop-shadow(0 2px 2px rgba(35, 27, 18, 0.24))
+    drop-shadow(0 8px 10px rgba(35, 27, 18, 0.16));
 
-  --overlay: rgba(42, 33, 23, 0.45);
+  --overlay: rgba(33, 30, 26, 0.5);
+
+  /* Charts. Series 2 is a deliberately different hue family from the brass
+   * of series 1 — a muted olive, not a lighter beige derived from gold,
+   * which was indistinguishable from it in a stacked bar. */
+  --color-chart-grid: #b4a892;
+  --color-chart-axis: #786f62;
+  --color-chart-series-1: #8a6228;
+  --color-chart-series-2: #6c7050;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --color-bg: #0a0908;
-  --color-surface: #110f0d;
-  --color-surface-raised: #171411;
-  --color-surface-sunken: #060504;
+  --color-bg: #080807;
+  --color-surface: #11100e;
+  --color-surface-raised: #191713;
+  --color-surface-sunken: #050504;
+  --color-surface-control: #15130f;
+  --color-surface-hover: #201c16;
 
-  --color-text: #f2e9d9;
-  --color-text-secondary: #cdbea7;
-  --color-text-muted: #9d8c74;
+  --color-text: #eee8dc;
+  --color-text-secondary: #bdb3a3;
+  --color-text-muted: #938777;
 
-  --color-border: #322a22;
-  --color-border-strong: #5a4730;
-  --color-border-hover: rgba(195, 154, 74, 0.55);
+  --color-border: #332d25;
+  --color-border-strong: #665238;
+  --color-border-subtle: rgba(226, 205, 168, 0.1);
+  --color-border-hover: #a98039;
 
-  --color-accent: #c39a4a;
-  --color-accent-strong: #d2ac62;
-  --color-accent-soft: #2b241b;
-  --color-on-accent: #1c140b;
+  --color-accent: #c29a4b;
+  --color-accent-strong: #d4af67;
+  --color-accent-soft: #292218;
+  --color-on-accent: #1b1409;
 
   --color-success: #a8c0a2;
-  --color-success-soft: #243126;
+  --color-success-soft: #212b23;
   --color-success-strong: #2f4a34;
   --color-on-success: #eef2e9;
   --color-danger: #e4a39a;
-  --color-danger-soft: #472826;
+  --color-danger-soft: #3f2422;
   --color-warning: #d4b06a;
-  --color-warning-soft: #3d3120;
+  --color-warning-soft: #352a1b;
 
-  --color-info-bg: #221b14;
-  --color-info-border: #3d3120;
+  --color-info-bg: #1b1712;
+  --color-info-border: #352d21;
 
   --color-owned: #bcd0bb;
   --color-absent: #f4938e;
 
-  --gradient-accent: linear-gradient(180deg, #d2ac62 0%, #c39a4a 100%);
+  --color-row-hover: #201c16;
+  --color-selected: #2b2318;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.22);
-  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.3), 0 20px 44px rgba(0, 0, 0, 0.4);
+  --color-focus-ring: #c29a4b;
 
-  --shadow-card: 0 2px 4px rgba(0, 0, 0, 0.24), 0 8px 20px rgba(0, 0, 0, 0.2);
-  --shadow-card-hover:
-    0 4px 10px rgba(0, 0, 0, 0.32), 0 12px 26px rgba(0, 0, 0, 0.24),
-    0 0 0 1px rgba(195, 154, 74, 0.1);
-  --shadow-panel: 0 4px 18px rgba(0, 0, 0, 0.16);
+  --highlight-inset: rgba(255, 255, 255, 0.06);
 
-  --shadow-coin: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.34))
-    drop-shadow(0 8px 12px rgba(0, 0, 0, 0.26));
+  --color-button-primary-top: #c69f52;
+  --color-button-primary-bottom: #ab8339;
+  --color-button-primary-border: #8a6a2c;
+
+  --gradient-accent: linear-gradient(
+    180deg,
+    var(--color-button-primary-top) 0%,
+    var(--color-button-primary-bottom) 100%
+  );
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.42), 0 8px 20px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 4px 18px rgba(0, 0, 0, 0.44), 0 20px 44px rgba(0, 0, 0, 0.52);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.44), 0 7px 18px rgba(0, 0, 0, 0.34);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.5), 0 12px 24px rgba(0, 0, 0, 0.4);
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+
+  --shadow-coin: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.48))
+    drop-shadow(0 10px 14px rgba(0, 0, 0, 0.34));
 
   --overlay: rgba(4, 3, 2, 0.78);
+
+  --color-chart-grid: #332d25;
+  --color-chart-axis: #938777;
+  --color-chart-series-1: #c29a4b;
+  --color-chart-series-2: #8b8f62;
 }
 
 /* ------------------------------------------------------------------ base */
@@ -176,10 +250,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The display serif is opt-in per element, not a blanket rule on headings:
+ * a panel heading that names an interface function is UI typography and
+ * stays in the body face (docs/08-ui-map.md). Content headings — page
+ * titles, coin and series names — add .display or their own font-family. */
 h1,
 h2,
 h3 {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
+  /* Only 400/600/700 of Source Sans 3 are loaded (main.tsx); 600 is the
+   * "semibold" the type scale asks for without synthesising a weight. */
   font-weight: 600;
   margin: 0;
   color: var(--color-text);
@@ -196,11 +276,29 @@ button {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 /* Sums and years sit in columns and must not wiggle (docs/08-ui-map.md). */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Content-oriented display type: page titles, coin and series names, the
+ * few monetary values that carry editorial emphasis. */
+.display {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
