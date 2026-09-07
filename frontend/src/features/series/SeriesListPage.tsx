@@ -114,14 +114,15 @@ export function SeriesListPage() {
         <>
           <div className={styles.toolbar}>
             <div className={styles.filters}>
-              <Input
-                type="search"
-                placeholder={t('series.searchPlaceholder')}
-                aria-label={t('series.searchPlaceholder')}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                className={styles.search}
-              />
+              <div className={styles.search}>
+                <Input
+                  type="search"
+                  placeholder={t('series.searchPlaceholder')}
+                  aria-label={t('series.searchPlaceholder')}
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                />
+              </div>
               <Select
                 aria-label={t('catalog.country')}
                 value={countryId ?? ''}
