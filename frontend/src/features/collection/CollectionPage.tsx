@@ -86,18 +86,16 @@ export function CollectionPage() {
   return (
     <div className={styles.page}>
       <PageHeader
+        align="center"
         title={t('collection.title')}
         subtitle={t('collection.subtitle')}
         actions={
           <>
-            <Link to="/collection/coins/new-position">
-              <Button variant="ghost">{t('catalog.createOwn')}</Button>
+            <Link to="/collection/coins/new">
+              <Button>+ {t('card.addPurchase')}</Button>
             </Link>
             <Link to="/import">
               <Button variant="ghost">{t('catalog.importUcoin')}</Button>
-            </Link>
-            <Link to="/collection/coins/new">
-              <Button>+ {t('card.addPurchase')}</Button>
             </Link>
           </>
         }

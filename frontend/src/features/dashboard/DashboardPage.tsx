@@ -20,6 +20,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  PageHeader,
   ProgressRing,
   Skeleton,
   StatTile,
@@ -51,10 +52,7 @@ export function DashboardPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.pageHeader}>
-        <h1 className={styles.title}>{t('dashboard.title')}</h1>
-        <p className={styles.subtitle}>{t('dashboard.subtitle')}</p>
-      </header>
+      <PageHeader align="center" title={t('dashboard.title')} subtitle={t('dashboard.subtitle')} />
 
       {data.dashboard.isEmpty ? (
         <Card>
@@ -67,8 +65,8 @@ export function DashboardPage() {
                 <Link to="/catalog">
                   <Button>{t('dashboard.emptyCatalog')}</Button>
                 </Link>
-                <Link to="/collection/coins/new-position">
-                  <Button variant="secondary">{t('dashboard.emptyCreate')}</Button>
+                <Link to="/collection/coins/new">
+                  <Button variant="secondary">{t('card.addPurchase')}</Button>
                 </Link>
               </>
             }

@@ -2,7 +2,6 @@ import { api, toQuery } from '@/shared/api/client';
 import type {
   CatalogCard,
   CatalogCollectionItem,
-  CatalogItemCreate,
   CatalogPage,
   CountryOut,
   CurrencyOut,
@@ -68,10 +67,6 @@ export function fetchSeries(countryId?: number): Promise<SeriesOut[]> {
 
 export function fetchCurrencies(): Promise<CurrencyOut[]> {
   return api<CurrencyOut[]>('/currencies');
-}
-
-export function createCatalogItem(body: CatalogItemCreate): Promise<CatalogCard> {
-  return api<CatalogCard>('/catalog', { method: 'POST', body });
 }
 
 /** Quick lookup for pickers: a handful of active items matching the text. */
