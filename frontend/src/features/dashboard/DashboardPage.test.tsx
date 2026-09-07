@@ -82,7 +82,7 @@ describe('DashboardPage', () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap({ isEmpty: true }));
     renderPage();
 
-    expect(await screen.findByText('Ваша колекція поки порожня')).toBeInTheDocument();
+    expect(await screen.findByText('Колекція поки порожня')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Знайти монету' })).toHaveAttribute('href', '/catalog');
     expect(screen.queryByText('Фінанси')).toBeNull();
   });
@@ -91,7 +91,7 @@ describe('DashboardPage', () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
     renderPage();
 
-    await screen.findByText('Усі важливі цифри та прогрес вашої колекції в одному місці.');
+    await screen.findByText('Усі важливі цифри та прогрес моєї колекції в одному місці.');
     expect(screen.getByRole('link', { name: /Монет у колекції/ })).toHaveAttribute(
       'href',
       '/collection/coins',

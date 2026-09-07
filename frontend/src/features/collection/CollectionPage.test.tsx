@@ -84,7 +84,7 @@ describe('CollectionPage', () => {
     vi.mocked(fetchSeries).mockResolvedValue([]);
     renderPage();
 
-    expect(await screen.findByText('У вашій колекції ще немає монет')).toBeInTheDocument();
+    expect(await screen.findByText('У колекції ще немає монет')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
       'href',
       '/catalog',
@@ -101,6 +101,6 @@ describe('CollectionPage', () => {
     renderPage();
 
     expect(await screen.findByPlaceholderText('Пошук у колекції…')).toBeInTheDocument();
-    expect(screen.queryByText('У вашій колекції ще немає монет')).toBeNull();
+    expect(screen.queryByText('У колекції ще немає монет')).toBeNull();
   });
 });
