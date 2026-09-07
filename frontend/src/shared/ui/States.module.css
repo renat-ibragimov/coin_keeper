@@ -1,3 +1,10 @@
+/* Whole-page empty states (Огляд, Мої монети, Серії, Гроші) share this
+ * exact width and centering — see docs/08-ui-map.md, "Загальні рішення". */
+.cardVariant {
+  max-width: 480px;
+  margin: 0 auto;
+}
+
 .state {
   display: flex;
   flex-direction: column;

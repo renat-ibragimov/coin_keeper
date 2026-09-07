@@ -4,6 +4,12 @@
   gap: var(--space-3);
 }
 
+/* Compensates .page's tight gap so the empty state sits exactly space-5
+ * below the header, like on every other cabinet page. */
+.emptyStateGap {
+  margin-top: var(--space-3);
+}
+
 /* Mirrors PageHeader's centered layout for the loading skeleton, which
  * renders before the real header (and its centering) is in place. */
 .pageHeader {

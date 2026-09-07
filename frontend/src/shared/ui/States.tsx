@@ -34,7 +34,16 @@ export function EmptyState({
       {actions ? <div className={styles.actions}>{actions}</div> : null}
     </div>
   );
-  return variant === 'card' ? <Card>{content}</Card> : content;
+  // padded={false}: .state already carries its own (roomier, vertically
+  // generous) padding — stacking Card's on top of it just made whole-page
+  // empty states taller than they need to be.
+  return variant === 'card' ? (
+    <Card padded={false} className={styles.cardVariant}>
+      {content}
+    </Card>
+  ) : (
+    content
+  );
 }
 
 interface ErrorStateProps {

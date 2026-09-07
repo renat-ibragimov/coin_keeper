@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { CircleDashed, Coins, PieChart, TrendingUp } from 'lucide-react';
+import { CircleDashed, Coins, LayoutDashboard, PieChart, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -62,22 +62,27 @@ export function DashboardPage() {
       <PageHeader align="center" title={t('dashboard.title')} subtitle={t('dashboard.subtitle')} />
 
       {data.dashboard.isEmpty ? (
-        <EmptyState
-          variant="card"
-          icon={<Coins strokeWidth={1.75} />}
-          title={t('dashboard.emptyTitle')}
-          description={t('dashboard.emptyText')}
-          actions={
-            <>
-              <Link to="/catalog">
-                <Button>{t('common.backToCatalog')}</Button>
-              </Link>
-              <Link to="/collection/coins/new">
-                <Button variant="secondary">{t('card.addPurchase')}</Button>
-              </Link>
-            </>
-          }
-        />
+        // .page's gap is tuned tight for the dense non-empty body below;
+        // the empty state alone needs the same header-to-card gap as every
+        // other cabinet page, so it makes up the difference itself.
+        <div className={styles.emptyStateGap}>
+          <EmptyState
+            variant="card"
+            icon={<LayoutDashboard strokeWidth={1.75} />}
+            title={t('dashboard.emptyTitle')}
+            description={t('dashboard.emptyText')}
+            actions={
+              <>
+                <Link to="/catalog">
+                  <Button>{t('common.backToCatalog')}</Button>
+                </Link>
+                <Link to="/collection/coins/new">
+                  <Button variant="secondary">{t('card.addPurchase')}</Button>
+                </Link>
+              </>
+            }
+          />
+        </div>
       ) : (
         <DashboardBody data={data} />
       )}
