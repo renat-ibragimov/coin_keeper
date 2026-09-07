@@ -1,19 +1,30 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
+import type { CollectionGroup, MetalKind } from '@/shared/api/types';
+
 export const COLLECTION_SORTS = ['date', 'title', 'total'] as const;
 export type CollectionSort = (typeof COLLECTION_SORTS)[number];
-export type CollectionView = 'cards' | 'list';
+export type CollectionView = 'cards' | 'table';
 
 export interface CollectionFilters {
   q: string;
   countryId?: number;
   seriesId?: number;
+  yearFrom?: number;
+  yearTo?: number;
+  denominationId?: number;
+  group?: CollectionGroup;
+  metalKind?: MetalKind;
+  grade?: string;
   sort: CollectionSort;
   order: 'asc' | 'desc';
   page: number;
   view: CollectionView;
 }
+
+const GROUPS: CollectionGroup[] = ['circulation', 'commemorative', 'collector', 'other'];
+const METALS: MetalKind[] = ['precious', 'base', 'unknown'];
 
 function intParam(params: URLSearchParams, key: string): number | undefined {
   const raw = params.get(key);
@@ -26,22 +37,41 @@ function intParam(params: URLSearchParams, key: string): number | undefined {
 export function parseCollectionFilters(params: URLSearchParams): CollectionFilters {
   const sort = params.get('sort');
   const view = params.get('view');
+  const group = params.get('group');
+  const metalKind = params.get('metalKind');
+  const grade = params.get('grade');
   return {
     q: params.get('q') ?? '',
     countryId: intParam(params, 'countryId'),
     seriesId: intParam(params, 'seriesId'),
+    yearFrom: intParam(params, 'yearFrom'),
+    yearTo: intParam(params, 'yearTo'),
+    denominationId: intParam(params, 'denominationId'),
+    group: GROUPS.includes(group as CollectionGroup) ? (group as CollectionGroup) : undefined,
+    metalKind: METALS.includes(metalKind as MetalKind) ? (metalKind as MetalKind) : undefined,
+    grade: grade || undefined,
     sort: COLLECTION_SORTS.includes(sort as CollectionSort) ? (sort as CollectionSort) : 'date',
     order: params.get('order') === 'asc' ? 'asc' : 'desc',
     page: intParam(params, 'page') ?? 1,
-    view: view === 'list' ? 'list' : 'cards',
+    view: view === 'table' ? 'table' : 'cards',
   };
 }
 
 export function serializeCollectionFilters(filters: CollectionFilters): URLSearchParams {
   const params = new URLSearchParams();
-  if (filters.q) params.set('q', filters.q);
-  if (filters.countryId) params.set('countryId', String(filters.countryId));
-  if (filters.seriesId) params.set('seriesId', String(filters.seriesId));
+  const setIf = (key: string, value: string | number | undefined) => {
+    if (value === undefined || value === '') return;
+    params.set(key, String(value));
+  };
+  setIf('q', filters.q);
+  setIf('countryId', filters.countryId);
+  setIf('seriesId', filters.seriesId);
+  setIf('yearFrom', filters.yearFrom);
+  setIf('yearTo', filters.yearTo);
+  setIf('denominationId', filters.denominationId);
+  setIf('group', filters.group);
+  setIf('metalKind', filters.metalKind);
+  setIf('grade', filters.grade);
   if (filters.sort !== 'date') params.set('sort', filters.sort);
   if (filters.order !== 'desc') params.set('order', filters.order);
   if (filters.page > 1) params.set('page', String(filters.page));
@@ -50,7 +80,17 @@ export function serializeCollectionFilters(filters: CollectionFilters): URLSearc
 }
 
 export function hasActiveFilters(filters: CollectionFilters): boolean {
-  return Boolean(filters.q || filters.countryId || filters.seriesId);
+  return Boolean(
+    filters.q ||
+      filters.countryId ||
+      filters.seriesId ||
+      filters.yearFrom ||
+      filters.yearTo ||
+      filters.denominationId ||
+      filters.group ||
+      filters.metalKind ||
+      filters.grade,
+  );
 }
 
 export function useCollectionFilters() {

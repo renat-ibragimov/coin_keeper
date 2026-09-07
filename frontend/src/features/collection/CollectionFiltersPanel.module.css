@@ -1,0 +1,37 @@
+.search {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.field {
+  flex: 1 1 140px;
+  min-width: 130px;
+}
+
+.yearField {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.groupTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+}
+
+.yearRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.yearRow input {
+  width: 90px;
+}
+
+.yearDash {
+  color: var(--color-text-muted);
+}
