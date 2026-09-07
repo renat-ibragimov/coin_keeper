@@ -327,3 +327,14 @@
 .addOneMore {
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .card:hover {
+    transform: none;
+  }
+
+  .card:hover .image,
+  .card:hover .imageSingle {
+    transform: none;
+  }
+}

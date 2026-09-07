@@ -131,3 +131,10 @@
 .block {
   width: 100%;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .primary:hover:not(:disabled),
+  .primary:active:not(:disabled) {
+    transform: none;
+  }
+}

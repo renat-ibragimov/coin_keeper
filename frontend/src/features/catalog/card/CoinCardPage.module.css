@@ -365,8 +365,8 @@ button.photoFrame {
 .sourceLink {
   font-size: 13.5px;
   transition:
-    color 140ms ease,
-    text-decoration-color 140ms ease;
+    color var(--duration-fast) var(--ease-standard),
+    text-decoration-color var(--duration-fast) var(--ease-standard);
 }
 
 .sourceLink:hover {

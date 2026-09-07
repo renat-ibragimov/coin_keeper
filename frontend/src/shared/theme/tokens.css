@@ -292,8 +292,12 @@ button {
   font-weight: 600;
 }
 
+/* Motion that carries meaning rather than polish — a spinner saying a
+ * request is still running — opts out by carrying the global
+ * .motion-essential class alongside its own (Spinner.tsx). Everything else
+ * stops: hovers, lifts, the skeleton shimmer, the toast's rise. */
 @media (prefers-reduced-motion: reduce) {
-  *,
+  *:not(.motion-essential),
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
@@ -301,4 +305,10 @@ button {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+
+  /* A transition of zero length still moves the element, just instantly, so
+   * every hover lift also cancels its own transform — done per component
+   * (the cards, the series row, the photo plinth), because a blanket
+   * transform:none here would also flatten the elements that are centred
+   * with a translate. */
 }
