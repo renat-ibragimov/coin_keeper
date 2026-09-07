@@ -250,6 +250,23 @@ class CollectionRepository:
         )
         return (await self._session.execute(query)).scalars().all()
 
+    async def owned_year_bounds_by_country(self) -> dict[int, tuple[int, int]]:
+        """`(min issue_year, max issue_year)` per country, over catalog items
+        the owner holds at least one purchase of — feeds the "Мої монети"
+        year filter's dropdown range (docs/03-api-contract.md)."""
+        query = (
+            select(
+                CatalogItem.country_id,
+                func.min(CatalogItem.issue_year),
+                func.max(CatalogItem.issue_year),
+            )
+            .join(CollectionItem, CollectionItem.catalog_item_id == CatalogItem.id)
+            .where(CollectionItem.owner_id == self._owner_id)
+            .group_by(CatalogItem.country_id)
+        )
+        result = await self._session.execute(query)
+        return {row[0]: (row[1], row[2]) for row in result}
+
     async def list_owned_series(self, country_id: int | None = None) -> Sequence[CoinSeries]:
         catalog_condition = CatalogItem.series_id == CoinSeries.id
         if country_id is not None:

@@ -534,6 +534,10 @@ export interface paths {
          * List Countries
          * @description `scope=active` is the storefront; `scope=all` is the personal-item form,
          *     where the user may enter a coin of any issuer ever.
+         *
+         *     `minYear`/`maxYear` are the issue-year bounds of the catalog items
+         *     actually visible to this user in that country (docs/03-api-contract.md) —
+         *     feeds the year filter's dropdown range, not a global catalog fact.
          */
         get: operations["list_countries_api_v1_countries_get"];
         put?: never;
@@ -1134,6 +1138,10 @@ export interface components {
             isActive: boolean;
             /** Sortorder */
             sortOrder: number;
+            /** Minyear */
+            minYear: number | null;
+            /** Maxyear */
+            maxYear: number | null;
         };
         /** CurrencyOut */
         CurrencyOut: {
@@ -1250,6 +1258,18 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /**
+         * ExpenseMonthTotal
+         * @description One point on the 12-month chart; zero-filled for months with no spending.
+         */
+        ExpenseMonthTotal: {
+            /** Month */
+            month: string;
+            /** Coinsuah */
+            coinsUah: string;
+            /** Supportinguah */
+            supportingUah: string;
+        };
         /** ExpenseOut */
         ExpenseOut: {
             /** Id */
@@ -1298,15 +1318,6 @@ export interface components {
             vendor?: string | null;
             /** Description */
             description?: string | null;
-        };
-        /** ExpenseMonthTotal */
-        ExpenseMonthTotal: {
-            /** Month */
-            month: string;
-            /** Coinsuah */
-            coinsUah: string;
-            /** Supportinguah */
-            supportingUah: string;
         };
         /** ExpensesSummaryOut */
         ExpensesSummaryOut: {
@@ -2584,6 +2595,7 @@ export interface operations {
                 category?: components["schemas"]["ExpenseCategory"] | null;
                 dateFrom?: string | null;
                 dateTo?: string | null;
+                locale?: string | null;
                 page?: number;
                 pageSize?: number;
             };

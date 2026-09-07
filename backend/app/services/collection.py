@@ -47,7 +47,9 @@ from app.services.catalog import display_title
 from app.services.media_urls import CatalogImages, MediaUrlBuilder
 
 
-def _country_out(country: Country, locale: str) -> CountryOut:
+def _country_out(
+    country: Country, locale: str, year_bounds: tuple[int, int] | None = None
+) -> CountryOut:
     return CountryOut(
         id=country.id,
         code=country.code,
@@ -61,6 +63,8 @@ def _country_out(country: Country, locale: str) -> CountryOut:
         collect_variants=country.collect_variants,
         is_active=country.is_active,
         sort_order=country.sort_order,
+        min_year=year_bounds[0] if year_bounds else None,
+        max_year=year_bounds[1] if year_bounds else None,
     )
 
 
@@ -147,7 +151,11 @@ class CollectionService:
 
     async def list_owned_countries(self) -> list[CountryOut]:
         countries = await self._repo.list_owned_countries()
-        return [_country_out(country, self._locale) for country in countries]
+        year_bounds = await self._repo.owned_year_bounds_by_country()
+        return [
+            _country_out(country, self._locale, year_bounds.get(country.id))
+            for country in countries
+        ]
 
     async def list_owned_series(self, country_id: int | None) -> list[SeriesOut]:
         series = await self._repo.list_owned_series(country_id)

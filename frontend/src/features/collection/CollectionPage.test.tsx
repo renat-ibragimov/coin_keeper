@@ -104,6 +104,8 @@ const OWNED_COUNTRY: CountryOut = {
   collectVariants: false,
   isActive: true,
   sortOrder: 1,
+  minYear: null,
+  maxYear: null,
 };
 
 const EMPTY_PAGE: CollectionPageOut = { items: [], total: 0, page: 1, pageSize: 24 };

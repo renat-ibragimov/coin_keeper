@@ -21,6 +21,8 @@ class CountryOut(CamelModel):
     collect_variants: bool
     is_active: bool
     sort_order: int
+    min_year: int | None
+    max_year: int | None
 
 
 class DenominationOut(CamelModel):

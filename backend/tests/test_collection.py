@@ -545,14 +545,23 @@ async def test_owned_countries_series_denominations_are_scoped_to_purchases(
     empty = await client.get("/api/v1/collection/countries", headers=headers_a)
     assert empty.json() == []
 
-    # ctx.item_id: Ukraine, uah_2, fauna series.
+    # ctx.item_id: Ukraine, uah_2, fauna series, year 2018.
     item = await db_session.get(CatalogItem, ctx.item_id)
     assert item is not None
     await add_collection_item(db_session, owner_id=ctx.id_a, item=item)
     await add_collection_item(db_session, owner_id=ctx.id_a, item=cent)
+    # A second Ukrainian purchase, an older year: the bounds must span both.
+    hryvnia_1996 = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Гривня", year=1996, denomination=refs.uah_2
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=hryvnia_1996)
 
     countries = (await client.get("/api/v1/collection/countries", headers=headers_a)).json()
     assert {country["code"] for country in countries} == {"UA", "US"}
+    ukraine = next(country for country in countries if country["code"] == "UA")
+    assert (ukraine["minYear"], ukraine["maxYear"]) == (1996, 2018)
+    usa = next(country for country in countries if country["code"] == "US")
+    assert (usa["minYear"], usa["maxYear"]) == (2009, 2009)
 
     series = (await client.get("/api/v1/collection/series", headers=headers_a)).json()
     assert [row["id"] for row in series] == [refs.fauna.id]

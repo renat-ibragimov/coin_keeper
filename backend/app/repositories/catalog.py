@@ -517,6 +517,26 @@ class CatalogRepository:
             source_url=row.source_url,
         )
 
+    async def year_bounds_by_country(self) -> dict[int, tuple[int, int]]:
+        """`(min issue_year, max issue_year)` per country, over the same
+        scope a default (non-archived) listing would show — feeds the year
+        filter's dropdown bounds (docs/03-api-contract.md)."""
+        query = (
+            select(
+                CatalogItem.country_id,
+                func.min(CatalogItem.issue_year),
+                func.max(CatalogItem.issue_year),
+            )
+            .where(
+                self._visible(),
+                self._archive_condition(archived=False),
+                storefront_visible(self._user_id),
+            )
+            .group_by(CatalogItem.country_id)
+        )
+        result = await self._session.execute(query)
+        return {row[0]: (row[1], row[2]) for row in result}
+
     async def get_visible(self, item_id: int) -> CatalogItem | None:
         """The bare item under the visibility filter, archive state ignored.
 

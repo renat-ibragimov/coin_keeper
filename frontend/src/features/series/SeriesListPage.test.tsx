@@ -74,6 +74,8 @@ const COUNTRY: CountryOut = {
   collectVariants: false,
   isActive: true,
   sortOrder: 0,
+  minYear: null,
+  maxYear: null,
 };
 
 function progress(id: number, name: string, owned: number, total: number): SeriesProgress {

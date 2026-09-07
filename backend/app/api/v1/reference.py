@@ -8,7 +8,9 @@ from fastapi import APIRouter, Query
 
 from app.api.deps import CurrentUser, DbSession, RequestLocale
 from app.core.locale import pick_name
+from app.models.enums import UserRole
 from app.reference_data.denominations import render_label
+from app.repositories.catalog import CatalogRepository
 from app.repositories.reference import ReferenceRepository
 from app.schemas.reference import CountryOut, CurrencyOut, DenominationOut
 
@@ -18,15 +20,23 @@ router = APIRouter(tags=["reference"])
 @router.get("/countries")
 async def list_countries(
     session: DbSession,
-    _user: CurrentUser,
+    user: CurrentUser,
     locale: RequestLocale,
     scope: Annotated[Literal["active", "all"], Query()] = "active",
 ) -> list[CountryOut]:
     """`scope=active` is the storefront; `scope=all` is the personal-item form,
-    where the user may enter a coin of any issuer ever."""
+    where the user may enter a coin of any issuer ever.
+
+    `minYear`/`maxYear` are the issue-year bounds of the catalog items
+    actually visible to this user in that country (docs/03-api-contract.md) —
+    feeds the year filter's dropdown range, not a global catalog fact.
+    """
     countries = await ReferenceRepository(session, locale).list_countries(
         active_only=scope == "active"
     )
+    year_bounds = await CatalogRepository(
+        session, user_id=user.id, is_admin=user.role == UserRole.ADMIN
+    ).year_bounds_by_country()
     return [
         CountryOut(
             id=country.id,
@@ -41,6 +51,8 @@ async def list_countries(
             collect_variants=country.collect_variants,
             is_active=country.is_active,
             sort_order=country.sort_order,
+            min_year=year_bounds.get(country.id, (None, None))[0],
+            max_year=year_bounds.get(country.id, (None, None))[1],
         )
         for country in countries
     ]

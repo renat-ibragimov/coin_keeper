@@ -6,7 +6,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.helpers import register_and_verify
-from tests.seed import seed_reference
+from tests.seed import make_catalog_item, seed_reference, user_id_by_email
 
 
 async def test_reference_endpoints_require_auth(client: AsyncClient) -> None:
@@ -40,6 +40,8 @@ async def test_active_countries_lead_with_ukraine(
         "collectVariants": False,
         "isActive": True,
         "sortOrder": 0,
+        "minYear": None,
+        "maxYear": None,
     }
 
 
@@ -81,6 +83,40 @@ async def test_names_follow_the_requested_locale(
         )
     ).json()
     assert next(row for row in by_header if row["code"] == "PL")["name"] == "Poland"
+
+
+async def test_country_year_bounds_span_visible_catalog_items(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list
+) -> None:
+    refs = await seed_reference(db_session)
+    email, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+    user_id = await user_id_by_email(db_session, email)
+
+    for year in (2005, 2021, 2013):
+        await make_catalog_item(db_session, country=refs.ukraine, title=f"Монета {year}", year=year)
+    # Archived and not held by this user: excluded from the default (non-archived) bounds.
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Архівна",
+        year=1950,
+        is_archived=True,
+        archive_reason="test",
+    )
+    # A personal item still counts towards its own country's bounds.
+    await make_catalog_item(
+        db_session, country=refs.usa, title="Особиста", year=1999, created_by=user_id
+    )
+
+    rows = (await client.get("/api/v1/countries?scope=all", headers=headers)).json()
+    ukraine = next(row for row in rows if row["id"] == refs.ukraine.id)
+    assert (ukraine["minYear"], ukraine["maxYear"]) == (2005, 2021)
+    usa = next(row for row in rows if row["id"] == refs.usa.id)
+    assert (usa["minYear"], usa["maxYear"]) == (1999, 1999)
+    # A country with no visible catalog items at all: null, not zero.
+    poland = next(row for row in rows if row["code"] == "PL")
+    assert (poland["minYear"], poland["maxYear"]) == (None, None)
 
 
 async def test_denominations_filtered_by_country(
