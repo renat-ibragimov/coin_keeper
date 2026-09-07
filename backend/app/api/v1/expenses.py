@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CurrentUser, DbSession, Pagination
+from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
 from app.api.errors import ProblemError
 from app.models.enums import ExpenseCategory
 from app.repositories.expenses import ExpenseFilters
@@ -50,13 +50,14 @@ def _unprocessable(problem_type: str, detail: str) -> ProblemError:
 async def list_expenses(
     session: DbSession,
     user: CurrentUser,
+    locale: RequestLocale,
     pagination: Pagination,
     category: Annotated[ExpenseCategory | None, Query()] = None,
     date_from: Annotated[date | None, Query(alias="dateFrom")] = None,
     date_to: Annotated[date | None, Query(alias="dateTo")] = None,
 ) -> Page[ExpenseOut]:
     filters = ExpenseFilters(category=category, date_from=date_from, date_to=date_to)
-    items, total = await ExpenseService(session, user).list_expenses(
+    items, total = await ExpenseService(session, user, locale).list_expenses(
         filters, limit=pagination.page_size, offset=pagination.offset
     )
     return Page(items=items, total=total, page=pagination.page, page_size=pagination.page_size)

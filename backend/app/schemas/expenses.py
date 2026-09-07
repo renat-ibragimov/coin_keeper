@@ -25,6 +25,7 @@ class ExpenseOut(CamelModel):
     series_id: int | None
     vendor: str | None
     description: str | None
+    coin_title: str | None
 
 
 class ExpenseCreate(CamelModel):
@@ -55,8 +56,20 @@ class ExpenseCategorySummary(CamelModel):
     total_uah: Money
 
 
+class ExpenseMonthTotal(CamelModel):
+    """One point on the 12-month chart; zero-filled for months with no spending."""
+
+    month: str  # "YYYY-MM"
+    coins_uah: Money
+    supporting_uah: Money
+
+
 class ExpensesSummaryOut(CamelModel):
     categories: list[ExpenseCategorySummary]
     total_uah: Money
     coin_spend_uah: Money
     related_spend_uah: Money
+    by_month: list[ExpenseMonthTotal]
+    by_category: list[ExpenseCategorySummary]
+    this_month_uah: Money
+    prev_month_uah: Money

@@ -41,7 +41,9 @@ async def ctx(
     )
 
 
-async def _add_purchase(client: AsyncClient, token: str, item_id: int, price: str) -> int:
+async def _add_purchase(
+    client: AsyncClient, token: str, item_id: int, price: str, purchase_date: str = "2024-01-01"
+) -> int:
     response = await client.post(
         "/api/v1/collection",
         json={
@@ -49,7 +51,7 @@ async def _add_purchase(client: AsyncClient, token: str, item_id: int, price: st
             "quantity": 1,
             "price": price,
             "currency": "UAH",
-            "purchaseDate": "2024-01-01",
+            "purchaseDate": purchase_date,
         },
         headers=auth(token),
     )
@@ -235,3 +237,70 @@ async def test_summary(client: AsyncClient, ctx: SimpleNamespace) -> None:
     summary_b = (await client.get("/api/v1/expenses/summary", headers=auth(ctx.token_b))).json()
     assert summary_b["totalUah"] == "0.00"
     assert summary_b["categories"] == []
+
+
+def _shift_month(day: date, months: int) -> date:
+    total = day.year * 12 + (day.month - 1) + months
+    year, month = divmod(total, 12)
+    return date(year, month + 1, 1)
+
+
+async def test_summary_by_month_zero_filled(client: AsyncClient, ctx: SimpleNamespace) -> None:
+    headers = auth(ctx.token_a)
+    this_month = date.today().replace(day=1)
+    prev_month = _shift_month(this_month, -1)
+    outside_window = _shift_month(this_month, -12).strftime("%Y-%m")
+
+    await _add_purchase(
+        client, ctx.token_a, ctx.item_id, "300.00", purchase_date=this_month.isoformat()
+    )
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "50.00",
+            "currency": "UAH",
+            "expenseDate": prev_month.isoformat(),
+        },
+        headers=headers,
+    )
+
+    summary = (await client.get("/api/v1/expenses/summary", headers=headers)).json()
+    by_month = {row["month"]: row for row in summary["byMonth"]}
+    assert len(summary["byMonth"]) == 12
+    assert by_month[this_month.strftime("%Y-%m")]["coinsUah"] == "300.00"
+    assert by_month[this_month.strftime("%Y-%m")]["supportingUah"] == "0.00"
+    assert by_month[prev_month.strftime("%Y-%m")]["supportingUah"] == "50.00"
+    # A month that never had activity stays a solid zero, not a missing key.
+    untouched = _shift_month(this_month, -5)
+    if untouched.strftime("%Y-%m") not in (
+        this_month.strftime("%Y-%m"),
+        prev_month.strftime("%Y-%m"),
+    ):
+        assert by_month[untouched.strftime("%Y-%m")]["coinsUah"] == "0.00"
+        assert by_month[untouched.strftime("%Y-%m")]["supportingUah"] == "0.00"
+
+    assert summary["thisMonthUah"] == "300.00"
+    assert summary["prevMonthUah"] == "50.00"
+    assert summary["byCategory"] == summary["categories"]
+    assert outside_window not in by_month
+
+
+async def test_coin_title_in_listing(client: AsyncClient, ctx: SimpleNamespace) -> None:
+    headers = auth(ctx.token_a)
+    await _add_purchase(client, ctx.token_a, ctx.item_id, "120.00")
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "10.00",
+            "currency": "UAH",
+            "expenseDate": "2024-01-01",
+        },
+        headers=headers,
+    )
+
+    listing = (await client.get("/api/v1/expenses", headers=headers)).json()
+    by_category = {item["category"]: item for item in listing["items"]}
+    assert by_category["coin_purchase"]["coinTitle"] == "Дельфін"
+    assert by_category["album"]["coinTitle"] is None

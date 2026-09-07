@@ -411,8 +411,23 @@ GET    /expenses?category&dateFrom&dateTo&page&pageSize
 POST   /expenses
 PATCH  /expenses/{id}
 DELETE /expenses/{id}
-GET    /expenses/summary  → по категориям и итого
+GET    /expenses/summary
 ```
+
+В `ExpenseOut` для `category=coin_purchase` `coinTitle` — локализованная (`?locale`/
+`Accept-Language`) название монеты, джойном через `catalogItemId`; для остальных категорий
+— всегда `null`.
+
+`GET /expenses/summary` (`ExpensesSummaryOut`):
+
+- `categories` / `total_uah` / `coin_spend_uah` / `related_spend_uah` — как раньше;
+- `byCategory` — тот же список, что `categories` (по каждой категории с ненулевой суммой:
+  `category`, `count`, `totalUah`);
+- `byMonth` — последние 12 календарных месяцев по дате сервера, от самого старого к
+  текущему, каждый — `{month: "YYYY-MM", coinsUah, supportingUah}`; месяцы без трат идут
+  нулями, а не пропускаются, чтобы ось графика была сплошной;
+- `thisMonthUah` / `prevMonthUah` — сумма (монеты + сопутствующие) за текущий и
+  предыдущий календарный месяц; равны последним двум точкам `byMonth`.
 
 ## Цены и курсы
 

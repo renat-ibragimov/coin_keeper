@@ -13,18 +13,26 @@ from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.locale import DEFAULT_LOCALE
 from app.models import CoinSeries, Currency, Expense, User
 from app.models.enums import ExpenseCategory, UserRole
 from app.repositories.catalog import CatalogRepository
-from app.repositories.expenses import ExpenseFilters, ExpenseRepository
+from app.repositories.expenses import ExpenseFilters, ExpenseRepository, MonthlyTotal
 from app.repositories.rates import RateRepository
 from app.schemas.expenses import (
     ExpenseCategorySummary,
     ExpenseCreate,
+    ExpenseMonthTotal,
     ExpenseOut,
     ExpensesSummaryOut,
     ExpenseUpdate,
 )
+
+
+def _shift_month(day: date, months: int) -> date:
+    total = day.year * 12 + (day.month - 1) + months
+    year, month = divmod(total, 12)
+    return date(year, month + 1, 1)
 
 
 class ExpenseError(Exception):
@@ -66,10 +74,10 @@ class BadReferenceError(ExpenseError):
 
 
 class ExpenseService:
-    def __init__(self, session: AsyncSession, user: User) -> None:
+    def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
         self._session = session
         self._user = user
-        self._repo = ExpenseRepository(session, owner_id=user.id)
+        self._repo = ExpenseRepository(session, owner_id=user.id, locale=locale)
         self._catalog = CatalogRepository(
             session, user_id=user.id, is_admin=user.role == UserRole.ADMIN
         )
@@ -78,8 +86,15 @@ class ExpenseService:
     async def list_expenses(
         self, filters: ExpenseFilters, *, limit: int, offset: int
     ) -> tuple[list[ExpenseOut], int]:
-        expenses, total = await self._repo.list_page(filters, limit=limit, offset=offset)
-        return [self._out(expense) for expense in expenses], total
+        rows, total = await self._repo.list_page(filters, limit=limit, offset=offset)
+        items = [
+            self._out(
+                expense,
+                coin_title=title if expense.category == ExpenseCategory.COIN_PURCHASE else None,
+            )
+            for expense, title in rows
+        ]
+        return items, total
 
     async def create(self, payload: ExpenseCreate) -> ExpenseOut:
         if payload.category == ExpenseCategory.COIN_PURCHASE:
@@ -136,19 +151,43 @@ class ExpenseService:
             (row.total_uah for row in totals if row.category != ExpenseCategory.COIN_PURCHASE),
             Decimal(0),
         )
+        category_summaries = [
+            ExpenseCategorySummary(category=row.category, count=row.count, total_uah=row.total_uah)
+            for row in categories
+        ]
+
+        by_month = await self._monthly_series()
+        this_month = by_month[-1].coins_uah + by_month[-1].supporting_uah
+        prev_month = by_month[-2].coins_uah + by_month[-2].supporting_uah
+
         return ExpensesSummaryOut(
-            categories=[
-                ExpenseCategorySummary(
-                    category=row.category, count=row.count, total_uah=row.total_uah
-                )
-                for row in categories
-            ],
+            categories=category_summaries,
             total_uah=coin + related,
             coin_spend_uah=coin,
             related_spend_uah=related,
+            by_month=by_month,
+            by_category=category_summaries,
+            this_month_uah=this_month,
+            prev_month_uah=prev_month,
         )
 
     # ------------------------------------------------------------- internals
+
+    async def _monthly_series(self) -> list[ExpenseMonthTotal]:
+        """Last 12 calendar months, oldest first, zero-filled where empty."""
+        current_month = date.today().replace(day=1)
+        start = _shift_month(current_month, -11)
+        totals = {row.month: row for row in await self._repo.monthly_totals(start=start)}
+        months = [_shift_month(start, offset) for offset in range(12)]
+        empty = MonthlyTotal(month=current_month, coins_uah=Decimal(0), supporting_uah=Decimal(0))
+        return [
+            ExpenseMonthTotal(
+                month=month.strftime("%Y-%m"),
+                coins_uah=totals.get(month, empty).coins_uah,
+                supporting_uah=totals.get(month, empty).supporting_uah,
+            )
+            for month in months
+        ]
 
     async def _get_editable(self, expense_id: int) -> Expense:
         expense = await self._repo.get(expense_id)
@@ -177,7 +216,7 @@ class ExpenseService:
             raise BadReferenceError("Unknown seriesId.")
 
     @staticmethod
-    def _out(expense: Expense) -> ExpenseOut:
+    def _out(expense: Expense, *, coin_title: str | None = None) -> ExpenseOut:
         return ExpenseOut(
             id=expense.id,
             category=expense.category,
@@ -191,4 +230,5 @@ class ExpenseService:
             series_id=expense.series_id,
             vendor=expense.vendor,
             description=expense.description,
+            coin_title=coin_title,
         )
