@@ -171,12 +171,13 @@
    * body::before layer far below. Not a colour token — nothing else may
    * consume it (see "page texture" below). */
   --page-texture-image: url('../../assets/textures/surface-noise-light.webp');
-  /* Higher than a "barely there" value on purpose (owner's call, 2026-09-07:
-   * the grain was invisible at 0.055). Safe for the approved palette: the
-   * tile's own channel means are 198.7/190.2/177.2 against this theme's
-   * ground of 200/191/175, so the mix stays #c8bfaf at any opacity and only
-   * the amplitude of the grain changes. */
-  --page-texture-opacity: 0.28;
+  /* Deliberately at the quiet end. Raising it does not shift the approved
+   * colour — the tile's channel means (198.7/190.2/177.2) sit on this
+   * theme's ground of 200/191/175, so the mix stays #c8bfaf at any opacity
+   * and only the grain's amplitude changes — but past roughly 0.1 the grain
+   * stops reading as a material and starts reading as digital noise
+   * (tried at 0.28 and rejected, owner's call 2026-09-07). */
+  --page-texture-opacity: 0.055;
 }
 
 :root[data-theme='dark'] {
@@ -189,9 +190,9 @@
    * from the coins themselves, never from the fill of a card or a panel.
    * Hierarchy is built from lightness, not from more red. */
   /* --color-bg is set below the ground the visitor actually sees: the texture
-   * tile's own mean (≈32/32/30) sits well above near-black, so at the opacity
-   * below it lifts the page by about five levels. #040505 plus the grain
-   * lands on ≈#090a0a — near-black with a grey cast, which is the point. */
+   * tile's own mean (≈32/32/30) sits well above near-black, so the layer
+   * lifts the page a little. #040505 plus the grain lands on ≈#070707 —
+   * near-black with a grey cast, which is the point. */
   --color-bg: #040505;
   --color-surface: #0c0e0f;
   --color-surface-raised: #131618;
@@ -273,7 +274,7 @@
   --color-chart-series-2: #8b8f62;
 
   --page-texture-image: url('../../assets/textures/surface-noise-dark.webp');
-  --page-texture-opacity: 0.16;
+  --page-texture-opacity: 0.065;
 }
 
 /* ------------------------------------------------------------------ base */
