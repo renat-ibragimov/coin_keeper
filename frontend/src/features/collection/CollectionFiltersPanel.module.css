@@ -28,8 +28,8 @@
   gap: var(--space-2);
 }
 
-.yearSelect {
-  width: 112px;
+.yearInput {
+  width: 90px;
 }
 
 .yearDash {

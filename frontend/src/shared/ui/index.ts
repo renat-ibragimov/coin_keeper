@@ -4,6 +4,7 @@ export type { Crumb } from './Breadcrumbs';
 export { Button } from './Button';
 export { Card } from './Card';
 export { CoinImage } from './CoinImage';
+export { Combobox } from './Combobox';
 export { FiltersShell, FiltersToolbar, GridIcon, TableIcon } from './FiltersShell';
 export type { ActiveFilterChip } from './FiltersShell';
 export { FormActions, FormError, FormRow, FormSection, FormStack } from './FormLayout';

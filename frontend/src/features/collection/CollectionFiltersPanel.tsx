@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CountryOut, DenominationOut, SeriesOut } from '@/shared/api/types';
-import { buildYearGroups, clampYear, computeYearBounds } from '@/shared/lib/yearRange';
+import { buildYearList, clampYear, computeYearBounds } from '@/shared/lib/yearRange';
 import type { ActiveFilterChip } from '@/shared/ui';
-import { FiltersShell, Input, Select } from '@/shared/ui';
+import { Combobox, FiltersShell, Input, Select } from '@/shared/ui';
 
 import { GRADES } from './grades';
 import type { CollectionFilters } from './useCollectionFilters';
@@ -47,16 +47,18 @@ export function CollectionFiltersPanel({
     return Number.isFinite(value) && value > 0 ? value : undefined;
   };
 
-  // Bounds for the year dropdowns: the selected country's own range among
-  // the owner's purchases, or the whole loaded list when none is selected
-  // (docs/03). Each field additionally narrows against the other's current
-  // value, so "до" never offers a year before "від" and vice versa.
+  // Bounds for the year fields' suggestion lists: the selected country's own
+  // range among the owner's purchases, or the whole loaded list when none is
+  // selected (docs/03). Each field additionally narrows against the other's
+  // current value, so "до" never suggests a year before "від" and vice versa.
+  // Both fields stay free-text inputs — the list is a suggestion, not a
+  // constraint (docs/08-ui-map.md).
   const yearBounds = computeYearBounds(countries, filters.countryId);
-  const yearFromGroups = buildYearGroups({
+  const yearFromList = buildYearList({
     min: yearBounds.min,
     max: filters.yearTo ?? yearBounds.max,
   });
-  const yearToGroups = buildYearGroups({
+  const yearToList = buildYearList({
     min: filters.yearFrom ?? yearBounds.min,
     max: yearBounds.max,
   });
@@ -123,41 +125,25 @@ export function CollectionFiltersPanel({
       <div className={styles.yearField}>
         <div className={styles.groupTitle}>{t('catalog.years')}</div>
         <div className={styles.yearRow}>
-          <Select
-            className={styles.yearSelect}
-            value={filters.yearFrom ?? ''}
+          <Combobox
+            inputMode="numeric"
+            options={yearFromList.map(String)}
+            placeholder={t('catalog.yearFrom')}
+            value={filters.yearFrom !== undefined ? String(filters.yearFrom) : ''}
             onChange={(event) => update({ yearFrom: numberOrUndefined(event.target.value) })}
             aria-label={t('catalog.yearFrom')}
-          >
-            <option value="">—</option>
-            {yearFromGroups.map((group) => (
-              <optgroup key={group.decade} label={t('catalog.decade', { decade: group.decade })}>
-                {group.years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </Select>
+            className={styles.yearInput}
+          />
           <span className={styles.yearDash}>—</span>
-          <Select
-            className={styles.yearSelect}
-            value={filters.yearTo ?? ''}
+          <Combobox
+            inputMode="numeric"
+            options={yearToList.map(String)}
+            placeholder={t('catalog.yearTo')}
+            value={filters.yearTo !== undefined ? String(filters.yearTo) : ''}
             onChange={(event) => update({ yearTo: numberOrUndefined(event.target.value) })}
             aria-label={t('catalog.yearTo')}
-          >
-            <option value="">—</option>
-            {yearToGroups.map((group) => (
-              <optgroup key={group.decade} label={t('catalog.decade', { decade: group.decade })}>
-                {group.years.map((year) => (
-                  <option key={year} value={year}>
-                    {year}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </Select>
+            className={styles.yearInput}
+          />
         </div>
       </div>
 

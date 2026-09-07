@@ -1,0 +1,38 @@
+.wrapper {
+  position: relative;
+}
+
+.chevron {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.chevron:disabled {
+  cursor: not-allowed;
+}
+
+.chevron svg {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.chevronOpen svg {
+  transform: rotate(180deg);
+}
+
+/* Room for the chevron so typed text never runs under it. */
+.input {
+  padding-right: 32px;
+}

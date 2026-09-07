@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import { Children, isValidElement, useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, OptgroupHTMLAttributes, OptionHTMLAttributes, ReactNode } from 'react';
+import type { KeyboardEvent, OptionHTMLAttributes, ReactNode } from 'react';
 
 import styles from './Select.module.css';
 
@@ -9,8 +9,6 @@ interface SelectOption {
   disabled: boolean;
   content: ReactNode;
   searchText: string;
-  /** Set from a parent <optgroup label>, undefined for a top-level <option>. */
-  group?: string;
 }
 
 interface SelectProps {
@@ -38,39 +36,19 @@ function textOf(node: ReactNode): string {
   return '';
 }
 
-function optionEntry(props: OptionHTMLAttributes<HTMLOptionElement>, group?: string): SelectOption {
-  const content = props.children;
-  return {
-    value: String(props.value ?? ''),
-    disabled: Boolean(props.disabled),
-    content,
-    searchText: textOf(content).toLocaleLowerCase(),
-    group,
-  };
-}
-
-/** Flattens <option>s, including any nested inside an <optgroup label>, into
- *  one list the listbox below renders and searches — grouping is purely a
- *  display concern layered on top (docs/08-ui-map.md: year filters). */
 function parseOptions(children: ReactNode): SelectOption[] {
   return Children.toArray(children).flatMap((child) => {
-    if (!isValidElement(child)) return [];
-    if (child.type === 'option') {
-      return [optionEntry(child.props as OptionHTMLAttributes<HTMLOptionElement>)];
-    }
-    if (child.type === 'optgroup') {
-      const { label, children: groupChildren } =
-        child.props as OptgroupHTMLAttributes<HTMLOptGroupElement>;
-      return Children.toArray(groupChildren).flatMap((inner) => {
-        if (
-          !isValidElement<OptionHTMLAttributes<HTMLOptionElement>>(inner) ||
-          inner.type !== 'option'
-        )
-          return [];
-        return [optionEntry(inner.props, label)];
-      });
-    }
-    return [];
+    if (!isValidElement<OptionHTMLAttributes<HTMLOptionElement>>(child) || child.type !== 'option')
+      return [];
+    const content = child.props.children;
+    return [
+      {
+        value: String(child.props.value ?? ''),
+        disabled: Boolean(child.props.disabled),
+        content,
+        searchText: textOf(content).toLocaleLowerCase(),
+      },
+    ];
   });
 }
 
@@ -135,32 +113,6 @@ export function Select({
     const needle = query.trim().toLocaleLowerCase();
     return indexed.filter(({ option }) => option.searchText.includes(needle));
   }, [options, searchable, query]);
-
-  // Interleaves a heading row before each run of options sharing a group (an
-  // <optgroup label>); an ungrouped run gets no heading. `position` still
-  // indexes only the options, in the same order as `filtered`, so keyboard
-  // navigation is unaffected by the headings threaded between them.
-  const renderItems = useMemo(() => {
-    const items: (
-      | { kind: 'heading'; label: string; key: string }
-      | { kind: 'option'; option: SelectOption; index: number; position: number }
-    )[] = [];
-    let previousGroup: string | undefined;
-    filtered.forEach(({ option, index }, position) => {
-      if (option.group !== previousGroup) {
-        if (option.group !== undefined) {
-          items.push({
-            kind: 'heading',
-            label: option.group,
-            key: `_group_${option.group}_${position}`,
-          });
-        }
-        previousGroup = option.group;
-      }
-      items.push({ kind: 'option', option, index, position });
-    });
-    return items;
-  }, [filtered]);
 
   useEffect(() => {
     if (!open) return;
@@ -315,38 +267,32 @@ export function Select({
               onKeyDown={searchable ? undefined : handleListKeyDown}
               aria-activedescendant={!searchable && active ? optionDomId(active.index) : undefined}
             >
-              {renderItems.map((item) =>
-                item.kind === 'heading' ? (
-                  <div key={item.key} className={styles.groupLabel} role="presentation">
-                    {item.label}
-                  </div>
-                ) : (
-                  <div
-                    key={item.option.value}
-                    id={optionDomId(item.index)}
-                    role="option"
-                    aria-selected={item.index === selectedIndex}
-                    aria-disabled={item.option.disabled || undefined}
-                    className={[
-                      styles.option,
-                      item.index === selectedIndex ? styles.optionSelected : '',
-                      item.position === activeIndex ? styles.optionActive : '',
-                      item.option.disabled ? styles.optionDisabled : '',
-                    ]
-                      .filter(Boolean)
-                      .join(' ')}
-                    onMouseEnter={() => setActiveIndex(item.position)}
-                    onClick={() => select(item.option)}
-                  >
-                    <span className={styles.optionText}>{item.option.content}</span>
-                    {item.index === selectedIndex ? (
-                      <span className={styles.check} aria-hidden="true">
-                        <Check strokeWidth={2.25} />
-                      </span>
-                    ) : null}
-                  </div>
-                ),
-              )}
+              {filtered.map(({ option, index }, position) => (
+                <div
+                  key={option.value}
+                  id={optionDomId(index)}
+                  role="option"
+                  aria-selected={index === selectedIndex}
+                  aria-disabled={option.disabled || undefined}
+                  className={[
+                    styles.option,
+                    index === selectedIndex ? styles.optionSelected : '',
+                    position === activeIndex ? styles.optionActive : '',
+                    option.disabled ? styles.optionDisabled : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                  onMouseEnter={() => setActiveIndex(position)}
+                  onClick={() => select(option)}
+                >
+                  <span className={styles.optionText}>{option.content}</span>
+                  {index === selectedIndex ? (
+                    <span className={styles.check} aria-hidden="true">
+                      <Check strokeWidth={2.25} />
+                    </span>
+                  ) : null}
+                </div>
+              ))}
               {filtered.length === 0 ? <div className={styles.empty}>—</div> : null}
             </div>
           </div>

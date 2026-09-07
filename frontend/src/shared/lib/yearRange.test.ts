@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CountryOut } from '@/shared/api/types';
 
-import { buildYearGroups, clampYear, computeYearBounds } from './yearRange';
+import { buildYearList, clampYear, computeYearBounds } from './yearRange';
 
 function country(overrides: Partial<CountryOut>): CountryOut {
   return {
@@ -64,17 +64,13 @@ describe('computeYearBounds', () => {
   });
 });
 
-describe('buildYearGroups', () => {
-  it('lists years newest first, grouped into descending decades', () => {
-    const groups = buildYearGroups({ min: 2008, max: 2021 });
-    expect(groups.map((g) => g.decade)).toEqual([2020, 2010, 2000]);
-    expect(groups[0]?.years).toEqual([2021, 2020]);
-    expect(groups[1]?.years).toEqual([2019, 2018, 2017, 2016, 2015, 2014, 2013, 2012, 2011, 2010]);
-    expect(groups[2]?.years).toEqual([2009, 2008]);
+describe('buildYearList', () => {
+  it('lists every year in the range, oldest first', () => {
+    expect(buildYearList({ min: 2018, max: 2021 })).toEqual([2018, 2019, 2020, 2021]);
   });
 
-  it('returns a single year in a single group', () => {
-    expect(buildYearGroups({ min: 2020, max: 2020 })).toEqual([{ decade: 2020, years: [2020] }]);
+  it('returns a single year for a single-year range', () => {
+    expect(buildYearList({ min: 2020, max: 2020 })).toEqual([2020]);
   });
 });
 

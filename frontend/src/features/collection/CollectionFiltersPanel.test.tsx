@@ -47,12 +47,23 @@ function renderPanel(
       activeFilters={[]}
     />,
   );
-  return update;
+  return { update };
+}
+
+/** The suggestion years listed in a year field's dropdown, opened by focusing it. */
+function suggestedYears(fieldLabel: string): string[] {
+  const input = screen.getByLabelText(fieldLabel);
+  fireEvent.focus(input);
+  const listboxId = input.getAttribute('aria-controls');
+  const listbox = listboxId ? document.getElementById(listboxId) : null;
+  return Array.from(listbox?.querySelectorAll('[role="option"]') ?? []).map(
+    (option) => option.textContent ?? '',
+  );
 }
 
 describe('CollectionFiltersPanel year fields', () => {
   it('clamps out-of-range years to the newly selected country instead of clearing them', () => {
-    const update = renderPanel({ yearFrom: 1950, yearTo: 2025 });
+    const { update } = renderPanel({ yearFrom: 1950, yearTo: 2025 });
     fireEvent.click(screen.getByLabelText('Країна'));
     fireEvent.click(screen.getByRole('option', { name: 'Україна' }));
 
@@ -61,10 +72,11 @@ describe('CollectionFiltersPanel year fields', () => {
     );
   });
 
-  it('trims "до" options to years no earlier than the chosen "від"', () => {
+  it('suggests "до" years no earlier than the chosen "від", oldest first', () => {
     renderPanel({ countryId: 1, yearFrom: 2010 });
-    fireEvent.click(screen.getByLabelText('до'));
-    expect(screen.queryByRole('option', { name: '2005' })).not.toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '2018' })).toBeInTheDocument();
+    const values = suggestedYears('до');
+    expect(values).not.toContain('2005');
+    expect(values[0]).toBe('2010');
+    expect(values[values.length - 1]).toBe('2018');
   });
 });
