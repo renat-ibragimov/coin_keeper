@@ -27,8 +27,30 @@
       var(--shadow-card-hover);
   }
 
-  .card:hover .image {
-    transform: scale(1.02);
+  /* Depth, not movement — same answer as the catalogue tile
+   * (CoinCard.module.css). */
+  .card:hover .image img,
+  .card:hover .image svg {
+    filter: var(--shadow-coin-hover);
+  }
+}
+
+.image img,
+.image svg {
+  transition: filter var(--duration-normal) var(--ease-standard);
+}
+
+/* Keyboard focus rings the whole card, not the title text — see the same
+ * rule in CoinCard.module.css for why the outline survives overflow: hidden
+ * and why the inner ring is suppressed. */
+@supports selector(:has(*)) {
+  .card:has(.titleLinkStretched:focus-visible) {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 3px;
+  }
+
+  .titleLinkStretched:focus-visible {
+    outline: none;
   }
 }
 
@@ -171,7 +193,8 @@
     transform: none;
   }
 
-  .card:hover .image {
-    transform: none;
+  .image img,
+  .image svg {
+    transition: none;
   }
 }

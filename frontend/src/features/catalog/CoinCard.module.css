@@ -19,8 +19,10 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  /* A lift, not a zoom: the card rises two pixels and the coin grows a
-   * couple of percent. Scaling the whole card blurred its text. */
+  /* A lift, and nothing else moves: the card rises exactly two pixels, its
+   * border firms up and its shadow opens. No scaling — scaling the card
+   * blurred its own text, and scaling the coin inside it made a grid of
+   * thirty photographs restless. */
   .card:hover {
     transform: translateY(-2px);
     border-color: var(--color-border-hover);
@@ -29,9 +31,43 @@
       var(--shadow-card-hover);
   }
 
-  .card:hover .image,
-  .card:hover .imageSingle {
-    transform: scale(1.02);
+  /* The coin answers the hover with depth rather than movement: the same
+   * silhouette shadow, a little deeper. Selects CoinImage's own <img>/<svg>
+   * by element — the filter lives on those, not on the frame this file
+   * owns, and CoinImage itself is shared with the tables and the detail
+   * page, which must not pick this up. */
+  .card:hover .image img,
+  .card:hover .image svg,
+  .card:hover .imageSingle img,
+  .card:hover .imageSingle svg {
+    filter: var(--shadow-coin-hover);
+  }
+}
+
+.image img,
+.image svg,
+.imageSingle img,
+.imageSingle svg {
+  transition: filter var(--duration-normal) var(--ease-standard);
+}
+
+/* The title link is this card's one tab stop (the media link above it is
+ * tabIndex=-1) and its stretched ::after already covers the whole card, so
+ * keyboard focus should ring the card rather than the two lines of the
+ * title. An outline on .card is painted outside .card's own box, so the
+ * overflow: hidden that clips the coin photos does not clip it.
+ *
+ * Where :has() is unavailable the global :focus-visible rule still rings the
+ * title text — degraded, but never invisible. */
+@supports selector(:has(*)) {
+  .card:has(.titleLinkStretched:focus-visible) {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 3px;
+  }
+
+  /* One ring, not two. */
+  .titleLinkStretched:focus-visible {
+    outline: none;
   }
 }
 
@@ -306,13 +342,17 @@
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
+/* Motion off, feedback on: the border, the card shadow and the coin's own
+ * deeper shadow all still answer a hover — only the lift and the easing go. */
 @media (prefers-reduced-motion: reduce) {
   .card:hover {
     transform: none;
   }
 
-  .card:hover .image,
-  .card:hover .imageSingle {
-    transform: none;
+  .image img,
+  .image svg,
+  .imageSingle img,
+  .imageSingle svg {
+    transition: none;
   }
 }
