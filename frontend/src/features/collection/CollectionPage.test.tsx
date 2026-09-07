@@ -1,26 +1,33 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
-import { fetchCountries, fetchDenominations, fetchSeries } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { fetchSeriesProgress } from '@/features/series/api';
 import type {
   BootstrapOut,
   CollectionPosition,
   CollectionPage as CollectionPageOut,
+  CountryOut,
 } from '@/shared/api/types';
 
-import { fetchCollection } from './api';
+import {
+  fetchCollection,
+  fetchOwnedCountries,
+  fetchOwnedDenominations,
+  fetchOwnedSeries,
+} from './api';
 import { CollectionPage } from './CollectionPage';
 
-vi.mock('./api', () => ({ fetchCollection: vi.fn(), PAGE_SIZE: 24 }));
-vi.mock('@/features/catalog/api', () => ({
-  fetchCountries: vi.fn(),
-  fetchSeries: vi.fn(),
-  fetchDenominations: vi.fn(),
+vi.mock('./api', () => ({
+  fetchCollection: vi.fn(),
+  fetchOwnedCountries: vi.fn(),
+  fetchOwnedSeries: vi.fn(),
+  fetchOwnedDenominations: vi.fn(),
+  PAGE_SIZE: 24,
 }));
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
 vi.mock('@/features/series/api', () => ({ fetchSeriesProgress: vi.fn() }));
@@ -86,6 +93,19 @@ const POSITION: CollectionPosition = {
   thumbnailUrl: null,
 };
 
+const OWNED_COUNTRY: CountryOut = {
+  id: 3,
+  code: 'UA',
+  name: 'Україна',
+  nameOriginal: 'Україна',
+  originalLang: 'uk',
+  nameUk: 'Україна',
+  nameEn: 'Ukraine',
+  collectVariants: false,
+  isActive: true,
+  sortOrder: 1,
+};
+
 const EMPTY_PAGE: CollectionPageOut = { items: [], total: 0, page: 1, pageSize: 24 };
 
 function renderPage() {
@@ -103,9 +123,9 @@ function renderPage() {
 function mockCommonQueries(isEmpty: boolean) {
   vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(isEmpty));
   vi.mocked(fetchSeriesProgress).mockResolvedValue([]);
-  vi.mocked(fetchCountries).mockResolvedValue([]);
-  vi.mocked(fetchSeries).mockResolvedValue([]);
-  vi.mocked(fetchDenominations).mockResolvedValue([]);
+  vi.mocked(fetchOwnedCountries).mockResolvedValue([]);
+  vi.mocked(fetchOwnedSeries).mockResolvedValue([]);
+  vi.mocked(fetchOwnedDenominations).mockResolvedValue([]);
 }
 
 describe('CollectionPage', () => {
@@ -146,5 +166,15 @@ describe('CollectionPage', () => {
     expect(screen.getByText('1 100 ₴')).toBeInTheDocument();
     expect(screen.getByText('UNC · XF')).toBeInTheDocument();
     expect(screen.getByText('Показано 1 з 1')).toBeInTheDocument();
+  });
+
+  it('populates the country filter from what the user owns, not the whole catalog', async () => {
+    vi.mocked(fetchCollection).mockResolvedValue(EMPTY_PAGE);
+    mockCommonQueries(false);
+    vi.mocked(fetchOwnedCountries).mockResolvedValue([OWNED_COUNTRY]);
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Країна' }));
+    expect(await screen.findByRole('option', { name: 'Україна' })).toBeInTheDocument();
   });
 });

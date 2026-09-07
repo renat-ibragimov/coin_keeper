@@ -4,6 +4,9 @@ import type {
   CollectionItemCreate,
   CollectionItemUpdate,
   CollectionPage,
+  CountryOut,
+  DenominationOut,
+  SeriesOut,
 } from '@/shared/api/types';
 
 import type { CollectionFilters } from './useCollectionFilters';
@@ -27,6 +30,20 @@ export function fetchCollection(filters: CollectionFilters): Promise<CollectionP
     order: filters.order,
   });
   return api<CollectionPage>(`/collection${query}`);
+}
+
+/** Countries the user actually owns a coin from — narrower than the
+ *  catalog-wide `fetchCountries`, for the "Мої монети" filters panel. */
+export function fetchOwnedCountries(): Promise<CountryOut[]> {
+  return api<CountryOut[]>('/collection/countries');
+}
+
+export function fetchOwnedSeries(countryId?: number): Promise<SeriesOut[]> {
+  return api<SeriesOut[]>(`/collection/series${toQuery({ countryId })}`);
+}
+
+export function fetchOwnedDenominations(countryId?: number): Promise<DenominationOut[]> {
+  return api<DenominationOut[]>(`/collection/denominations${toQuery({ countryId })}`);
 }
 
 export function fetchCollectionItem(id: number): Promise<CollectionItem> {

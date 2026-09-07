@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { fetchCountries, fetchDenominations, fetchSeries } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { fetchSeriesProgress } from '@/features/series/api';
 import { ApiError } from '@/shared/api/client';
@@ -24,7 +23,13 @@ import {
   TableIcon,
 } from '@/shared/ui';
 
-import { fetchCollection, PAGE_SIZE } from './api';
+import {
+  fetchCollection,
+  fetchOwnedCountries,
+  fetchOwnedDenominations,
+  fetchOwnedSeries,
+  PAGE_SIZE,
+} from './api';
 import { CollectionFiltersPanel } from './CollectionFiltersPanel';
 import { PositionCard } from './PositionCard';
 import { PositionTable } from './PositionTable';
@@ -68,14 +73,20 @@ export function CollectionPage() {
     queryKey: ['series', 'progress', undefined],
     queryFn: () => fetchSeriesProgress(undefined),
   });
-  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
+  // Scoped to what the user actually owns — not the catalog-wide reference
+  // lists (docs/03-api-contract.md), so the key namespace differs from the
+  // catalog's own ['countries']/['series', ...]/['denominations', ...].
+  const countriesQuery = useQuery({
+    queryKey: ['collection', 'countries'],
+    queryFn: () => fetchOwnedCountries(),
+  });
   const seriesQuery = useQuery({
-    queryKey: ['series', 'list', filters.countryId],
-    queryFn: () => fetchSeries(filters.countryId),
+    queryKey: ['collection', 'series', filters.countryId],
+    queryFn: () => fetchOwnedSeries(filters.countryId),
   });
   const denominationsQuery = useQuery({
-    queryKey: ['denominations', filters.countryId],
-    queryFn: () => fetchDenominations(filters.countryId),
+    queryKey: ['collection', 'denominations', filters.countryId],
+    queryFn: () => fetchOwnedDenominations(filters.countryId),
   });
 
   const page = collectionQuery.data;
