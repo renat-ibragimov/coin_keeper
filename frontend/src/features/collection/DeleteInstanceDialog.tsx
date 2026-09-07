@@ -1,15 +1,23 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 
-import type { CollectionItem } from '@/shared/api/types';
 import { formatUah } from '@/shared/lib/format';
 import { ConfirmDialog, useToast } from '@/shared/ui';
 
 import { deleteCollectionItem } from './api';
 import { COLLECTION_DEPENDENT_KEYS } from './model';
 
+/** The purchase's own title and total — not the full CollectionItemOut, so
+ *  a caller with a narrower shape (e.g. a coin card's own instance list,
+ *  which already knows the coin's title) can reuse this dialog too. */
+interface DeletableInstance {
+  id: number;
+  title: string;
+  totalUah: string;
+}
+
 interface DeleteInstanceDialogProps {
-  item: CollectionItem | null;
+  item: DeletableInstance | null;
   onClose: () => void;
   onDeleted?: () => void;
 }

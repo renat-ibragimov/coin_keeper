@@ -256,6 +256,7 @@ function CardBody({ card }: { card: CatalogCard }) {
                       items={instancesQuery.data}
                       loading={instancesQuery.isPending}
                       addHref={addUrl}
+                      coinTitle={title}
                     />
                   </details>
                 </>
@@ -264,6 +265,7 @@ function CardBody({ card }: { card: CatalogCard }) {
                   items={instancesQuery.data}
                   loading={instancesQuery.isPending}
                   addHref={addUrl}
+                  coinTitle={title}
                 />
               )}
             </>
