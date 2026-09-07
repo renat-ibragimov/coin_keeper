@@ -139,19 +139,34 @@ describe('CollectionPage', () => {
       'href',
       '/catalog',
     );
+    expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
+      'href',
+      '/collection/coins/new',
+    );
+    expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
+      'href',
+      '/import',
+    );
     expect(screen.queryByPlaceholderText('Пошук у колекції…')).toBeNull();
+    // No header actions ("+ Додати покупку" would collide with the card's
+    // own "Додати покупку" link if it rendered — this one has no "+").
+    expect(screen.queryByRole('link', { name: '+ Додати покупку' })).toBeNull();
     // No zero-value KPI tiles or filters above the empty state.
     expect(screen.queryByText('Монет у колекції')).toBeNull();
     expect(screen.queryByText('Поточна оцінка')).toBeNull();
   });
 
-  it('shows the filters panel once the collection has coins', async () => {
+  it('shows the filters panel and header actions once the collection has coins', async () => {
     vi.mocked(fetchCollection).mockResolvedValue(EMPTY_PAGE);
     mockCommonQueries(false);
     renderPage();
 
     expect(await screen.findByPlaceholderText('Пошук у колекції…')).toBeInTheDocument();
     expect(screen.queryByText('У колекції ще немає монет')).toBeNull();
+    expect(screen.getByRole('link', { name: '+ Додати покупку' })).toHaveAttribute(
+      'href',
+      '/collection/coins/new',
+    );
   });
 
   it('renders one card per position, grouping every purchase of a coin', async () => {

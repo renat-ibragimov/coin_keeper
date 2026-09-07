@@ -135,19 +135,27 @@ export function ExpensesPage() {
         title={t('expenses.title')}
         subtitle={t('expenses.subtitle')}
         actions={
-          <Button onClick={() => setEditor({ mode: 'create' })}>+ {t('expenses.add')}</Button>
+          collectionEmpty ? undefined : (
+            <Button onClick={() => setEditor({ mode: 'create' })}>+ {t('expenses.add')}</Button>
+          )
         }
       />
 
       {collectionEmpty ? (
         <EmptyState
+          variant="card"
           icon={<Wallet strokeWidth={1.75} />}
           title={t('expenses.emptyCollectionTitle')}
           description={t('expenses.emptyCollectionText')}
           actions={
-            <Link to="/catalog">
-              <Button>{t('expenses.emptyCollectionButton')}</Button>
-            </Link>
+            <>
+              <Link to="/catalog">
+                <Button>{t('common.backToCatalog')}</Button>
+              </Link>
+              <Link to="/collection/coins/new">
+                <Button variant="secondary">{t('card.addPurchase')}</Button>
+              </Link>
+            </>
           }
         />
       ) : (

@@ -102,13 +102,19 @@ export function SeriesListPage() {
 
       {collectionEmpty ? (
         <EmptyState
+          variant="card"
           icon={<Layers strokeWidth={1.75} />}
           title={t('series.emptyCollectionTitle')}
           description={t('series.emptyCollectionText')}
           actions={
-            <Link to="/catalog">
-              <Button>{t('common.backToCatalog')}</Button>
-            </Link>
+            <>
+              <Link to="/catalog">
+                <Button>{t('common.backToCatalog')}</Button>
+              </Link>
+              <Link to="/collection/coins/new">
+                <Button variant="secondary">{t('card.addPurchase')}</Button>
+              </Link>
+            </>
           }
         />
       ) : (

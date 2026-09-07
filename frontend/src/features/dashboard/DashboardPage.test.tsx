@@ -83,7 +83,14 @@ describe('DashboardPage', () => {
     renderPage();
 
     expect(await screen.findByText('Колекція поки порожня')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Знайти монету' })).toHaveAttribute('href', '/catalog');
+    expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
+      'href',
+      '/catalog',
+    );
+    expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
+      'href',
+      '/collection/coins/new',
+    );
     expect(screen.queryByText('Фінанси')).toBeNull();
   });
 

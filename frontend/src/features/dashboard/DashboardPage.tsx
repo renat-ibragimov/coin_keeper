@@ -62,23 +62,22 @@ export function DashboardPage() {
       <PageHeader align="center" title={t('dashboard.title')} subtitle={t('dashboard.subtitle')} />
 
       {data.dashboard.isEmpty ? (
-        <Card>
-          <EmptyState
-            icon={<Coins strokeWidth={1.75} />}
-            title={t('dashboard.emptyTitle')}
-            description={t('dashboard.emptyText')}
-            actions={
-              <>
-                <Link to="/catalog">
-                  <Button>{t('dashboard.emptyCatalog')}</Button>
-                </Link>
-                <Link to="/collection/coins/new">
-                  <Button variant="secondary">{t('card.addPurchase')}</Button>
-                </Link>
-              </>
-            }
-          />
-        </Card>
+        <EmptyState
+          variant="card"
+          icon={<Coins strokeWidth={1.75} />}
+          title={t('dashboard.emptyTitle')}
+          description={t('dashboard.emptyText')}
+          actions={
+            <>
+              <Link to="/catalog">
+                <Button>{t('common.backToCatalog')}</Button>
+              </Link>
+              <Link to="/collection/coins/new">
+                <Button variant="secondary">{t('card.addPurchase')}</Button>
+              </Link>
+            </>
+          }
+        />
       ) : (
         <DashboardBody data={data} />
       )}

@@ -172,11 +172,16 @@ describe('ExpensesPage', () => {
     renderPage();
 
     expect(await screen.findByText('Фінансової історії поки немає')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Додати першу монету' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
       'href',
       '/catalog',
     );
-    // No zero-value KPI tiles, charts or category chips above the empty state.
+    expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
+      'href',
+      '/collection/coins/new',
+    );
+    // No header action, zero-value KPI tiles, charts or category chips above the empty state.
+    expect(screen.queryByRole('button', { name: /Додати витрату/ })).toBeNull();
     expect(screen.queryByText('Разом на хобі')).toBeNull();
     expect(screen.queryByText('Витрати за місяцями')).toBeNull();
     expect(screen.queryByText('Усі категорії')).toBeNull();
@@ -191,6 +196,9 @@ describe('ExpensesPage', () => {
 
     expect(await screen.findByText('Витрат ще немає')).toBeInTheDocument();
     expect(screen.queryByText('Фінансової історії поки немає')).toBeNull();
+    // The header action stays (plus this empty state's own inline CTA),
+    // since the collection itself isn't empty.
+    expect(screen.getAllByRole('button', { name: /Додати витрату/ })).toHaveLength(2);
   });
 
   it('shows the "this month" tile with a delta against last month', async () => {

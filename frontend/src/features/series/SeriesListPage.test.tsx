@@ -211,6 +211,10 @@ describe('SeriesListPage', () => {
       'href',
       '/catalog',
     );
+    expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
+      'href',
+      '/collection/coins/new',
+    );
     expect(screen.queryByText('Almost')).toBeNull();
     expect(screen.queryByText('0 %')).toBeNull();
   });

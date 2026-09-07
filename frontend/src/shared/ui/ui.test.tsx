@@ -210,6 +210,16 @@ describe('EmptyState', () => {
     render(<EmptyState title="Nothing here" icon={<span data-testid="custom-icon" />} />);
     expect(screen.getByTestId('custom-icon')).toBeInTheDocument();
   });
+
+  it('stays unwrapped by default, for in-content "nothing found" states', () => {
+    const { container } = render(<EmptyState title="Nothing here" />);
+    expect(container.firstElementChild?.className).not.toMatch(/card/i);
+  });
+
+  it('sits on a card surface with variant="card", for whole-page empty states', () => {
+    const { container } = render(<EmptyState title="Nothing here" variant="card" />);
+    expect(container.firstElementChild?.className).toMatch(/card/i);
+  });
 });
 
 describe('ErrorState', () => {

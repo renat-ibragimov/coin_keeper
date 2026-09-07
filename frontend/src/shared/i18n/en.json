@@ -216,8 +216,7 @@
     "ratesAsOf": "as of {{date}}",
     "rateMissing": "no data",
     "emptyTitle": "The collection is empty so far",
-    "emptyText": "Find a first coin in the catalog and add it to the collection.",
-    "emptyCatalog": "Find a coin"
+    "emptyText": "Find a first coin in the catalog and add it to the collection."
   },
   "card": {
     "photosLabel": "Photos",
@@ -432,7 +431,6 @@
     "emptyText": "Coin purchases show up here on their own; add related expenses by hand.",
     "emptyCollectionTitle": "No financial history yet",
     "emptyCollectionText": "Once you add a purchase, expenses, current valuation and the difference will show up here.",
-    "emptyCollectionButton": "Add a first coin",
     "deleteTitle": "Delete the expense?",
     "deleteText": "The expense {{amount}} ({{category}}) will be deleted. This cannot be undone.",
     "created": "Expense added.",

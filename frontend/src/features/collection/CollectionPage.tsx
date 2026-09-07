@@ -195,31 +195,39 @@ export function CollectionPage() {
         title={t('collection.title')}
         subtitle={t('collection.subtitle')}
         actions={
-          <>
-            <Link to="/collection/coins/new">
-              <Button>+ {t('card.addPurchase')}</Button>
-            </Link>
-            <Link to="/import">
-              <Button variant="ghost">{t('catalog.importUcoin')}</Button>
-            </Link>
-          </>
+          collectionEmpty ? undefined : (
+            <>
+              <Link to="/collection/coins/new">
+                <Button>+ {t('card.addPurchase')}</Button>
+              </Link>
+              <Link to="/import">
+                <Button variant="ghost">{t('catalog.importUcoin')}</Button>
+              </Link>
+            </>
+          )
         }
       />
 
       {collectionEmpty ? (
         <EmptyState
+          variant="card"
           icon={<Coins strokeWidth={1.75} />}
           title={t('collection.emptyTitle')}
           description={t('collection.emptyText')}
           actions={
-            <>
-              <Link to="/catalog">
-                <Button>{t('common.backToCatalog')}</Button>
+            <div className={styles.emptyActions}>
+              <div className={styles.emptyButtons}>
+                <Link to="/catalog">
+                  <Button>{t('common.backToCatalog')}</Button>
+                </Link>
+                <Link to="/collection/coins/new">
+                  <Button variant="secondary">{t('card.addPurchase')}</Button>
+                </Link>
+              </div>
+              <Link to="/import" className={styles.emptyImportLink}>
+                {t('catalog.importUcoin')}
               </Link>
-              <Link to="/collection/coins/new">
-                <Button variant="secondary">{t('card.addPurchase')}</Button>
-              </Link>
-            </>
+            </div>
           }
         />
       ) : (

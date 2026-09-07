@@ -3,6 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from './Button';
+import { Card } from './Card';
 import styles from './States.module.css';
 
 interface StateProps {
@@ -10,6 +11,10 @@ interface StateProps {
   description?: ReactNode;
   actions?: ReactNode;
   icon?: ReactNode;
+  /** "card" puts the state on a surface-raised card — the whole-page empty
+   *  states (Огляд, Мої монети, Серії, Гроші). In-content states (nothing
+   *  found after a filter/search) stay "plain", the default. */
+  variant?: 'plain' | 'card';
 }
 
 export function EmptyState({
@@ -17,8 +22,9 @@ export function EmptyState({
   description,
   actions,
   icon = <CircleDashed strokeWidth={1.75} />,
+  variant = 'plain',
 }: StateProps) {
-  return (
+  const content = (
     <div className={styles.state}>
       <div className={styles.icon} aria-hidden="true">
         {icon}
@@ -28,6 +34,7 @@ export function EmptyState({
       {actions ? <div className={styles.actions}>{actions}</div> : null}
     </div>
   );
+  return variant === 'card' ? <Card>{content}</Card> : content;
 }
 
 interface ErrorStateProps {
