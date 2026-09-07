@@ -106,11 +106,7 @@
 .thumb {
   width: 46px;
   height: 46px;
-  border-radius: 50%;
   flex: none;
-  background: var(--color-surface-sunken);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
 }
 
 /* The frame is round and small, so the placeholder coin may fill nearly all of

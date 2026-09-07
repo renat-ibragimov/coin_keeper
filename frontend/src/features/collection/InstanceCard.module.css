@@ -24,18 +24,12 @@
   opacity: 0.8;
 }
 
-/* Same plaque treatment as the coin detail page's .photo
- * (CoinCardPage.module.css) and the catalog tile's .media (CoinCard.module.css). */
+/* No background of its own: the coin sits directly on the card's own
+ * surface (var(--color-surface-raised) from .card), same as the catalog
+ * tile's .media (CoinCard.module.css). */
 .media {
   display: block;
   aspect-ratio: 1 / 1;
-  background:
-    radial-gradient(
-      circle at 35% 30%,
-      color-mix(in srgb, var(--color-accent) 10%, transparent),
-      transparent 70%
-    ),
-    var(--color-surface-sunken);
 }
 
 .image {
