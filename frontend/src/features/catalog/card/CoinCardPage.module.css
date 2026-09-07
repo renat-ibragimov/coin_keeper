@@ -301,26 +301,32 @@ button.photoFrame {
 }
 
 /* A card-in-a-card: a bordered, radiused box around the number that matters
- * most here, on a surface a touch different from .sidebarCard's own. It
+ * most here, on a surface a touch different from .sidebarCard's own, with
+ * its own shadow so it reads as resting a little above that surface. It
  * grows into whatever vertical room .sidebarCard has left (a square card is
- * often taller than its fixed-height rows need) and centers its lines in
- * that space rather than leaving it as bare air below the CTA. */
+ * often taller than its fixed-height rows need); space-between spreads its
+ * three lines across that room — label at the top, meta at the bottom —
+ * instead of bunching them in the middle, and everything centers
+ * horizontally rather than hugging the left edge. */
 .priceBlock {
   display: flex;
   flex: 1;
   flex-direction: column;
-  justify-content: center;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
   margin-top: var(--space-1);
   padding: var(--space-4) var(--space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--color-surface-sunken) 55%, transparent);
+  box-shadow: var(--shadow-sm);
+  text-align: center;
 }
 
 .priceLabel {
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  font-size: 13px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
@@ -346,12 +352,20 @@ button.photoFrame {
   color: var(--color-text-muted);
 }
 
+/* The one number this whole card exists to answer: a gold gradient text
+ * fill (the same --gradient-accent as the CTA button below it) instead of
+ * the plain body colour, so it reads as the page's other headline moment,
+ * not just another line of text. */
 .priceValue {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 44px;
+  font-size: 68px;
+  font-weight: 700;
   line-height: 1.05;
-  color: var(--color-text);
+  background: var(--gradient-accent);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 .priceMeta {
