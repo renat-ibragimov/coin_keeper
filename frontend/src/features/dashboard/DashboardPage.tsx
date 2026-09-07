@@ -35,7 +35,7 @@ import {
 } from '@/shared/ui';
 
 import { fetchBootstrap } from './api';
-import { nearestToCompletion, valueDelta } from './finance';
+import { myCollectionSeries, valueDelta } from './finance';
 import styles from './DashboardPage.module.css';
 
 // The "missing" page is gone (docs/08-ui-map.md): the catalog's own "немає
@@ -104,7 +104,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
   const { dashboard, exchangeRates } = data;
   const delta = valueDelta(dashboard.totalSpendUah, dashboard.marketValueUah);
   const deltaTone = delta.diffUah > 0 ? 'success' : delta.diffUah < 0 ? 'danger' : 'neutral';
-  const series = nearestToCompletion(dashboard.seriesBreakdown).slice(0, 6);
+  const series = myCollectionSeries(dashboard.seriesBreakdown);
 
   return (
     <>

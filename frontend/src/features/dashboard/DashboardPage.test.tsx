@@ -142,13 +142,38 @@ describe('DashboardPage', () => {
     expect(screen.getByText('без ціни: 41')).toBeInTheDocument();
   });
 
-  it('lists only unfinished series, closest to completion first', async () => {
+  it('lists every started series, closest to completion first and finished ones last', async () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
     renderPage();
 
     expect(await screen.findByText('Флора і фауна')).toBeInTheDocument();
-    expect(screen.queryByText('Готово')).toBeNull();
     expect(screen.getByText('19 з 20')).toBeInTheDocument();
+    const names = screen
+      .getAllByRole('link', { name: /Флора і фауна|Готово/ })
+      .map((link) => link.textContent);
+    expect(names).toEqual(['Флора і фауна', 'Готово']);
+  });
+
+  it('drops a series the owner has not started at all', async () => {
+    vi.mocked(fetchBootstrap).mockResolvedValue(
+      makeBootstrap({
+        seriesBreakdown: [
+          { id: 11, name: 'Флора і фауна', country: 'Україна', count: 20, owned: 19 },
+          { id: 13, name: 'Ще не почато', country: 'Україна', count: 5, owned: 0 },
+        ],
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Флора і фауна')).toBeInTheDocument();
+    expect(screen.queryByText('Ще не почато')).toBeNull();
+  });
+
+  it('shows the empty-series message when nothing has been started yet', async () => {
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap({ seriesBreakdown: [] }));
+    renderPage();
+
+    expect(await screen.findByText('Ще не почато жодної серії.')).toBeInTheDocument();
   });
 
   it('shows the rate with its date and a placeholder for a missing one', async () => {

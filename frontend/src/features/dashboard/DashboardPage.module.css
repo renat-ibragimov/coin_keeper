@@ -114,12 +114,19 @@
 
 /* --- series in progress --- */
 
+/* Fixed at roughly six rows' worth of height: with fewer started series the
+ * list simply falls short of it (no scrollbar), and with more, the max-height
+ * doesn't land on a row boundary on purpose — the last visible row gets cut
+ * off by the container's edge as a visual invitation to scroll
+ * (docs/08-ui-map.md). */
 .seriesList {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .seriesRow {
