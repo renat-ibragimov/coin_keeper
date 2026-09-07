@@ -7,6 +7,7 @@ import '@/shared/i18n';
 import { Badge } from './Badge';
 import { Button } from './Button';
 import { CoinImage } from './CoinImage';
+import { FiltersShell, FiltersToolbar } from './FiltersShell';
 import { Input } from './Input';
 import { pageItems } from './pageItems';
 import { Pagination } from './Pagination';
@@ -87,6 +88,90 @@ describe('Pagination', () => {
   it('renders nothing for a single page', () => {
     const { container } = render(<Pagination page={1} pageCount={1} onChange={() => {}} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('FiltersShell', () => {
+  it('renders the field slot and hides the chip row when nothing is active', () => {
+    render(
+      <FiltersShell activeFilters={[]} onReset={() => {}}>
+        <div>a field</div>
+      </FiltersShell>,
+    );
+    expect(screen.getByText('a field')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /скинути/i })).toBeNull();
+  });
+
+  it('removes a chip and resets from the active-filters row', async () => {
+    const onRemove = vi.fn();
+    const onReset = vi.fn();
+    render(
+      <FiltersShell
+        activeFilters={[{ key: 'country', label: 'Україна', onRemove }]}
+        onReset={onReset}
+      >
+        <div />
+      </FiltersShell>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: /Україна/ }));
+    expect(onRemove).toHaveBeenCalledOnce();
+    await userEvent.click(screen.getByRole('button', { name: /скинути/i }));
+    expect(onReset).toHaveBeenCalledOnce();
+  });
+});
+
+describe('FiltersToolbar', () => {
+  it('shows the result count and drives view, sort and order changes', async () => {
+    const onViewChange = vi.fn();
+    const onSortChange = vi.fn();
+    const onOrderChange = vi.fn();
+    render(
+      <FiltersToolbar<'cards' | 'table'>
+        shown={8}
+        total={20}
+        view="cards"
+        viewOptions={[
+          { value: 'cards', label: 'Cards' },
+          { value: 'table', label: 'Table' },
+        ]}
+        onViewChange={onViewChange}
+        sort="date"
+        sortOptions={[
+          { value: 'date', label: 'By date' },
+          { value: 'title', label: 'By title' },
+        ]}
+        onSortChange={onSortChange}
+        order="desc"
+        onOrderChange={onOrderChange}
+      />,
+    );
+    expect(screen.getByText('Показано 8 з 20')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /фільтри/i })).toBeNull();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Table' }));
+    expect(onViewChange).toHaveBeenCalledWith('table');
+
+    await userEvent.click(screen.getByRole('button', { name: /спаданням/i }));
+    expect(onOrderChange).toHaveBeenCalledOnce();
+  });
+
+  it('shows the mobile filters trigger only when a handler is given', () => {
+    render(
+      <FiltersToolbar<'cards' | 'table'>
+        shown={1}
+        total={1}
+        view="cards"
+        viewOptions={[{ value: 'cards', label: 'Cards' }]}
+        onViewChange={() => {}}
+        sort="date"
+        sortOptions={[{ value: 'date', label: 'By date' }]}
+        onSortChange={() => {}}
+        order="asc"
+        onOrderChange={() => {}}
+        onOpenFilters={() => {}}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /фільтри/i })).toBeInTheDocument();
   });
 });
 
