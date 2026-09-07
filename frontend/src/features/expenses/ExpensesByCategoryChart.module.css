@@ -1,0 +1,66 @@
+.layout {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.chart {
+  flex: none;
+}
+
+.legend {
+  flex: 1;
+  min-width: 0;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.legendRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  flex: none;
+}
+
+.legendLabel {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.legendValue {
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.legendShare {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 34px;
+  text-align: right;
+}
+
+@media (max-width: 560px) {
+  .layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chart {
+    align-self: center;
+  }
+}

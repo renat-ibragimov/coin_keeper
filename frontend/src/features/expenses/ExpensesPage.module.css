@@ -10,6 +10,19 @@
   gap: var(--space-4);
 }
 
+.charts {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-4);
+}
+
+.chartTitle {
+  margin: 0 0 var(--space-3);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -103,5 +116,9 @@
   .tiles {
     grid-template-columns: 1fr;
     gap: var(--space-3);
+  }
+
+  .charts {
+    grid-template-columns: 1fr;
   }
 }

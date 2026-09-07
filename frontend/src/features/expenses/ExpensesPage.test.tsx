@@ -1,15 +1,47 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
 import { fetchCurrencies } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
-import type { BootstrapOut, ExpensePage, ExpensesSummary } from '@/shared/api/types';
+import type { BootstrapOut, ExpenseOut, ExpensePage, ExpensesSummary } from '@/shared/api/types';
+import { ThemeContext } from '@/shared/theme/themeContext';
 
 import { fetchExpenses, fetchExpensesSummary } from './api';
 import { ExpensesPage } from './ExpensesPage';
+
+// recharts measures its container through ResizeObserver + getBoundingClientRect,
+// neither of which jsdom implements; stub both so the charts actually render.
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+    width: 600,
+    height: 300,
+    top: 0,
+    left: 0,
+    bottom: 300,
+    right: 600,
+    x: 0,
+    y: 0,
+    toJSON() {
+      return {};
+    },
+  });
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 vi.mock('./api', () => ({
   fetchExpenses: vi.fn(),
@@ -73,6 +105,10 @@ const EMPTY_SUMMARY: ExpensesSummary = {
   totalUah: '0.00',
   coinSpendUah: '0.00',
   relatedSpendUah: '0.00',
+  byMonth: [],
+  byCategory: [],
+  thisMonthUah: '0.00',
+  prevMonthUah: '0.00',
 };
 
 function renderPage() {
@@ -80,11 +116,51 @@ function renderPage() {
     <QueryClientProvider
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
-      <MemoryRouter>
-        <ExpensesPage />
-      </MemoryRouter>
+      {/* jsdom has no matchMedia, so the theme is provided directly rather than via ThemeProvider. */}
+      <ThemeContext.Provider value={{ theme: 'light', toggleTheme: () => {} }}>
+        <MemoryRouter>
+          <ExpensesPage />
+        </MemoryRouter>
+      </ThemeContext.Provider>
     </QueryClientProvider>,
   );
+}
+
+function monthKey(offsetFromToday: number): string {
+  const date = new Date();
+  date.setDate(1);
+  date.setMonth(date.getMonth() + offsetFromToday);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function makeByMonth(thisMonthCoins: string, prevMonthSupporting: string) {
+  return Array.from({ length: 12 }, (_, index) => {
+    const offset = index - 11;
+    return {
+      month: monthKey(offset),
+      coinsUah: offset === 0 ? thisMonthCoins : '0.00',
+      supportingUah: offset === -1 ? prevMonthSupporting : '0.00',
+    };
+  });
+}
+
+function makeExpense(overrides: Partial<ExpenseOut>): ExpenseOut {
+  return {
+    id: 1,
+    category: 'album',
+    amount: '100.00',
+    currencyCode: 'UAH',
+    rateUah: '1',
+    amountUah: '100.00',
+    expenseDate: '2024-01-01',
+    catalogItemId: null,
+    collectionItemId: null,
+    seriesId: null,
+    vendor: null,
+    description: null,
+    coinTitle: null,
+    ...overrides,
+  };
 }
 
 describe('ExpensesPage', () => {
@@ -111,5 +187,52 @@ describe('ExpensesPage', () => {
 
     expect(await screen.findByText('Витрат ще немає')).toBeInTheDocument();
     expect(screen.queryByText('Фінансової історії поки немає')).toBeNull();
+  });
+
+  it('renders the month and category charts once there is data', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({
+          id: 1,
+          category: 'coin_purchase',
+          catalogItemId: 5,
+          coinTitle: 'Дельфін',
+          amountUah: '300.00',
+        }),
+        makeExpense({ id: 2, category: 'album', amountUah: '100.00' }),
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue({
+      categories: [
+        { category: 'coin_purchase', count: 1, totalUah: '300.00' },
+        { category: 'album', count: 1, totalUah: '100.00' },
+      ],
+      totalUah: '400.00',
+      coinSpendUah: '300.00',
+      relatedSpendUah: '100.00',
+      byMonth: makeByMonth('300.00', '50.00'),
+      byCategory: [
+        { category: 'coin_purchase', count: 1, totalUah: '300.00' },
+        { category: 'album', count: 1, totalUah: '100.00' },
+      ],
+      thisMonthUah: '300.00',
+      prevMonthUah: '50.00',
+    });
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    const { container } = renderPage();
+
+    expect(await screen.findByText('Витрати за місяцями')).toBeInTheDocument();
+    expect(screen.getByText('За категоріями')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(container.querySelectorAll('.recharts-surface').length).toBeGreaterThanOrEqual(2);
+    });
+    // The category donut's legend is plain markup, independent of chart measurement.
+    const categoryCard = container.querySelector('[aria-label="За категоріями"]');
+    expect(categoryCard?.textContent).toContain('Покупка монети');
+    expect(categoryCard?.textContent).toContain('Альбоми');
   });
 });

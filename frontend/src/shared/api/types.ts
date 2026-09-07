@@ -45,3 +45,4 @@ export type ExpenseCategory = components['schemas']['ExpenseCategory'];
 export type ExpensePage = components['schemas']['Page_ExpenseOut_'];
 export type ExpensesSummary = components['schemas']['ExpensesSummaryOut'];
 export type ExpenseCategorySummary = components['schemas']['ExpenseCategorySummary'];
+export type ExpenseMonthTotal = components['schemas']['ExpenseMonthTotal'];

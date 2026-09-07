@@ -97,6 +97,13 @@ export function formatMonthYear(value: string | Date, locale: string): string {
   );
 }
 
+/** Chart axis tick for a "YYYY-MM" month: "січ" / "Jan", no year. */
+export function formatMonthShort(value: string, locale: string): string {
+  const date = new Date(`${value}-01T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(intlLocale(locale), { month: 'short' }).format(date);
+}
+
 /** Today's calendar date as "YYYY-MM-DD" in the local time zone. */
 export function todayIso(): string {
   const now = new Date();

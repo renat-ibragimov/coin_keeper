@@ -1278,6 +1278,8 @@ export interface components {
             vendor: string | null;
             /** Description */
             description: string | null;
+            /** Cointitle */
+            coinTitle: string | null;
         };
         /** ExpenseUpdate */
         ExpenseUpdate: {
@@ -1297,6 +1299,15 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /** ExpenseMonthTotal */
+        ExpenseMonthTotal: {
+            /** Month */
+            month: string;
+            /** Coinsuah */
+            coinsUah: string;
+            /** Supportinguah */
+            supportingUah: string;
+        };
         /** ExpensesSummaryOut */
         ExpensesSummaryOut: {
             /** Categories */
@@ -1307,6 +1318,14 @@ export interface components {
             coinSpendUah: string;
             /** Relatedspenduah */
             relatedSpendUah: string;
+            /** Bymonth */
+            byMonth: components["schemas"]["ExpenseMonthTotal"][];
+            /** Bycategory */
+            byCategory: components["schemas"]["ExpenseCategorySummary"][];
+            /** Thismonthuah */
+            thisMonthUah: string;
+            /** Prevmonthuah */
+            prevMonthUah: string;
         };
         /** FinanceOut */
         FinanceOut: {

@@ -8,9 +8,11 @@ import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { ExpenseCategory, ExpenseOut } from '@/shared/api/types';
 import { formatDate, formatMoney, formatUah } from '@/shared/lib/format';
+import { useChartPalette } from '@/shared/theme/useChartPalette';
 import {
   Badge,
   Button,
+  Card,
   ConfirmDialog,
   EmptyState,
   ErrorState,
@@ -31,6 +33,8 @@ import {
   PAGE_SIZE,
   updateExpense,
 } from './api';
+import { ExpensesByCategoryChart } from './ExpensesByCategoryChart';
+import { ExpensesByMonthChart } from './ExpensesByMonthChart';
 import { ExpenseForm } from './ExpenseForm';
 import type { ExpenseValues } from './ExpenseForm';
 import styles from './ExpensesPage.module.css';
@@ -110,6 +114,7 @@ export function ExpensesPage() {
     : null;
   const list = listQuery.data;
   const pageCount = Math.max(1, Math.ceil((list?.total ?? 0) / PAGE_SIZE));
+  const palette = useChartPalette();
 
   return (
     <div className={styles.page}>
@@ -145,6 +150,19 @@ export function ExpensesPage() {
           Array.from({ length: 3 }, (_, index) => <Skeleton key={index} height={96} />)
         )}
       </section>
+
+      {summary && summary.categories.length > 0 ? (
+        <div className={styles.charts}>
+          <Card aria-label={t('expenses.chartByMonthTitle')}>
+            <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
+            <ExpensesByMonthChart data={summary.byMonth} locale={locale} palette={palette} />
+          </Card>
+          <Card aria-label={t('expenses.chartByCategoryTitle')}>
+            <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
+            <ExpensesByCategoryChart data={summary.byCategory} locale={locale} palette={palette} />
+          </Card>
+        </div>
+      ) : null}
 
       {summary && summary.categories.length > 0 ? (
         <div className={styles.chips} role="group" aria-label={t('expenses.category')}>
