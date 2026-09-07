@@ -11,6 +11,7 @@ import {
   ErrorState,
   FiltersToolbar,
   GridIcon,
+  PageHeader,
   Pagination,
   Skeleton,
   TableIcon,
@@ -174,10 +175,7 @@ export function CatalogPage() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.pageHeader}>
-        <h1 className={styles.title}>{t('catalog.title')}</h1>
-        <p className={styles.subtitle}>{t('catalog.subtitle')}</p>
-      </header>
+      <PageHeader align="center" title={t('catalog.title')} subtitle={t('catalog.subtitle')} />
 
       <div className={styles.filtersBar}>{filtersPanel}</div>
 

@@ -79,6 +79,7 @@ export function SeriesDetailPage() {
   return (
     <div className={styles.page}>
       <PageHeader
+        align="center"
         above={
           <Breadcrumbs
             items={[

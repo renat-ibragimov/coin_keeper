@@ -114,6 +114,7 @@ export function ExpensesPage() {
   return (
     <div className={styles.page}>
       <PageHeader
+        align="center"
         title={t('expenses.title')}
         subtitle={t('expenses.subtitle')}
         actions={

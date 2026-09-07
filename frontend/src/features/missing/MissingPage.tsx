@@ -72,7 +72,7 @@ export function MissingPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title={t('missing.title')} subtitle={t('missing.subtitle')} />
+      <PageHeader align="center" title={t('missing.title')} subtitle={t('missing.subtitle')} />
 
       {collectionEmpty ? (
         <EmptyState
