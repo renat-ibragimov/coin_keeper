@@ -18,16 +18,24 @@
   font-size: 14.5px;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
 }
 
-.page:hover:not(:disabled) {
-  border-color: var(--color-border-strong);
-  color: var(--color-text);
+@media (hover: hover) and (pointer: fine) {
+  .page:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+    border-color: var(--color-border);
+    color: var(--color-text);
+  }
 }
 
-.current {
+.current,
+.current:hover {
   border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+  background: var(--color-selected);
   color: var(--color-accent-strong);
   font-weight: 700;
 }

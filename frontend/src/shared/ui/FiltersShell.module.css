@@ -1,10 +1,14 @@
+/* One structural panel, built into the page: the hierarchy inside it comes
+ * from label treatment and the recessed controls, not from extra wrappers or
+ * a heading (docs/08-ui-map.md). */
 .panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-panel);
   padding: var(--space-4);
 }
 
@@ -21,13 +25,15 @@
   align-items: center;
   gap: var(--space-2) var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .activeLabel {
   color: var(--color-text-secondary);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   flex: 0 0 auto;
 }
 
@@ -39,6 +45,8 @@
   flex: 1 1 auto;
 }
 
+/* A compact filter, so a pill is right here — but a quiet one: an accent
+ * border and tint, not a call to action. */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -52,14 +60,22 @@
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.chip svg {
+  width: 13px;
+  height: 13px;
 }
 
 :root[data-theme='dark'] .chip {
   color: var(--color-accent);
 }
 
-.chip:hover {
-  background: color-mix(in srgb, var(--color-accent) 24%, var(--color-accent-soft));
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover {
+    background: color-mix(in srgb, var(--color-accent) 24%, var(--color-accent-soft));
+  }
 }
 
 .resetButton {

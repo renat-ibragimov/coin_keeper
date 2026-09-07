@@ -20,6 +20,7 @@
 .link {
   color: var(--color-text-secondary);
   text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .link:hover {
@@ -28,5 +29,5 @@
 }
 
 .separator {
-  color: var(--color-border-strong);
+  color: var(--color-text-muted);
 }

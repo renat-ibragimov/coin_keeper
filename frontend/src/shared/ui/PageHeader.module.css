@@ -27,9 +27,11 @@
   gap: var(--space-3);
 }
 
+/* The page's own name is content, so it keeps the display serif, and it
+ * scales with the viewport instead of stepping at one breakpoint. */
 .title {
   font-family: var(--font-display);
-  font-size: 36px;
+  font-size: clamp(28px, 3.2vw, 38px);
   line-height: 1.15;
 }
 
@@ -49,10 +51,6 @@
 }
 
 @media (max-width: 900px) {
-  .title {
-    font-size: 28px;
-  }
-
   .actions {
     width: 100%;
   }

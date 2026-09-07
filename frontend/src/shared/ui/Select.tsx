@@ -1,3 +1,4 @@
+import { Check } from 'lucide-react';
 import { Children, isValidElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent, OptionHTMLAttributes, ReactNode } from 'react';
 
@@ -287,7 +288,7 @@ export function Select({
                   <span className={styles.optionText}>{option.content}</span>
                   {index === selectedIndex ? (
                     <span className={styles.check} aria-hidden="true">
-                      ✓
+                      <Check strokeWidth={2.25} />
                     </span>
                   ) : null}
                 </div>

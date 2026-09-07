@@ -5,35 +5,67 @@
 }
 
 .label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
+/* Fields read as recessed into the panel around them: the control surface is
+ * a step below a raised card, the radius is smaller than a card's, and the
+ * border is quiet but always visible. */
 .input {
   width: 100%;
   padding: 10px 12px;
   min-height: 42px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-control);
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: 15px;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (pointer: coarse) {
+  .input {
+    min-height: 44px;
+  }
 }
 
 .input::placeholder {
   color: var(--color-text-muted);
 }
 
-.input:focus {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+@media (hover: hover) and (pointer: fine) {
+  .input:hover:not(:disabled):not(:focus) {
+    border-color: var(--color-border-strong);
+  }
 }
 
-.invalid {
+/* A crisp ring with an offset, not a glow: the field itself does not bloom. */
+.input:focus,
+.input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-color: var(--color-border-hover);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.invalid,
+.invalid:focus {
   border-color: var(--color-danger);
+}
+
+/* Years, sums and counts stand in columns even inside a field. */
+.input[type='number'],
+.input[type='date'] {
+  font-variant-numeric: tabular-nums;
 }
 
 /* The trailing control sits over the input only — never over the hint. */
@@ -63,6 +95,8 @@
   font-size: 16px;
   padding: 2px 6px;
   font-family: inherit;
+  border-radius: var(--radius-sm);
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .trailing button:hover {

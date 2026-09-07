@@ -1,3 +1,12 @@
+import {
+  ArrowDown,
+  ArrowUp,
+  LayoutGrid,
+  Rows3,
+  RotateCcw,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -40,12 +49,13 @@ export function FiltersShell({ children, activeFilters, onReset }: FiltersShellP
                 aria-label={`${chip.label} — ${t('catalog.removeFilter')}`}
               >
                 {chip.label}
-                <span aria-hidden="true">×</span>
+                <X aria-hidden="true" />
               </button>
             ))}
           </div>
           <Button variant="secondary" size="sm" onClick={onReset} className={styles.resetButton}>
-            ↺ {t('catalog.resetFilters')}
+            <RotateCcw size={15} aria-hidden="true" />
+            {t('catalog.resetFilters')}
           </Button>
         </div>
       ) : null}
@@ -98,7 +108,8 @@ export function FiltersToolbar<View extends string>({
           className={styles.filtersButton}
           onClick={onOpenFilters}
         >
-          ☰ {t('catalog.filters')}
+          <SlidersHorizontal size={15} aria-hidden="true" />
+          {t('catalog.filters')}
         </Button>
       ) : null}
       <Tabs<View>
@@ -126,30 +137,24 @@ export function FiltersToolbar<View extends string>({
           aria-label={order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
           title={order === 'asc' ? t('catalog.orderAsc') : t('catalog.orderDesc')}
         >
-          {order === 'asc' ? '↑' : '↓'}
+          {order === 'asc' ? (
+            <ArrowUp size={15} aria-hidden="true" />
+          ) : (
+            <ArrowDown size={15} aria-hidden="true" />
+          )}
         </Button>
       </span>
     </div>
   );
 }
 
+/* The grid/table pair keeps its own names — every view switch in the app
+ * imports them — but draws from the shared Lucide set like the rest of the
+ * interface, instead of two hand-rolled SVGs at their own stroke weight. */
 export function GridIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="8" y="1" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="1" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="8" y="8" width="5" height="5" rx="1" stroke="currentColor" strokeWidth="1.3" />
-    </svg>
-  );
+  return <LayoutGrid size={15} aria-hidden="true" />;
 }
 
 export function TableIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-      <rect x="1" y="1" width="12" height="12" rx="1.2" stroke="currentColor" strokeWidth="1.3" />
-      <line x1="1" y1="5.3" x2="13" y2="5.3" stroke="currentColor" strokeWidth="1.1" />
-      <line x1="1" y1="9.3" x2="13" y2="9.3" stroke="currentColor" strokeWidth="1.1" />
-    </svg>
-  );
+  return <Rows3 size={15} aria-hidden="true" />;
 }

@@ -19,17 +19,17 @@
   box-shadow: var(--shadow-lg);
   font-size: 14.5px;
   text-align: center;
-  animation: rise 200ms ease-out;
+  animation: rise var(--duration-normal) var(--ease-standard);
 }
 
 .success {
-  background: var(--color-success);
-  color: #fff;
+  background: var(--color-success-strong);
+  color: var(--color-on-success);
 }
 
 .error {
   background: var(--color-danger);
-  color: #fff;
+  color: var(--color-on-accent);
 }
 
 .info {

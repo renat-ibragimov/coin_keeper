@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -46,7 +47,7 @@ export function Lightbox({ open, onClose, label, children }: LightboxProps) {
           aria-label={t('common.close')}
           autoFocus
         >
-          ✕
+          <X size={18} aria-hidden="true" />
         </button>
         <div className={styles.caption}>{label}</div>
         <div className={styles.content}>{children}</div>

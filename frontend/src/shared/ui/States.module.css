@@ -68,9 +68,9 @@
   border-radius: var(--radius-md);
   background: linear-gradient(
     100deg,
-    var(--color-surface-sunken) 40%,
-    color-mix(in srgb, var(--color-surface-raised) 70%, var(--color-surface-sunken)) 50%,
-    var(--color-surface-sunken) 60%
+    var(--color-surface-control) 40%,
+    var(--color-surface-hover) 50%,
+    var(--color-surface-control) 60%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;

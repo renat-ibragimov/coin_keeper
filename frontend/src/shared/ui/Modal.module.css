@@ -16,7 +16,9 @@
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  box-shadow:
+    inset 0 1px 0 var(--highlight-inset),
+    var(--shadow-lg);
 }
 
 .sm {
@@ -35,17 +37,32 @@
   padding: var(--space-4) var(--space-5) 0;
 }
 
+/* A dialog heading names an interface action, so it stays in the body face
+ * (docs/08-ui-map.md). */
 .title {
-  font-size: 21px;
+  font-size: 20px;
 }
 
 .close {
-  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
   background: none;
-  font-size: 18px;
   color: var(--color-text-secondary);
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .close:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
 }
 
 .body {
@@ -60,7 +77,7 @@
   justify-content: flex-end;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-5) var(--space-4);
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 @media (max-width: 600px) {

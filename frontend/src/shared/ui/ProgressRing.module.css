@@ -10,21 +10,25 @@
   inset: 0;
 }
 
+/* A muted track and restrained brass on it: the ring is a reading, not a
+ * highlight (docs/08-ui-map.md). */
 .track {
   fill: none;
   stroke: var(--color-border);
+  opacity: 0.7;
 }
 
 .value {
   fill: none;
   stroke: var(--color-accent);
   stroke-linecap: round;
-  transition: stroke-dashoffset 400ms ease;
+  transition: stroke-dashoffset 400ms var(--ease-standard);
 }
 
 .label {
   position: relative;
   font-size: 12px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--color-text);
 }

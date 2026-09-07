@@ -1,3 +1,4 @@
+import { X } from 'lucide-react';
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -52,7 +53,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
             onClick={onClose}
             aria-label={t('common.close')}
           >
-            ✕
+            <X size={18} aria-hidden="true" />
           </button>
         </div>
         <div className={styles.body}>{children}</div>

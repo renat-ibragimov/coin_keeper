@@ -1,3 +1,4 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from './Button';
@@ -25,7 +26,8 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
   return (
     <nav className={styles.pagination} aria-label={t('pagination.label')}>
       <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => goTo(page - 1)}>
-        ← {t('pagination.previous')}
+        <ChevronLeft size={15} aria-hidden="true" />
+        {t('pagination.previous')}
       </Button>
       {pageItems(page, pageCount).map((item, index) =>
         item === 'gap' ? (
@@ -50,7 +52,8 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
         disabled={page >= pageCount}
         onClick={() => goTo(page + 1)}
       >
-        {t('pagination.next')} →
+        {t('pagination.next')}
+        <ChevronRight size={15} aria-hidden="true" />
       </Button>
     </nav>
   );

@@ -16,10 +16,12 @@
   gap: var(--space-4);
 }
 
+/* A form section names an interface step, so it stays in the body face at
+ * UI-panel weight (docs/08-ui-map.md). */
 .sectionTitle {
-  font-size: 19px;
+  font-size: 18px;
   padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .actions {

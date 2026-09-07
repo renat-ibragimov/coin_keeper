@@ -5,9 +5,9 @@
 }
 
 .label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-secondary);
 }
 
 .labelCenter {
@@ -26,13 +26,28 @@
   padding: 10px 12px;
   min-height: 42px;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-strong);
-  background-color: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface-control);
   color: var(--color-text);
   font-family: var(--font-body);
   font-size: 15px;
   text-align: left;
   cursor: pointer;
+  transition:
+    border-color var(--duration-fast) var(--ease-standard),
+    background-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (pointer: coarse) {
+  .trigger {
+    min-height: 44px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .trigger:hover:not(:disabled) {
+    border-color: var(--color-border-strong);
+  }
 }
 
 .trigger:disabled {
@@ -40,11 +55,12 @@
   opacity: 0.6;
 }
 
+/* A crisp ring with an offset, not a glow (docs/08-ui-map.md). */
 .trigger:focus-visible,
 .triggerOpen {
-  outline: none;
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 20%, transparent);
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-color: var(--color-border-hover);
 }
 
 .triggerText {
@@ -59,21 +75,19 @@
   flex: 0 0 auto;
   width: 12px;
   height: 8px;
-  background-color: #8a7660;
+  background-color: var(--color-text-muted);
   -webkit-mask: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.6' d='m1 1.5 5 5 5-5'/%3E%3C/svg%3E")
     center / contain no-repeat;
   mask: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='none' stroke='%23000' stroke-width='1.6' d='m1 1.5 5 5 5-5'/%3E%3C/svg%3E")
     center / contain no-repeat;
 }
 
-:root[data-theme='dark'] .arrow {
-  background-color: #9d8c74;
-}
-
 .invalid {
   border-color: var(--color-danger);
 }
 
+/* The open menu is a raised card in its own right: card surface, card
+ * shadow, one step of radius below the trigger's siblings. */
 .menu {
   position: absolute;
   z-index: 30;
@@ -81,10 +95,10 @@
   left: 0;
   right: 0;
   min-width: 220px;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-surface-raised);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -93,7 +107,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .searchIcon {
@@ -160,6 +174,7 @@
   border-radius: var(--radius-sm);
   color: var(--color-text);
   cursor: pointer;
+  transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
 .optionText {
@@ -170,11 +185,11 @@
 }
 
 .optionActive {
-  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-raised));
+  background: var(--color-surface-hover);
 }
 
 .optionSelected {
-  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface-raised));
+  background: var(--color-selected);
   color: var(--color-accent-strong);
   font-weight: 600;
 }
@@ -189,8 +204,14 @@
 }
 
 .check {
+  display: inline-flex;
   flex: 0 0 auto;
   color: var(--color-accent-strong);
+}
+
+.check svg {
+  width: 15px;
+  height: 15px;
 }
 
 :root[data-theme='dark'] .check {
