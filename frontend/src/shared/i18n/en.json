@@ -216,7 +216,7 @@
     "ratesAsOf": "as of {{date}}",
     "rateMissing": "no data",
     "emptyTitle": "The collection is empty so far",
-    "emptyText": "Find a first coin in the catalog and add it to the collection."
+    "emptyText": "Find your first coin in the catalog and add it to your collection — progress and totals will show up here."
   },
   "card": {
     "photosLabel": "Photos",
