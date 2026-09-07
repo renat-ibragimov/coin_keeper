@@ -355,13 +355,18 @@ button.photoFrame {
 /* The one number this whole card exists to answer: a gold gradient text
  * fill (the same --gradient-accent as the CTA button below it) instead of
  * the plain body colour, so it reads as the page's other headline moment,
- * not just another line of text. */
+ * not just another line of text. lining-nums: Playfair Display's default
+ * oldstyle figures dip "5"/"7"/"9" below the baseline, and at this size that
+ * descender falls outside the line box that background-clip: text paints
+ * into — the digit's ink is there, just uncoloured, so it reads as clipped.
+ * Lining figures sit uniformly on the baseline and sidestep that. */
 .priceValue {
   margin: 0;
   font-family: var(--font-display);
   font-size: 68px;
   font-weight: 700;
   line-height: 1.05;
+  font-variant-numeric: lining-nums;
   background: var(--gradient-accent);
   background-clip: text;
   -webkit-background-clip: text;
