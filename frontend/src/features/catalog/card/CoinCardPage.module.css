@@ -10,7 +10,7 @@
   gap: var(--space-1);
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--color-warning);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-md);
   background: var(--color-warning-soft);
   color: var(--color-text);
   font-size: 14.5px;
@@ -46,7 +46,7 @@
 
 .title {
   font-family: var(--font-display);
-  font-size: 34px;
+  font-size: clamp(26px, 3.4vw, 36px);
   line-height: 1.15;
   text-align: center;
 }
@@ -79,13 +79,11 @@
   margin: 0;
 }
 
+/* A display plinth, not a vitrine: one clean surface, a quiet border, the
+ * shared lit top edge and a minimal shadow. The spotlight gradient that used
+ * to pool behind the coin is gone — the only thing on this page that should
+ * draw the eye is the coin itself (docs/08-ui-map.md). */
 .photoFrame {
-  /* A private, page-scoped token (not a shared one — this one shape of
-   * highlight belongs to this frame only): a bright inner edge in light
-   * theme reads as glass/plaque sheen, but the same brightness on a dark
-   * surface reads as a milky smear, so dark theme dims it to a whisper
-   * instead of dropping it. */
-  --photo-highlight: rgb(255 255 255 / 0.22);
   position: relative;
   display: block;
   width: 100%;
@@ -94,26 +92,16 @@
   padding: 0;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-border) 85%, var(--color-accent) 15%);
-  /* A vitrine, not a flat plaque: a faint spotlight pooling behind where the
-   * coin sits, fading to the same surface the other hero cards use. */
-  background: radial-gradient(
-    circle at 50% 42%,
-    color-mix(in srgb, var(--color-accent) 6%, var(--color-surface-raised)),
-    var(--color-surface-raised) 68%
-  );
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
   box-shadow:
-    inset 0 1px 0 var(--photo-highlight),
+    inset 0 1px 0 var(--highlight-inset),
     var(--shadow-sm);
   font: inherit;
   transition:
-    transform 180ms ease,
-    border-color 160ms ease,
-    box-shadow 180ms ease;
-}
-
-:root[data-theme='dark'] .photoFrame {
-  --photo-highlight: rgb(255 255 255 / 0.05);
+    transform var(--duration-normal) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    box-shadow var(--duration-normal) var(--ease-standard);
 }
 
 /* CoinImage normally erases a photo's white studio backdrop by blending it
@@ -136,14 +124,14 @@ button.photoFrame {
 }
 
 @media (hover: hover) and (pointer: fine) {
-  /* A small lift, not a zoom: the whole plaque rises a couple of pixels,
+  /* A small lift, not a zoom: the whole plinth rises a couple of pixels,
    * the coin doesn't grow. */
   button.photoFrame:hover,
   button.photoFrame:focus-visible {
-    transform: translateY(-2px) scale(1.008);
+    transform: translateY(-2px);
     border-color: var(--color-border-hover);
     box-shadow:
-      inset 0 1px 0 var(--photo-highlight),
+      inset 0 1px 0 var(--highlight-inset),
       var(--shadow-md);
   }
 
@@ -181,31 +169,26 @@ button.photoFrame {
   height: 44px;
   border-radius: 50%;
   border: 1px solid var(--color-border-strong);
-  background: color-mix(in srgb, var(--color-surface) 85%, transparent);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
   color: var(--color-text);
-  font-size: 18px;
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0.85);
+  transform: translate(-50%, -50%) scale(0.9);
   transition:
-    opacity 160ms ease,
-    transform 160ms ease;
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 
-/* A vitrine caption, not a button: quieter weight, a hair of letter-spacing,
- * glassy rather than solid. */
+/* A caption, not a button: an eyebrow in the corner of the plinth, with no
+ * frosted pill or shadow of its own competing with the coin. */
 .photoLabel {
   position: absolute;
-  top: var(--space-2);
-  left: var(--space-2);
-  padding: 3px 10px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--color-surface) 74%, transparent);
-  backdrop-filter: blur(6px);
-  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.06);
-  font-size: 12px;
-  letter-spacing: 0.04em;
-  color: var(--color-text-secondary);
+  top: var(--space-3);
+  left: var(--space-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 /* Kept for when the photo attribution line returns (see CoinCardPage.tsx). */
@@ -252,35 +235,37 @@ button.photoFrame {
 /* A solid badge with a soft halo a few shades lighter than its own fill —
  * color-mix keeps the halo in step with the theme automatically instead of
  * a second pair of light/dark tokens (docs/08-ui-map.md). */
+/* Integrated, not badge-like: the solid disc stays — it is what makes the
+ * state legible at a glance next to its heading — but loses the soft halo
+ * that made it read as a sticker pasted onto the card, and comes down a size
+ * so the price below it stays the loudest thing here (docs/08-ui-map.md). */
 .statusIcon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   flex-shrink: 0;
   color: var(--color-on-icon-badge);
 }
 
 .statusIcon svg {
-  width: 22px;
-  height: 22px;
+  width: 19px;
+  height: 19px;
 }
 
 .statusIconOwned {
   background: var(--color-owned-icon);
-  box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-owned-icon) 16%, transparent);
 }
 
 .statusIconAbsent {
   background: var(--color-absent-icon);
-  box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-absent-icon) 16%, transparent);
 }
 
 .statusHeading {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 27px;
+  font-size: 24px;
 }
 
 .statusOwned {
@@ -302,14 +287,12 @@ button.photoFrame {
   font-weight: 600;
 }
 
-/* A card-in-a-card: a bordered, radiused box around the number that matters
- * most here, on a surface a touch different from .sidebarCard's own, with
- * its own shadow so it reads as resting a little above that surface. It
- * grows into whatever vertical room .sidebarCard has left (a square card is
- * often taller than its fixed-height rows need); space-between spreads its
- * three lines across that room — label at the top, meta at the bottom —
- * instead of bunching them in the middle, and everything centers
- * horizontally rather than hugging the left edge. */
+/* Recessed into the card, not another card floating inside it: a surface
+ * below the card's own, an inset top shadow instead of a drop shadow, and a
+ * radius one step smaller than its parent (docs/08-ui-map.md). It grows into
+ * whatever vertical room .sidebarCard has left — a square card is often
+ * taller than its fixed-height rows need — and space-between spreads its
+ * three lines across that room instead of bunching them in the middle. */
 .priceBlock {
   display: flex;
   flex: 1;
@@ -319,16 +302,17 @@ button.photoFrame {
   gap: var(--space-2);
   margin-top: var(--space-1);
   padding: var(--space-4) var(--space-5);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--color-surface-sunken) 55%, transparent);
-  box-shadow: var(--shadow-sm);
+  background: color-mix(in srgb, var(--color-surface-sunken) 40%, transparent);
+  box-shadow: var(--shadow-inset);
   text-align: center;
 }
 
 .priceLabel {
-  font-size: 13px;
-  letter-spacing: 0.1em;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-text-muted);
 }
@@ -354,25 +338,20 @@ button.photoFrame {
   color: var(--color-text-muted);
 }
 
-/* The one number this whole card exists to answer: a gold gradient text
- * fill (the same --gradient-accent as the CTA button below it) instead of
- * the plain body colour, so it reads as the page's other headline moment,
- * not just another line of text. lining-nums: Playfair Display's default
- * oldstyle figures dip "5"/"7"/"9" below the baseline, and at this size that
- * descender falls outside the line box that background-clip: text paints
- * into — the digit's ink is there, just uncoloured, so it reads as clipped.
- * Lining figures sit uniformly on the baseline and sidestep that. */
+/* The one number this whole card exists to answer, and still the strongest
+ * text in the sidebar — but a solid brass rather than a gold gradient fill,
+ * and sized to sit under the two coin photographs instead of shouting over
+ * them (docs/08-ui-map.md). lining-nums: Playfair Display's default oldstyle
+ * figures dip "5"/"7"/"9" below the baseline, which reads as a misalignment
+ * in a number this size. */
 .priceValue {
   margin: 0;
   font-family: var(--font-display);
-  font-size: 68px;
+  font-size: clamp(38px, 4.4vw, 54px);
   font-weight: 700;
   line-height: 1.05;
-  font-variant-numeric: lining-nums;
-  background: var(--gradient-accent);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
+  font-variant-numeric: lining-nums tabular-nums;
+  color: var(--color-accent-strong);
 }
 
 .priceMeta {
@@ -394,51 +373,13 @@ button.photoFrame {
   text-decoration-thickness: 2px;
 }
 
-/* The one primary action on the page gets a bit of that catalogue-button
- * physicality: a glassy top edge, a small lift on hover, a press on click.
- * Targets the shared Button's own <button> by DOM position instead of
- * touching Button.module.css, which every page's primary actions share. */
+/* The page's one primary action, given the size it deserves. The lit top
+ * edge, the lift on hover and the press on click now live in the shared
+ * Button itself, so all that is left here is the larger footprint. */
 .cardActions button {
-  --cta-highlight: rgb(255 255 255 / 0.22);
-  position: relative;
   padding: 14px 20px;
   min-height: 50px;
   font-size: 16px;
-  box-shadow:
-    inset 0 1px 0 var(--cta-highlight),
-    var(--shadow-sm);
-  transition:
-    transform 140ms ease,
-    box-shadow 140ms ease,
-    filter 140ms ease;
-}
-
-:root[data-theme='dark'] .cardActions button {
-  --cta-highlight: rgb(255 255 255 / 0.08);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .cardActions button:hover:not(:disabled) {
-    transform: translateY(-1px);
-    box-shadow:
-      inset 0 1px 0 var(--cta-highlight),
-      var(--shadow-md);
-  }
-}
-
-.cardActions button:active:not(:disabled) {
-  transform: translateY(0);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cardActions button {
-    transition: none;
-  }
-
-  .cardActions button:hover:not(:disabled),
-  .cardActions button:active:not(:disabled) {
-    transform: none;
-  }
 }
 
 .muted {
@@ -508,7 +449,7 @@ button.photoFrame {
 .instancesSummary {
   margin-bottom: var(--space-3);
   padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .instancesDisclosure summary {
@@ -546,6 +487,7 @@ button.photoFrame {
 .tabsWrapper [role='tab'] {
   position: relative;
   padding: var(--space-2) var(--space-1) var(--space-3);
+  border: none;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -554,6 +496,10 @@ button.photoFrame {
 .tabsWrapper [role='tab'][aria-selected='true'] {
   background: transparent;
   box-shadow: none;
+  color: var(--color-accent-strong);
+}
+
+:root[data-theme='dark'] .tabsWrapper [role='tab'][aria-selected='true'] {
   color: var(--color-accent);
 }
 
@@ -595,10 +541,6 @@ button.photoFrame {
   .hero {
     grid-template-columns: minmax(0, 420px);
     justify-content: center;
-  }
-
-  .title {
-    font-size: 28px;
   }
 }
 

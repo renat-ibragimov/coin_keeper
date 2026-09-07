@@ -18,24 +18,24 @@
 }
 
 .grid {
-  stroke: var(--color-border);
+  stroke: var(--color-chart-grid);
   stroke-dasharray: 2 4;
 }
 
 .axisLabel {
-  fill: var(--color-text-muted);
+  fill: var(--color-chart-axis);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .area {
-  fill: var(--color-accent);
+  fill: var(--color-chart-series-1);
   opacity: 0.1;
 }
 
 .line {
   fill: none;
-  stroke: var(--color-accent);
+  stroke: var(--color-chart-series-1);
   stroke-width: 1.8;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -43,12 +43,12 @@
 
 .point {
   fill: var(--color-surface-raised);
-  stroke: var(--color-accent);
+  stroke: var(--color-chart-series-1);
   stroke-width: 1.6;
 }
 
 .ownPoint {
-  fill: var(--color-accent);
+  fill: var(--color-chart-series-1);
   stroke: var(--color-surface-raised);
   stroke-width: 1.6;
 }

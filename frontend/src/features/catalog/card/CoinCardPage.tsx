@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
-import { CircleCheck, CircleMinus } from 'lucide-react';
+import { ArrowLeft, CircleCheck, CircleMinus, Maximize2 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
@@ -148,7 +148,8 @@ function CardBody({ card }: { card: CatalogCard }) {
             track and the title lands exactly in the middle. */}
         <div className={styles.titleBar}>
           <Button variant="ghost" size="sm" onClick={goBack} className={styles.backButton}>
-            ← {t('common.back')}
+            <ArrowLeft size={15} aria-hidden="true" />
+            {t('common.back')}
           </Button>
           <div className={styles.titleCell}>
             <h1 className={styles.title}>{title}</h1>
@@ -183,7 +184,7 @@ function CardBody({ card }: { card: CatalogCard }) {
                   <CoinImage {...side.card} alt="" className={styles.photoImage} />
                   <span className={styles.photoLabel}>{side.label}</span>
                   <span className={styles.magnify} aria-hidden="true">
-                    ⤢
+                    <Maximize2 size={18} />
                   </span>
                 </button>
               ) : (
