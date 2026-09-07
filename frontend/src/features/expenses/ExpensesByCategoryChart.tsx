@@ -45,7 +45,7 @@ export function ExpensesByCategoryChart({ data, locale, palette }: Props) {
             innerRadius={56}
             outerRadius={86}
             paddingAngle={data.length > 1 ? 2 : 0}
-            stroke={palette.surface}
+            stroke={palette.panel}
             strokeWidth={2}
           >
             {chartData.map((row, index) => (

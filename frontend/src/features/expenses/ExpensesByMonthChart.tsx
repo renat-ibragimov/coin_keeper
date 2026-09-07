@@ -48,12 +48,12 @@ function MonthTooltip({
         {typeof label === 'string' ? formatMonthYear(`${label}-01`, locale) : label}
       </div>
       <div className={styles.row}>
-        <span className={styles.swatch} style={{ background: palette.accent }} />
+        <span className={styles.swatch} style={{ background: palette.series1 }} />
         <span className={styles.label}>{coinsLabel}</span>
         <span className={styles.value}>{formatUah(coins, locale)}</span>
       </div>
       <div className={styles.row}>
-        <span className={styles.swatch} style={{ background: palette.accentSoft }} />
+        <span className={styles.swatch} style={{ background: palette.series2 }} />
         <span className={styles.label}>{supportingLabel}</span>
         <span className={styles.value}>{formatUah(supporting, locale)}</span>
       </div>
@@ -83,12 +83,12 @@ export function ExpensesByMonthChart({ data, locale, palette }: Props) {
         <XAxis
           dataKey="month"
           tickFormatter={(value: string) => formatMonthShort(value, locale)}
-          tick={{ fill: palette.textMuted, fontSize: 12 }}
+          tick={{ fill: palette.axis, fontSize: 12 }}
           axisLine={{ stroke: palette.grid }}
           tickLine={false}
         />
         <YAxis
-          tick={{ fill: palette.textMuted, fontSize: 12 }}
+          tick={{ fill: palette.axis, fontSize: 12 }}
           axisLine={false}
           tickLine={false}
           width={48}
@@ -107,23 +107,23 @@ export function ExpensesByMonthChart({ data, locale, palette }: Props) {
           )}
         />
         <Legend
-          wrapperStyle={{ fontSize: 12.5, color: palette.textMuted }}
+          wrapperStyle={{ fontSize: 12.5, color: palette.axis }}
           formatter={(value) => (value === 'coinsUah' ? coinsLabel : supportingLabel)}
         />
         <Bar
           dataKey="coinsUah"
           stackId="month"
-          fill={palette.accent}
+          fill={palette.series1}
           radius={[0, 0, 4, 4]}
-          stroke={palette.surface}
+          stroke={palette.panel}
           strokeWidth={2}
         />
         <Bar
           dataKey="supportingUah"
           stackId="month"
-          fill={palette.accentSoft}
+          fill={palette.series2}
           radius={[4, 4, 0, 0]}
-          stroke={palette.surface}
+          stroke={palette.panel}
           strokeWidth={2}
         />
       </BarChart>

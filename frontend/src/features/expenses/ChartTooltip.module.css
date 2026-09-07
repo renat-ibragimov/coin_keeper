@@ -4,8 +4,9 @@
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-strong);
   background: var(--color-surface-raised);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-card);
   font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .title {
@@ -44,7 +45,7 @@
 .total {
   margin-top: 6px;
   padding-top: 6px;
-  border-top: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border-subtle);
   display: flex;
   justify-content: space-between;
   color: var(--color-text);

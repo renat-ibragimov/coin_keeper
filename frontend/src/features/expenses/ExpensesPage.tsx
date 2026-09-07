@@ -196,11 +196,11 @@ export function ExpensesPage() {
 
           {summary && summary.categories.length > 0 ? (
             <div className={styles.charts}>
-              <Card aria-label={t('expenses.chartByMonthTitle')}>
+              <Card variant="panel" aria-label={t('expenses.chartByMonthTitle')}>
                 <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
                 <ExpensesByMonthChart data={summary.byMonth} locale={locale} palette={palette} />
               </Card>
-              <Card aria-label={t('expenses.chartByCategoryTitle')}>
+              <Card variant="panel" aria-label={t('expenses.chartByCategoryTitle')}>
                 <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
                 <ExpensesByCategoryChart
                   data={summary.byCategory}
