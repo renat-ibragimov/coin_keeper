@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CalendarDays } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -7,7 +8,7 @@ import { fetchCurrencies } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { ExpenseCategory, ExpenseOut } from '@/shared/api/types';
-import { formatDate, formatMoney, formatUah } from '@/shared/lib/format';
+import { formatDate, formatMoney, formatSignedUah, formatUah } from '@/shared/lib/format';
 import { useChartPalette } from '@/shared/theme/useChartPalette';
 import {
   Badge,
@@ -116,6 +117,17 @@ export function ExpensesPage() {
   const pageCount = Math.max(1, Math.ceil((list?.total ?? 0) / PAGE_SIZE));
   const palette = useChartPalette();
 
+  const thisMonth = summary ? Number(summary.thisMonthUah) : null;
+  const prevMonth = summary ? Number(summary.prevMonthUah) : null;
+  const thisMonthHint =
+    thisMonth !== null && prevMonth !== null
+      ? prevMonth === 0 && thisMonth > 0
+        ? t('expenses.thisMonthHintNoPrev')
+        : t('expenses.thisMonthHint', {
+            delta: formatSignedUah(thisMonth - prevMonth, locale),
+          })
+      : null;
+
   return (
     <div className={styles.page}>
       <PageHeader
@@ -145,9 +157,15 @@ export function ExpensesPage() {
                   .reduce((sum, row) => sum + row.count, 0),
               })}
             />
+            <StatTile
+              icon={<CalendarDays strokeWidth={1.75} />}
+              label={t('expenses.tileThisMonth')}
+              value={formatUah(summary.thisMonthUah, locale)}
+              hint={thisMonthHint}
+            />
           </>
         ) : (
-          Array.from({ length: 3 }, (_, index) => <Skeleton key={index} height={96} />)
+          Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={96} />)
         )}
       </section>
 
@@ -252,7 +270,7 @@ export function ExpensesPage() {
                     <td>
                       {fromPurchase && expense.catalogItemId ? (
                         <Link to={`/catalog/${expense.catalogItemId}`}>
-                          {expense.description || t('expenses.fromPurchase')}
+                          {expense.coinTitle || t('expenses.fromPurchase')}
                         </Link>
                       ) : (
                         expense.description || '—'
@@ -268,7 +286,7 @@ export function ExpensesPage() {
                     <td className={styles.actions}>
                       {fromPurchase ? (
                         <span className={styles.managed} title={t('expenses.managedNote')}>
-                          {t('expenses.fromPurchase')}
+                          —
                         </span>
                       ) : (
                         <>

@@ -189,6 +189,119 @@ describe('ExpensesPage', () => {
     expect(screen.queryByText('Фінансової історії поки немає')).toBeNull();
   });
 
+  it('shows the "this month" tile with a delta against last month', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [makeExpense({ id: 1 })],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue({
+      categories: [{ category: 'album', count: 1, totalUah: '100.00' }],
+      totalUah: '100.00',
+      coinSpendUah: '0.00',
+      relatedSpendUah: '100.00',
+      byMonth: makeByMonth('0.00', '50.00'),
+      byCategory: [{ category: 'album', count: 1, totalUah: '100.00' }],
+      thisMonthUah: '300.00',
+      prevMonthUah: '50.00',
+    });
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByText('Цього місяця')).toBeInTheDocument();
+    expect(screen.getByText('300 ₴')).toBeInTheDocument();
+    expect(screen.getByText('+250 ₴ до минулого місяця')).toBeInTheDocument();
+  });
+
+  it('says there was no spending last month when the previous month is empty', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [makeExpense({ id: 1 })],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue({
+      categories: [{ category: 'album', count: 1, totalUah: '100.00' }],
+      totalUah: '100.00',
+      coinSpendUah: '0.00',
+      relatedSpendUah: '100.00',
+      byMonth: makeByMonth('80.00', '0.00'),
+      byCategory: [{ category: 'album', count: 1, totalUah: '100.00' }],
+      thisMonthUah: '80.00',
+      prevMonthUah: '0.00',
+    });
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByText('минулого місяця витрат не було')).toBeInTheDocument();
+  });
+
+  it('links a coin_purchase row to the coin, falling back when there is no title', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({
+          id: 1,
+          category: 'coin_purchase',
+          catalogItemId: 5,
+          coinTitle: 'Дельфін',
+          amountUah: '300.00',
+        }),
+        makeExpense({
+          id: 2,
+          category: 'coin_purchase',
+          catalogItemId: 7,
+          coinTitle: null,
+          amountUah: '120.00',
+        }),
+        makeExpense({
+          id: 3,
+          category: 'album',
+          description: 'Альбом для монет',
+          vendor: 'Rozetka',
+        }),
+      ],
+      total: 3,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue({
+      categories: [
+        { category: 'coin_purchase', count: 2, totalUah: '420.00' },
+        { category: 'album', count: 1, totalUah: '100.00' },
+      ],
+      totalUah: '520.00',
+      coinSpendUah: '420.00',
+      relatedSpendUah: '100.00',
+      byMonth: makeByMonth('300.00', '50.00'),
+      byCategory: [
+        { category: 'coin_purchase', count: 2, totalUah: '420.00' },
+        { category: 'album', count: 1, totalUah: '100.00' },
+      ],
+      thisMonthUah: '300.00',
+      prevMonthUah: '50.00',
+    });
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Дельфін' })).toHaveAttribute(
+      'href',
+      '/catalog/5',
+    );
+    expect(screen.getByRole('link', { name: 'з покупки монети' })).toHaveAttribute(
+      'href',
+      '/catalog/7',
+    );
+
+    // The right-hand actions column no longer repeats "з покупки монети" for these rows.
+    expect(screen.getAllByText('з покупки монети')).toHaveLength(1);
+    expect(screen.getByText('Редагувати')).toBeInTheDocument();
+    expect(screen.getByText('Видалити')).toBeInTheDocument();
+  });
+
   it('renders the month and category charts once there is data', async () => {
     vi.mocked(fetchExpenses).mockResolvedValue({
       items: [
