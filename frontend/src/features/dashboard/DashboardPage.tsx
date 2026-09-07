@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { CircleDashed, Coins, PieChart, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -93,7 +94,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
       <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
         <Link to="/collection/coins" className={styles.tileLink}>
           <StatTile
-            icon="◎"
+            icon={<Coins strokeWidth={1.75} />}
             label={t('dashboard.tileCoins')}
             value={formatNumber(dashboard.collectionItems, locale, 0)}
             hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
@@ -101,7 +102,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
         </Link>
         <Link to="/collection/missing" className={styles.tileLink}>
           <StatTile
-            icon="◌"
+            icon={<CircleDashed strokeWidth={1.75} />}
             label={t('dashboard.tileMissing')}
             value={formatNumber(dashboard.missingItems, locale, 0)}
             hint={t('dashboard.tileMissingHint', { count: dashboard.catalogItems })}
@@ -109,7 +110,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
         </Link>
         <Link to="/collection/series" className={styles.tileLink}>
           <StatTile
-            icon="◔"
+            icon={<PieChart strokeWidth={1.75} />}
             label={t('dashboard.tileCompletion')}
             value={formatPercent(dashboard.completionPercent, locale, 1)}
             hint={t('dashboard.progress', {
@@ -120,9 +121,21 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
         </Link>
         <Link to="/collection/money" className={styles.tileLink}>
           <StatTile
-            icon="↗"
+            icon={<TrendingUp strokeWidth={1.75} />}
             label={t('dashboard.marketValue')}
             value={formatUah(dashboard.marketValueUah, locale)}
+            hint={
+              delta.percent !== null ? (
+                <span className={styles[deltaTone]}>
+                  {formatSignedUah(delta.diffUah, locale)}{' '}
+                  <span className={styles.deltaPercent}>
+                    ({formatSignedPercent(delta.percent, locale)})
+                  </span>
+                </span>
+              ) : (
+                formatSignedUah(delta.diffUah, locale)
+              )
+            }
           />
         </Link>
       </section>
