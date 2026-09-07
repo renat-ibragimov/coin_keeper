@@ -1,32 +1,39 @@
+/* The table is a structural panel, not a stack of cards: it sits on the
+ * panel surface, one step below a raised card, with a panel radius and no
+ * lift of its own (docs/08-ui-map.md). */
 .scroll {
   overflow-x: auto;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
 }
 
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
   min-width: 860px;
 }
 
+/* The header is set apart by typography and one firm rule, not by a fill:
+ * a filled header band turned the panel into two stacked blocks. */
 .table th {
   padding: 10px var(--space-4);
   border-bottom: 1px solid var(--color-border-strong);
-  background: var(--color-surface-raised);
   color: var(--color-text-secondary);
-  font-size: 12.5px;
-  font-weight: 700;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   white-space: nowrap;
 }
 
 .table td {
   padding: 8px var(--space-4);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border-subtle);
   vertical-align: middle;
 }
 
@@ -35,8 +42,12 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .table tbody tr {
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+
   .table tbody tr:hover {
-    background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface-raised));
+    background: var(--color-row-hover);
   }
 }
 
@@ -80,13 +91,22 @@
   padding: 0;
 }
 
+.sortButton {
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
 .sortButton:hover {
   color: var(--color-accent);
 }
 
+/* One box for the icon whatever it is, so the three sort states share a
+ * baseline and the header text never shifts between them. */
 .sortIcon {
+  display: inline-flex;
+  align-items: center;
+  width: 13px;
+  height: 13px;
   color: var(--color-text-muted);
-  font-size: 11px;
 }
 
 .sortButton[aria-sort] .sortIcon {
@@ -127,6 +147,10 @@
   font-size: 15.5px;
   color: inherit;
   text-decoration: none;
+}
+
+.coinTitle {
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .coinTitle:hover {
@@ -170,6 +194,7 @@
   height: 32px;
   padding-left: var(--space-3);
   border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-success-strong) 72%, #000);
   background: var(--color-success-strong);
   color: var(--color-on-success);
   font-weight: 600;

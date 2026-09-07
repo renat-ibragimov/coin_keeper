@@ -1,3 +1,4 @@
+import { Check, ExternalLink, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -120,7 +121,8 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
               target="_blank"
               rel="noreferrer"
             >
-              {sourceLabel} ↗
+              {sourceLabel}
+              <ExternalLink size={11} aria-hidden="true" />
             </a>
           ) : (
             <span className={styles.priceSource}>{sourceLabel}</span>
@@ -130,7 +132,10 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
       <div className={styles.action}>
         {owned ? (
           <div className={styles.ownedRow}>
-            <span className={styles.ownedStatus}>✓ {t('catalog.badgeInCollection')}</span>
+            <span className={styles.ownedStatus}>
+              <Check size={15} aria-hidden="true" />
+              {t('catalog.badgeInCollection')}
+            </span>
             <Link
               to={addUrl}
               state={addState}
@@ -142,7 +147,10 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
           </div>
         ) : (
           <Link to={addUrl} state={addState}>
-            <Button block>+ {t('catalog.addToCollection')}</Button>
+            <Button block>
+              <Plus size={16} aria-hidden="true" />
+              {t('catalog.addToCollection')}
+            </Button>
           </Link>
         )}
       </div>

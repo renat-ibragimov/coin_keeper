@@ -1,3 +1,4 @@
+import { ArrowDown, ArrowUp, Check, ChevronsUpDown, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -74,7 +75,15 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                     >
                       {t(`catalog.${column.key}`)}
                       <span className={styles.sortIcon} aria-hidden="true">
-                        {filters.sort === column.sort ? (filters.order === 'asc' ? '↑' : '↓') : '⇅'}
+                        {filters.sort === column.sort ? (
+                          filters.order === 'asc' ? (
+                            <ArrowUp size={13} />
+                          ) : (
+                            <ArrowDown size={13} />
+                          )
+                        ) : (
+                          <ChevronsUpDown size={13} />
+                        )}
                       </span>
                     </button>
                   ) : (
@@ -129,7 +138,10 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                 <td className={`${ALIGN_CLASS.center} ${styles.actionsCell}`}>
                   {owned ? (
                     <div className={styles.ownedPill}>
-                      <span className={styles.ownedStatus}>✓ {t('catalog.badgeInCollection')}</span>
+                      <span className={styles.ownedStatus}>
+                        <Check size={14} aria-hidden="true" />
+                        {t('catalog.badgeInCollection')}
+                      </span>
                       <Link
                         to={addUrl}
                         className={styles.addOneMore}
@@ -141,7 +153,8 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                   ) : (
                     <Link to={addUrl}>
                       <Button size="sm" className={styles.addButton}>
-                        + {t('catalog.addToCollection')}
+                        <Plus size={14} aria-hidden="true" />
+                        {t('catalog.addToCollection')}
                       </Button>
                     </Link>
                   )}

@@ -1,3 +1,6 @@
+/* A raised card, and the coin on it is the brightest thing in the grid: the
+ * card itself only has to sit clearly above the page ground and stay out of
+ * the photo's way (docs/08-ui-map.md). */
 .card {
   position: relative;
   display: flex;
@@ -6,18 +9,29 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: var(--shadow-card);
+  box-shadow:
+    inset 0 1px 0 var(--highlight-inset),
+    var(--shadow-card);
   transition:
-    transform 160ms ease,
-    box-shadow 160ms ease,
-    border-color 160ms ease;
+    transform var(--duration-normal) var(--ease-standard),
+    box-shadow var(--duration-normal) var(--ease-standard),
+    border-color var(--duration-normal) var(--ease-standard);
 }
 
 @media (hover: hover) and (pointer: fine) {
+  /* A lift, not a zoom: the card rises two pixels and the coin grows a
+   * couple of percent. Scaling the whole card blurred its text. */
   .card:hover {
-    transform: translateY(-2px) scale(1.01);
+    transform: translateY(-2px);
     border-color: var(--color-border-hover);
-    box-shadow: var(--shadow-card-hover);
+    box-shadow:
+      inset 0 1px 0 var(--highlight-inset),
+      var(--shadow-card-hover);
+  }
+
+  .card:hover .image,
+  .card:hover .imageSingle {
+    transform: scale(1.02);
   }
 }
 
@@ -92,6 +106,7 @@
   height: 100%;
   padding: 1px;
   isolation: isolate;
+  transition: transform var(--duration-normal) var(--ease-standard);
 }
 
 .image + .image {
@@ -103,6 +118,7 @@
   width: 100%;
   height: 100%;
   padding: var(--space-2);
+  transition: transform var(--duration-normal) var(--ease-standard);
 }
 
 /* Explicit z-index (higher than .image's, above) so it stays above the coin
@@ -151,6 +167,10 @@
 .titleLink {
   color: inherit;
   text-decoration: none;
+}
+
+.titleLink {
+  transition: color var(--duration-fast) var(--ease-standard);
 }
 
 .titleLink:hover {
@@ -218,6 +238,7 @@
 .price {
   font-weight: 700;
   font-size: 15.5px;
+  font-variant-numeric: tabular-nums;
 }
 
 .noPrice {
@@ -266,6 +287,7 @@
   min-height: 42px;
   padding-left: var(--space-4);
   border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--color-success-strong) 72%, #000);
   background: var(--color-success-strong);
   color: var(--color-on-success);
   font-weight: 600;
@@ -273,6 +295,9 @@
 }
 
 .ownedStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -297,4 +322,8 @@
   .addOneMore:hover {
     background: color-mix(in srgb, currentColor 26%, transparent);
   }
+}
+
+.addOneMore {
+  transition: background-color var(--duration-fast) var(--ease-standard);
 }

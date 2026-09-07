@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { SearchX } from 'lucide-react';
+import { SearchX, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -275,7 +275,7 @@ export function CatalogPage() {
                 onClick={() => setDrawerOpen(false)}
                 aria-label={t('catalog.closeFilters')}
               >
-                ✕
+                <X size={20} aria-hidden="true" />
               </button>
             </div>
             {filtersPanel}
