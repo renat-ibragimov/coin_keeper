@@ -189,25 +189,33 @@
    * brass hardware (accents, focus, primary buttons, active navigation) and
    * from the coins themselves, never from the fill of a card or a panel.
    * Hierarchy is built from lightness, not from more red. */
-  /* The texture tile's own mean (≈32/32/30) sits well above near-black, so
-   * the layer lifts the page a little: #070808 plus the grain lands on
-   * ≈#0a0a0a — near-black with a grey cast, which is the point. */
-  --color-bg: #070808;
-  --color-surface: #0d0f10;
-  --color-surface-raised: #141719;
-  --color-surface-sunken: #090a0b;
-  --color-surface-control: #101315;
-  --color-surface-hover: #1a1e20;
+  /* Every large surface is a pure neutral grey — red, green and blue equal.
+   * Not a stylistic nicety: at these levels a channel spread of only 3–5
+   * is a 20–25% imbalance, and the previous values (#0d0f10 header, #141719
+   * card) measured exactly that much extra blue against a page ground that
+   * was already neutral. The header and the filter panel read blue and the
+   * cards read as a grey slab (owner, 2026-09-07, from a catalogue
+   * screenshot). Neutral also cannot drift back toward brown, which is the
+   * other failure mode this theme has already had.
+   *
+   * The texture tile's own mean sits above near-black, so the layer lifts
+   * the ground a little: #050505 plus the grain lands on ≈#080808. */
+  --color-bg: #050505;
+  --color-surface: #0b0b0b;
+  --color-surface-raised: #111111;
+  --color-surface-sunken: #070707;
+  --color-surface-control: #0d0d0d;
+  --color-surface-hover: #181818;
 
   --color-text: #eeeae2;
   --color-text-secondary: #b7b5af;
-  --color-text-muted: #888b89;
+  --color-text-muted: #8a8a8a;
 
   /* Ordinary edges are steel and stone. Brass is the hover/focus/selected
    * edge only — never the resting border of every card. */
-  --color-border: #2b3034;
-  --color-border-strong: #454e53;
-  --color-border-subtle: rgba(211, 220, 224, 0.075);
+  --color-border: #262626;
+  --color-border-strong: #454545;
+  --color-border-subtle: rgba(255, 255, 255, 0.075);
   --color-border-hover: #9d7c3e;
 
   --color-accent: #c29a4b;
@@ -226,18 +234,18 @@
   --color-warning: #d4b06a;
   --color-warning-soft: #352a1b;
 
-  --color-info-bg: #14181a;
-  --color-info-border: #2b3236;
+  --color-info-bg: #111111;
+  --color-info-border: #262626;
 
   --color-owned: #bcd0bb;
   --color-absent: #f4938e;
 
-  --color-row-hover: #202427;
+  --color-row-hover: #181818;
   --color-selected: #2b2519;
 
   --color-focus-ring: #c29a4b;
 
-  --highlight-inset: rgba(220, 228, 232, 0.045);
+  --highlight-inset: rgba(255, 255, 255, 0.04);
 
   --color-button-primary-top: #c69f52;
   --color-button-primary-bottom: #ab8339;
@@ -261,10 +269,10 @@
   --shadow-coin: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.48))
     drop-shadow(0 10px 14px rgba(0, 0, 0, 0.34));
 
-  --overlay: rgba(5, 6, 6, 0.78);
+  --overlay: rgba(0, 0, 0, 0.8);
 
-  --color-chart-grid: #30363a;
-  --color-chart-axis: #888b89;
+  --color-chart-grid: #262626;
+  --color-chart-axis: #8a8a8a;
   --color-chart-series-1: #c29a4b;
   --color-chart-series-2: #8b8f62;
 
