@@ -423,7 +423,7 @@
       "other": "Інше"
     },
     "amount": "Сума, {{symbol}}",
-    "amountHeader": "Сума",
+    "amountHeader": "Вартість",
     "amountInvalid": "Вкажіть суму числом, більшу за 0.",
     "date": "Дата",
     "vendor": "Продавець",

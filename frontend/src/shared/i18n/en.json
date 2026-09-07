@@ -419,7 +419,7 @@
       "other": "Other"
     },
     "amount": "Amount, {{symbol}}",
-    "amountHeader": "Amount",
+    "amountHeader": "Cost",
     "amountInvalid": "Enter the amount as a number above 0.",
     "date": "Date",
     "vendor": "Vendor",

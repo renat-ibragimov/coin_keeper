@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Wallet } from 'lucide-react';
+import { CalendarDays, Coins, Receipt, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -113,6 +113,12 @@ export function ExpensesPage() {
         .filter((row) => row.category !== 'coin_purchase')
         .reduce((sum, row) => sum + Number(row.totalUah), 0)
     : null;
+  const relatedCount = summary
+    ? summary.categories
+        .filter((row) => row.category !== 'coin_purchase')
+        .reduce((sum, row) => sum + row.count, 0)
+    : 0;
+  const totalCount = summary ? summary.categories.reduce((sum, row) => sum + row.count, 0) : 0;
   const list = listQuery.data;
   const pageCount = Math.max(1, Math.ceil((list?.total ?? 0) / PAGE_SIZE));
   const palette = useChartPalette();
@@ -165,22 +171,22 @@ export function ExpensesPage() {
             {summary ? (
               <>
                 <StatTile
+                  icon={<Wallet strokeWidth={1.75} />}
                   label={t('expenses.tileTotal')}
                   value={formatUah(summary.totalUah, locale)}
+                  hint={t('expenses.count', { count: totalCount })}
                 />
                 <StatTile
+                  icon={<Coins strokeWidth={1.75} />}
                   label={t('expenses.tileCoins')}
                   value={formatUah(coins?.totalUah ?? '0', locale)}
                   hint={t('expenses.count', { count: coins?.count ?? 0 })}
                 />
                 <StatTile
+                  icon={<Receipt strokeWidth={1.75} />}
                   label={t('expenses.tileRelated')}
                   value={formatUah(relatedUah, locale)}
-                  hint={t('expenses.count', {
-                    count: summary.categories
-                      .filter((row) => row.category !== 'coin_purchase')
-                      .reduce((sum, row) => sum + row.count, 0),
-                  })}
+                  hint={t('expenses.count', { count: relatedCount })}
                 />
                 <StatTile
                   icon={<CalendarDays strokeWidth={1.75} />}
@@ -271,7 +277,7 @@ export function ExpensesPage() {
                     <th>{t('expenses.description')}</th>
                     <th>{t('expenses.vendor')}</th>
                     <th className={styles.number}>{t('expenses.amountHeader')}</th>
-                    <th className={styles.number}>₴</th>
+                    <th className={styles.number}>$</th>
                     <th />
                   </tr>
                 </thead>
@@ -299,9 +305,9 @@ export function ExpensesPage() {
                         <td className={`${styles.number} tabular`}>
                           {formatMoney(expense.amount, expense.currencyCode, locale)}
                         </td>
-                        <td className={`${styles.number} tabular`}>
-                          {formatUah(expense.amountUah, locale)}
-                        </td>
+                        {/* USD equivalent: the column is in place, the value
+                            comes from the API in a later step. */}
+                        <td className={`${styles.number} tabular`}>—</td>
                         <td className={styles.actions}>
                           {fromPurchase ? (
                             <span className={styles.managed} title={t('expenses.managedNote')}>

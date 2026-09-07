@@ -26,7 +26,10 @@ export function PositionCard({ item }: PositionCardProps) {
       </Link>
       <div className={styles.body}>
         <div className={styles.headline}>
-          <h3 className={styles.title}>
+          {/* title: the same native tooltip the catalogue tile carries — the
+              heading clamps to two lines, so a long coin name is only
+              readable in full on hover (CoinCard.tsx). */}
+          <h3 className={styles.title} title={item.title}>
             <Link to={cardUrl} className={`${styles.titleLink} ${styles.titleLinkStretched}`}>
               {item.title}
             </Link>
