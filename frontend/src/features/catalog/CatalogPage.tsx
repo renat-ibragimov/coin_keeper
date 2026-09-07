@@ -1,10 +1,12 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { SearchX, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { useDismissable } from '@/shared/lib/useDismissable';
+import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
 import type { ActiveFilterChip } from '@/shared/ui';
 import {
   Button,
@@ -61,6 +63,16 @@ export function CatalogPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   // The overlay handles the outside press itself; Escape and navigation come from the hook.
   useDismissable(drawerOpen, () => setDrawerOpen(false));
+
+  const [searchParams] = useSearchParams();
+  const viewMode = useStoredViewMode('ck.viewMode.catalog');
+  useEffect(() => {
+    // Only on mount, and only when the URL itself says nothing: a shared
+    // link's own `?view=` always wins over what was remembered here.
+    const resolved = viewMode.resolve(searchParams.get('view') ?? undefined);
+    if (resolved !== filters.view) update({ view: resolved, page: filters.page });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolve once, from the initial URL
+  }, []);
 
   const catalogQuery = useQuery({
     queryKey: ['catalog', filters, GRID_PAGE_SIZE],
@@ -205,7 +217,10 @@ export function CatalogPage() {
               ),
             },
           ]}
-          onViewChange={(view) => update({ view, page: filters.page })}
+          onViewChange={(view) => {
+            update({ view, page: filters.page });
+            viewMode.remember(view);
+          }}
           sort={filters.sort}
           sortOptions={SORT_FIELDS.map((field) => ({ value: field, label: t(SORT_LABELS[field]) }))}
           onSortChange={(sort) => update({ sort: sort as SortField })}

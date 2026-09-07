@@ -8,6 +8,8 @@ import { useAuth } from '@/features/auth/useAuth';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { setLocale } from '@/shared/i18n';
 import type { Locale } from '@/shared/i18n';
+import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
+import type { ViewMode } from '@/shared/lib/useStoredViewMode';
 import { useTheme } from '@/shared/theme/useTheme';
 import {
   Badge,
@@ -38,6 +40,15 @@ export function SettingsPage() {
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [locale, setLocaleField] = useState<Locale>(user?.locale === 'en' ? 'en' : 'uk');
+
+  const catalogViewMode = useStoredViewMode('ck.viewMode.catalog');
+  const collectionViewMode = useStoredViewMode('ck.viewMode.collection');
+  const [catalogView, setCatalogView] = useState<ViewMode>(() =>
+    catalogViewMode.resolve(undefined),
+  );
+  const [collectionView, setCollectionView] = useState<ViewMode>(() =>
+    collectionViewMode.resolve(undefined),
+  );
 
   const profileMutation = useMutation({
     mutationFn: () => updateProfile({ displayName: displayName.trim() || null, locale }),
@@ -115,6 +126,39 @@ export function SettingsPage() {
               />
               <p className={styles.note}>{t('settings.themeNote')}</p>
             </div>
+          </FormStack>
+
+          <h2 className={`${styles.sectionTitle} ${styles.spaced}`}>
+            {t('settings.viewModeTitle')}
+          </h2>
+          <FormStack>
+            <FormRow>
+              <Select
+                label={t('settings.viewModeCatalog')}
+                value={catalogView}
+                onChange={(event) => {
+                  const view: ViewMode = event.target.value === 'table' ? 'table' : 'cards';
+                  setCatalogView(view);
+                  catalogViewMode.remember(view);
+                }}
+              >
+                <option value="cards">{t('catalog.viewCards')}</option>
+                <option value="table">{t('catalog.viewTable')}</option>
+              </Select>
+              <Select
+                label={t('settings.viewModeCollection')}
+                value={collectionView}
+                onChange={(event) => {
+                  const view: ViewMode = event.target.value === 'table' ? 'table' : 'cards';
+                  setCollectionView(view);
+                  collectionViewMode.remember(view);
+                }}
+              >
+                <option value="cards">{t('catalog.viewCards')}</option>
+                <option value="table">{t('catalog.viewTable')}</option>
+              </Select>
+            </FormRow>
+            <p className={styles.note}>{t('settings.viewModeNote')}</p>
           </FormStack>
 
           <h2 className={`${styles.sectionTitle} ${styles.spaced}`}>{t('settings.gradesTitle')}</h2>

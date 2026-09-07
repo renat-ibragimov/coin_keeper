@@ -1,14 +1,15 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Coins, Layers, SearchX, TrendingUp, Wallet, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { fetchSeriesProgress } from '@/features/series/api';
 import { ApiError } from '@/shared/api/client';
 import { useDismissable } from '@/shared/lib/useDismissable';
 import { formatNumber, formatPercent, formatUah } from '@/shared/lib/format';
+import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
 import type { ActiveFilterChip } from '@/shared/ui';
 import {
   Button,
@@ -62,6 +63,16 @@ export function CollectionPage() {
   const { filters, update, reset } = useCollectionFilters();
   const [drawerOpen, setDrawerOpen] = useState(false);
   useDismissable(drawerOpen, () => setDrawerOpen(false));
+
+  const [searchParams] = useSearchParams();
+  const viewMode = useStoredViewMode('ck.viewMode.collection');
+  useEffect(() => {
+    // Only on mount, and only when the URL itself says nothing: a shared
+    // link's own `?view=` always wins over what was remembered here.
+    const resolved = viewMode.resolve(searchParams.get('view') ?? undefined);
+    if (resolved !== filters.view) update({ view: resolved, page: filters.page });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- resolve once, from the initial URL
+  }, []);
 
   const collectionQuery = useQuery({
     queryKey: ['collection', filters],
@@ -299,7 +310,10 @@ export function CollectionPage() {
                 ),
               },
             ]}
-            onViewChange={(view) => update({ view, page: filters.page })}
+            onViewChange={(view) => {
+              update({ view, page: filters.page });
+              viewMode.remember(view);
+            }}
             sort={filters.sort}
             sortOptions={COLLECTION_SORTS.map((sort) => ({
               value: sort,
