@@ -189,16 +189,15 @@
    * brass hardware (accents, focus, primary buttons, active navigation) and
    * from the coins themselves, never from the fill of a card or a panel.
    * Hierarchy is built from lightness, not from more red. */
-  /* --color-bg is set below the ground the visitor actually sees: the texture
-   * tile's own mean (≈32/32/30) sits well above near-black, so the layer
-   * lifts the page a little. #040505 plus the grain lands on ≈#070707 —
-   * near-black with a grey cast, which is the point. */
-  --color-bg: #040505;
-  --color-surface: #0c0e0f;
-  --color-surface-raised: #131618;
-  --color-surface-sunken: #070808;
-  --color-surface-control: #0e1012;
-  --color-surface-hover: #191d20;
+  /* The texture tile's own mean (≈32/32/30) sits well above near-black, so
+   * the layer lifts the page a little: #070808 plus the grain lands on
+   * ≈#0a0a0a — near-black with a grey cast, which is the point. */
+  --color-bg: #070808;
+  --color-surface: #0d0f10;
+  --color-surface-raised: #141719;
+  --color-surface-sunken: #090a0b;
+  --color-surface-control: #101315;
+  --color-surface-hover: #1a1e20;
 
   --color-text: #eeeae2;
   --color-text-secondary: #b7b5af;
@@ -206,13 +205,9 @@
 
   /* Ordinary edges are steel and stone. Brass is the hover/focus/selected
    * edge only — never the resting border of every card. */
-  --color-border: #30363a;
-  /* #616c73 rather than the #505a60 of the brief: this is the border that
-   * outlines a secondary button and rules a table header, so it has to clear
-   * 3:1 against the control and card surfaces it sits on (WCAG 1.4.11) —
-   * #505a60 measured 2.4–2.7:1. Same blackened steel, two steps lighter. */
-  --color-border-strong: #616c73;
-  --color-border-subtle: rgba(211, 220, 224, 0.09);
+  --color-border: #2b3034;
+  --color-border-strong: #454e53;
+  --color-border-subtle: rgba(211, 220, 224, 0.075);
   --color-border-hover: #9d7c3e;
 
   --color-accent: #c29a4b;
