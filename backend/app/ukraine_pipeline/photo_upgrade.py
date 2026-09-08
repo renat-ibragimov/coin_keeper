@@ -123,9 +123,7 @@ def pick_roles_by_metadata(images: Sequence[GalleryImage]) -> dict[str, RolePick
     return picks
 
 
-def pick_roles(
-    images: Sequence[GalleryImage], verdicts: dict[str, Verdict]
-) -> dict[str, RolePick]:
+def pick_roles(images: Sequence[GalleryImage], verdicts: dict[str, Verdict]) -> dict[str, RolePick]:
     """Tiers 1 and 2 together. `verdicts` is keyed by `GalleryImage.url` for
     every image tier 2 might need to rank — tier 3 (nothing left to assign)
     is simply the role staying absent from the result."""
@@ -134,6 +132,7 @@ def pick_roles(
     remaining = [image for image in images if image.url not in used and image.url in verdicts]
     missing = [role for role in ROLES if role not in picks]
     if missing and remaining:
+
         def _rank(image: GalleryImage) -> tuple[bool, float, int]:
             verdict = verdicts[image.url]
             return (not verdict.is_coin, -score(verdict), image.order)
@@ -337,9 +336,7 @@ async def scan(
     for index, (item, url) in enumerate(rows, start=1):
         outcome.scanned += 1
         try:
-            diff = await _diff_for_item(
-                session, storage=storage, client=client, item=item, url=url
-            )
+            diff = await _diff_for_item(session, storage=storage, client=client, item=item, url=url)
         except Exception as exc:  # a bad page or a bad object must not stop the run
             outcome.failed.append(
                 {"itemId": item.id, "title": item.title_original, "error": str(exc)}

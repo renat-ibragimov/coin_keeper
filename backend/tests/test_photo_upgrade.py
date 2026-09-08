@@ -275,11 +275,19 @@ async def test_scan_proposes_a_confident_metadata_replacement(
     item = await make_catalog_item(db_session, country=country, title="Test coin", year=2022)
     await _link_ua_coins(db_session, item=item, url=PAGE_URL)
     await _add_photo(
-        db_session, item=item, role=MediaRole.OBVERSE, key="old-o", storage=storage,
+        db_session,
+        item=item,
+        role=MediaRole.OBVERSE,
+        key="old-o",
+        storage=storage,
         payload=packaging_bytes(),
     )
     await _add_photo(
-        db_session, item=item, role=MediaRole.REVERSE, key="old-r", storage=storage,
+        db_session,
+        item=item,
+        role=MediaRole.REVERSE,
+        key="old-r",
+        storage=storage,
         payload=packaging_bytes(),
     )
     html = gallery_html([(OBVERSE_URL, "Аверс"), (REVERSE_URL, "Реверс")])
@@ -290,8 +298,12 @@ async def test_scan_proposes_a_confident_metadata_replacement(
 
     with client:
         outcome = await photo_upgrade.scan(
-            db_session, storage=storage, client=client, country_id=country.id,
-            limit=None, log=lambda _m: None,
+            db_session,
+            storage=storage,
+            client=client,
+            country_id=country.id,
+            limit=None,
+            log=lambda _m: None,
         )
 
     assert outcome.scanned == 1
@@ -313,7 +325,11 @@ async def test_figural_coin_is_never_a_confident_win(
     item = await make_catalog_item(db_session, country=country, title="Писанка", year=2022)
     await _link_ua_coins(db_session, item=item, url=PAGE_URL)
     await _add_photo(
-        db_session, item=item, role=MediaRole.OBVERSE, key="old-o", storage=storage,
+        db_session,
+        item=item,
+        role=MediaRole.OBVERSE,
+        key="old-o",
+        storage=storage,
         payload=figural_bytes(),
     )
     html = gallery_html([(OBVERSE_URL, "Аверс")])
@@ -321,8 +337,12 @@ async def test_figural_coin_is_never_a_confident_win(
 
     with client:
         outcome = await photo_upgrade.scan(
-            db_session, storage=storage, client=client, country_id=country.id,
-            limit=None, log=lambda _m: None,
+            db_session,
+            storage=storage,
+            client=client,
+            country_id=country.id,
+            limit=None,
+            log=lambda _m: None,
         )
 
     assert outcome.diffs == []
@@ -338,11 +358,19 @@ async def test_missing_role_candidate_is_reported_as_a_fallback_not_a_diff(
     item = await make_catalog_item(db_session, country=country, title="Test coin", year=2022)
     await _link_ua_coins(db_session, item=item, url=PAGE_URL)
     await _add_photo(
-        db_session, item=item, role=MediaRole.OBVERSE, key="old-o", storage=storage,
+        db_session,
+        item=item,
+        role=MediaRole.OBVERSE,
+        key="old-o",
+        storage=storage,
         payload=packaging_bytes(),
     )
     await _add_photo(
-        db_session, item=item, role=MediaRole.REVERSE, key="old-r", storage=storage,
+        db_session,
+        item=item,
+        role=MediaRole.REVERSE,
+        key="old-r",
+        storage=storage,
         payload=packaging_bytes(),
     )
     # Only one gallery image at all — nothing left to resolve "reverse" with.
@@ -351,8 +379,12 @@ async def test_missing_role_candidate_is_reported_as_a_fallback_not_a_diff(
 
     with client:
         outcome = await photo_upgrade.scan(
-            db_session, storage=storage, client=client, country_id=country.id,
-            limit=None, log=lambda _m: None,
+            db_session,
+            storage=storage,
+            client=client,
+            country_id=country.id,
+            limit=None,
+            log=lambda _m: None,
         )
 
     assert outcome.diffs == []
@@ -374,11 +406,19 @@ async def test_apply_then_rescan_gives_an_empty_diff(
     item = await make_catalog_item(db_session, country=country, title="Test coin", year=2022)
     await _link_ua_coins(db_session, item=item, url=PAGE_URL)
     await _add_photo(
-        db_session, item=item, role=MediaRole.OBVERSE, key="old-o", storage=storage,
+        db_session,
+        item=item,
+        role=MediaRole.OBVERSE,
+        key="old-o",
+        storage=storage,
         payload=packaging_bytes(),
     )
     await _add_photo(
-        db_session, item=item, role=MediaRole.REVERSE, key="old-r", storage=storage,
+        db_session,
+        item=item,
+        role=MediaRole.REVERSE,
+        key="old-r",
+        storage=storage,
         payload=packaging_bytes(),
     )
     html = gallery_html([(OBVERSE_URL, "Аверс"), (REVERSE_URL, "Реверс")])
@@ -388,19 +428,31 @@ async def test_apply_then_rescan_gives_an_empty_diff(
 
     with client:
         first = await photo_upgrade.scan(
-            db_session, storage=storage, client=client, country_id=country.id,
-            limit=None, log=lambda _m: None,
+            db_session,
+            storage=storage,
+            client=client,
+            country_id=country.id,
+            limit=None,
+            log=lambda _m: None,
         )
         assert len(first.diffs) == 1
         apply_outcome = await photo_upgrade.apply_diffs(
-            db_session, storage=storage, client=client, diffs=first.diffs,
-            only_item_ids=None, log=lambda _m: None,
+            db_session,
+            storage=storage,
+            client=client,
+            diffs=first.diffs,
+            only_item_ids=None,
+            log=lambda _m: None,
         )
         assert apply_outcome.summary()["replaced"] == 1
 
         second = await photo_upgrade.scan(
-            db_session, storage=storage, client=client, country_id=country.id,
-            limit=None, log=lambda _m: None,
+            db_session,
+            storage=storage,
+            client=client,
+            country_id=country.id,
+            limit=None,
+            log=lambda _m: None,
         )
 
     assert second.diffs == []
