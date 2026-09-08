@@ -175,6 +175,16 @@ describe('CoinCard series link', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('Видатні особистості України')).toBeInTheDocument();
   });
+
+  it('shows a circulation stand-in label when a circulation coin has no series', () => {
+    render(<CoinCard item={makeItem({ seriesName: null, collectionGroup: 'circulation' })} />);
+    expect(screen.getByText('Обігові монети')).toBeInTheDocument();
+  });
+
+  it('shows nothing for a non-circulation coin with no series', () => {
+    render(<CoinCard item={makeItem({ seriesName: null, collectionGroup: 'commemorative' })} />);
+    expect(screen.queryByText('Обігові монети')).not.toBeInTheDocument();
+  });
 });
 
 describe('CoinCard price source', () => {

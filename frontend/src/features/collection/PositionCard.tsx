@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { CollectionPosition } from '@/shared/api/types';
+import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
 import { Badge, Button, CoinImage } from '@/shared/ui';
 
@@ -18,6 +19,7 @@ export function PositionCard({ item }: PositionCardProps) {
   const cardUrl = `/catalog/${item.catalogItemId}`;
   const addUrl = `/collection/coins/new?catalogItemId=${item.catalogItemId}`;
   const meta = [String(item.year), item.denomination].filter(Boolean).join(' · ');
+  const series = seriesLabel(item, t);
 
   return (
     <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
@@ -36,7 +38,7 @@ export function PositionCard({ item }: PositionCardProps) {
           </h3>
           {item.grades.length > 0 ? <Badge>{item.grades.join(' · ')}</Badge> : null}
         </div>
-        {item.seriesName ? <div className={styles.series}>{item.seriesName}</div> : null}
+        {series ? <div className={styles.series}>{series}</div> : null}
         <div className={styles.meta}>
           {item.country}
           {meta ? ` · ${meta}` : ''}

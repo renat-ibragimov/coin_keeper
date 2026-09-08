@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 /** The subset of a catalog record that carries its names. */
 export interface TitledItem {
   titleOriginal: string;
@@ -23,4 +25,23 @@ export function coinTitle(item: TitledItem, locale: string): string {
 /** Whether the original wording is worth showing next to the displayed name. */
 export function showsOriginal(item: TitledItem, locale: string): boolean {
   return coinTitle(item, locale) !== item.titleOriginal.trim();
+}
+
+/** The subset of a catalog record needed to label its series. */
+export interface SeriesedItem {
+  seriesName: string | null;
+  collectionGroup: 'circulation' | 'commemorative' | 'collector' | 'other';
+}
+
+/**
+ * Series text for a coin: its real series when it has one; otherwise, for
+ * circulation coins, a display-only "Обігові монети" stand-in — decided by
+ * the owner (2026-09-07) to keep the taxonomy free of a fake series while
+ * the catalog still reads as complete. Every other group without a series
+ * shows nothing, same as before.
+ */
+export function seriesLabel(item: SeriesedItem, t: TFunction): string | null {
+  if (item.seriesName) return item.seriesName;
+  if (item.collectionGroup === 'circulation') return t('catalog.circulationSeries');
+  return null;
 }

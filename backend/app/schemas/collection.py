@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from pydantic import Field
 
+from app.models.enums import CollectionGroup
 from app.schemas.base import CamelModel
 from app.schemas.common import Money, Rate
 
@@ -23,6 +24,7 @@ class CollectionPositionOut(CamelModel):
     title: str
     country: str
     series_name: str | None
+    collection_group: CollectionGroup
     denomination: str | None
     year: int
     is_archived: bool

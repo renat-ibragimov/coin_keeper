@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { CatalogCard, CollectionGroup } from '@/shared/api/types';
+import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatNumber } from '@/shared/lib/format';
 import type { PropertyRow } from '@/shared/ui';
 
@@ -36,7 +37,7 @@ function metalMaterial(card: CatalogCard, t: TFunction): string | null {
 export function identitySpecRows(card: CatalogCard, t: TFunction): PropertyRow[] {
   return [
     { key: 'country', label: t('card.specCountry'), value: card.country },
-    { key: 'series', label: t('card.specSeries'), value: card.seriesName },
+    { key: 'series', label: t('card.specSeries'), value: seriesLabel(card, t) },
     {
       key: 'category',
       label: t('card.specCategory'),

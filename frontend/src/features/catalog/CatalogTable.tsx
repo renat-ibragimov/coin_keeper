@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
-import { coinTitle } from '@/shared/lib/coinTitle';
+import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { Badge, Button, CoinImage } from '@/shared/ui';
 
@@ -140,7 +140,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                 </td>
                 <td className={`${ALIGN_CLASS.center} ${styles.secondary}`}>{item.country}</td>
                 <td className={`${ALIGN_CLASS.center} ${styles.secondary}`}>
-                  {item.seriesName ?? '—'}
+                  {seriesLabel(item, t) ?? '—'}
                 </td>
                 <td className={`${ALIGN_CLASS.center} tabular`}>{item.year}</td>
                 <td className={ALIGN_CLASS.center}>{item.denomination?.label ?? '—'}</td>

@@ -305,6 +305,7 @@ class CollectionService:
             title=display_title(item, self._locale),
             country=row.country,
             series_name=row.series_name,
+            collection_group=item.collection_group,
             denomination=(
                 None
                 if row.denomination is None

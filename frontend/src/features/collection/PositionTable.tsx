@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { CollectionPosition } from '@/shared/api/types';
+import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
 import { Badge, CoinImage } from '@/shared/ui';
 
@@ -57,7 +58,7 @@ export function PositionTable({ items }: PositionTableProps) {
                 </div>
               </td>
               <td className={styles.secondary}>{item.country}</td>
-              <td className={styles.secondary}>{item.seriesName ?? '—'}</td>
+              <td className={styles.secondary}>{seriesLabel(item, t) ?? '—'}</td>
               <td className={`${styles.number} tabular`}>
                 {t('catalog.quantity', { count: item.totalQuantity })}
               </td>

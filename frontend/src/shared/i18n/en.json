@@ -179,6 +179,7 @@
     "tableCoin": "Coin",
     "tableCountry": "Country",
     "tableSeries": "Series",
+    "circulationSeries": "Circulation coins",
     "tableYear": "Year",
     "tableDenomination": "Denomination",
     "tablePurchase": "Purchased for",

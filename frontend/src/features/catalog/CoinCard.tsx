@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
-import { coinTitle } from '@/shared/lib/coinTitle';
+import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
 import { Badge, Button, CoinImage } from '@/shared/ui';
@@ -61,6 +61,7 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
   const price = formatUah(item.marketPriceUah, i18n.language);
   const owned = item.quantityOwned > 0;
   const title = coinTitle(item, i18n.language);
+  const series = seriesLabel(item, t);
   const cardUrl = `/catalog/${item.id}`;
   const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
   const addState = backTo ? { from: backTo } : undefined;
@@ -95,16 +96,16 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
         <div className={styles.meta}>
           {item.country} · <span className="tabular">{item.year}</span>
         </div>
-        {item.seriesName ? (
-          seriesIdByName?.[item.seriesName] != null ? (
+        {series ? (
+          item.seriesName && seriesIdByName?.[item.seriesName] != null ? (
             <Link
               to={`/collection/series/${seriesIdByName[item.seriesName]}`}
               className={styles.seriesLink}
             >
-              {item.seriesName}
+              {series}
             </Link>
           ) : (
-            <div className={styles.series}>{item.seriesName}</div>
+            <div className={styles.series}>{series}</div>
           )
         ) : null}
         {/* No negative "missing" badge: the footer below already says it —

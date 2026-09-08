@@ -81,6 +81,7 @@ const POSITION: CollectionPosition = {
   title: 'Дельфін',
   country: 'Україна',
   seriesName: 'Флора і фауна',
+  collectionGroup: 'commemorative',
   denomination: '2 ₴',
   year: 2018,
   isArchived: false,

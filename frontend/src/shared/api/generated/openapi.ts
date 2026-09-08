@@ -1081,6 +1081,7 @@ export interface components {
             country: string;
             /** Seriesname */
             seriesName: string | null;
+            collectionGroup: components["schemas"]["CollectionGroup"];
             /** Denomination */
             denomination: string | null;
             /** Year */
