@@ -921,6 +921,98 @@ the new pair under `source = ua_coins`. The report names what was replaced
 and what failed; a row whose fetch fails is left exactly as it was; no
 partial state.
 
+## photo-upgrade — general photo replacement (stage 4.5, part D continued)
+
+`app/ukraine_pipeline/photo_upgrade.py`, a step of `scripts/
+ukraine_pipeline.py` (unlike the standalone script above): every shared,
+active Ukrainian record with a known ua-coins.info page (`price_source_links`,
+`source = "UA-Coins"`, an absolute URL — what `bridge` writes) has its whole
+gallery pulled, ranked, and — only on a confident win over what is already
+stored — replaces the photo. No title-matching, no per-record judgment call:
+see `../docs/05-integrations.md`, section 13, for the three-tier pick and the
+threshold.
+
+### 1. A directory the container can write to
+
+Same shape as the coin photo packaging scan above, its own subdirectory so
+the two never mix ownership:
+
+```bash
+mkdir -p migration-reports/photo-upgrade
+```
+
+The `api` image runs as uid/gid 1001; rather than `chown`ing a directory to
+that (root-only, and easy to forget which of several report directories got
+it), run the container as your own host user instead — verified against the
+production image:
+
+```bash
+docker compose run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/migration-reports:/reports" \
+  api python -c "import app; print('ok')"
+```
+
+Use `--user "$(id -u):$(id -g)"` on every `photo-upgrade` command below. If
+`migration-reports/` (no subdirectory) is already `chown`-ed to `1001:1001`
+from an earlier run (the legacy migration, or the first coin-photo-packaging
+wave), do not mix the two schemes in one directory — the dedicated
+`migration-reports/photo-upgrade/` subdirectory above stays owned by you.
+
+### 2. Dry run — the stop point
+
+```bash
+docker compose run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --dry-run \
+    --steps photo-upgrade \
+    --photo-upgrade-out /reports/photo-upgrade/diff.csv \
+    --report /reports/photo-upgrade/report.json \
+    --cache-dir /reports/ukraine-cache
+```
+
+Nothing is written. `diff.csv` lists only the records that would be
+replaced: `itemId`, `title`, `currentScore`/`candidateScore`, `tier`
+(`metadata`/`geometry`), `obverseUrl`/`reverseUrl`. Read it — that is the
+whole review step for this one; there is no decision to make beyond "does
+this look right", and nothing here needs a `decision` column filled in
+unless you want to apply only some of it (below). `report.json`'s
+`photo-upgrade` section carries `scanned`, `withReplacement`, `fallbacks`
+(a role photo-upgrade could not confidently resolve — left alone),
+`withoutPage` (no known ua-coins.info page — out of scope for this step),
+`failed`, and `duplicateTitles` (a report-only addendum, `../docs/BACKLOG.md`).
+
+### 3. Apply
+
+With no review file, `--apply` replaces the *entire* diff — re-computed
+against the same cached pages, so this is exactly what the dry run just
+showed you:
+
+```bash
+docker compose run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply \
+    --steps photo-upgrade \
+    --report /reports/photo-upgrade/apply-report.json \
+    --cache-dir /reports/ukraine-cache
+```
+
+To apply only some rows, put `yes` in `decision` against them in a copy of
+`diff.csv` and pass it back — editing the URL columns does nothing, they are
+recomputed from the cache the same way every time:
+
+```bash
+docker compose run --rm --user "$(id -u):$(id -g)" \
+  -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply \
+    --steps photo-upgrade \
+    --apply-photo-upgrade-review /reports/photo-upgrade/diff.csv \
+    --report /reports/photo-upgrade/apply-report.json \
+    --cache-dir /reports/ukraine-cache
+```
+
+Re-running `--dry-run` afterwards is expected to give an empty `diff.csv` —
+a replaced photo is now the "current" one, at the candidate's own score.
+
 ## Legacy data migration
 
 Moves the desktop SQLite database into PostgreSQL. Specification:

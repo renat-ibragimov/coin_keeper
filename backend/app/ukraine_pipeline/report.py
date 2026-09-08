@@ -35,6 +35,7 @@ STEP_ORDER = (
     "merge-b",
     "inventory-b",
     "roll-series",
+    "photo-upgrade",
     "translate-c",
 )
 EXAMPLES_IN_SUMMARY = 10

@@ -123,6 +123,72 @@ class RegularUaImages:
     reverse: str | None
 
 
+_GALLERY_PATH_MARKER = "/images/coins"
+
+
+@dataclass(frozen=True, slots=True)
+class GalleryImage:
+    url: str
+    alt: str
+    filename: str
+    order: int
+
+
+def parse_coin_gallery(html: str) -> list[GalleryImage]:
+    """Every photo a coin's own page (`/list/{id}-slug` or `/show-regular-ua/{slug}`)
+    offers, in page order, deduplicated by URL.
+
+    Not only the obverse/reverse pair `image_url` predicts and
+    `parse_regular_ua_detail` reads: a real page can also carry an edge shot
+    or, for a record whose stored photo turns out to be packaging
+    (`app/ukraine_pipeline/classify_coin_photos.py`), something that is not a
+    coin picture at all. This hands every candidate under the site's own
+    `/images/coins...` path to `app/ukraine_pipeline/photo_upgrade.py`, which
+    ranks them rather than guessing here which one is which.
+
+    A `data-fancybox="gallery"` anchor is read at its own `href` — the big
+    variant, exactly what `parse_regular_ua_detail` already trusts — with the
+    `alt` of the `<img>` it wraps; an `<img>` not wrapped in such an anchor
+    (a plain edge photo, say) is read at its own `src` instead, so nothing
+    under the path is silently dropped for not using the lightbox markup.
+    """
+    tree = HTMLParser(html)
+    seen: set[str] = set()
+    found: list[GalleryImage] = []
+
+    def _add(url: str, alt: str) -> None:
+        absolute = url if url.startswith("http") else BASE_URL + url
+        if absolute in seen:
+            return
+        seen.add(absolute)
+        filename = absolute.rsplit("/", 1)[-1]
+        image = GalleryImage(url=absolute, alt=alt.strip(), filename=filename, order=len(found))
+        found.append(image)
+
+    for node in tree.css('a[data-fancybox="gallery"][href], img[src]'):
+        if node.tag == "a":
+            href = node.attributes.get("href") or ""
+            if _GALLERY_PATH_MARKER not in href:
+                continue
+            inner = node.css_first("img")
+            alt = (inner.attributes.get("alt") or "") if inner is not None else ""
+            _add(href, alt)
+            continue
+        parent = node.parent
+        if (
+            parent is not None
+            and parent.tag == "a"
+            and parent.attributes.get("data-fancybox") == "gallery"
+        ):
+            continue  # already read at the anchor's own href, the bigger variant
+        src = node.attributes.get("src") or ""
+        if _GALLERY_PATH_MARKER not in src:
+            continue
+        _add(src, node.attributes.get("alt") or "")
+
+    return found
+
+
 def parse_regular_ua_detail(html: str) -> RegularUaImages:
     """The two full-size photographs a "show-regular-ua" detail page serves.
 

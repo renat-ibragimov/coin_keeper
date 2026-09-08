@@ -1,6 +1,16 @@
 """scan_coin_photo_packaging — which stored Ukrainian coin photos are actually
 packaging, and which of those have a clean ua-coins.info replacement.
 
+This was the first wave (2026-09-08): a narrow, review-everything pass, its
+`replacementUrl` filled in automatically only for the nine (now twelve) "Ми
+сильні. Ми разом." rolls (`roll_photos.py` below). The general mechanism it
+led to — pull every gallery photo a record's known ua-coins.info page offers
+and rank it, no title-matching needed — is `app/ukraine_pipeline/
+photo_upgrade.py`, the "photo-upgrade" pipeline step; this script is kept as
+a diagnostic (a plain coin/packaging verdict over what is already stored,
+independent of whether a replacement exists at all), not the thing to reach
+for to fix a packaging photo.
+
 The circulation-commemorative rolls ("Ми сильні. Ми разом. <область>" and
 the like, docs/05-integrations.md section 9) are read off a souvenir roll
 card, and the roll card's own photograph is the roll — a tube, ribbons, the
@@ -48,25 +58,16 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.images import process_image
-from app.core.media_keys import (
-    catalog_base,
-    preview_key_of,
-    primary_key_of,
-    stored_variants,
-    variant_key,
-)
 from app.core.storage import ObjectStorage
 from app.models import CatalogItem, MediaFile
-from app.models.enums import MediaRole, MediaSource
+from app.ukraine_pipeline import photo_replace
 from app.ukraine_pipeline.catalog import ukraine_country_id
-from app.ukraine_pipeline.classify_coin_photos import Verdict, classify
+from app.ukraine_pipeline.classify_coin_photos import Verdict, classify, combine
+from app.ukraine_pipeline.photo_replace import OFFICIAL_SOURCES
 from app.ukraine_pipeline.roll_photos import match_candidates, oblast_name
 from app.ukraine_recon import ua_coins
 from app.ukraine_recon.http import PoliteClient, SourceUnreachableError
 
-ROLES = ("obverse", "reverse")
-OFFICIAL_SOURCES = (MediaSource.NBU, MediaSource.UA_COINS, MediaSource.MANUAL)
 YES = frozenset({"y", "yes", "1", "true", "+", "так"})
 CSV_COLUMNS = (
     "decision",
@@ -154,16 +155,6 @@ async def _candidate_items(session: AsyncSession, *, country_id: int) -> list[An
     return list(rows.scalars().all())
 
 
-def _worst(verdicts: list[Verdict]) -> tuple[bool, float, float, float]:
-    is_coin = all(v.is_coin for v in verdicts)
-    return (
-        is_coin,
-        min((v.worst_circularity for v in verdicts), default=0.0),
-        min((v.worst_aspect for v in verdicts), default=0.0),
-        min((v.worst_fill for v in verdicts), default=0.0),
-    )
-
-
 async def scan(
     session: AsyncSession,
     *,
@@ -207,17 +198,17 @@ async def scan(
                 {"itemId": item.id, "title": item.title_original, "error": str(exc)}
             )
             continue
-        is_coin, circularity, aspect, fill = _worst(verdicts)
+        combined = combine(verdicts)
         outcome.items.append(
             ItemVerdict(
                 item_id=item.id,
                 title=item.title_original,
                 year=item.issue_year,
-                is_coin=is_coin,
-                worst_circularity=circularity,
-                worst_aspect=aspect,
-                worst_fill=fill,
-                note="ok" if is_coin else "non-circular object in a stored photo",
+                is_coin=combined.is_coin,
+                worst_circularity=combined.worst_circularity,
+                worst_aspect=combined.worst_aspect,
+                worst_fill=combined.worst_fill,
+                note="ok" if combined.is_coin else "non-circular object in a stored photo",
             )
         )
         if index % 25 == 0 or index == len(items):
@@ -311,66 +302,16 @@ async def _replace_photo(
     if not any(urls.values()):
         message = f"no obverse/reverse photograph found on {url}"
         raise ValueError(message)
-
-    old_rows = (
-        (
-            await session.execute(
-                select(MediaFile).where(
-                    MediaFile.catalog_item_id == item_id,
-                    MediaFile.source.in_(OFFICIAL_SOURCES),
-                    MediaFile.role.in_([MediaRole(role) for role in ROLES]),
-                )
-            )
-        )
-        .scalars()
-        .all()
+    outcome = await photo_replace.replace_photos(
+        session,
+        storage=storage,
+        client=client,
+        item_id=item_id,
+        urls=urls,
+        license="ua-coins.info, © 2015-2026, used with attribution",
+        attribution="ua-coins.info",
     )
-    old_keys = [key for row in old_rows for key in (row.variants or {}).values()]
-
-    stored: list[str] = []
-    for role, side_url in urls.items():
-        if not side_url:
-            continue
-        _result, payload = client.get_range(side_url, 12 * 1024 * 1024)
-        if payload is None:
-            continue
-        processed = process_image(payload)
-        base = catalog_base(item_id, role, processed.sha256[:16])
-        keys = {side: variant_key(base, side) for side in processed.variants}
-        for side, key in keys.items():
-            storage.put(key, processed.variants[side], processed.mime_type)
-        session.add(
-            MediaFile(
-                catalog_item_id=item_id,
-                owner_id=None,
-                role=MediaRole(role),
-                source=MediaSource.UA_COINS,
-                license="ua-coins.info, © 2015-2026, used with attribution",
-                attribution="ua-coins.info",
-                storage_key=primary_key_of(keys),
-                thumbnail_key=preview_key_of(keys),
-                variants=stored_variants(keys),
-                external_url=side_url,
-                mime_type=processed.mime_type,
-                width=processed.width,
-                height=processed.height,
-                size_bytes=processed.total_bytes,
-                sha256=processed.sha256,
-            )
-        )
-        stored.append(role)
-
-    for row in old_rows:
-        await session.delete(row)
-    if old_keys:
-        storage.delete_many(old_keys)
-    await session.flush()
-    return {
-        "itemId": item_id,
-        "url": url,
-        "rolesReplaced": stored,
-        "oldPhotosRemoved": len(old_rows),
-    }
+    return {**outcome, "url": url}
 
 
 async def apply_replacements(

@@ -170,6 +170,19 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "passing it on a dry run is the one case where a dry run still calls the API",
     )
     parser.add_argument(
+        "--photo-upgrade-out",
+        type=Path,
+        help="where photo-upgrade writes the replacement diff for review — the stop "
+        "point for this step; --apply with no review file applies the whole diff",
+    )
+    parser.add_argument(
+        "--apply-photo-upgrade-review",
+        type=Path,
+        dest="photo_upgrade_review_in",
+        help="a reviewed photo-upgrade diff CSV; only rows marked yes are applied, "
+        "instead of the whole diff --apply would otherwise replace",
+    )
+    parser.add_argument(
         "--ua-coins",
         choices=(
             source_module.MODE_AUTO,
@@ -241,6 +254,10 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
         "mergeBOut": str(args.merge_b_out) if args.merge_b_out else None,
         "mergeBIn": str(args.merge_b_in) if args.merge_b_in else None,
         "translateOut": str(args.translate_out) if args.translate_out else None,
+        "photoUpgradeOut": str(args.photo_upgrade_out) if args.photo_upgrade_out else None,
+        "photoUpgradeReviewIn": (
+            str(args.photo_upgrade_review_in) if args.photo_upgrade_review_in else None
+        ),
     }
     report.assumptions = [
         "Only shared Ukrainian records take part; personal items belong to their authors.",
@@ -252,7 +269,13 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
 
     settings = get_settings()
     storage: ObjectStorage | None = None
-    if args.apply and ("photos" in steps or "circ-photos" in steps):
+    # photo-upgrade needs storage even on a plain dry run — it reads the photo
+    # already stored to score it against the candidate; it only ever writes
+    # under --apply, same as every other step here.
+    needs_storage = "photo-upgrade" in steps or (
+        args.apply and ("photos" in steps or "circ-photos" in steps)
+    )
+    if needs_storage:
         storage = ObjectStorage(build_s3_client(settings), settings.s3_bucket)
         storage.ensure_bucket()
 
@@ -314,6 +337,8 @@ async def _run(args: argparse.Namespace, log: Callable[[str], None]) -> int:
             merge_b_out=args.merge_b_out,
             merge_b_in=args.merge_b_in,
             translate_out=args.translate_out,
+            photo_upgrade_out=args.photo_upgrade_out,
+            photo_upgrade_review_in=args.photo_upgrade_review_in,
             report_path=args.report,
         )
         try:
@@ -359,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
         ("jubilee review", args.jubilee_review_in),
         ("inventory review", args.inventory_review_in),
         ("merge-b review", args.merge_b_in),
+        ("photo-upgrade review", args.photo_upgrade_review_in),
     )
     for name, path in checks:
         if path is not None and not path.exists():

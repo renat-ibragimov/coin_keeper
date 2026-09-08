@@ -128,6 +128,21 @@ def classify(path: Path, max_side: int = 800) -> Verdict:
     return Verdict(is_coin, len(significant), worst_circularity, worst_aspect, worst_fill, reason)
 
 
+def combine(verdicts: list[Verdict]) -> Verdict:
+    """The worst of several verdicts, as one — a record with several stored
+    sides is only as good as its worst side (scripts/scan_coin_photo_packaging.py,
+    app/ukraine_pipeline/photo_upgrade.py)."""
+    if not verdicts:
+        return Verdict(False, 0, 0.0, 0.0, 0.0, "no photo")
+    is_coin = all(v.is_coin for v in verdicts)
+    circularity = min(v.worst_circularity for v in verdicts)
+    aspect = min(v.worst_aspect for v in verdicts)
+    fill = min(v.worst_fill for v in verdicts)
+    objects = sum(v.objects for v in verdicts)
+    reason = "ok" if is_coin else "non-circular object in frame"
+    return Verdict(is_coin, objects, circularity, aspect, fill, reason)
+
+
 def score(verdict: Verdict) -> float:
     """One continuous number for ranking; the pass/fail bar stays separate.
 

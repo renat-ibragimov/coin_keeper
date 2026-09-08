@@ -44,6 +44,7 @@ from app.ukraine_pipeline import (
     jubilee_bridge,
     merge,
     merge_b,
+    photo_upgrade,
     photos,
     prices,
     repair,
@@ -107,10 +108,12 @@ CIRCULATION_STEPS = (
 # them, and this copies series_id from a sibling record by hand instead.
 # merge-b runs before inventory-b on purpose: every pair it merges away is one
 # fewer row for inventory-b to survey. Independent of the ordered chains
-# above and of each other otherwise — any of the four can run alone — but
+# above and of each other otherwise — any of the five can run alone — but
 # grouped at the end of STEPS so `--steps` with no argument still runs
-# everything once.
-EXTRA_STEPS = ("jubilee-bridge", "merge-b", "inventory-b", "roll-series")
+# everything once. photo-upgrade is its own thing entirely (a general
+# gallery-ranking replacement, not tied to the commemorative/circulation
+# bridges above) — see app/ukraine_pipeline/photo_upgrade.py.
+EXTRA_STEPS = ("jubilee-bridge", "merge-b", "inventory-b", "roll-series", "photo-upgrade")
 # LLM translation of whatever the steps above still left without an official
 # name (docs/05-integrations.md, part C) — no Sources, no NBU/ua-coins/Wikipedia
 # fetch, entirely independent of everything above. Last on purpose: it should
@@ -176,6 +179,13 @@ class Options:
     # Passing it on a dry run is the one exception to "dry run never calls the
     # API" — see app/ukraine_pipeline/translate_c.py's module docstring.
     translate_out: Path | None = None
+    # photo-upgrade: where to write the replacement diff for review. Applying
+    # needs no CSV at all by default — --apply replaces every row of the
+    # (re-computed, cache-backed) diff; --apply-photo-upgrade-review restricts
+    # that to the rows a person marked `decision=yes` in a previous diff CSV,
+    # the same optional-partial-apply idiom the rest of the pipeline uses.
+    photo_upgrade_out: Path | None = None
+    photo_upgrade_review_in: Path | None = None
 
 
 @dataclass
@@ -648,6 +658,51 @@ class Runner:
             self.report.warn(f"roll-series: {outcome.problem}")
         await self._commit()
         await self._load_catalog()
+
+    async def _step_photo_upgrade(self) -> None:
+        assert self._country_id is not None
+        if self.storage is None:
+            message = (
+                "photo-upgrade needs object storage even on a dry run, to score the "
+                "photo already stored against the candidate"
+            )
+            raise PipelineError(message)
+        outcome = await photo_upgrade.scan(
+            self.session,
+            storage=self.storage,
+            client=self.client,
+            country_id=self._country_id,
+            limit=self.options.limit,
+            log=self.log,
+        )
+        only_item_ids = None
+        if self.options.photo_upgrade_review_in is not None:
+            path = self.options.photo_upgrade_review_in
+            only_item_ids = photo_upgrade.read_review_csv(path)
+            self.log(f"photo-upgrade: {len(only_item_ids)} rows marked yes in {path}")
+        apply_outcome = photo_upgrade.ApplyOutcome()
+        if not self.options.dry_run:
+            apply_outcome = await photo_upgrade.apply_diffs(
+                self.session,
+                storage=self.storage,
+                client=self.client,
+                diffs=outcome.diffs,
+                only_item_ids=only_item_ids,
+                log=self.log,
+            )
+        rows = 0
+        if self.options.photo_upgrade_out is not None:
+            rows = photo_upgrade.write_diff_csv(self.options.photo_upgrade_out, outcome)
+            self.log(f"photo-upgrade: {rows} diff rows written to {self.options.photo_upgrade_out}")
+        self.report.step(
+            "photo-upgrade",
+            {**outcome.summary(), **apply_outcome.summary(), "diffRowsWritten": rows},
+            fallbacks=outcome.fallbacks[:50],
+            failed=outcome.failed[:50],
+            duplicateTitles=outcome.duplicate_titles[:50],
+            replaced=apply_outcome.replaced[:50],
+        )
+        await self._commit()
 
     # -------------------------------------------------------------- translate
     async def _step_translate_c(self) -> None:
