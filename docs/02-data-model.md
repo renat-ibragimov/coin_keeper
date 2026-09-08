@@ -283,12 +283,39 @@ thickness_mm       numeric(8,2)
 shape, edge, orientation  text
 catalog_km, catalog_uc, catalog_numista  text
 notes              text
+descriptions       jsonb             -- заполняется парсером coin-collector, руками не редактируется
+artists            jsonb             -- заполняется парсером coin-collector, руками не редактируется
 source_key         text              -- ключ дедупликации импорта, см. 04-business-rules
 created_by         bigint FK users ON DELETE CASCADE    -- NULL = общая (системная) запись
 is_archived        boolean NOT NULL DEFAULT false
 archived_at        timestamptz
 archive_reason     text              -- 'снята с выпуска НБУ', 'дубликат', 'ошибочная запись'
 created_at, updated_at timestamptz
+```
+
+### descriptions и artists
+
+Обе колонки могут быть `NULL` целиком — это нормальное состояние строки, которую парсер
+coin-collector ещё не коснулся. Но если колонка не `NULL`, внутренняя форма JSON
+зафиксирована, и код не должен защищаться от отсутствующих ключей.
+
+`descriptions` — тексты описания по локалям и частям монеты. Ключ локали (`uk`, `en`, в
+будущем `pl` и другие) и ключи `general`/`obverse`/`reverse` внутри локали присутствуют
+всегда — их пишет coin-collector безусловно. Отсутствие текста — это `null` в значении, а
+не отсутствие ключа:
+
+```json
+{
+  "uk": {"general": "...", "obverse": "...", "reverse": "..."},
+  "en": {"general": null, "obverse": null, "reverse": null}
+}
+```
+
+`artists` — авторы монеты. `designers` и `sculptors` — всегда массивы (в худшем случае
+пустые `[]`), никогда `null` и никогда не отсутствуют как ключи:
+
+```json
+{"designers": ["Чайковський Роман"], "sculptors": ["Чайковський Роман"]}
 ```
 
 `created_by` определяет слой: `NULL` — общая запись, значение — личная позиция автора.

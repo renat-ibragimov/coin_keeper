@@ -24,7 +24,7 @@ from sqlalchemy import (
     UniqueConstraint,
     text,
 )
-from sqlalchemy.dialects.postgresql import ENUM
+from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at_column, updated_at_column
@@ -199,6 +199,10 @@ class CatalogItem(Base):
     catalog_uc: Mapped[str | None] = mapped_column(Text)
     catalog_numista: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
+    # Filled by the coin-collector parser, never edited by hand. NULL means
+    # untouched; once set, the inner shape is fixed (docs/02-data-model.md).
+    descriptions: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    artists: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     source_key: Mapped[str | None] = mapped_column(Text)
     # CASCADE, not SET NULL: deleting a user must not silently promote their
     # personal items into the shared catalog. See docs/02-data-model.md.

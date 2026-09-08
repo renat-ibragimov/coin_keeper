@@ -284,6 +284,43 @@ async def test_delete_shared_rules(
     assert snapshots == 0
 
 
+async def test_descriptions_and_artists_columns_round_trip(
+    db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """coin-collector's fixed JSON shape (docs/02-data-model.md): a column can
+    be NULL whole, but once set, keys inside it are always present, even when
+    the value at a key is null (an unmatched English card, say).
+    """
+    refs = ctx.refs
+    untouched = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Не оброблена", year=2022
+    )
+    parsed = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Оброблена",
+        year=2023,
+        descriptions={
+            "uk": {"general": "Опис", "obverse": "Аверс", "reverse": "Реверс"},
+            "en": {"general": None, "obverse": None, "reverse": None},
+        },
+        artists={"designers": ["Чайковський Роман"], "sculptors": []},
+    )
+
+    stored_untouched = await db_session.get(CatalogItem, untouched.id)
+    assert stored_untouched is not None
+    assert stored_untouched.descriptions is None
+    assert stored_untouched.artists is None
+
+    stored_parsed = await db_session.get(CatalogItem, parsed.id)
+    assert stored_parsed is not None
+    assert stored_parsed.descriptions == {
+        "uk": {"general": "Опис", "obverse": "Аверс", "reverse": "Реверс"},
+        "en": {"general": None, "obverse": None, "reverse": None},
+    }
+    assert stored_parsed.artists == {"designers": ["Чайковський Роман"], "sculptors": []}
+
+
 async def test_delete_personal_of_other_user_is_404(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
