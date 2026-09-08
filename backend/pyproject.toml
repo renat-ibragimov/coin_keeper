@@ -22,6 +22,12 @@ dependencies = [
     "selectolax>=0.3.21",
     "rapidfuzz>=3.9",
     "anthropic>=0.40",
+    # app/ukraine_pipeline/classify_coin_photos.py: geometric coin/packaging
+    # classification. The rest of the codebase's image work is deliberately
+    # Pillow-only (app/services/media_background.py's own docstring); this is
+    # the one module that needs real contour geometry, not just a flood fill.
+    "opencv-python-headless>=4.10",
+    "numpy>=2.1",
 ]
 
 [project.optional-dependencies]
@@ -87,6 +93,10 @@ plugins = []
 
 [[tool.mypy.overrides]]
 module = ["boto3.*", "botocore.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["cv2.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

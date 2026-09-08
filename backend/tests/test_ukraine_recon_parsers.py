@@ -106,6 +106,33 @@ def test_ua_coins_url_templates() -> None:
     assert ua_coins.image_url(115, "reverse", "big_png").endswith(
         "/images/coins/big/115_reverse.png"
     )
+    assert ua_coins.regular_ua_listing_url() == "https://www.ua-coins.info/ua/regular-ua/"
+
+
+def test_ua_coins_regular_ua_listing_carries_every_my_sylni_slug() -> None:
+    """tests/fixtures/ukraine_recon/ua_coins_regular_ua_listing.html: real
+    anchors cut from https://www.ua-coins.info/ua/regular-ua/, retrieved
+    2026-09-08 — the 12 "Ми сильні. Ми разом" oblasts (our nine plus the
+    three the catalogue is missing) plus one ordinary coin for contrast.
+    """
+    found = ua_coins.parse_regular_ua_listing(fixture("ua_coins_regular_ua_listing.html"))
+    assert len(found) == 13
+    assert found["280-obihova-pam-yatna-moneta-10-hryven-my-sylni-my-razom-zaporizka-oblast"] == (
+        "https://www.ua-coins.info/ua/show-regular-ua/"
+        "280-obihova-pam-yatna-moneta-10-hryven-my-sylni-my-razom-zaporizka-oblast"
+    )
+    assert "118-1-hryvnya-2018-roku" in found
+
+
+def test_ua_coins_regular_ua_detail_gives_the_big_photographs() -> None:
+    """tests/fixtures/ukraine_recon/ua_coins_regular_ua_detail.html: the
+    media strip cut from https://www.ua-coins.info/ua/show-regular-ua/280-...
+    -zaporizka-oblast (retrieved 2026-09-08) — a "Ми сильні" coin's actual
+    clean obverse/reverse, not the roll it ships in.
+    """
+    images = ua_coins.parse_regular_ua_detail(fixture("ua_coins_regular_ua_detail.html"))
+    assert images.obverse == "https://www.ua-coins.info/images/coins/big/2990_obverse.webp"
+    assert images.reverse == "https://www.ua-coins.info/images/coins/big/2990_reverse.webp"
 
 
 # ----------------------------------------------------------------------- nbu

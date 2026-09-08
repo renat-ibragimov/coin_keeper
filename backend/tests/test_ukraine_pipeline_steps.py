@@ -703,6 +703,10 @@ async def test_gaps_creates_nothing_from_a_roll_card(db_session: AsyncSession) -
         "skippedRollOnly": 1,
     }
     assert (await db_session.execute(select(CatalogItem))).scalars().all() == []
+    # A dry run has nothing else to say which coin a skipped roll was for.
+    assert outcome.skipped_roll_titles == [
+        {"clusterKey": "nbu:1740", "title": "Ми сильні. Ми разом. Запорізька область", "year": 2026}
+    ]
 
 
 async def test_gaps_does_not_duplicate_one_of_our_unlinked_records(

@@ -311,6 +311,12 @@
    "ua_coins": "suvenirnaya-produkciya",
    "ours": [],
    "note": "ua-coins lists souvenir packaging as a category; the NBU keeps it as a separate product category (Souvenir), outside the coin list."
+  },
+  {
+   "nbu": null,
+   "ua_coins": null,
+   "ours": ["Ми сильні. Ми разом"],
+   "note": "The National Bank never names this series: the coin has no numismatic card of its own (it is a circulation commemorative, 10 UAH since 2022), only a souvenir-roll card, and a roll card states no series (app/ukraine_pipeline/sources.py:roll_coin sets series=None on purpose). This map, and the `series` step that reads it, therefore can never attach or canonicalise this series — a shared CoinSeries row for it, and every record's series_id, are set by hand, propagated to new siblings by the `roll-series` step (app/ukraine_pipeline/roll_series.py) on the title prefix alone. Do not add an `nbu` value here expecting it to start working: nothing upstream will ever populate one."
   }
  ]
 }

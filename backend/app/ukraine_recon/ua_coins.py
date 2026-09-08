@@ -83,6 +83,67 @@ def image_url(coin_id: int, side: str, variant: str) -> str:
     return BASE_URL + IMAGE_VARIANTS[variant].format(id=coin_id, side=side)
 
 
+def regular_ua_listing_url(locale: str = LOCALE_UK) -> str:
+    """The "розмінні та обігові" listing — the section the numismatic catalogue
+    (`catalog_url` above) does not carry, including the circulation-commemorative
+    rolls (docs/05-integrations.md, "Ми сильні. Ми разом" note).
+    """
+    prefix = f"/{locale}" if locale else ""
+    return f"{BASE_URL}{prefix}/regular-ua/"
+
+
+_REGULAR_UA_HREF_RE = re.compile(r"/show-regular-ua/([a-z0-9-]+)")
+
+
+def parse_regular_ua_listing(html: str) -> dict[str, str]:
+    """{slug: absolute detail-page URL}, one entry per link the listing carries.
+
+    The slug itself is the only identifying text this needs: it already
+    spells the coin out in transliterated Ukrainian ("...-my-sylni-my-razom-
+    zaporizka-oblast"), which is what app/ukraine_pipeline/roll_photos.py
+    matches against, so nothing here reads the link's own visible title.
+    """
+    tree = HTMLParser(html)
+    found: dict[str, str] = {}
+    for link in tree.css("a[href]"):
+        match = _REGULAR_UA_HREF_RE.search(link.attributes.get("href") or "")
+        if match is None:
+            continue
+        slug = match.group(1)
+        found.setdefault(slug, f"{BASE_URL}/ua/show-regular-ua/{slug}")
+    return found
+
+
+_REGULAR_UA_BIG_IMAGE_RE = re.compile(r"/images/coins/big/\d+_(obverse|reverse)\.webp")
+
+
+@dataclass(frozen=True, slots=True)
+class RegularUaImages:
+    obverse: str | None
+    reverse: str | None
+
+
+def parse_regular_ua_detail(html: str) -> RegularUaImages:
+    """The two full-size photographs a "show-regular-ua" detail page serves.
+
+    Read straight off the "enlarge" anchors (`data-fancybox="gallery"`),
+    which already point at the big variant — the same
+    `/images/coins/big/{id}_{side}.webp` shape `image_url` builds for an
+    ordinary `/list/{id}-slug` coin, because it is the same image store; this
+    page merely numbers its own listing separately, so the id inside the URL
+    is read, not reconstructed or guessed.
+    """
+    tree = HTMLParser(html)
+    sides: dict[str, str] = {}
+    for link in tree.css('a[data-fancybox="gallery"][href]'):
+        href = link.attributes.get("href") or ""
+        match = _REGULAR_UA_BIG_IMAGE_RE.search(href)
+        if match is None:
+            continue
+        sides.setdefault(match.group(1), BASE_URL + href)
+    return RegularUaImages(obverse=sides.get("obverse"), reverse=sides.get("reverse"))
+
+
 @dataclass
 class CatalogRow:
     coin_id: int

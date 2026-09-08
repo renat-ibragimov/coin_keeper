@@ -47,6 +47,7 @@ from app.ukraine_pipeline import (
     photos,
     prices,
     repair,
+    roll_series,
     series,
     titles,
     translate_c,
@@ -99,13 +100,17 @@ CIRCULATION_STEPS = (
 # section 10 continuation): a targeted NBU match for six specific
 # mispatriated jubilee records, a self-to-self merge of the legacy Excel
 # remainder that already has a twin in our own catalogue (section 10's
-# "merge-b" subsection), and a survey CSV of whatever is left genuinely
-# unlinked afterwards. merge-b runs before inventory-b on purpose: every pair
-# it merges away is one fewer row for inventory-b to survey. Independent of
-# the ordered chains above and of each other otherwise — any of the three can
-# run alone — but grouped at the end of STEPS so `--steps` with no argument
-# still runs everything once.
-EXTRA_STEPS = ("jubilee-bridge", "merge-b", "inventory-b")
+# "merge-b" subsection), a survey CSV of whatever is left genuinely
+# unlinked afterwards, and the series backfill for circulation-commemorative
+# rolls (section 9's "Ми сильні" note — app/ukraine_pipeline/roll_series.py):
+# their NBU card has no series field, so `series` can never canonicalise
+# them, and this copies series_id from a sibling record by hand instead.
+# merge-b runs before inventory-b on purpose: every pair it merges away is one
+# fewer row for inventory-b to survey. Independent of the ordered chains
+# above and of each other otherwise — any of the four can run alone — but
+# grouped at the end of STEPS so `--steps` with no argument still runs
+# everything once.
+EXTRA_STEPS = ("jubilee-bridge", "merge-b", "inventory-b", "roll-series")
 # LLM translation of whatever the steps above still left without an official
 # name (docs/05-integrations.md, part C) — no Sources, no NBU/ua-coins/Wikipedia
 # fetch, entirely independent of everything above. Last on purpose: it should
@@ -297,6 +302,7 @@ class Runner:
             {**outcome.summary(), "duplicateRowsWritten": rows},
             created=outcome.created[:50],
             wouldDuplicate=outcome.would_duplicate[:50],
+            skippedRoll=outcome.skipped_roll_titles[:50],
         )
         for problem in outcome.problems:
             self.report.warn(f"gaps: {problem}")
@@ -629,6 +635,17 @@ class Runner:
         self.report.step(
             "inventory-b", {**outcome.summary(), "csvRowsWritten": rows, "linkRowsWritten": written}
         )
+        await self._commit()
+        await self._load_catalog()
+
+    async def _step_roll_series(self) -> None:
+        assert self._country_id is not None
+        outcome = await roll_series.backfill_series(
+            self.session, country_id=self._country_id, dry_run=self.options.dry_run
+        )
+        self.report.step("roll-series", outcome.summary(), updated=outcome.updated[:50])
+        if outcome.problem:
+            self.report.warn(f"roll-series: {outcome.problem}")
         await self._commit()
         await self._load_catalog()
 

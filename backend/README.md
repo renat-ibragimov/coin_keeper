@@ -758,6 +758,30 @@ docker compose run --rm -v "$PWD/migration-reports:/reports" \
 `archive`/`manual` rows are for a person to act on by hand; nothing here
 does it for them.
 
+### 9b. roll-series — series for the "Ми сильні" rolls
+
+`gaps` never creates a "Ми сильні. Ми разом. <область>" record: its NBU
+card is a souvenir roll, and a roll card states neither metal nor series
+(step 4 above, and `../docs/05-integrations.md` section 9's roll note), so
+every one of these coins — and their `series_id` — has entered the catalogue
+by hand. This step does not invent the series name either: it copies
+`series_id` off whichever `Ми сильні. Ми разом.%` record already has one
+onto its siblings that do not yet, so a newly catalogued oblast only needs
+the coin itself typed in, not a repeat of the original manual `UPDATE`.
+Independent of everything else; safe to run any time, before or after a new
+oblast is added by hand:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/ukraine_pipeline.py --apply --steps roll-series \
+    --report /reports/roll-series.json
+```
+
+`seriesId: null` in the report means no `Ми сильні. Ми разом.%` record
+carries a series yet — nothing to copy, and the step does nothing rather
+than guess one. Re-running once every sibling already has `series_id` set
+changes nothing (`updated: 0`).
+
 ### Full battle-run order
 
 One list, in the order to actually run these in against the owner's
@@ -848,6 +872,54 @@ is the existing `PATCH /catalog/{id}` — see `../docs/03-api-contract.md`,
 empty string. No new endpoint, no new screen — the admin-mode edit form on
 the record page is a backlog item (`../docs/BACKLOG.md`), the API contract
 is already there.
+
+## Coin photo packaging scan (stage 4.5, part D)
+
+`app/ukraine_pipeline/classify_coin_photos.py`: is a stored photo actually a
+coin, or a roll/tube/blister the roll card's own image happened to show
+(`../docs/05-integrations.md`, section 12 — the circulation-commemorative
+rolls, "Ми сильні. Ми разом. <область>" and the like). Not wired into the
+download pipeline yet (`../docs/BACKLOG.md`); for now, `scripts/
+scan_coin_photo_packaging.py` scans what is already stored.
+
+### 1. Scan
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/scan_coin_photo_packaging.py --dry-run \
+    --out /reports/coin-photo-packaging.csv \
+    --report /reports/coin-photo-packaging.json --cache-dir /reports/ukraine-cache
+```
+
+One row per shared Ukrainian catalog record with an official (`nbu`/
+`ua_coins`/`manual`) stored photo, plus every `Ми сильні. Ми разом.%`
+record even without one — `verdict`: `coin`, `packaging`, or `no-photo`.
+`replacementUrl` is filled in automatically only for a `Ми сильні. Ми
+разом.%` title matched against ua-coins.info's own clean obverse/reverse
+(`../docs/05-integrations.md`, section 12, "roll_photos.py"); every other
+`packaging` row's `replacementUrl` is blank for a person to paste in by
+hand. Nothing is replaced by this run — `decision` is empty in every row.
+
+### 2. Review the CSV, then apply
+
+Put `yes` in `decision` against the rows to actually replace — only rows
+with both `decision=yes` and a non-empty `replacementUrl` do anything:
+
+```bash
+docker compose run --rm -v "$PWD/migration-reports:/reports" \
+  api python scripts/scan_coin_photo_packaging.py --apply \
+    --apply-review /reports/coin-photo-packaging.csv \
+    --report /reports/coin-photo-packaging-apply.json --cache-dir /reports/ukraine-cache
+```
+
+For each: downloads the obverse/reverse ua-coins.info actually serves for
+that coin, runs them through `process_image` — the same background-removal
+guard every other Ukrainian photo already goes through
+(`app/core/images.py`) — deletes the record's old official photos (rows and
+storage objects, every role, any of `nbu`/`ua_coins`/`manual`), and stores
+the new pair under `source = ua_coins`. The report names what was replaced
+and what failed; a row whose fetch fails is left exactly as it was; no
+partial state.
 
 ## Legacy data migration
 

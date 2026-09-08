@@ -85,6 +85,12 @@ class GapsOutcome:
     skipped_not_coin: int = 0
     skipped_existing: int = 0
     skipped_roll: int = 0
+    # The coin behind each skipped roll card, named — nothing else in a dry
+    # run says which "Ми сильні. Ми разом. <область>" the issuer has just
+    # published a roll for; skipped_roll alone is only a count. Not a
+    # to-do list: a title showing up here that we already have a record
+    # for (see app/ukraine_pipeline/roll_series.py) is expected, not new.
+    skipped_roll_titles: list[dict[str, Any]] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
@@ -346,6 +352,9 @@ async def create_missing(
             # match it, and states neither its metal nor its series, which is
             # not enough to create it.
             outcome.skipped_roll += 1
+            outcome.skipped_roll_titles.append(
+                {"clusterKey": cluster_key(cluster), "title": cluster.title, "year": cluster.year}
+            )
             continue
         key = f"{SOURCE_KEY_PREFIX}{record.source_id}"
         if key in existing_keys:
