@@ -34,6 +34,14 @@ combined (worst-of-both-sides, `classify_coin_photos.combine`) score of what
 is already stored — this is what protects a figural coin (Писанка,
 Пектораль): its own gallery photos are exactly as "non-circular" as its
 stored one, so no confident win, no replacement, no special-casing needed.
+
+Traversal is a single streaming pass (2026-09-08 fix, after an OOM on the
+3.7 GiB production box at ~1300 records): `run()` looks at one record at a
+time — fetch its gallery, score it, compare, optionally write a CSV row and
+apply, then move on. Nothing from one record's images or verdicts survives
+into the next iteration, and every accumulator the report is built from is a
+`BoundedList` (a fixed-size sample plus a count) rather than a list that
+grows with the size of the catalogue — see its own docstring.
 """
 
 from __future__ import annotations
@@ -75,6 +83,11 @@ CANDIDATE_MIN = 0.85
 CURRENT_MAX = 0.65
 GAP_MIN = 0.25
 CANDIDATE_FLOOR = 0.70
+
+# How many example rows the report keeps for fallbacks/failures/replacements/
+# duplicate-title groups — a constant, not a fraction of the catalogue, so
+# the report itself cannot be the thing that grows with N (BoundedList).
+SAMPLE_LIMIT = 50
 
 YES = frozenset({"y", "yes", "1", "true", "+", "так"})
 CSV_COLUMNS = (
@@ -143,7 +156,7 @@ def pick_roles(images: Sequence[GalleryImage], verdicts: dict[str, Verdict]) -> 
     return picks
 
 
-# --------------------------------------------------------------------- scan
+# ------------------------------------------------------------------ per-item
 @dataclass
 class ItemDiff:
     item_id: int
@@ -157,36 +170,26 @@ class ItemDiff:
     note: str = "ok"
 
 
-@dataclass
-class PhotoUpgradeOutcome:
-    diffs: list[ItemDiff] = field(default_factory=list)
-    scanned: int = 0
-    without_page: int = 0
-    fallbacks: list[dict[str, Any]] = field(default_factory=list)
-    failed: list[dict[str, Any]] = field(default_factory=list)
-    duplicate_titles: list[dict[str, Any]] = field(default_factory=list)
-
-    def summary(self) -> dict[str, Any]:
-        return {
-            "scanned": self.scanned,
-            "withReplacement": len(self.diffs),
-            "fallbacks": len(self.fallbacks),
-            "withoutPage": self.without_page,
-            "failed": len(self.failed),
-            "duplicateTitles": len(self.duplicate_titles),
-        }
-
-
 async def candidate_items(
     session: AsyncSession, *, country_id: int
-) -> list[tuple[CatalogItem, str]]:
-    """(record, ua-coins.info page URL) for every shared, active Ukrainian
-    record a link already names an absolute URL for. Bare legacy ids (no
-    slug, no URL) cannot be turned into a fetchable page without guessing at
-    one, so they fall out of this — into `without_page`, not treated as a
-    page we know."""
+) -> list[tuple[int, str, int, str]]:
+    """(item_id, title_original, issue_year, ua-coins.info page URL) for every
+    shared, active Ukrainian record a link already names an absolute URL for.
+
+    Only the four scalar columns actually used below — never the full ORM
+    entity, and never a relationship — so materialising this list for an
+    order-1000 catalogue costs kilobytes, not the megabytes a widish row
+    class multiplies into. Bare legacy ids (no slug, no URL) cannot be turned
+    into a fetchable page without guessing at one, so they fall out of this —
+    into `without_page`, not treated as a page we know.
+    """
     rows = await session.execute(
-        select(CatalogItem, PriceSourceLink.external_id)
+        select(
+            CatalogItem.id,
+            CatalogItem.title_original,
+            CatalogItem.issue_year,
+            PriceSourceLink.external_id,
+        )
         .join(PriceSourceLink, PriceSourceLink.catalog_item_id == CatalogItem.id)
         .where(
             CatalogItem.country_id == country_id,
@@ -197,26 +200,30 @@ async def candidate_items(
         )
         .order_by(CatalogItem.id)
     )
-    return [(item, url) for item, url in rows.all()]
+    return [(item_id, title, year, url) for item_id, title, year, url in rows.all()]
 
 
-async def _active_items(session: AsyncSession, *, country_id: int) -> list[CatalogItem]:
+async def _title_year_rows(session: AsyncSession, *, country_id: int) -> list[tuple[int, str, int]]:
     rows = await session.execute(
-        select(CatalogItem).where(
+        select(CatalogItem.id, CatalogItem.title_original, CatalogItem.issue_year).where(
             CatalogItem.country_id == country_id,
             CatalogItem.created_by.is_(None),
             CatalogItem.is_archived.is_(False),
         )
     )
-    return list(rows.scalars().all())
+    return [(item_id, title, year) for item_id, title, year in rows.all()]
 
 
-def find_duplicate_titles(items: Sequence[CatalogItem]) -> list[dict[str, Any]]:
-    """{title_original, issue_year} shared by 2+ active records — a report-only
-    addendum (docs/BACKLOG.md decides what, if anything, to do about it)."""
+def find_duplicate_titles(rows: Sequence[tuple[int, str, int]]) -> list[dict[str, Any]]:
+    """(item_id, title_original, issue_year) rows grouped by title+year, kept
+    only where 2+ active records share one — a report-only addendum
+    (docs/BACKLOG.md decides what, if anything, to do about it). Takes the
+    same lightweight rows `_title_year_rows` reads, not full catalog entities
+    and not anything the photo walk itself touches.
+    """
     groups: dict[tuple[str, int], list[int]] = {}
-    for item in items:
-        groups.setdefault((item.title_original, item.issue_year), []).append(item.id)
+    for item_id, title, year in rows:
+        groups.setdefault((title, year), []).append(item_id)
     return [
         {"titleOriginal": title, "issueYear": year, "itemIds": sorted(ids)}
         for (title, year), ids in sorted(groups.items())
@@ -229,6 +236,10 @@ def _suffix_of(url: str) -> str:
 
 
 def _classify_url(client: PoliteClient, url: str) -> Verdict | None:
+    """Download, classify, discard: `payload` and, inside `classify()`, the
+    decoded image array both go out of scope with this call — only the small
+    `Verdict` survives it, so a caller looping over many records never holds
+    more than one record's bytes at a time."""
     _result, payload = client.get_range(url, MAX_SOURCE_BYTES)
     if not payload:
         return None
@@ -252,10 +263,12 @@ async def _diff_for_item(
     *,
     storage: ObjectStorage,
     client: PoliteClient,
-    item: CatalogItem,
+    item_id: int,
+    title: str,
+    year: int,
     url: str,
 ) -> ItemDiff | dict[str, Any] | None:
-    current = await photo_replace.official_photos(session, item.id)
+    current = await photo_replace.official_photos(session, item_id)
     roles_present = [role for role in ROLES if role in current]
     if not roles_present:
         return None  # nothing stored yet for this record — out of scope here
@@ -263,15 +276,15 @@ async def _diff_for_item(
     page = client.get(url)
     if not page.ok:
         return {
-            "itemId": item.id,
-            "title": item.title_original,
+            "itemId": item_id,
+            "title": title,
             "reason": f"page unreachable: HTTP {page.status}",
         }
     images = ua_coins.parse_coin_gallery(page.text)
     if not images:
         return {
-            "itemId": item.id,
-            "title": item.title_original,
+            "itemId": item_id,
+            "title": title,
             "reason": "no gallery images found on the page",
         }
 
@@ -285,8 +298,8 @@ async def _diff_for_item(
     missing = [role for role in roles_present if role not in picks]
     if missing:
         return {
-            "itemId": item.id,
-            "title": item.title_original,
+            "itemId": item_id,
+            "title": title,
             "reason": f"no candidate photo resolved for: {', '.join(missing)}",
         }
 
@@ -305,9 +318,9 @@ async def _diff_for_item(
     # stored at all) is not this step's job to add; that is out of scope
     # (docs/05-integrations.md, section 13).
     return ItemDiff(
-        item_id=item.id,
-        title=item.title_original,
-        year=item.issue_year,
+        item_id=item_id,
+        title=title,
+        year=year,
         current_score=round(current_score, 3),
         candidate_score=round(candidate_score, 3),
         tier=tier,
@@ -316,7 +329,117 @@ async def _diff_for_item(
     )
 
 
-async def scan(
+# --------------------------------------------------------------------- scan
+class BoundedList(list[Any]):
+    """A list capped at `limit` items; `overflow` counts what did not fit.
+
+    Used for every "examples" collection the report shows — memory stays a
+    small constant no matter how many times `add` is called over a run of
+    any size, so the report itself can never be the thing that grows with
+    the size of the catalogue.
+    """
+
+    def __init__(self, limit: int) -> None:
+        super().__init__()
+        self.limit = limit
+        self.overflow = 0
+
+    def add(self, item: Any) -> None:
+        if len(self) < self.limit:
+            self.append(item)
+        else:
+            self.overflow += 1
+
+
+@dataclass
+class PhotoUpgradeOutcome:
+    scanned: int = 0
+    with_replacement: int = 0
+    fallback_count: int = 0
+    without_page: int = 0
+    failed_count: int = 0
+    replaced_count: int = 0
+    failed_apply_count: int = 0
+    duplicate_title_groups: int = 0
+    diffs_sample: BoundedList = field(default_factory=lambda: BoundedList(SAMPLE_LIMIT))
+    fallbacks: BoundedList = field(default_factory=lambda: BoundedList(SAMPLE_LIMIT))
+    failed: BoundedList = field(default_factory=lambda: BoundedList(SAMPLE_LIMIT))
+    replaced: BoundedList = field(default_factory=lambda: BoundedList(SAMPLE_LIMIT))
+    duplicate_titles: BoundedList = field(default_factory=lambda: BoundedList(SAMPLE_LIMIT))
+
+    def summary(self) -> dict[str, Any]:
+        return {
+            "scanned": self.scanned,
+            "withReplacement": self.with_replacement,
+            "fallbacks": self.fallback_count,
+            "withoutPage": self.without_page,
+            "failed": self.failed_count,
+            "replaced": self.replaced_count,
+            "failedApply": self.failed_apply_count,
+            "duplicateTitleGroups": self.duplicate_title_groups,
+        }
+
+
+def _diff_row(diff: ItemDiff) -> dict[str, Any]:
+    return {
+        "decision": "",
+        "itemId": diff.item_id,
+        "title": diff.title,
+        "year": diff.year,
+        "currentScore": diff.current_score,
+        "candidateScore": diff.candidate_score,
+        "tier": diff.tier,
+        "obverseUrl": diff.obverse_url or "",
+        "reverseUrl": diff.reverse_url or "",
+        "note": diff.note,
+    }
+
+
+class _DiffCsvWriter:
+    """One row at a time, flushed immediately — open for the whole run
+    rather than built up in memory and written at the end."""
+
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self._handle = path.open("w", encoding="utf-8", newline="")
+        self._writer = csv.DictWriter(self._handle, fieldnames=CSV_COLUMNS)
+        self._writer.writeheader()
+
+    def write(self, diff: ItemDiff) -> None:
+        self._writer.writerow(_diff_row(diff))
+        self._handle.flush()
+
+    def close(self) -> None:
+        self._handle.close()
+
+
+def write_diff_csv(path: Path, diffs: Sequence[ItemDiff]) -> int:
+    """Convenience wrapper for a caller that already has the full list of
+    diffs in hand (tests; a person re-rendering a saved run) — `run()` itself
+    writes through `_DiffCsvWriter` one row at a time as it scans."""
+    writer = _DiffCsvWriter(path)
+    try:
+        for diff in diffs:
+            writer.write(diff)
+    finally:
+        writer.close()
+    return len(diffs)
+
+
+def read_review_csv(path: Path) -> set[int]:
+    """Item ids marked `decision=yes` in a previously written diff CSV. The
+    URL columns are never read back: re-running against the same cached
+    pages resolves the same candidates, so a hand edit of them would do
+    nothing — only `decision` narrows which of the recomputed rows apply."""
+    chosen: set[int] = set()
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            if (row.get("decision") or "").strip().casefold() in YES:
+                chosen.add(int(str(row["itemId"]).strip()))
+    return chosen
+
+
+async def run(
     session: AsyncSession,
     *,
     storage: ObjectStorage,
@@ -324,109 +447,121 @@ async def scan(
     country_id: int,
     limit: int | None,
     log: Callable[[str], None],
+    diff_out: Path | None = None,
+    apply: bool = False,
+    only_item_ids: set[int] | None = None,
 ) -> PhotoUpgradeOutcome:
-    outcome = PhotoUpgradeOutcome()
-    rows = await candidate_items(session, country_id=country_id)
-    all_active = await _active_items(session, country_id=country_id)
-    outcome.duplicate_titles = find_duplicate_titles(all_active)
-    outcome.without_page = max(len(all_active) - len(rows), 0)
+    """One streaming pass over the candidates: score, compare, optionally
+    write a CSV row and replace, then move to the next record. Nothing about
+    one record's gallery or verdicts is still reachable once its iteration
+    ends — see the module docstring and `tests/test_photo_upgrade.py`'s own
+    memory-boundedness test.
 
+    `apply=False` (the default, a dry run) never calls `photo_replace`.
+    `apply=True` with `only_item_ids=None` replaces every confident-win row
+    this pass computes; a non-None set (from a previously saved diff CSV,
+    `read_review_csv`) restricts that to the ids it names.
+    """
+    outcome = PhotoUpgradeOutcome()
+    title_rows = await _title_year_rows(session, country_id=country_id)
+    duplicates = find_duplicate_titles(title_rows)
+    outcome.duplicate_title_groups = len(duplicates)
+    for row in duplicates:
+        outcome.duplicate_titles.add(row)
+
+    candidates = await candidate_items(session, country_id=country_id)
+    outcome.without_page = max(len(title_rows) - len(candidates), 0)
     if limit is not None:
-        rows = rows[:limit]
-    for index, (item, url) in enumerate(rows, start=1):
-        outcome.scanned += 1
-        try:
-            diff = await _diff_for_item(session, storage=storage, client=client, item=item, url=url)
-        except Exception as exc:  # a bad page or a bad object must not stop the run
-            outcome.failed.append(
-                {"itemId": item.id, "title": item.title_original, "error": str(exc)}
+        candidates = candidates[:limit]
+    total = len(candidates)
+
+    writer = _DiffCsvWriter(diff_out) if diff_out is not None else None
+    try:
+        for index, (item_id, title, year, url) in enumerate(candidates, start=1):
+            outcome.scanned += 1
+            status = await _process_one(
+                session,
+                storage=storage,
+                client=client,
+                item_id=item_id,
+                title=title,
+                year=year,
+                url=url,
+                outcome=outcome,
+                writer=writer,
+                apply=apply,
+                only_item_ids=only_item_ids,
             )
-            continue
-        if isinstance(diff, ItemDiff):
-            outcome.diffs.append(diff)
-        elif diff is not None:
-            outcome.fallbacks.append(diff)
-        if index % 25 == 0 or index == len(rows):
-            log(f"photo-upgrade scan {index}/{len(rows)}")
+            log(f"[{index}/{total}] {title} ({year}) … {status}")
+    finally:
+        if writer is not None:
+            writer.close()
     return outcome
 
 
-# -------------------------------------------------------------------- apply
-@dataclass
-class ApplyOutcome:
-    replaced: list[dict[str, Any]] = field(default_factory=list)
-    failed: list[dict[str, Any]] = field(default_factory=list)
-
-    def summary(self) -> dict[str, Any]:
-        return {"replaced": len(self.replaced), "failedApply": len(self.failed)}
-
-
-async def apply_diffs(
+async def _process_one(
     session: AsyncSession,
     *,
     storage: ObjectStorage,
     client: PoliteClient,
-    diffs: list[ItemDiff],
+    item_id: int,
+    title: str,
+    year: int,
+    url: str,
+    outcome: PhotoUpgradeOutcome,
+    writer: _DiffCsvWriter | None,
+    apply: bool,
     only_item_ids: set[int] | None,
-    log: Callable[[str], None],
-) -> ApplyOutcome:
-    """Store the candidate pair for every diff (or, with `only_item_ids`,
-    only the ones a person marked `decision=yes` in the diff CSV — the URLs
-    themselves are not read back from that file: re-running the same scan
-    against the same cached pages resolves the same candidates, so there is
-    nothing for a hand edit of the URL columns to change)."""
-    outcome = ApplyOutcome()
-    chosen = [d for d in diffs if only_item_ids is None or d.item_id in only_item_ids]
-    for index, diff in enumerate(chosen, start=1):
+) -> str:
+    """One record's worth of work; returns the progress-line status word."""
+    try:
+        result = await _diff_for_item(
+            session,
+            storage=storage,
+            client=client,
+            item_id=item_id,
+            title=title,
+            year=year,
+            url=url,
+        )
+    except Exception as exc:  # a bad page or a bad object must not stop the run
+        outcome.failed_count += 1
+        outcome.failed.add({"itemId": item_id, "title": title, "error": str(exc)})
+        return "failed"
+
+    if result is None:
+        return "kept"
+
+    if isinstance(result, dict):
+        reason = str(result["reason"])
+        if reason.startswith(("page unreachable", "no gallery images")):
+            outcome.failed_count += 1
+            outcome.failed.add(result)
+            return "no-page"
+        outcome.fallback_count += 1
+        outcome.fallbacks.add(result)
+        return "fallback"
+
+    outcome.with_replacement += 1
+    outcome.diffs_sample.add(result)
+    if writer is not None:
+        writer.write(result)
+    if apply and (only_item_ids is None or item_id in only_item_ids):
         try:
-            result = await photo_replace.replace_photos(
+            applied = await photo_replace.replace_photos(
                 session,
                 storage=storage,
                 client=client,
-                item_id=diff.item_id,
-                urls={"obverse": diff.obverse_url, "reverse": diff.reverse_url},
+                item_id=item_id,
+                urls={"obverse": result.obverse_url, "reverse": result.reverse_url},
                 license="ua-coins.info, © 2015-2026, used with attribution",
                 attribution="ua-coins.info",
             )
-            outcome.replaced.append(result)
             await session.commit()
+            outcome.replaced_count += 1
+            outcome.replaced.add(applied)
         except Exception as exc:  # one bad replacement must not stop the run
             await session.rollback()
-            outcome.failed.append({"itemId": diff.item_id, "error": str(exc)})
-        log(f"photo-upgrade apply {index}/{len(chosen)}")
-    return outcome
-
-
-# ------------------------------------------------------------------- review
-def write_diff_csv(path: Path, outcome: PhotoUpgradeOutcome) -> int:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=CSV_COLUMNS)
-        writer.writeheader()
-        for diff in outcome.diffs:
-            writer.writerow(
-                {
-                    "decision": "",
-                    "itemId": diff.item_id,
-                    "title": diff.title,
-                    "year": diff.year,
-                    "currentScore": diff.current_score,
-                    "candidateScore": diff.candidate_score,
-                    "tier": diff.tier,
-                    "obverseUrl": diff.obverse_url or "",
-                    "reverseUrl": diff.reverse_url or "",
-                    "note": diff.note,
-                }
-            )
-    return len(outcome.diffs)
-
-
-def read_review_csv(path: Path) -> set[int]:
-    """Item ids marked `decision=yes` — see `apply_diffs`'s own docstring for
-    why the URL columns are not read back."""
-    chosen: set[int] = set()
-    with path.open(encoding="utf-8-sig", newline="") as handle:
-        for row in csv.DictReader(handle):
-            if (row.get("decision") or "").strip().casefold() in YES:
-                chosen.add(int(str(row["itemId"]).strip()))
-    return chosen
+            outcome.failed_apply_count += 1
+            outcome.failed.add({"itemId": item_id, "error": str(exc)})
+    return "upgraded"

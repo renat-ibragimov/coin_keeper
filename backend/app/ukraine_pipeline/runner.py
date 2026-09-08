@@ -667,40 +667,38 @@ class Runner:
                 "photo already stored against the candidate"
             )
             raise PipelineError(message)
-        outcome = await photo_upgrade.scan(
+        only_item_ids = None
+        if self.options.photo_upgrade_review_in is not None:
+            path = self.options.photo_upgrade_review_in
+            only_item_ids = photo_upgrade.read_review_csv(path)
+            self.log(f"photo-upgrade: {len(only_item_ids)} rows marked yes in {path}")
+        # One streaming pass: scores, optionally writes the diff CSV row by
+        # row, and (under --apply) replaces immediately, rather than holding
+        # the whole run's diffs or images in memory (docs/05-integrations.md,
+        # section 13 — the 2026-09-08 OOM fix).
+        outcome = await photo_upgrade.run(
             self.session,
             storage=self.storage,
             client=self.client,
             country_id=self._country_id,
             limit=self.options.limit,
             log=self.log,
+            diff_out=self.options.photo_upgrade_out,
+            apply=not self.options.dry_run,
+            only_item_ids=only_item_ids,
         )
-        only_item_ids = None
-        if self.options.photo_upgrade_review_in is not None:
-            path = self.options.photo_upgrade_review_in
-            only_item_ids = photo_upgrade.read_review_csv(path)
-            self.log(f"photo-upgrade: {len(only_item_ids)} rows marked yes in {path}")
-        apply_outcome = photo_upgrade.ApplyOutcome()
-        if not self.options.dry_run:
-            apply_outcome = await photo_upgrade.apply_diffs(
-                self.session,
-                storage=self.storage,
-                client=self.client,
-                diffs=outcome.diffs,
-                only_item_ids=only_item_ids,
-                log=self.log,
-            )
-        rows = 0
         if self.options.photo_upgrade_out is not None:
-            rows = photo_upgrade.write_diff_csv(self.options.photo_upgrade_out, outcome)
-            self.log(f"photo-upgrade: {rows} diff rows written to {self.options.photo_upgrade_out}")
+            self.log(
+                f"photo-upgrade: {outcome.with_replacement} diff rows written to "
+                f"{self.options.photo_upgrade_out}"
+            )
         self.report.step(
             "photo-upgrade",
-            {**outcome.summary(), **apply_outcome.summary(), "diffRowsWritten": rows},
-            fallbacks=outcome.fallbacks[:50],
-            failed=outcome.failed[:50],
-            duplicateTitles=outcome.duplicate_titles[:50],
-            replaced=apply_outcome.replaced[:50],
+            outcome.summary(),
+            fallbacks=list(outcome.fallbacks),
+            failed=list(outcome.failed),
+            duplicateTitles=list(outcome.duplicate_titles),
+            replaced=list(outcome.replaced),
         )
         await self._commit()
 

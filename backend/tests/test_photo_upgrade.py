@@ -1,5 +1,6 @@
 """photo_upgrade: the three-tier obverse/reverse pick, the confident-win
-threshold, and the end-to-end scan/apply/idempotency round trip.
+threshold, the streaming scan/apply/idempotency round trip, and the
+memory-boundedness the 2026-09-08 OOM fix added.
 
 Photo bytes are synthetic (Pillow-drawn circles and rectangles, the same
 approach tests/test_classify_coin_photos.py and
@@ -9,8 +10,11 @@ committed to the repository (CLAUDE.md).
 
 from __future__ import annotations
 
+import gc
 import io
+import weakref
 from pathlib import Path
+from types import SimpleNamespace
 
 import httpx
 from PIL import Image, ImageDraw
@@ -227,15 +231,27 @@ def test_should_not_replace_when_current_is_already_as_good() -> None:
 
 # --------------------------------------------------------------- duplicates
 def test_find_duplicate_titles_groups_by_title_and_year() -> None:
-    items = [
-        CatalogItem(id=1, title_original="Український борщ", issue_year=2022),
-        CatalogItem(id=2, title_original="Український борщ", issue_year=2022),
-        CatalogItem(id=3, title_original="Соня садова", issue_year=1999),
+    """Lightweight (id, title, year) rows — never a full catalog entity — is
+    the whole point after the 2026-09-08 OOM fix (docs/05-integrations.md,
+    section 13)."""
+    rows = [
+        (1, "Український борщ", 2022),
+        (2, "Український борщ", 2022),
+        (3, "Соня садова", 1999),
     ]
-    duplicates = photo_upgrade.find_duplicate_titles(items)
+    duplicates = photo_upgrade.find_duplicate_titles(rows)
     assert duplicates == [
         {"titleOriginal": "Український борщ", "issueYear": 2022, "itemIds": [1, 2]}
     ]
+
+
+# --------------------------------------------------------- pure: bounded list
+def test_bounded_list_caps_at_the_limit_and_counts_the_rest() -> None:
+    sample = photo_upgrade.BoundedList(3)
+    for i in range(10):
+        sample.add(i)
+    assert list(sample) == [0, 1, 2]
+    assert sample.overflow == 7
 
 
 # -------------------------------------------------------------------- async
@@ -260,13 +276,13 @@ async def test_candidate_items_only_counts_rows_with_an_absolute_ua_coins_url(
 
     rows = await photo_upgrade.candidate_items(db_session, country_id=country.id)
 
-    ids = {item.id for item, _url in rows}
+    ids = {item_id for item_id, _title, _year, _url in rows}
     assert with_url.id in ids
     assert bare_id.id not in ids
     assert without_link.id not in ids
 
 
-async def test_scan_proposes_a_confident_metadata_replacement(
+async def test_run_proposes_a_confident_metadata_replacement(
     db_session: AsyncSession, tmp_path: Path
 ) -> None:
     await seed_currencies(db_session)
@@ -295,25 +311,27 @@ async def test_scan_proposes_a_confident_metadata_replacement(
         tmp_path,
         {PAGE_URL: html, OBVERSE_URL: coin_bytes(), REVERSE_URL: coin_bytes()},
     )
+    log_lines: list[str] = []
 
     with client:
-        outcome = await photo_upgrade.scan(
+        outcome = await photo_upgrade.run(
             db_session,
             storage=storage,
             client=client,
             country_id=country.id,
             limit=None,
-            log=lambda _m: None,
+            log=log_lines.append,
         )
 
     assert outcome.scanned == 1
-    assert len(outcome.diffs) == 1
-    diff = outcome.diffs[0]
+    assert outcome.with_replacement == 1
+    diff = outcome.diffs_sample[0]
     assert diff.item_id == item.id
     assert diff.tier == "metadata"
     assert diff.obverse_url == OBVERSE_URL
     assert diff.reverse_url == REVERSE_URL
     assert diff.candidate_score > diff.current_score
+    assert log_lines == ["[1/1] Test coin (2022) … upgraded"]
 
 
 async def test_figural_coin_is_never_a_confident_win(
@@ -336,7 +354,7 @@ async def test_figural_coin_is_never_a_confident_win(
     client = routed_client(tmp_path, {PAGE_URL: html, OBVERSE_URL: figural_bytes()})
 
     with client:
-        outcome = await photo_upgrade.scan(
+        outcome = await photo_upgrade.run(
             db_session,
             storage=storage,
             client=client,
@@ -345,8 +363,8 @@ async def test_figural_coin_is_never_a_confident_win(
             log=lambda _m: None,
         )
 
-    assert outcome.diffs == []
-    assert outcome.fallbacks == []
+    assert outcome.with_replacement == 0
+    assert outcome.fallback_count == 0
 
 
 async def test_missing_role_candidate_is_reported_as_a_fallback_not_a_diff(
@@ -378,7 +396,7 @@ async def test_missing_role_candidate_is_reported_as_a_fallback_not_a_diff(
     client = routed_client(tmp_path, {PAGE_URL: html, OBVERSE_URL: coin_bytes()})
 
     with client:
-        outcome = await photo_upgrade.scan(
+        outcome = await photo_upgrade.run(
             db_session,
             storage=storage,
             client=client,
@@ -387,17 +405,13 @@ async def test_missing_role_candidate_is_reported_as_a_fallback_not_a_diff(
             log=lambda _m: None,
         )
 
-    assert outcome.diffs == []
-    assert len(outcome.fallbacks) == 1
+    assert outcome.with_replacement == 0
+    assert outcome.fallback_count == 1
     assert outcome.fallbacks[0]["itemId"] == item.id
-    assert "reverse" in cast_reason(outcome.fallbacks[0])
+    assert "reverse" in str(outcome.fallbacks[0]["reason"])
 
 
-def cast_reason(row: dict[str, object]) -> str:
-    return str(row["reason"])
-
-
-async def test_apply_then_rescan_gives_an_empty_diff(
+async def test_apply_then_rerun_gives_an_empty_diff(
     db_session: AsyncSession, tmp_path: Path
 ) -> None:
     await seed_currencies(db_session)
@@ -427,26 +441,19 @@ async def test_apply_then_rescan_gives_an_empty_diff(
     )
 
     with client:
-        first = await photo_upgrade.scan(
+        first = await photo_upgrade.run(
             db_session,
             storage=storage,
             client=client,
             country_id=country.id,
             limit=None,
             log=lambda _m: None,
+            apply=True,
         )
-        assert len(first.diffs) == 1
-        apply_outcome = await photo_upgrade.apply_diffs(
-            db_session,
-            storage=storage,
-            client=client,
-            diffs=first.diffs,
-            only_item_ids=None,
-            log=lambda _m: None,
-        )
-        assert apply_outcome.summary()["replaced"] == 1
+        assert first.with_replacement == 1
+        assert first.replaced_count == 1
 
-        second = await photo_upgrade.scan(
+        second = await photo_upgrade.run(
             db_session,
             storage=storage,
             client=client,
@@ -455,7 +462,7 @@ async def test_apply_then_rescan_gives_an_empty_diff(
             log=lambda _m: None,
         )
 
-    assert second.diffs == []
+    assert second.with_replacement == 0
     rows = (
         (await db_session.execute(select(MediaFile).where(MediaFile.catalog_item_id == item.id)))
         .scalars()
@@ -465,22 +472,20 @@ async def test_apply_then_rescan_gives_an_empty_diff(
 
 
 def test_diff_csv_round_trips_the_decision_column(tmp_path: Path) -> None:
-    outcome = photo_upgrade.PhotoUpgradeOutcome(
-        diffs=[
-            photo_upgrade.ItemDiff(
-                item_id=42,
-                title="Test coin",
-                year=2022,
-                current_score=0.3,
-                candidate_score=0.9,
-                tier="metadata",
-                obverse_url=OBVERSE_URL,
-                reverse_url=REVERSE_URL,
-            )
-        ]
-    )
+    diffs = [
+        photo_upgrade.ItemDiff(
+            item_id=42,
+            title="Test coin",
+            year=2022,
+            current_score=0.3,
+            candidate_score=0.9,
+            tier="metadata",
+            obverse_url=OBVERSE_URL,
+            reverse_url=REVERSE_URL,
+        )
+    ]
     path = tmp_path / "diff.csv"
-    rows = photo_upgrade.write_diff_csv(path, outcome)
+    rows = photo_upgrade.write_diff_csv(path, diffs)
     assert rows == 1
 
     text = path.read_text(encoding="utf-8")
@@ -488,3 +493,139 @@ def test_diff_csv_round_trips_the_decision_column(tmp_path: Path) -> None:
     path.write_text(text, encoding="utf-8")
 
     assert photo_upgrade.read_review_csv(path) == {42}
+
+
+# ------------------------------------------------------ memory boundedness
+class TrackedBytes(bytearray):
+    """A payload we can weakref (plain `bytes`/`bytearray` cannot be, but a
+    subclass of the mutable one can — `bytes` itself refuses one even
+    subclassed, its fixed-size layout leaves no room for `__weakref__`).
+    Behaves as bytes for everything `photo_upgrade.py` does with it (writing
+    to a file, truthiness); proves the payload is not still reachable once
+    `run()` has moved past the record it belongs to."""
+
+
+class _PopOnceStorage:
+    """Storage that forgets a key the moment it is read, isolating any
+    lingering reference to what it returned to the code under test — see
+    the module docstring's memory-boundedness claim."""
+
+    def __init__(self, tracked: list[weakref.ref[bytes]]) -> None:
+        self._data: dict[str, bytes] = {}
+        self._tracked = tracked
+
+    def put(self, key: str, payload: bytes, content_type: str) -> None:
+        self._data[key] = payload
+
+    def get(self, key: str) -> bytes:
+        payload = TrackedBytes(self._data.pop(key))
+        self._tracked.append(weakref.ref(payload))
+        return payload
+
+    def delete_many(self, keys: list[str]) -> None:
+        for key in keys:
+            self._data.pop(key, None)
+
+    def ensure_bucket(self) -> None:
+        return None
+
+
+class _PopOnceClient:
+    """Same idea as `_PopOnceStorage`, for gallery pages and images — a
+    plain object satisfying the two methods `photo_upgrade.py` calls, no
+    real HTTP or `PoliteClient` involved."""
+
+    def __init__(self, pages: dict[str, str], tracked: list[weakref.ref[bytes]]) -> None:
+        self._pages = pages
+        self._images: dict[str, bytes] = {}
+        self._tracked = tracked
+
+    def add_page(self, url: str, html: str) -> None:
+        self._pages[url] = html
+
+    def add_image(self, url: str, payload: bytes) -> None:
+        self._images[url] = payload
+
+    def get(self, url: str) -> SimpleNamespace:
+        text = self._pages.get(url)
+        return SimpleNamespace(ok=text is not None, text=text or "", status=200 if text else 404)
+
+    def get_range(self, url: str, _max_bytes: int) -> tuple[SimpleNamespace, bytes | None]:
+        payload = self._images.pop(url, None)
+        if payload is None:
+            return SimpleNamespace(ok=False, status=404), None
+        tracked = TrackedBytes(payload)
+        self._tracked.append(weakref.ref(tracked))
+        return SimpleNamespace(ok=True, status=200), tracked
+
+
+async def test_streaming_does_not_retain_byte_payloads_across_items(
+    db_session: AsyncSession,
+) -> None:
+    """N records, each with its own current photo and gallery candidate —
+    every one of those payloads must be unreachable once `run()` returns, no
+    matter how many records it walked (the 2026-09-08 OOM fix)."""
+    await seed_currencies(db_session)
+    country = await country_by_code(db_session, "UA")
+    tracked: list[weakref.ref[bytes]] = []
+    storage = _PopOnceStorage(tracked)
+    client = _PopOnceClient({}, tracked)
+
+    record_count = 40
+    for i in range(record_count):
+        page_url = f"https://www.ua-coins.info/ua/list/{i}-coin"
+        obverse_url = f"https://www.ua-coins.info/images/coins/big/{i}_obverse.webp"
+        reverse_url = f"https://www.ua-coins.info/images/coins/big/{i}_reverse.webp"
+        item = await make_catalog_item(
+            db_session, country=country, title=f"Coin {i}", year=2000 + i
+        )
+        await _link_ua_coins(db_session, item=item, url=page_url)
+        await _add_photo(
+            db_session,
+            item=item,
+            role=MediaRole.OBVERSE,
+            key=f"o-{i}",
+            storage=storage,
+            payload=coin_bytes(),
+        )
+        await _add_photo(
+            db_session,
+            item=item,
+            role=MediaRole.REVERSE,
+            key=f"r-{i}",
+            storage=storage,
+            payload=coin_bytes(),
+        )
+        client.add_page(page_url, gallery_html([(obverse_url, "Аверс"), (reverse_url, "Реверс")]))
+        client.add_image(obverse_url, coin_bytes())
+        client.add_image(reverse_url, coin_bytes())
+
+    outcome = await photo_upgrade.run(
+        db_session,
+        storage=storage,  # type: ignore[arg-type]
+        client=client,  # type: ignore[arg-type]
+        country_id=country.id,
+        limit=None,
+        log=lambda _m: None,
+    )
+
+    assert outcome.scanned == record_count
+    assert len(tracked) == record_count * 4  # 2 stored + 2 gallery images each
+
+    gc.collect()
+    alive = [ref for ref in tracked if ref() is not None]
+    assert alive == []
+
+
+def test_photo_upgrade_outcome_report_lists_stay_bounded() -> None:
+    """The report's example lists never grow past SAMPLE_LIMIT, however many
+    times something is added to them — the report itself cannot be the thing
+    OOM-ing a long run."""
+    outcome = photo_upgrade.PhotoUpgradeOutcome()
+    for i in range(photo_upgrade.SAMPLE_LIMIT * 3):
+        outcome.fallbacks.add({"itemId": i})
+        outcome.failed.add({"itemId": i})
+        outcome.duplicate_titles.add({"itemId": i})
+    assert len(outcome.fallbacks) == photo_upgrade.SAMPLE_LIMIT
+    assert len(outcome.failed) == photo_upgrade.SAMPLE_LIMIT
+    assert len(outcome.duplicate_titles) == photo_upgrade.SAMPLE_LIMIT
