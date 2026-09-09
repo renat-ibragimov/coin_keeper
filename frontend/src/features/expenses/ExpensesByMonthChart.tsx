@@ -93,8 +93,21 @@ export function ExpensesByMonthChart({ data, locale, palette }: Props) {
           tickLine={false}
           width={48}
         />
+        {/* Glued to the cursor: recharts otherwise glides the box to its new
+            place over 400ms, and flips it to the other side of the cursor once
+            it would cross the plot's edge — a ~150px jump upwards as the
+            pointer moves down, since the box is half as tall as the chart. No
+            animation and a free vertical axis mean it simply trails the
+            pointer; near the bottom it hangs over the axis instead of jumping
+            (docs/08-ui-map.md). */}
         <Tooltip
           cursor={{ fill: palette.grid, opacity: 0.25 }}
+          isAnimationActive={false}
+          allowEscapeViewBox={{ x: false, y: true }}
+          /* The legend's wrapper is positioned too and comes later in the DOM,
+             so without this the box slides under its labels on the way down.
+             wrapperStyle is merged last, over recharts' own positioning. */
+          wrapperStyle={{ zIndex: 1 }}
           content={(props) => (
             <MonthTooltip
               {...props}

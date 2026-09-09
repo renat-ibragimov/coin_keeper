@@ -52,7 +52,18 @@ export function ExpensesByCategoryChart({ data, locale, palette }: Props) {
               <Cell key={row.category} fill={colors[index]} />
             ))}
           </Pie>
+          {/* Glued to the cursor: recharts otherwise glides the box to its new
+              place over 400ms, and flips it to the other side of the cursor once
+              it would cross the plot's edge — a ~150px jump upwards as the
+              pointer moves down, since the box is half as tall as the chart. No
+              animation and a free vertical axis mean it simply trails the
+              pointer; near the bottom it hangs over the axis instead of jumping
+              (docs/08-ui-map.md). */}
           <Tooltip
+            isAnimationActive={false}
+            allowEscapeViewBox={{ x: false, y: true }}
+            /* Over the legend list below the chart, same as the month chart. */
+            wrapperStyle={{ zIndex: 1 }}
             content={(props: TooltipContentProps) => {
               const row = props.active ? props.payload?.[0] : undefined;
               if (!row) return null;
