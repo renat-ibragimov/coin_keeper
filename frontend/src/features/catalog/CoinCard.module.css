@@ -167,9 +167,31 @@
   flex: 1;
 }
 
-.denomination {
+/* One line for the two facts that explain a price gap between coins that look
+ * alike in the grid: face value left, material right and quieter. The material
+ * is already cut to two words (shortMaterial); the ellipsis here is the
+ * backstop for a single very long word (docs/08-ui-map.md). */
+.specs {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
   font-size: 13px;
   color: var(--color-text-secondary);
+}
+
+.denomination {
+  flex: none;
+  white-space: nowrap;
+}
+
+.material {
+  min-width: 0;
+  color: var(--color-text-muted);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Fixed two-line window regardless of title length: short titles leave the

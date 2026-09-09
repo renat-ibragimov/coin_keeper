@@ -34,7 +34,8 @@ class CollectionFilters:
     group: CollectionGroup | None = None
     metal_kind: MetalKind | None = None
     grade: str | None = None
-    sort: str = "date"  # date | title | total
+    # Every column of the "Мої монети" table sorts (docs/08-ui-map.md).
+    sort: str = "date"  # date | title | country | series | quantity | total | valuation | grade
     order: str = "desc"
 
 
@@ -155,6 +156,10 @@ class CollectionRepository:
 
         agg = self._position_lateral()
         descending = filters.order == "desc"
+        # The valuation is a product, not a column: the same expression the row
+        # carries (price of one coin times how many are held), so the listing
+        # sorts by what the reader sees.
+        valuation = latest_price_uah_for(CatalogItem.id, self._owner_id) * agg.c.total_quantity
         sort_columns: dict[str, Any] = {
             "date": agg.c.last_acquisition_date,
             "title": localized(
@@ -163,7 +168,24 @@ class CollectionRepository:
                 en=CatalogItem.title_en,
                 original=CatalogItem.title_original,
             ),
+            "country": localized(
+                self._locale,
+                uk=Country.name_uk,
+                en=Country.name_en,
+                original=Country.name_original,
+            ),
+            "series": localized(
+                self._locale,
+                uk=CoinSeries.name_uk,
+                en=CoinSeries.name_en,
+                original=CoinSeries.name_original,
+            ),
+            "quantity": agg.c.total_quantity,
             "total": agg.c.total_spend_uah,
+            "valuation": valuation,
+            # An array orders by its first element and then along it, which is
+            # what a column of "AU · XF" chips reads as.
+            "grade": agg.c.grades,
         }
         column = sort_columns.get(filters.sort, sort_columns["date"])
         ordering = column.desc().nulls_last() if descending else column.asc().nulls_last()

@@ -10,17 +10,21 @@ import { ApiError } from '@/shared/api/client';
 import type { ExpenseCategory, ExpenseOut } from '@/shared/api/types';
 import { formatDate, formatMoney, formatSignedUah, formatUah } from '@/shared/lib/format';
 import { useChartPalette } from '@/shared/theme/useChartPalette';
+import type { SortOrder } from '@/shared/ui';
 import {
   Badge,
   Button,
   Card,
+  cellAlign,
   ConfirmDialog,
+  DataTable,
   EmptyState,
   ErrorState,
   Modal,
   PageHeader,
   Pagination,
   Skeleton,
+  SortHeader,
   StatTile,
   useToast,
 } from '@/shared/ui';
@@ -29,11 +33,13 @@ import {
   ALL_CATEGORIES,
   createExpense,
   deleteExpense,
+  EXPENSE_SORTS,
   fetchExpenses,
   fetchExpensesSummary,
   PAGE_SIZE,
   updateExpense,
 } from './api';
+import type { ExpenseSort } from './api';
 import { ExpensesByCategoryChart } from './ExpensesByCategoryChart';
 import { ExpensesByMonthChart } from './ExpensesByMonthChart';
 import { ExpenseForm } from './ExpenseForm';
@@ -41,6 +47,16 @@ import type { ExpenseValues } from './ExpenseForm';
 import styles from './ExpensesPage.module.css';
 
 const DEPENDENT_KEYS = ['expenses', 'bootstrap'];
+
+// Widths of their own, so the columns stay put from page to page (the same
+// rule as the other two tables, docs/08-ui-map.md).
+const SORTABLE_COLUMNS: { key: string; sort: ExpenseSort; className: string | undefined }[] = [
+  { key: 'expenses.date', sort: 'date', className: styles.dateColumn },
+  { key: 'expenses.category', sort: 'category', className: styles.categoryColumn },
+  { key: 'expenses.description', sort: 'description', className: undefined },
+  { key: 'expenses.vendor', sort: 'vendor', className: styles.vendorColumn },
+  { key: 'expenses.amountHeader', sort: 'amount', className: styles.moneyColumn },
+];
 
 type Editor = { mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; expense: ExpenseOut };
 
@@ -56,12 +72,17 @@ export function ExpensesPage() {
     ? (categoryParam as ExpenseCategory)
     : undefined;
   const page = Math.max(1, Number.parseInt(params.get('page') ?? '1', 10) || 1);
+  const sortParam = params.get('sort');
+  const sort = EXPENSE_SORTS.includes(sortParam as ExpenseSort)
+    ? (sortParam as ExpenseSort)
+    : 'date';
+  const order = params.get('order') === 'asc' ? 'asc' : 'desc';
   const [editor, setEditor] = useState<Editor>({ mode: 'closed' });
   const [deleting, setDeleting] = useState<ExpenseOut | null>(null);
 
   const listQuery = useQuery({
-    queryKey: ['expenses', 'list', category, page],
-    queryFn: () => fetchExpenses({ category, page }),
+    queryKey: ['expenses', 'list', category, page, sort, order],
+    queryFn: () => fetchExpenses({ category, page, sort, order }),
     placeholderData: keepPreviousData,
   });
   const summaryQuery = useQuery({
@@ -94,11 +115,25 @@ export function ExpensesPage() {
     onError: () => toast.show(t('errors.generic'), 'error'),
   });
 
-  const setFilter = (changes: { category?: ExpenseCategory; page?: number }) => {
+  const setFilter = (changes: {
+    category?: ExpenseCategory;
+    page?: number;
+    sort?: ExpenseSort;
+    order?: SortOrder;
+  }) => {
     const next = new URLSearchParams(params);
     if ('category' in changes) {
       if (changes.category) next.set('category', changes.category);
       else next.delete('category');
+      next.delete('page');
+    }
+    if (changes.sort) {
+      // The listing's own default stays out of the address, same rule as the
+      // catalogue's filters: a plain link is a plain link.
+      if (changes.sort === 'date') next.delete('sort');
+      else next.set('sort', changes.sort);
+      if (changes.order === 'asc') next.set('order', 'asc');
+      else next.delete('order');
       next.delete('page');
     }
     if (changes.page && changes.page > 1) next.set('page', String(changes.page));
@@ -268,76 +303,87 @@ export function ExpensesPage() {
             />
           ) : null}
           {list && list.items.length > 0 ? (
-            <div className={styles.scroll}>
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>{t('expenses.date')}</th>
-                    <th>{t('expenses.category')}</th>
-                    <th>{t('expenses.description')}</th>
-                    <th>{t('expenses.vendor')}</th>
-                    <th className={styles.number}>{t('expenses.amountHeader')}</th>
-                    <th className={styles.number}>$</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  {list.items.map((expense) => {
-                    const fromPurchase = expense.category === 'coin_purchase';
-                    return (
-                      <tr key={expense.id}>
-                        <td className="tabular">{formatDate(expense.expenseDate, locale)}</td>
-                        <td>
-                          <Badge tone={fromPurchase ? 'accent' : 'neutral'}>
-                            {t(`expenses.categories.${expense.category}`)}
-                          </Badge>
-                        </td>
-                        <td>
-                          {fromPurchase && expense.catalogItemId ? (
-                            <Link to={`/catalog/${expense.catalogItemId}`}>
-                              {expense.coinTitle || t('expenses.fromPurchase')}
-                            </Link>
-                          ) : (
-                            expense.description || '—'
-                          )}
-                        </td>
-                        <td>{expense.vendor || '—'}</td>
-                        <td className={`${styles.number} tabular`}>
-                          {formatMoney(expense.amount, expense.currencyCode, locale)}
-                        </td>
-                        {/* USD equivalent: the column is in place, the value
-                            comes from the API in a later step. */}
-                        <td className={`${styles.number} tabular`}>—</td>
-                        <td className={styles.actions}>
-                          {fromPurchase ? (
-                            <span className={styles.managed} title={t('expenses.managedNote')}>
-                              —
-                            </span>
-                          ) : (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setEditor({ mode: 'edit', expense })}
-                              >
-                                {t('common.edit')}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setDeleting(expense)}
-                              >
-                                {t('common.delete')}
-                              </Button>
-                            </>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable minWidth={860}>
+              <thead>
+                <tr>
+                  {SORTABLE_COLUMNS.map((column) => (
+                    <SortHeader
+                      key={column.key}
+                      label={t(column.key)}
+                      field={column.sort}
+                      sort={sort}
+                      order={order}
+                      onSort={(nextSort, nextOrder) =>
+                        setFilter({ sort: nextSort, order: nextOrder })
+                      }
+                      className={column.className}
+                    />
+                  ))}
+                  {/* Reserved for the amount in dollars at the National Bank's
+                      rate of the day, so the spending can be read in a currency
+                      that does not move under your feet. The value comes in a
+                      later step (docs/BACKLOG.md), and nothing sorts by a column
+                      that carries none yet. */}
+                  <th className={styles.usdColumn}>{t('expenses.amountUsdHeader')}</th>
+                  <th className={styles.actionsColumn}>{t('catalog.tableActions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {list.items.map((expense) => {
+                  const fromPurchase = expense.category === 'coin_purchase';
+                  return (
+                    <tr key={expense.id}>
+                      <td className={`${cellAlign.center} tabular`}>
+                        {formatDate(expense.expenseDate, locale)}
+                      </td>
+                      <td className={cellAlign.center}>
+                        <Badge tone={fromPurchase ? 'accent' : 'neutral'}>
+                          {t(`expenses.categories.${expense.category}`)}
+                        </Badge>
+                      </td>
+                      <td>
+                        {fromPurchase && expense.catalogItemId ? (
+                          <Link to={`/catalog/${expense.catalogItemId}`}>
+                            {expense.coinTitle || t('expenses.fromPurchase')}
+                          </Link>
+                        ) : (
+                          expense.description || '—'
+                        )}
+                      </td>
+                      <td className={`${cellAlign.center} ${styles.secondary}`}>
+                        {expense.vendor || '—'}
+                      </td>
+                      <td className={`${cellAlign.center} tabular`}>
+                        {formatMoney(expense.amount, expense.currencyCode, locale)}
+                      </td>
+                      {/* In dollars at the rate of the day: the column is in
+                          place, the value comes from the API later. */}
+                      <td className={`${cellAlign.center} ${styles.muted} tabular`}>—</td>
+                      <td className={styles.actions}>
+                        {/* A purchase's expense is maintained by the purchase
+                              itself, so there is nothing to press here — an
+                              empty cell rather than a dash that reads as a
+                              missing value (owner, 2026-09-09). */}
+                        {fromPurchase ? null : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditor({ mode: 'edit', expense })}
+                            >
+                              {t('common.edit')}
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => setDeleting(expense)}>
+                              {t('common.delete')}
+                            </Button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </DataTable>
           ) : null}
           <Pagination
             page={page}

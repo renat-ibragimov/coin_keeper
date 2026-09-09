@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { CatalogCard, CollectionGroup } from '@/shared/api/types';
+import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatNumber } from '@/shared/lib/format';
 import type { PropertyRow } from '@/shared/ui';
@@ -28,8 +29,8 @@ export function collectionGroupLabel(group: CollectionGroup, t: TFunction): stri
 
 /** "Нейзильбер" — the composition dictionary name, the free-text material, or the metal kind. */
 function metalMaterial(card: CatalogCard, t: TFunction): string | null {
-  if (card.composition?.name) return card.composition.name;
-  if (card.material) return card.material;
+  const material = coinMaterial(card);
+  if (material) return material;
   return card.metalKind === 'unknown' ? null : t(METAL_LABELS[card.metalKind]);
 }
 

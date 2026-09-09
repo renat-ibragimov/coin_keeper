@@ -34,6 +34,7 @@ const SORT_LABELS: Record<SortField, string> = {
   series: 'catalog.sortSeries',
   year: 'catalog.sortYear',
   denomination: 'catalog.sortDenomination',
+  material: 'catalog.sortMaterial',
   owned: 'catalog.sortOwned',
   purchase: 'catalog.sortPurchase',
   price: 'catalog.sortPrice',

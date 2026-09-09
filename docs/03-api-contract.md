@@ -134,9 +134,14 @@ GET /catalog
   &owned           — true (есть в коллекции) | false (не хватает)
   &scope           — all (по умолчанию) | shared (только общий каталог) | own (только личные)
   &archived        — false (по умолчанию) | true (только архивные)
-  &sort            — title | country | series | year | denomination | owned | purchase | price
+  &sort            — title | country | series | year | denomination | material
+                     | owned | purchase | price
   &order           — asc | desc
 ```
+
+`sort=material` — по тому, что показано в колонке «Матеріал»: название из справочника
+`materials` на языке запроса, а где его нет — свободный текст `catalog_items.material`
+(`08-ui-map.md`).
 
 Выдача всегда ограничена видимыми позициями: общий каталог плюс личные позиции текущего
 пользователя (`created_by IS NULL OR created_by = :userId`). Фильтр ставит репозиторий, а не
@@ -346,6 +351,11 @@ PATCH  /collection/{id}
 DELETE /collection/{id}
 ```
 
+`sort` — `date` (по умолчанию) | `title` | `country` | `series` | `quantity` | `total` |
+`valuation` | `grade`, `order` — `asc` | `desc`. По колонке таблицы «Мої монети»
+(`08-ui-map.md`); `valuation` — по произведению «цена монеты × количество», то есть по тому
+же числу, что показано в колонке, `grade` — по массиву состояний позиции.
+
 `GET /collection` — список позиций: одна строка на каталожную монету,
 все покупки этой монеты пользователем схлопнуты в одну позицию. Детали отдельных покупок —
 только через `GET/PATCH/DELETE /collection/{id}` (id покупки, `CollectionItem`) и
@@ -417,12 +427,18 @@ GET  /series/summary?countryId
 ## Расходы
 
 ```
-GET    /expenses?category&dateFrom&dateTo&page&pageSize
+GET    /expenses?category&dateFrom&dateTo&page&pageSize&sort&order
 POST   /expenses
 PATCH  /expenses/{id}
 DELETE /expenses/{id}
 GET    /expenses/summary
 ```
+
+`sort` — `date` (по умолчанию) | `category` | `description` | `vendor` | `amount`,
+`order` — `asc` | `desc` (по умолчанию). Сортировка по колонкам журнала (`08-ui-map.md`):
+`description` — по тому, что показано в колонке «Опис» (название монеты для покупки, свой
+текст для остального), `amount` — по сумме в гривне, `category` — в порядке объявления
+таксономии, а не по алфавиту: смысл этой сортировки — сгруппировать журнал по видам.
 
 В `ExpenseOut` для `category=coin_purchase` `coinTitle` — локализованная (`?locale`/
 `Accept-Language`) название монеты, джойном через `catalogItemId`; для остальных категорий

@@ -3,7 +3,18 @@ import { useSearchParams } from 'react-router-dom';
 
 import type { CollectionGroup, MetalKind } from '@/shared/api/types';
 
-export const COLLECTION_SORTS = ['date', 'title', 'total'] as const;
+// Every column of the table sorts, and the toolbar offers the same list
+// (docs/08-ui-map.md); the order here is the order of the columns.
+export const COLLECTION_SORTS = [
+  'title',
+  'country',
+  'series',
+  'quantity',
+  'total',
+  'valuation',
+  'date',
+  'grade',
+] as const;
 export type CollectionSort = (typeof COLLECTION_SORTS)[number];
 export type CollectionView = 'cards' | 'table';
 

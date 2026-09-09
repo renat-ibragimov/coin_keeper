@@ -1,0 +1,121 @@
+/* One table for the whole site: the catalogue, "Мої монети" and the money
+ * journal draw the same panel, the same header strip, the same row rhythm and
+ * the same sort control (owner, 2026-09-09 — three tables had drifted into
+ * three sets of paddings and one of them had no sorting at all). A feature
+ * keeps only what is its own: column widths and the look of its cells'
+ * content (docs/08-ui-map.md). */
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+/* text-align on the table, not on its cells: the default reaches every cell by
+ * inheritance, so a cell that names its own alignment always wins — a rule on
+ * `.table td` would outweigh the alignment classes below. */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+
+/* The header is set apart by typography and one firm rule, not by a fill:
+ * a filled header band turns the panel into two stacked blocks. */
+.table th {
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--color-border-strong);
+  color: var(--color-text-secondary);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.table td {
+  padding: 10px var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Rows are positioned so a feature can stretch a link across one. */
+.table tbody tr {
+  position: relative;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .table tbody tr {
+    transition: background-color var(--duration-fast) var(--ease-standard);
+  }
+
+  /* A row that carries a tint of its own (an owned coin, say) sets
+   * --data-table-row-hover to a blend, so it answers the hover without
+   * losing its colour — and without a specificity fight over this rule. */
+  .table tbody tr:hover {
+    background: var(--data-table-row-hover, var(--color-row-hover));
+  }
+}
+
+.alignCenter {
+  text-align: center;
+}
+
+/* Two lines at most: a long series name or alloy description otherwise takes a
+ * third and makes its row taller than its neighbours. */
+.clamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* The label alone is what the column centres on: the chevrons sit in the
+ * button, so a header with them came out a few pixels left of the values below
+ * it. A spacer of the icon's own width on the other side balances it, rather
+ * than taking the icon out of the flow: the header row keeps its one height
+ * and nothing can overlap the column beside it. */
+.sortButton::before {
+  content: '';
+  width: 13px;
+}
+
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.sortButton:hover {
+  color: var(--color-accent);
+}
+
+/* One box for the glyph, so the three sort states share a baseline and the
+ * header text never shifts between them. Fainter than muted text: unsorted
+ * chevrons are an affordance, and the lit half of the sorted column has to
+ * stand out from them at 13px. */
+.sortIcon {
+  width: 13px;
+  height: 13px;
+  color: color-mix(in srgb, var(--color-text-muted) 60%, transparent);
+}
+
+.sortHalfActive {
+  color: var(--color-accent);
+}

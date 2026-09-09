@@ -56,7 +56,10 @@ async def list_collection(
     group: Annotated[CollectionGroup | None, Query()] = None,
     metal_kind: Annotated[MetalKind | None, Query(alias="metalKind")] = None,
     grade: Annotated[str | None, Query(max_length=50)] = None,
-    sort: Annotated[Literal["date", "title", "total"], Query()] = "date",
+    sort: Annotated[
+        Literal["date", "title", "country", "series", "quantity", "total", "valuation", "grade"],
+        Query(),
+    ] = "date",
     order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[CollectionPositionOut]:
     filters = CollectionFilters(

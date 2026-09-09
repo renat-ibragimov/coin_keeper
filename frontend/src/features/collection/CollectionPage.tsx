@@ -39,9 +39,14 @@ import type { CollectionFilters, CollectionSort, CollectionView } from './useCol
 import styles from './CollectionPage.module.css';
 
 const SORT_LABELS: Record<CollectionSort, string> = {
-  date: 'collection.sortDate',
   title: 'collection.sortTitle',
+  country: 'catalog.sortCountry',
+  series: 'catalog.sortSeries',
+  quantity: 'collection.sortQuantity',
   total: 'collection.sortTotal',
+  valuation: 'collection.sortValuation',
+  date: 'collection.sortDate',
+  grade: 'collection.sortGrade',
 };
 
 const GROUP_LABELS: Record<NonNullable<CollectionFilters['group']>, string> = {
@@ -360,7 +365,12 @@ export function CollectionPage() {
                 ))}
               </div>
             ) : (
-              <PositionTable items={page.items} />
+              <PositionTable
+                items={page.items}
+                sort={filters.sort}
+                order={filters.order}
+                onSort={(sort, order) => update({ sort, order })}
+              />
             )
           ) : null}
 

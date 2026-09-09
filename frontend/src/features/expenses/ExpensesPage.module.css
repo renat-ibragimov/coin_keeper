@@ -75,65 +75,46 @@
   color: var(--color-text-muted);
 }
 
-/* Same structural-panel treatment as the other two tables. */
-.scroll {
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-panel);
+/* Structure, header strip, row rhythm and the sort control come from the
+ * shared table (shared/ui/DataTable.module.css). What stays here is this
+ * journal's own: its column widths and the look of its cells.
+ *
+ * Widths so the columns stay put from page to page; "Опис" takes what is left,
+ * being the one column whose text really varies. */
+.dateColumn {
+  width: 11%;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14.5px;
-  font-variant-numeric: tabular-nums;
-  min-width: 760px;
+.categoryColumn {
+  width: 14%;
 }
 
-.table th,
-.table td {
-  padding: 10px 14px;
-  text-align: left;
-  border-bottom: 1px solid var(--color-border-subtle);
-  vertical-align: middle;
+.vendorColumn {
+  width: 13%;
 }
 
-.table th {
-  font-size: 12px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-  font-weight: 600;
-  border-bottom-color: var(--color-border-strong);
+.moneyColumn {
+  width: 12%;
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .table tbody tr {
-    transition: background-color var(--duration-fast) var(--ease-standard);
-  }
-
-  .table tbody tr:hover {
-    background: var(--color-row-hover);
-  }
+.usdColumn {
+  width: 10%;
 }
 
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-.number {
-  text-align: right;
+.actionsColumn {
+  width: 170px;
 }
 
 .actions {
   white-space: nowrap;
-  text-align: right;
+  text-align: center;
 }
 
-.managed {
-  font-size: 12.5px;
+.secondary {
+  color: var(--color-text-secondary);
+}
+
+.muted {
   color: var(--color-text-muted);
 }
 

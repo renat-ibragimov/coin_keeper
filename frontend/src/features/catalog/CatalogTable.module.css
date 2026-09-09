@@ -1,74 +1,20 @@
-/* The table is a structural panel, not a stack of cards: it sits on the
- * panel surface, one step below a raised card, with a panel radius and no
- * lift of its own (docs/08-ui-map.md). */
-.scroll {
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-panel);
-}
-
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 14.5px;
-  font-variant-numeric: tabular-nums;
-  min-width: 860px;
-}
-
-/* The header is set apart by typography and one firm rule, not by a fill:
- * a filled header band turned the panel into two stacked blocks. */
-.table th {
-  padding: 10px var(--space-4);
-  border-bottom: 1px solid var(--color-border-strong);
-  color: var(--color-text-secondary);
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-}
-
-.table td {
-  padding: 8px var(--space-4);
-  border-bottom: 1px solid var(--color-border-subtle);
-  vertical-align: middle;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .table tbody tr {
-    transition: background-color var(--duration-fast) var(--ease-standard);
-  }
-
-  .table tbody tr:hover {
-    background: var(--color-row-hover);
-  }
-
-  /* A blended tone, not plain --color-row-hover: an owned row must still
-   * visibly answer a hover, but without losing its own green tint entirely. */
-  .table tbody tr.ownedRow:hover {
-    background: color-mix(in srgb, var(--color-owned-surface), var(--color-row-hover) 60%);
-  }
-}
+/* Structure, header strip, row rhythm and the sort control come from the
+ * shared table (shared/ui/DataTable.module.css). What stays here is this
+ * listing's own: its column widths, its cells and its owned/archived states. */
 
 /* Owned rows catch the eye scanning the table, same tint as the catalog's
  * card grid; the leading icon column below carries the same information as
- * text/icon, not colour alone (docs/08-ui-map.md). */
+ * text/icon, not colour alone (docs/08-ui-map.md). An owned row must still
+ * visibly answer a hover, but without losing its green tint entirely, so it
+ * hands the shared table a blended tone of its own rather than fighting it
+ * for the rule. */
 .ownedRow {
   background: var(--color-owned-surface);
-}
-
-/* Stretched-link pattern applied to a row: position:relative on modern
- * browsers works on table rows, so the title link's ::after can cover the
- * full row. The actions cell opts out with its own stacking context. */
-.table tbody tr {
-  position: relative;
+  --data-table-row-hover: color-mix(
+    in srgb,
+    var(--color-owned-surface),
+    var(--color-row-hover) 60%
+  );
 }
 
 .rowLink::after {
@@ -76,54 +22,6 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-}
-
-.alignLeft {
-  text-align: left;
-}
-
-.alignCenter {
-  text-align: center;
-}
-
-.alignRight {
-  text-align: right;
-}
-
-.sortButton {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  border: none;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-transform: inherit;
-  letter-spacing: inherit;
-  cursor: pointer;
-  padding: 0;
-}
-
-.sortButton {
-  transition: color var(--duration-fast) var(--ease-standard);
-}
-
-.sortButton:hover {
-  color: var(--color-accent);
-}
-
-/* One box for the icon whatever it is, so the three sort states share a
- * baseline and the header text never shifts between them. */
-.sortIcon {
-  display: inline-flex;
-  align-items: center;
-  width: 13px;
-  height: 13px;
-  color: var(--color-text-muted);
-}
-
-.sortButton[aria-sort] .sortIcon {
-  color: var(--color-accent);
 }
 
 .archivedRow {
@@ -146,6 +44,46 @@
 .ownedIcon {
   display: block;
   color: var(--color-owned);
+}
+
+/* Fixed shares rather than whatever this page's text happens to measure: the
+ * columns then stay put from page to page and rows keep one height. They add
+ * up to less than the full width — what is left goes to the actions column,
+ * whose button is the widest thing in it (docs/08-ui-map.md). */
+.coinColumn {
+  width: 24%;
+}
+
+.countryColumn {
+  width: 9%;
+}
+
+.seriesColumn {
+  width: 12%;
+}
+
+.yearColumn {
+  width: 5%;
+}
+
+.denominationColumn {
+  width: 10%;
+}
+
+.materialColumn {
+  width: 11%;
+}
+
+.moneyColumn {
+  width: 8%;
+}
+
+/* The one column measured in pixels: it holds a button in one state and a
+ * status pill in the other, and without a width of its own the table gave a
+ * page of pills less room than a page of buttons, shifting every column with
+ * it. The two controls below share a footprint for the same reason. */
+.actionsColumn {
+  width: 210px;
 }
 
 .coinCell {
@@ -171,8 +109,14 @@
   min-width: 0;
 }
 
+/* Same two-line window as the grid card's title: the coin column is capped
+ * (.coinColumn) so a long name clamps with an ellipsis instead of stretching
+ * the column and squeezing the columns beside it (docs/08-ui-map.md). */
 .coinTitle {
-  display: block;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
   font-weight: 600;
   font-family: var(--font-display);
   font-size: 15.5px;
@@ -208,10 +152,15 @@
   position: relative;
   z-index: 2;
   white-space: nowrap;
+  /* Both states of the action share this footprint, so a page of "in my
+   * collection" pills and a page of "add" buttons come out the same width and
+   * no column moves between them. */
+  --catalog-action-width: 172px;
 }
 
 .addButton {
   min-height: 34px;
+  min-width: var(--catalog-action-width);
   padding: 6px 14px;
 }
 
@@ -221,8 +170,10 @@
 .ownedPill {
   display: inline-flex;
   align-items: center;
+  justify-content: space-between;
   gap: 6px;
   height: 32px;
+  min-width: var(--catalog-action-width);
   padding-left: var(--space-3);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-success-edge);

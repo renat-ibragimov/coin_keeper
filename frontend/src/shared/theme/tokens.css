@@ -473,6 +473,16 @@ button {
   outline-offset: 2px;
 }
 
+/* Every table on the site centres its column names over their column, whatever
+ * the alignment of the values below (owner, 2026-09-09): the header row then
+ * reads as one even strip instead of following each column's own alignment.
+ * Global on purpose — a table component has no business deciding this, and
+ * none of them override it: alignment classes go on the cells, not the
+ * headers (docs/08-ui-map.md). */
+th {
+  text-align: center;
+}
+
 /* Sums and years sit in columns and must not wiggle (docs/08-ui-map.md). */
 .tabular {
   font-variant-numeric: tabular-nums;

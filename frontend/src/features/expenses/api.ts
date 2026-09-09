@@ -24,14 +24,26 @@ export const MANUAL_CATEGORIES: ExpenseCategory[] = [
 
 export const ALL_CATEGORIES: ExpenseCategory[] = ['coin_purchase', ...MANUAL_CATEGORIES];
 
+/** Every column of the journal sorts (docs/08-ui-map.md). */
+export const EXPENSE_SORTS = ['date', 'category', 'description', 'vendor', 'amount'] as const;
+export type ExpenseSort = (typeof EXPENSE_SORTS)[number];
+
 export interface ExpenseFilters {
   category?: ExpenseCategory;
   page: number;
+  sort: ExpenseSort;
+  order: 'asc' | 'desc';
 }
 
 export function fetchExpenses(filters: ExpenseFilters): Promise<ExpensePage> {
   return api<ExpensePage>(
-    `/expenses${toQuery({ category: filters.category, page: filters.page, pageSize: PAGE_SIZE })}`,
+    `/expenses${toQuery({
+      category: filters.category,
+      page: filters.page,
+      pageSize: PAGE_SIZE,
+      sort: filters.sort,
+      order: filters.order,
+    })}`,
   );
 }
 

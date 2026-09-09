@@ -71,6 +71,24 @@ describe('CoinCard', () => {
   });
 });
 
+describe('CoinCard specs line', () => {
+  it('puts the material next to the denomination, and leaves it out when unknown', () => {
+    const { rerender } = render(
+      <CoinCard item={makeItem({ composition: { id: 3, code: 'silver', name: 'Срібло' } })} />,
+    );
+    expect(screen.getByText('5 гривень')).toBeInTheDocument();
+    expect(screen.getByText('Срібло')).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <CoinCard item={makeItem({ composition: null, material: null })} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('5 гривень')).toBeInTheDocument();
+    expect(screen.queryByText('Срібло')).not.toBeInTheDocument();
+  });
+});
+
 describe('CoinCard collection state (same footer everywhere: catalog, series)', () => {
   it('offers to add the coin to the collection when it is missing, with no negative badge', () => {
     render(<CoinCard item={makeItem({ quantityOwned: 0 })} />);

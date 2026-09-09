@@ -389,6 +389,25 @@ async def test_listing_filters_and_sorting(
     by_total = await client.get("/api/v1/collection?sort=total&order=desc", headers=headers)
     assert [row["totalSpendUah"] for row in by_total.json()["items"]] == ["300.00", "20.00"]
 
+    # Every column of the table sorts, not just the three the toolbar offered.
+    async def titles(sort: str, order: str) -> list[str]:
+        response = await client.get(
+            f"/api/v1/collection?sort={sort}&order={order}", headers=headers
+        )
+        return [row["title"] for row in response.json()["items"]]
+
+    assert await titles("country", "asc") == ["Lincoln cent", "Дельфін"]
+    assert await titles("country", "desc") == ["Дельфін", "Lincoln cent"]
+    assert await titles("quantity", "desc") == ["Дельфін", "Lincoln cent"]
+    assert await titles("title", "asc") == ["Lincoln cent", "Дельфін"]
+
+    # The valuation is a product — the price of one coin times how many are
+    # held — so it needs prices to sort by at all.
+    await add_snapshot(db_session, cent, "500.00")
+    assert await titles("valuation", "desc") == ["Lincoln cent", "Дельфін"]
+    # The unpriced position has no valuation and stays last either way.
+    assert await titles("valuation", "asc") == ["Lincoln cent", "Дельфін"]
+
 
 async def test_get_single_instance_is_owner_only(client: AsyncClient, ctx: SimpleNamespace) -> None:
     created = await client.post(

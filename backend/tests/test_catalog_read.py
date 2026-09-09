@@ -7,9 +7,11 @@ from types import SimpleNamespace
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
+from app.models import Material
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
@@ -330,6 +332,58 @@ async def test_per_user_sorting(
     totals = {row["id"]: row["purchaseTotalUah"] for row in listing.json()["items"]}
     assert totals[cheap.id] == "40.00"
     assert totals[dear.id] == "450.00"
+
+
+async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The column shows the dictionary name where there is one and the record's
+    own text where there is not, and the sort follows the column."""
+    refs = ctx.refs
+    nickel_silver = (
+        await db_session.execute(select(Material).where(Material.code == "nickel_silver"))
+    ).scalar_one()
+    silver_925 = (
+        await db_session.execute(select(Material).where(Material.code == "silver_925"))
+    ).scalar_one()
+
+    dictionary_late = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Нейзильбер",
+        year=2001,
+        composition_id=nickel_silver.id,
+    )
+    free_text = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Вільний текст", year=2002, material="Алюміній"
+    )
+    dictionary_early = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Срібло", year=2003, composition_id=silver_925.id
+    )
+    nothing = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Без матеріалу", year=2004
+    )
+
+    response = await client.get(
+        "/api/v1/catalog?sort=material&order=asc", headers=auth(ctx.token_a)
+    )
+    rows = response.json()["items"]
+    # "Алюміній" < "Нейзильбер" < "Срібло 925"; the record with neither is last.
+    assert [row["id"] for row in rows] == [
+        free_text.id,
+        dictionary_late.id,
+        dictionary_early.id,
+        nothing.id,
+    ]
+
+    descending = await client.get(
+        "/api/v1/catalog?sort=material&order=desc", headers=auth(ctx.token_a)
+    )
+    assert [row["id"] for row in descending.json()["items"]][:3] == [
+        dictionary_early.id,
+        dictionary_late.id,
+        free_text.id,
+    ]
 
 
 async def test_card_and_own_instances(

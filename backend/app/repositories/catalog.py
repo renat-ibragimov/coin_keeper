@@ -36,7 +36,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.locale import DEFAULT_LOCALE
+from app.core.locale import DEFAULT_LOCALE, LOCALE_UK
 from app.models import (
     CatalogItem,
     CoinSeries,
@@ -377,6 +377,13 @@ class CatalogRepository:
             self._locale, uk=Country.name_uk, en=Country.name_en, original=Country.name_original
         )
 
+    def _material_name(self) -> ColumnElement[str | None]:
+        """What the listing shows in "Матеріал": the dictionary name in the
+        reader's language, and the record's own free text where the dictionary
+        has no row for it (docs/08-ui-map.md)."""
+        name = Material.name_uk if self._locale == LOCALE_UK else Material.name_en
+        return func.coalesce(name, CatalogItem.material)
+
     def _series_name(self) -> ColumnElement[str]:
         return localized(
             self._locale,
@@ -423,6 +430,7 @@ class CatalogRepository:
             "series": [self._series_name()],
             "year": [CatalogItem.issue_year],
             "denomination": [Denomination.sort_order, Denomination.value],
+            "material": [self._material_name()],
             "owned": [owned.c.quantity_owned],
             "purchase": [owned.c.purchase_total_uah],
             "price": [price.c.price_uah],

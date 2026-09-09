@@ -34,7 +34,7 @@ from app.services.catalog import (
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
 SortField = Literal[
-    "title", "country", "series", "year", "denomination", "owned", "purchase", "price"
+    "title", "country", "series", "year", "denomination", "material", "owned", "purchase", "price"
 ]
 
 

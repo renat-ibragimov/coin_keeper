@@ -1,11 +1,21 @@
-import { ArrowDown, ArrowUp, Check, ChevronsUpDown, CircleCheck, Plus } from 'lucide-react';
+import { Check, CircleCheck, Plus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
+import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
-import { Badge, Button, CoinImage } from '@/shared/ui';
+import type { SortOrder } from '@/shared/ui';
+import {
+  Badge,
+  Button,
+  cellAlign,
+  clampTwoLines,
+  CoinImage,
+  DataTable,
+  SortHeader,
+} from '@/shared/ui';
 
 import type { CatalogFilters, SortField } from './useCatalogFilters';
 import styles from './CatalogTable.module.css';
@@ -16,171 +26,149 @@ interface CatalogTableProps {
   update: (changes: Partial<CatalogFilters>) => void;
 }
 
-type Align = 'left' | 'center' | 'right';
-
-const ALIGN_CLASS: Record<Align, string> = {
-  left: styles.alignLeft!,
-  center: styles.alignCenter!,
-  right: styles.alignRight!,
-};
-
-// The coin name is the row's anchor, so its header stays left with the
-// thumbnail below it; every other column reads as a calm, centered strip
-// even where its own values are right-aligned for scanning (docs/08-ui-map.md).
-const COLUMNS: { key: string; sort?: SortField; align: Align }[] = [
-  { key: 'tableCoin', sort: 'title', align: 'left' },
-  { key: 'tableCountry', sort: 'country', align: 'center' },
-  { key: 'tableSeries', sort: 'series', align: 'center' },
-  { key: 'tableYear', sort: 'year', align: 'center' },
-  { key: 'tableDenomination', sort: 'denomination', align: 'center' },
-  { key: 'tablePurchase', sort: 'purchase', align: 'right' },
-  { key: 'tablePrice', sort: 'price', align: 'right' },
-  { key: 'tableActions', align: 'center' },
+// Every column carries its own width. Left to itself the table measures each
+// page's own text, so the same series wrapped onto two lines on one page and
+// three on the next, and rows changed height from page to page. The actions
+// column is measured in pixels rather than in a share of the table: it holds a
+// button in one state and a status pill in the other (docs/08-ui-map.md).
+const COLUMNS: { key: string; sort?: SortField; className?: string }[] = [
+  { key: 'tableCoin', sort: 'title', className: styles.coinColumn },
+  { key: 'tableCountry', sort: 'country', className: styles.countryColumn },
+  { key: 'tableSeries', sort: 'series', className: styles.seriesColumn },
+  { key: 'tableYear', sort: 'year', className: styles.yearColumn },
+  { key: 'tableDenomination', sort: 'denomination', className: styles.denominationColumn },
+  { key: 'tableMaterial', sort: 'material', className: styles.materialColumn },
+  { key: 'tablePurchase', sort: 'purchase', className: styles.moneyColumn },
+  { key: 'tablePrice', sort: 'price', className: styles.moneyColumn },
+  { key: 'tableActions', className: styles.actionsColumn },
 ];
 
 export function CatalogTable({ items, filters, update }: CatalogTableProps) {
   const { t, i18n } = useTranslation();
 
-  function toggleSort(sort: SortField) {
-    if (filters.sort === sort) {
-      update({ order: filters.order === 'asc' ? 'desc' : 'asc' });
-    } else {
-      update({ sort, order: 'asc' });
-    }
+  function sortBy(sort: SortField, order: SortOrder) {
+    update({ sort, order });
   }
 
   return (
-    <div className={styles.scroll}>
-      <table className={styles.table}>
-        <thead>
-          <tr>
-            <th aria-hidden="true" className={styles.ownedHeader} />
-            {COLUMNS.map((column) => {
-              // The header itself is centered from "Країна" on — only the coin
-              // name keeps a left header, matching its left-aligned content.
-              const headerAlign = column.align === 'left' ? 'left' : 'center';
-              return (
-                <th key={column.key} className={ALIGN_CLASS[headerAlign]}>
-                  {column.sort ? (
-                    <button
-                      type="button"
-                      className={styles.sortButton}
-                      onClick={() => toggleSort(column.sort!)}
-                      aria-sort={
-                        filters.sort === column.sort
-                          ? filters.order === 'asc'
-                            ? 'ascending'
-                            : 'descending'
-                          : undefined
-                      }
+    <DataTable minWidth={980}>
+      <thead>
+        <tr>
+          <th aria-hidden="true" className={styles.ownedHeader} />
+          {COLUMNS.map((column) =>
+            column.sort ? (
+              <SortHeader
+                key={column.key}
+                label={t(`catalog.${column.key}`)}
+                field={column.sort}
+                sort={filters.sort}
+                order={filters.order}
+                onSort={sortBy}
+                className={column.className}
+              />
+            ) : (
+              <th key={column.key} className={column.className}>
+                {t(`catalog.${column.key}`)}
+              </th>
+            ),
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {items.map((item) => {
+          const owned = item.quantityOwned > 0;
+          const material = coinMaterial(item);
+          const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
+          return (
+            <tr
+              key={item.id}
+              className={[owned ? styles.ownedRow : '', item.isArchived ? styles.archivedRow : '']
+                .filter(Boolean)
+                .join(' ')}
+            >
+              <td className={styles.ownedCell}>
+                {owned ? (
+                  <CircleCheck
+                    size={16}
+                    strokeWidth={1.75}
+                    className={styles.ownedIcon}
+                    role="img"
+                    aria-label={t('catalog.badgeInCollection')}
+                  />
+                ) : null}
+              </td>
+              <td>
+                <div className={styles.coinCell}>
+                  <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
+                  <span className={styles.coinInfo}>
+                    <Link
+                      to={`/catalog/${item.id}`}
+                      className={`${styles.coinTitle} ${styles.rowLink}`}
                     >
-                      {t(`catalog.${column.key}`)}
-                      <span className={styles.sortIcon} aria-hidden="true">
-                        {filters.sort === column.sort ? (
-                          filters.order === 'asc' ? (
-                            <ArrowUp size={13} />
-                          ) : (
-                            <ArrowDown size={13} />
-                          )
-                        ) : (
-                          <ChevronsUpDown size={13} />
-                        )}
-                      </span>
-                    </button>
-                  ) : (
-                    t(`catalog.${column.key}`)
-                  )}
-                </th>
-              );
-            })}
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const owned = item.quantityOwned > 0;
-            const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
-            return (
-              <tr
-                key={item.id}
-                className={[owned ? styles.ownedRow : '', item.isArchived ? styles.archivedRow : '']
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                <td className={styles.ownedCell}>
-                  {owned ? (
-                    <CircleCheck
-                      size={16}
-                      strokeWidth={1.75}
-                      className={styles.ownedIcon}
-                      role="img"
-                      aria-label={t('catalog.badgeInCollection')}
-                    />
-                  ) : null}
-                </td>
-                <td className={ALIGN_CLASS.left}>
-                  <div className={styles.coinCell}>
-                    <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
-                    <span className={styles.coinInfo}>
-                      <Link
-                        to={`/catalog/${item.id}`}
-                        className={`${styles.coinTitle} ${styles.rowLink}`}
-                      >
-                        {coinTitle(item, i18n.language)}
-                      </Link>
-                      {item.isOwn || item.isArchived ? (
-                        <span className={styles.coinBadges}>
-                          {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
-                          {item.isArchived ? (
-                            <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
-                          ) : null}
-                        </span>
-                      ) : null}
-                    </span>
-                  </div>
-                </td>
-                <td className={`${ALIGN_CLASS.center} ${styles.secondary}`}>{item.country}</td>
-                <td className={`${ALIGN_CLASS.center} ${styles.secondary}`}>
-                  {seriesLabel(item, t) ?? '—'}
-                </td>
-                <td className={`${ALIGN_CLASS.center} tabular`}>{item.year}</td>
-                <td className={ALIGN_CLASS.center}>{item.denomination?.label ?? '—'}</td>
-                <td className={`${ALIGN_CLASS.right} tabular`}>
-                  {owned ? (formatUah(item.purchaseTotalUah, i18n.language) ?? '—') : '—'}
-                </td>
-                <td className={`${ALIGN_CLASS.right} tabular`}>
-                  {formatUah(item.marketPriceUah, i18n.language) ?? (
-                    <span className={styles.muted}>{t('catalog.noPrice')}</span>
-                  )}
-                </td>
-                <td className={`${ALIGN_CLASS.center} ${styles.actionsCell}`}>
-                  {owned ? (
-                    <div className={styles.ownedPill}>
-                      <span className={styles.ownedStatus}>
-                        <Check size={14} aria-hidden="true" />
-                        {t('catalog.badgeInCollection')}
-                      </span>
-                      <Link
-                        to={addUrl}
-                        className={styles.addOneMore}
-                        aria-label={t('catalog.addOneMore')}
-                      >
-                        +1
-                      </Link>
-                    </div>
-                  ) : (
-                    <Link to={addUrl}>
-                      <Button size="sm" className={styles.addButton}>
-                        <Plus size={14} aria-hidden="true" />
-                        {t('catalog.addToCollection')}
-                      </Button>
+                      {coinTitle(item, i18n.language)}
                     </Link>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+                    {item.isOwn || item.isArchived ? (
+                      <span className={styles.coinBadges}>
+                        {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
+                        {item.isArchived ? (
+                          <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
+                        ) : null}
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+              </td>
+              <td className={`${cellAlign.center} ${styles.secondary}`}>{item.country}</td>
+              <td className={`${cellAlign.center} ${styles.secondary}`}>
+                <span className={clampTwoLines}>{seriesLabel(item, t) ?? '—'}</span>
+              </td>
+              <td className={`${cellAlign.center} tabular`}>{item.year}</td>
+              <td className={cellAlign.center}>{item.denomination?.label ?? '—'}</td>
+              <td className={`${cellAlign.center} ${styles.secondary}`}>
+                {material ? (
+                  <span className={clampTwoLines} title={material}>
+                    {material}
+                  </span>
+                ) : (
+                  '—'
+                )}
+              </td>
+              <td className={`${cellAlign.center} tabular`}>
+                {owned ? (formatUah(item.purchaseTotalUah, i18n.language) ?? '—') : '—'}
+              </td>
+              <td className={`${cellAlign.center} tabular`}>
+                {formatUah(item.marketPriceUah, i18n.language) ?? (
+                  <span className={styles.muted}>{t('catalog.noPrice')}</span>
+                )}
+              </td>
+              <td className={`${cellAlign.center} ${styles.actionsCell}`}>
+                {owned ? (
+                  <div className={styles.ownedPill}>
+                    <span className={styles.ownedStatus}>
+                      <Check size={14} aria-hidden="true" />
+                      {t('catalog.badgeInCollection')}
+                    </span>
+                    <Link
+                      to={addUrl}
+                      className={styles.addOneMore}
+                      aria-label={t('catalog.addOneMore')}
+                    >
+                      +1
+                    </Link>
+                  </div>
+                ) : (
+                  <Link to={addUrl}>
+                    <Button size="sm" className={styles.addButton}>
+                      <Plus size={14} aria-hidden="true" />
+                      {t('catalog.addToCollection')}
+                    </Button>
+                  </Link>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </DataTable>
   );
 }

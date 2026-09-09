@@ -9,6 +9,7 @@ export const SORT_FIELDS = [
   'series',
   'year',
   'denomination',
+  'material',
   'owned',
   'purchase',
   'price',

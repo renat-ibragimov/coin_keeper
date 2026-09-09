@@ -210,6 +210,46 @@ async def test_filters_and_isolation(client: AsyncClient, ctx: SimpleNamespace) 
     assert foreign_patch.status_code == 404
 
 
+async def test_every_column_of_the_journal_sorts(client: AsyncClient, ctx: SimpleNamespace) -> None:
+    headers = auth(ctx.token_a)
+    for category, amount, expense_date, description, vendor in (
+        ("album", "100.00", "2024-01-10", "Альбом", "Пошта"),
+        ("delivery", "50.00", "2024-03-10", "Доставка", "Аукціон"),
+        ("holder", "70.00", "2024-02-10", "Холдери", "Магазин"),
+    ):
+        response = await client.post(
+            "/api/v1/expenses",
+            json={
+                "category": category,
+                "amount": amount,
+                "currency": "UAH",
+                "expenseDate": expense_date,
+                "description": description,
+                "vendor": vendor,
+            },
+            headers=headers,
+        )
+        assert response.status_code == 201
+
+    async def column(sort: str, order: str, field: str) -> list[str]:
+        response = await client.get(f"/api/v1/expenses?sort={sort}&order={order}", headers=headers)
+        return [row[field] for row in response.json()["items"]]
+
+    assert await column("date", "asc", "expenseDate") == ["2024-01-10", "2024-02-10", "2024-03-10"]
+    assert await column("date", "desc", "expenseDate") == [
+        "2024-03-10",
+        "2024-02-10",
+        "2024-01-10",
+    ]
+    assert await column("amount", "desc", "amount") == ["100.00", "70.00", "50.00"]
+    # Categories come in the order the taxonomy declares them (purchase first,
+    # then the supporting kinds), not alphabetically by code or by label: what
+    # this sort is for is grouping the journal by kind.
+    assert await column("category", "asc", "category") == ["delivery", "album", "holder"]
+    assert await column("description", "asc", "description") == ["Альбом", "Доставка", "Холдери"]
+    assert await column("vendor", "asc", "vendor") == ["Аукціон", "Магазин", "Пошта"]
+
+
 async def test_summary(client: AsyncClient, ctx: SimpleNamespace) -> None:
     headers = auth(ctx.token_a)
     await _add_purchase(client, ctx.token_a, ctx.item_id, "300.00")

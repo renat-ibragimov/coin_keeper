@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
 
@@ -55,8 +55,14 @@ async def list_expenses(
     category: Annotated[ExpenseCategory | None, Query()] = None,
     date_from: Annotated[date | None, Query(alias="dateFrom")] = None,
     date_to: Annotated[date | None, Query(alias="dateTo")] = None,
+    sort: Annotated[
+        Literal["date", "category", "description", "vendor", "amount"], Query()
+    ] = "date",
+    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[ExpenseOut]:
-    filters = ExpenseFilters(category=category, date_from=date_from, date_to=date_to)
+    filters = ExpenseFilters(
+        category=category, date_from=date_from, date_to=date_to, sort=sort, order=order
+    )
     items, total = await ExpenseService(session, user, locale).list_expenses(
         filters, limit=pagination.page_size, offset=pagination.offset
     )

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import ColumnElement, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,9 @@ class ExpenseFilters:
     category: ExpenseCategory | None = None
     date_from: date | None = None
     date_to: date | None = None
+    # Every column of the journal sorts (docs/08-ui-map.md).
+    sort: str = "date"  # date | category | description | vendor | amount
+    order: str = "desc"
 
 
 @dataclass
@@ -67,6 +71,24 @@ class ExpenseRepository:
             conditions.append(Expense.expense_date <= filters.date_to)
         return conditions
 
+    def _order_by(self, filters: ExpenseFilters) -> list[Any]:
+        descending = filters.order == "desc"
+        columns: dict[str, Any] = {
+            "date": Expense.expense_date,
+            "category": Expense.category,
+            # What the "Опис" column shows: the coin's name for a purchase,
+            # the typed description for everything else.
+            "description": func.coalesce(
+                func.nullif(func.btrim(Expense.description), ""), _coin_title(self._locale)
+            ),
+            "vendor": Expense.vendor,
+            "amount": _amount_uah(),
+        }
+        column = columns.get(filters.sort, columns["date"])
+        ordering = column.desc().nulls_last() if descending else column.asc().nulls_last()
+        # A stable tiebreaker, and the journal's own order within one day.
+        return [ordering, Expense.id.desc()]
+
     async def list_page(
         self, filters: ExpenseFilters, *, limit: int, offset: int
     ) -> tuple[list[tuple[Expense, str | None]], int]:
@@ -78,7 +100,7 @@ class ExpenseRepository:
             select(Expense, _coin_title(self._locale))
             .outerjoin(CatalogItem, CatalogItem.id == Expense.catalog_item_id)
             .where(*conditions)
-            .order_by(Expense.expense_date.desc(), Expense.id.desc())
+            .order_by(*self._order_by(filters))
             .limit(limit)
             .offset(offset)
         )

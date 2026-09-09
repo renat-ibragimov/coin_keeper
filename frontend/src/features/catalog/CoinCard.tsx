@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
+import { coinMaterial, shortMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
@@ -62,6 +63,7 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
   const owned = item.quantityOwned > 0;
   const title = coinTitle(item, i18n.language);
   const series = seriesLabel(item, t);
+  const material = coinMaterial(item);
   const cardUrl = `/catalog/${item.id}`;
   const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
   const addState = backTo ? { from: backTo } : undefined;
@@ -83,8 +85,20 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
         </span>
       </div>
       <div className={styles.body}>
-        {item.denomination ? (
-          <div className={styles.denomination}>{item.denomination.label}</div>
+        {/* Face value and metal on one line: two coins that look alike in the
+         * grid differ in price mostly by what they are made of. The material
+         * sits right of the face value, shortened to two words so it never
+         * takes the whole line; either half may be missing — the record
+         * simply says nothing (docs/08-ui-map.md). */}
+        {item.denomination || material ? (
+          <div className={styles.specs}>
+            <span className={styles.denomination}>{item.denomination?.label ?? ''}</span>
+            {material ? (
+              <span className={styles.material} title={material}>
+                {shortMaterial(material)}
+              </span>
+            ) : null}
+          </div>
         ) : null}
         {/* Fixed two-line window (CSS): every card's meta line starts at the
          * same height regardless of title length (docs/08-ui-map.md). */}

@@ -51,6 +51,7 @@ vi.mock('./api', () => ({
   deleteExpense: vi.fn(),
   PAGE_SIZE: 24,
   ALL_CATEGORIES: ['coin_purchase', 'delivery', 'album', 'holder', 'storage', 'grading'],
+  EXPENSE_SORTS: ['date', 'category', 'description', 'vendor', 'amount'],
 }));
 vi.mock('@/features/catalog/api', () => ({ fetchCurrencies: vi.fn() }));
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
