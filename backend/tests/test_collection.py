@@ -399,7 +399,11 @@ async def test_listing_filters_and_sorting(
     assert await titles("country", "asc") == ["Lincoln cent", "Дельфін"]
     assert await titles("country", "desc") == ["Дельфін", "Lincoln cent"]
     assert await titles("quantity", "desc") == ["Дельфін", "Lincoln cent"]
-    assert await titles("title", "asc") == ["Lincoln cent", "Дельфін"]
+    # Ukrainian-locale collation (uk-x-icu, app/repositories/localization.py)
+    # orders "Дельфін" ahead of the Latin-script "Lincoln cent" — Postgres's
+    # default collation instead sorted by raw code point, Latin before Cyrillic
+    # regardless of what either string actually says.
+    assert await titles("title", "asc") == ["Дельфін", "Lincoln cent"]
 
     # The valuation is a product — the price of one coin times how many are
     # held — so it needs prices to sort by at all.
