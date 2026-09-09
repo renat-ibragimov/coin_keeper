@@ -71,6 +71,14 @@ MATERIALS: tuple[MaterialSeed, ...] = (
 
 MATERIAL_CODES = frozenset(material.code for material in MATERIALS)
 
+# What the legacy base sometimes holds in the free-text material field instead
+# of an alloy name: one of our own dictionary codes ("nickel_silver"), or the
+# bare metal with no fineness ("silver", "gold"). A code names a dictionary
+# row and is resolved as one; a bare metal has no row to point at — without a
+# fineness there is nothing to name — so it stays text, in the wording the
+# National Bank uses and the rest of the catalogue already carries.
+BARE_METAL_WORDS: dict[str, str] = {"silver": "срібло", "gold": "золото"}
+
 # Alloy names as the two sources write them. Matched as a suffix, longest
 # first, so "Copper-Nickel plated Copper" never resolves to plain "Copper".
 _PHRASES: dict[str, tuple[str, ...]] = {
@@ -145,6 +153,10 @@ def _composition_of(head: str) -> str | None:
     normalised = _SPACES_RE.sub(" ", head.casefold().replace("ё", "е")).strip()
     if not normalised:
         return None
+    # A dictionary code standing in for the alloy's name: no coin catalogue
+    # writes "nickel_silver", so an exact match is our own token coming back.
+    if normalised in MATERIAL_CODES:
+        return normalised
     precious = _PRECIOUS_RE.search(normalised)
     if precious is not None:
         metal = _PRECIOUS_METAL[precious.group("metal")]
@@ -153,6 +165,19 @@ def _composition_of(head: str) -> str | None:
         code = f"{metal}{gilded}_{fineness}"
         return code if code in MATERIAL_CODES else None
     return next((code for phrase, code in _PHRASE_INDEX if normalised.endswith(phrase)), None)
+
+
+def plain_material(text: str | None) -> str | None:
+    """Free-text material as it should be stored: nothing, or real wording.
+
+    Only for text the parser could not resolve to a dictionary row. A bare
+    metal word is translated to the National Bank's wording; anything else is
+    the source's own text and is kept as it stands.
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return None
+    return BARE_METAL_WORDS.get(stripped.casefold(), stripped)
 
 
 def strip_material(text: str) -> str:

@@ -439,7 +439,11 @@ class MigrationRunner:
             "mintage_actual": row.get("mintage_actual"),
             "composition_id": self._material_ids.get(composition.composition or ""),
             # Only what the parser could not read stays as text.
-            "material": None if composition.composition else row.get("material"),
+            "material": (
+                None
+                if composition.composition
+                else material_seed.plain_material(row.get("material"))
+            ),
             "metal_kind": convert.to_enum_value(
                 row.get("metal_kind"), METAL_KINDS, default="unknown"
             ),

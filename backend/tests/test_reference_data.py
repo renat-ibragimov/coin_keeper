@@ -24,7 +24,12 @@ from app.reference_data.denominations import (
     parse_label,
     render_label,
 )
-from app.reference_data.materials import MATERIAL_CODES, MATERIALS, parse_material
+from app.reference_data.materials import (
+    MATERIAL_CODES,
+    MATERIALS,
+    parse_material,
+    plain_material,
+)
 
 
 # ------------------------------------------------------------------ countries
@@ -211,6 +216,29 @@ def test_material_is_read_from_the_end_of_the_string(
     assert parsed.composition == code
     assert parsed.weight_grams == (None if mass is None else Decimal(mass))
     assert parsed.diameter_mm == (None if diameter is None else Decimal(diameter))
+
+
+@pytest.mark.parametrize("text", ["nickel_silver", "Nickel_Silver", " silver_925 "])
+def test_a_dictionary_code_standing_in_for_a_name_resolves_to_its_row(text: str) -> None:
+    """The legacy base holds our own codes in the free-text material field."""
+    assert parse_material(text).composition == text.strip().casefold()
+
+
+@pytest.mark.parametrize(
+    ("text", "stored"),
+    [
+        ("silver", "срібло"),
+        ("Gold", "золото"),
+        ("Unobtainium", "Unobtainium"),
+        ("  срібло  ", "срібло"),
+        ("   ", None),
+        (None, None),
+    ],
+)
+def test_unparsed_material_text_keeps_its_wording_except_for_a_bare_metal(
+    text: str | None, stored: str | None
+) -> None:
+    assert plain_material(text) == stored
 
 
 def test_a_longer_phrase_wins_over_a_shorter_one() -> None:
