@@ -33,9 +33,11 @@
   width: 10%;
 }
 
-/* Stretched-link pattern: the whole row (there are no per-row actions here)
- * opens the coin's page, same as the catalogue table. The row is already
- * positioned by the shared table. */
+/* Stretched-link pattern, scoped to .coinCell rather than the row: table
+ * rows and cells are an unreliable containing block for an absolutely
+ * positioned descendant in WebKit — the overlay escaped all the way up to
+ * body, so a tap anywhere on the page opened whichever coin's row happened
+ * to be stacked on top. .coinCell is a plain div, immune to that. */
 .rowLink::after {
   content: '';
   position: absolute;
@@ -48,6 +50,7 @@
 }
 
 .coinCell {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);

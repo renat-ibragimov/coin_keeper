@@ -17,6 +17,11 @@
   );
 }
 
+/* Stretched over .coinCell, not over the row: table rows and cells are an
+ * unreliable containing block for an absolutely positioned descendant in
+ * WebKit — the overlay escaped all the way up to body, so a tap anywhere on
+ * the page (this table's own rows included) opened whichever coin's row
+ * happened to be stacked on top. .coinCell is a plain div, immune to that. */
 .rowLink::after {
   content: '';
   position: absolute;
@@ -87,6 +92,7 @@
 }
 
 .coinCell {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);

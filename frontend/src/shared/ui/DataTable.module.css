@@ -46,11 +46,6 @@
   border-bottom: none;
 }
 
-/* Rows are positioned so a feature can stretch a link across one. */
-.table tbody tr {
-  position: relative;
-}
-
 @media (hover: hover) and (pointer: fine) {
   .table tbody tr {
     transition: background-color var(--duration-fast) var(--ease-standard);
