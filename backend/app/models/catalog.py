@@ -140,6 +140,12 @@ class CoinSeries(Base):
     description: Mapped[str | None] = mapped_column(Text)
     start_year: Mapped[int | None] = mapped_column(Integer)
     end_year: Mapped[int | None] = mapped_column(Integer)
+    # True only for a series the issuer's own catalogue parser maintains, which
+    # today means the NBU series load-series walks. Curated series and other
+    # countries stay false.
+    is_official: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
@@ -195,6 +201,9 @@ class CatalogItem(Base):
     shape: Mapped[str | None] = mapped_column(Text)
     edge: Mapped[str | None] = mapped_column(Text)
     orientation: Mapped[str | None] = mapped_column(Text)
+    # Strike quality as a canonical code ('proof', 'uncirculated', ...). The
+    # dictionary lives in coin-parser and grows there, so no CHECK guards it.
+    quality: Mapped[str | None] = mapped_column(Text)
     catalog_km: Mapped[str | None] = mapped_column(Text)
     catalog_uc: Mapped[str | None] = mapped_column(Text)
     catalog_numista: Mapped[str | None] = mapped_column(Text)
@@ -203,10 +212,19 @@ class CatalogItem(Base):
     # untouched; once set, the inner shape is fixed (docs/02-data-model.md).
     descriptions: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     artists: Mapped[dict[str, object] | None] = mapped_column(JSONB)
+    # Names of the fields a human has corrected. A catalogue loader leaves
+    # those alone on the next run. Nothing writes it yet.
+    edited_fields: Mapped[list[str] | None] = mapped_column(JSONB)
     source_key: Mapped[str | None] = mapped_column(Text)
     # CASCADE, not SET NULL: deleting a user must not silently promote their
     # personal items into the shared catalog. See docs/02-data-model.md.
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    # Where an imported record sits before it is published. Nothing reads it
+    # yet -- keeping drafts out of the catalogue is an admin-stage task, and
+    # until then only 'active' is written.
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, default="active", server_default="active"
+    )
     is_archived: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
@@ -217,6 +235,7 @@ class CatalogItem(Base):
 
     # Partial indexes: nearly every query carries "NOT is_archived" verbatim.
     __table_args__ = (
+        CheckConstraint("status IN ('draft', 'active', 'rejected')", name="status_valid"),
         Index(
             "ix_catalog_items_country_id_issue_year",
             "country_id",

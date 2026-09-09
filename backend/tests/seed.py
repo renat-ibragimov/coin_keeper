@@ -145,8 +145,10 @@ async def make_catalog_item(
     return item
 
 
-async def make_series(session: AsyncSession, *, country: Country, name: str) -> CoinSeries:
-    series = CoinSeries(country_id=country.id, name_original=name)
+async def make_series(
+    session: AsyncSession, *, country: Country, name: str, **fields: object
+) -> CoinSeries:
+    series = CoinSeries(country_id=country.id, name_original=name, **fields)
     session.add(series)
     await session.commit()
     session.expunge(series)

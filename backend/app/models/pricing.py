@@ -54,12 +54,17 @@ class MarketPriceSnapshot(Base):
 
     __table_args__ = (
         CheckConstraint("price >= 0", name="price_non_negative"),
+        # NULLS NOT DISTINCT: most snapshots carry no grade, and under the
+        # default two of them differing in nothing else would not collide,
+        # leaving the history's only defence against duplicates in the
+        # loader's hands (migration 0006).
         UniqueConstraint(
             "catalog_item_id",
             "source",
             "grade",
             "observed_at",
             name="uq_market_price_snapshots_item_source_grade_observed",
+            postgresql_nulls_not_distinct=True,
         ),
         Index(
             "ix_market_price_snapshots_catalog_item_id_observed_at",

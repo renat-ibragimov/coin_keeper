@@ -294,3 +294,22 @@ async def test_own_price_snapshot_feeds_value(
         await client.get(f"/api/v1/series/{refs.fauna.id}/summary", headers=auth(ctx.token_a))
     ).json()
     assert summary_a["currentValueUah"] == "180.00"
+
+
+async def test_is_official_marks_only_a_parser_maintained_series(
+    db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """False unless the issuer's own catalogue parser claims the series.
+
+    Nothing backfills the flag (migration 0006): load-series in coin-parser
+    raises it for the NBU series it walks, and curated ones stay false.
+    """
+    from app.models import CoinSeries
+
+    curated = await make_series(db_session, country=ctx.refs.ukraine, name="Добірка колекціонера")
+    official = await make_series(
+        db_session, country=ctx.refs.ukraine, name="Пам'ятні монети НБУ", is_official=True
+    )
+
+    assert (await db_session.get(CoinSeries, curated.id)).is_official is False  # type: ignore[union-attr]
+    assert (await db_session.get(CoinSeries, official.id)).is_official is True  # type: ignore[union-attr]

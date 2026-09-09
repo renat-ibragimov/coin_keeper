@@ -250,9 +250,15 @@ name_uk, name_en  text
 name_uk_source, name_en_source  translation_source
 description       text
 start_year, end_year int
+is_official       boolean NOT NULL DEFAULT false   -- ведётся парсером каталога эмитента
 created_at, updated_at timestamptz
 UNIQUE (country_id, name_original)
 ```
+
+`is_official` проставляет `load-series` из coin-parser: true получают серии, которые ведёт
+парсер официального каталога эмитента (сегодня — НБУ). Кураторские серии и серии других
+стран остаются false. Бэкфилла по данным нет — флаг появляется на серии тогда, когда по ней
+проходит парсер.
 
 ### catalog_items
 
@@ -283,10 +289,13 @@ thickness_mm       numeric(8,2)
 shape, edge, orientation  text
 catalog_km, catalog_uc, catalog_numista  text
 notes              text
+quality            text              -- качество чеканки каноническим кодом, словарь в coin-parser
 descriptions       jsonb             -- заполняется парсером coin-collector, руками не редактируется
 artists            jsonb             -- заполняется парсером coin-collector, руками не редактируется
+edited_fields      jsonb             -- имена полей, правленных руками; загрузчики их не трогают
 source_key         text              -- ключ дедупликации импорта, см. 04-business-rules
 created_by         bigint FK users ON DELETE CASCADE    -- NULL = общая (системная) запись
+status             text NOT NULL DEFAULT 'active' CHECK (status IN ('draft','active','rejected'))
 is_archived        boolean NOT NULL DEFAULT false
 archived_at        timestamptz
 archive_reason     text              -- 'снята с выпуска НБУ', 'дубликат', 'ошибочная запись'
@@ -317,6 +326,23 @@ coin-collector ещё не коснулся. Но если колонка не `
 ```json
 {"designers": ["Чайковський Роман"], "sculptors": ["Чайковський Роман"]}
 ```
+
+### status, quality и edited_fields
+
+`status` — место, где импортированная запись ждёт публикации. Пишет её загрузчик каталога;
+существующие строки получили `'active'` через server_default. **Сейчас колонку никто не
+читает:** отсев драфтов из витрины, поиска и комплектности — задача этапа админки, а до неё
+в базу пишется только `'active'`. Это сознательное решение, а не пропущенная фильтрация.
+
+`quality` — качество чеканки каноническим кодом: `proof`, `special_uncirculated`,
+`uncirculated`, `brilliant_uncirculated` и далее. Колонки под это в схеме не было, а признак
+коллекционно значимый — ua-coins разводит такие монеты отдельными строками, и без колонки
+различие терялось. `CHECK` намеренно нет: словарь кодов живёт в coin-parser и будет расти,
+и миграция на каждый новый код — плохой обмен.
+
+`edited_fields` — список имён полей, поправленных руками. Контракт: загрузчик каталога не
+перезаписывает поля из этого списка. Пока в колонку никто не пишет — она заведена ради
+контракта, чтобы ручная правка не потерялась при первом же прогоне парсера.
 
 `created_by` определяет слой: `NULL` — общая запись, значение — личная позиция автора.
 Здесь именно `ON DELETE CASCADE`, а не `SET NULL`: иначе удаление пользователя молча
@@ -516,7 +542,7 @@ source_url       text
 raw_payload      jsonb                -- сырой ответ источника, для разбора багов
 created_by       bigint FK users ON DELETE SET NULL   -- NULL = снимок центральной задачи
 is_suspect       boolean NOT NULL DEFAULT false
-UNIQUE (catalog_item_id, source, grade, observed_at)
+UNIQUE NULLS NOT DISTINCT (catalog_item_id, source, grade, observed_at)
 ```
 
 ```sql
@@ -530,6 +556,12 @@ CREATE INDEX ON market_price_snapshots (created_by);
 ```sql
 WHERE created_by IS NULL OR created_by = :user_id
 ```
+
+Ключ уникальности — `NULLS NOT DISTINCT` (миграция 0006). У большинства снимков `grade`
+пуст, а при поведении Postgres по умолчанию две строки с `grade IS NULL` и одинаковыми
+остальными полями конфликтом не считаются — то есть от дублей истории защищала только
+дисциплина загрузчика. Миграция схлопнула такие группы до минимального `id`, дальше их не
+пропускает база.
 
 `raw_payload` был `TEXT` с JSON — переводим в `jsonb`. Это важно: в legacy цены ломались,
 и без сырых данных разобраться было нечем.

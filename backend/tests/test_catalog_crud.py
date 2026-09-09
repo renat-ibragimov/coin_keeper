@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
@@ -319,6 +320,48 @@ async def test_descriptions_and_artists_columns_round_trip(
         "en": {"general": None, "obverse": None, "reverse": None},
     }
     assert stored_parsed.artists == {"designers": ["Чайковський Роман"], "sculptors": []}
+
+
+async def test_status_quality_and_edited_fields_round_trip(
+    db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """Migration 0006's columns. Nothing writes them yet except a loader, so
+    what is tested is the storage contract: 'active' by default, a quality code
+    with no dictionary behind it, and the list of hand-corrected field names.
+    """
+    refs = ctx.refs
+    plain = await make_catalog_item(db_session, country=refs.ukraine, title="Звичайна", year=2021)
+    loaded = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="З якістю",
+        year=2024,
+        status="draft",
+        quality="special_uncirculated",
+        edited_fields=["title_uk", "mintage_actual"],
+    )
+
+    stored_plain = await db_session.get(CatalogItem, plain.id)
+    assert stored_plain is not None
+    assert stored_plain.status == "active"
+    assert stored_plain.quality is None
+    assert stored_plain.edited_fields is None
+
+    stored_loaded = await db_session.get(CatalogItem, loaded.id)
+    assert stored_loaded is not None
+    assert stored_loaded.status == "draft"
+    assert stored_loaded.quality == "special_uncirculated"
+    assert stored_loaded.edited_fields == ["title_uk", "mintage_actual"]
+
+
+async def test_an_unknown_status_is_rejected(
+    db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    with pytest.raises(IntegrityError):
+        await make_catalog_item(
+            db_session, country=ctx.refs.ukraine, title="Погана", year=2025, status="published"
+        )
+    await db_session.rollback()
 
 
 async def test_delete_personal_of_other_user_is_404(

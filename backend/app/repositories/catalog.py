@@ -387,13 +387,22 @@ class CatalogRepository:
 
     @staticmethod
     def _source_url_subquery() -> ColumnElement[str | None]:
+        """The card's "source" link, preferring UA-Coins over the NBU.
+
+        UA-Coins keeps the coin's page URL in external_id, so its row is the
+        link we want. The NBU keeps a card id instead, and no clickable URL is
+        built from that, so an NBU row deliberately yields nothing: it is
+        ranked above the rest only to outvote the leftover uCoin rows, which
+        are legacy and half of them carry the wrong source label. No link beats
+        a uCoin link.
+        """
         return (
-            select(PriceSourceLink.external_id)
+            select(case((PriceSourceLink.source == "NBU", None), else_=PriceSourceLink.external_id))
             .where(PriceSourceLink.catalog_item_id == CatalogItem.id)
             .order_by(
                 case(
-                    (PriceSourceLink.source == "uCoin", 0),
-                    (PriceSourceLink.source == "UA-Coins", 1),
+                    (PriceSourceLink.source == "UA-Coins", 0),
+                    (PriceSourceLink.source == "NBU", 1),
                     else_=2,
                 ),
                 PriceSourceLink.id.desc(),

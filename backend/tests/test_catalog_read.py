@@ -570,3 +570,54 @@ async def test_ua_coins_image_is_public(
     assert image is not None
     assert "ua_coins_600.webp" in image["medium"]
     assert image["attribution"] == "ua-coins.info"
+
+
+async def test_source_url_prefers_ua_coins(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """UA-Coins is the only link that is a page URL, so it wins the card."""
+    from app.models import PriceSourceLink
+
+    item = await make_catalog_item(
+        db_session, country=ctx.refs.ukraine, title="Десятинна церква", year=1996
+    )
+    db_session.add_all(
+        [
+            PriceSourceLink(catalog_item_id=item.id, source="uCoin", external_id="https://ucoin/x"),
+            PriceSourceLink(catalog_item_id=item.id, source="NBU", external_id="1307"),
+            PriceSourceLink(
+                catalog_item_id=item.id,
+                source="UA-Coins",
+                external_id="https://www.ua-coins.info/ua/list/10-desyatynna-tserkva",
+            ),
+        ]
+    )
+    await db_session.commit()
+    item_id = item.id
+
+    response = await client.get(f"/api/v1/catalog/{item_id}", headers=auth(ctx.token_a))
+    assert response.status_code == 200
+    assert response.json()["sourceUrl"] == "https://www.ua-coins.info/ua/list/10-desyatynna-tserkva"
+
+
+async def test_nbu_outranks_ucoin_and_yields_no_link(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """An NBU external_id is a card id, and no uCoin link is offered instead."""
+    from app.models import PriceSourceLink
+
+    item = await make_catalog_item(
+        db_session, country=ctx.refs.ukraine, title="Оборонцям Маріуполя", year=2023
+    )
+    db_session.add_all(
+        [
+            PriceSourceLink(catalog_item_id=item.id, source="uCoin", external_id="https://ucoin/y"),
+            PriceSourceLink(catalog_item_id=item.id, source="NBU", external_id="1307"),
+        ]
+    )
+    await db_session.commit()
+    item_id = item.id
+
+    response = await client.get(f"/api/v1/catalog/{item_id}", headers=auth(ctx.token_a))
+    assert response.status_code == 200
+    assert response.json()["sourceUrl"] is None

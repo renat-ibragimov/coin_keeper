@@ -13,7 +13,6 @@ imitation would test the imitation.
 from __future__ import annotations
 
 import asyncio
-import os
 import uuid
 from collections.abc import AsyncIterator
 from decimal import Decimal
@@ -21,12 +20,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from alembic.config import Config
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine
 
-from alembic import command
-from tests.conftest import _admin_url, _database_url
+from tests.conftest import _admin_url, _database_url, _run_alembic_to
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
@@ -86,25 +83,6 @@ SELECT setval(pg_get_serial_sequence('catalog_items', 'id'), 7);
 """
 
 
-def _run_alembic(url: str, revision: str) -> None:
-    """Alembic reads the URL from settings, so the environment is the knob."""
-    previous = os.environ.get("DATABASE_URL")
-    os.environ["DATABASE_URL"] = url
-    from app.core.config import get_settings
-
-    get_settings.cache_clear()
-    try:
-        config = Config(str(BACKEND_ROOT / "alembic.ini"))
-        config.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-        command.upgrade(config, revision)
-    finally:
-        if previous is None:
-            os.environ.pop("DATABASE_URL", None)
-        else:
-            os.environ["DATABASE_URL"] = previous
-        get_settings.cache_clear()
-
-
 @pytest.fixture(scope="module")
 async def migrated_connection() -> AsyncIterator[AsyncConnection]:
     """A database taken to 0002, filled with the legacy shape, then to 0003."""
@@ -116,14 +94,14 @@ async def migrated_connection() -> AsyncIterator[AsyncConnection]:
 
     url = _database_url(db_name)
     try:
-        await asyncio.to_thread(_run_alembic, url, "0002")
+        await asyncio.to_thread(_run_alembic_to, "0002", url)
         engine = create_async_engine(url)
         async with engine.begin() as connection:
             for statement in filter(None, (s.strip() for s in FIXTURE.split(";"))):
                 await connection.execute(text(statement))
         await engine.dispose()
 
-        await asyncio.to_thread(_run_alembic, url, "0003")
+        await asyncio.to_thread(_run_alembic_to, "0003", url)
 
         engine = create_async_engine(url)
         async with engine.connect() as connection:

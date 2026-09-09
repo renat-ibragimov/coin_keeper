@@ -83,9 +83,35 @@ def _configure_environment(url: str) -> None:
 
 
 def _run_migrations() -> None:
-    config = Config(str(BACKEND_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
-    command.upgrade(config, "head")
+    _run_alembic_to("head")
+
+
+def _run_alembic_to(revision: str, url: str | None = None) -> None:
+    """Migrate to a revision, optionally against a database of one's own.
+
+    Alembic reads the URL from settings, so a caller stepping some other
+    database through the revisions passes it here and the environment is the
+    knob. The migration tests use this to stop one revision short, fill the
+    database and go on.
+    """
+    previous = os.environ.get("DATABASE_URL")
+    if url is not None:
+        os.environ["DATABASE_URL"] = url
+
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        config = Config(str(BACKEND_ROOT / "alembic.ini"))
+        config.set_main_option("script_location", str(BACKEND_ROOT / "alembic"))
+        command.upgrade(config, revision)
+    finally:
+        if url is not None:
+            if previous is None:
+                os.environ.pop("DATABASE_URL", None)
+            else:
+                os.environ["DATABASE_URL"] = previous
+            get_settings.cache_clear()
 
 
 @pytest.fixture(scope="session")
