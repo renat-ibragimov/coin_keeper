@@ -304,16 +304,10 @@
   box-sizing: border-box;
 }
 
-/* overflow-x: hidden is the backstop against any single element overflowing
-   by a few pixels (a long unbreakable word, a control that doesn't wrap) and
-   dragging the whole document sideways with it — the phone layout scrolls
-   the document itself (AppLayout.module.css, .scrollArea), so nothing else
-   contains that horizontally. */
 html,
 body {
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
 }
 
 /* html carries the ground colour too, so overscroll past the top or bottom

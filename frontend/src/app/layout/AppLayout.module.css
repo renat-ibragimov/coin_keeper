@@ -28,6 +28,15 @@
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
+  /* The backstop against a single element overflowing by a few pixels (a
+   * long unbreakable word, a control that doesn't wrap) and dragging the
+   * whole page sideways with it. This has to live here and not on html/body:
+   * any ancestor of .header with overflow other than visible becomes its
+   * sticky positioning context instead of the real viewport, and since that
+   * ancestor never itself scrolls (nothing constrains its height), the
+   * header simply stops sticking and scrolls away with the rest of the page.
+   * .scrollArea is .header's sibling, not its ancestor, so it can't do that. */
+  overflow-x: hidden;
   scrollbar-gutter: stable;
   /* A column of its own, so .main keeps filling the height left over under
      the subnav the way it filled the shell before. */
