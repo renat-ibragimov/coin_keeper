@@ -24,9 +24,15 @@ import { fetchCatalog, fetchCountries, fetchDenominations, fetchSeries } from '.
 import { CatalogTable } from './CatalogTable';
 import { CoinCard } from './CoinCard';
 import { FiltersPanel } from './FiltersPanel';
-import { SORT_FIELDS, useCatalogFilters } from './useCatalogFilters';
+import { parseFilters, SORT_FIELDS, useCatalogFilters } from './useCatalogFilters';
 import type { CatalogFilters, CatalogView, SortField } from './useCatalogFilters';
 import styles from './CatalogPage.module.css';
+
+// The filters a fresh /catalog (no query string at all) starts from — reused
+// as what the mobile drawer's own "Скинути" resets its draft to, since that
+// reset must not touch the real, applied filters until "Застосувати" does
+// (docs/08-ui-map.md: apply-on-confirm, phone only).
+const EMPTY_FILTERS = parseFilters(new URLSearchParams());
 
 const SORT_LABELS: Record<SortField, string> = {
   country: 'catalog.sortCountry',
@@ -61,9 +67,26 @@ const GRID_PAGE_SIZE = 30;
 export function CatalogPage() {
   const { t } = useTranslation();
   const { filters, update, reset } = useCatalogFilters();
+
+  // The phone's filters drawer edits this instead of the real, applied
+  // filters directly — a field's own dropdown otherwise re-queried and
+  // re-rendered the page under the visitor's thumb before they'd finished
+  // picking a country, let alone gone on to its series and years. Opening
+  // the drawer seeds it from the applied filters; only "Застосувати" copies
+  // it across. The desktop filters bar is unaffected — it keeps applying
+  // straight to `filters` below (docs/08-ui-map.md: apply-on-confirm, phone only).
+  const [draft, setDraft] = useState<CatalogFilters>(filters);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // The overlay handles the outside press itself; Escape and navigation come from the hook.
   useDismissable(drawerOpen, () => setDrawerOpen(false));
+  const openDrawer = () => {
+    setDraft(filters);
+    setDrawerOpen(true);
+  };
+  const applyDraft = () => {
+    update(draft);
+    setDrawerOpen(false);
+  };
 
   const [searchParams] = useSearchParams();
   const viewMode = useStoredViewMode('ck.viewMode.catalog');
@@ -103,87 +126,115 @@ export function CatalogPage() {
   const pageCount = Math.max(1, Math.ceil(total / GRID_PAGE_SIZE));
   const shown = page ? page.items.length + (page.page - 1) * GRID_PAGE_SIZE : 0;
 
-  const activeChips = useMemo(() => {
+  // Shared between the real, applied filters and the drawer's own draft —
+  // each chip's onRemove writes back through whichever `apply` it was built
+  // with, so the same chip row works unchanged in both places.
+  function buildChips(
+    source: CatalogFilters,
+    apply: (changes: Partial<CatalogFilters>) => void,
+  ): ActiveFilterChip[] {
     const chips: ActiveFilterChip[] = [];
-    if (filters.q) {
-      chips.push({ key: 'q', label: filters.q, onRemove: () => update({ q: '' }) });
+    if (source.q) {
+      chips.push({ key: 'q', label: source.q, onRemove: () => apply({ q: '' }) });
     }
-    if (filters.countryId !== undefined) {
-      const country = (countriesQuery.data ?? []).find((c) => c.id === filters.countryId);
+    if (source.countryId !== undefined) {
+      const country = (countriesQuery.data ?? []).find((c) => c.id === source.countryId);
       if (country) {
         chips.push({
           key: 'country',
           label: country.name,
           onRemove: () =>
-            update({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
+            apply({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
         });
       }
     }
-    if (filters.seriesId !== undefined) {
-      const series = (seriesQuery.data ?? []).find((s) => s.id === filters.seriesId);
+    if (source.seriesId !== undefined) {
+      const series = (seriesQuery.data ?? []).find((s) => s.id === source.seriesId);
       if (series) {
         chips.push({
           key: 'series',
           label: series.name,
-          onRemove: () => update({ seriesId: undefined }),
+          onRemove: () => apply({ seriesId: undefined }),
         });
       }
     }
-    if (filters.yearFrom !== undefined || filters.yearTo !== undefined) {
+    if (source.yearFrom !== undefined || source.yearTo !== undefined) {
       chips.push({
         key: 'years',
-        label: `${t('catalog.years')}: ${filters.yearFrom ?? '…'}–${filters.yearTo ?? '…'}`,
-        onRemove: () => update({ yearFrom: undefined, yearTo: undefined }),
+        label: `${t('catalog.years')}: ${source.yearFrom ?? '…'}–${source.yearTo ?? '…'}`,
+        onRemove: () => apply({ yearFrom: undefined, yearTo: undefined }),
       });
     }
-    if (filters.denominationId !== undefined) {
+    if (source.denominationId !== undefined) {
       const denomination = (denominationsQuery.data ?? []).find(
-        (d) => d.id === filters.denominationId,
+        (d) => d.id === source.denominationId,
       );
       if (denomination) {
         chips.push({
           key: 'denomination',
           label: denomination.label,
-          onRemove: () => update({ denominationId: undefined }),
+          onRemove: () => apply({ denominationId: undefined }),
         });
       }
     }
-    if (filters.group) {
+    if (source.group) {
       chips.push({
         key: 'group',
-        label: t(GROUP_LABELS[filters.group]),
-        onRemove: () => update({ group: undefined }),
+        label: t(GROUP_LABELS[source.group]),
+        onRemove: () => apply({ group: undefined }),
       });
     }
-    if (filters.metalKind) {
+    if (source.metalKind) {
       chips.push({
         key: 'metal',
-        label: t(METAL_LABELS[filters.metalKind]),
-        onRemove: () => update({ metalKind: undefined }),
+        label: t(METAL_LABELS[source.metalKind]),
+        onRemove: () => apply({ metalKind: undefined }),
       });
     }
-    if (filters.owned !== undefined) {
+    if (source.owned !== undefined) {
       chips.push({
         key: 'owned',
-        label: t(filters.owned ? 'catalog.availabilityOwned' : 'catalog.availabilityMissing'),
-        onRemove: () => update({ owned: undefined }),
+        label: t(source.owned ? 'catalog.availabilityOwned' : 'catalog.availabilityMissing'),
+        onRemove: () => apply({ owned: undefined }),
       });
     }
     return chips;
-  }, [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t]);
+  }
+
+  const activeChips = useMemo(
+    () => buildChips(filters, update),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
+    [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t],
+  );
+  const draftChips = useMemo(
+    () => buildChips(draft, (changes) => setDraft((current) => ({ ...current, ...changes }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
+    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, t],
+  );
 
   const filtersPanel = (
     <FiltersPanel
       filters={filters}
-      update={(changes) => {
-        update(changes);
-      }}
+      update={update}
       reset={reset}
       countries={countriesQuery.data ?? []}
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
       activeFilters={activeChips}
+    />
+  );
+
+  const draftFiltersPanel = (
+    <FiltersPanel
+      filters={draft}
+      update={(changes) => setDraft((current) => ({ ...current, ...changes }))}
+      reset={() => setDraft(EMPTY_FILTERS)}
+      countries={countriesQuery.data ?? []}
+      series={seriesQuery.data ?? []}
+      seriesLoading={seriesQuery.isLoading}
+      denominations={denominationsQuery.data ?? []}
+      activeFilters={draftChips}
     />
   );
 
@@ -227,7 +278,7 @@ export function CatalogPage() {
           onSortChange={(sort) => update({ sort: sort as SortField })}
           order={filters.order}
           onOrderChange={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
-          onOpenFilters={() => setDrawerOpen(true)}
+          onOpenFilters={openDrawer}
         />
 
         {catalogQuery.isError ? (
@@ -294,8 +345,8 @@ export function CatalogPage() {
                 <X size={20} aria-hidden="true" />
               </button>
             </div>
-            {filtersPanel}
-            <Button block onClick={() => setDrawerOpen(false)}>
+            {draftFiltersPanel}
+            <Button block onClick={applyDraft}>
               {t('catalog.applyFilters')}
             </Button>
           </div>

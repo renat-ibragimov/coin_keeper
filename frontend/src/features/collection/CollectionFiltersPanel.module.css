@@ -35,3 +35,33 @@
 .yearDash {
   color: var(--color-text-muted);
 }
+
+/* One field per row in the mobile drawer: a field only as wide as its own
+ * min-width leaves its Select's open menu (min-width: 220px, Select.module.css)
+ * wider than the field itself — anchored at the field's left edge, that
+ * menu ran past the drawer's own edge and off the screen. Full width makes
+ * every field at least as wide as its own menu, so the menu never has to be
+ * wider than what it opens against (docs/08-ui-map.md). */
+@media (max-width: 900px) {
+  .search,
+  .field {
+    flex-basis: 100%;
+  }
+
+  .yearField {
+    flex-basis: 100%;
+  }
+
+  /* The wrapping div Combobox renders around its <input> (not the input
+   * itself — .yearInput only reaches that far) is what its own open menu
+   * sizes against; unstretched, it stayed input-width, and the menu below
+   * it (Select.module.css's shared .menu, min-width: 220px) overran it the
+   * same way. */
+  .yearRow > div {
+    flex: 1 1 auto;
+  }
+
+  .yearInput {
+    width: 100%;
+  }
+}

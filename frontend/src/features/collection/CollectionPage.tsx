@@ -34,9 +34,20 @@ import {
 import { CollectionFiltersPanel } from './CollectionFiltersPanel';
 import { PositionCard } from './PositionCard';
 import { PositionTable } from './PositionTable';
-import { COLLECTION_SORTS, hasActiveFilters, useCollectionFilters } from './useCollectionFilters';
+import {
+  COLLECTION_SORTS,
+  hasActiveFilters,
+  parseCollectionFilters,
+  useCollectionFilters,
+} from './useCollectionFilters';
 import type { CollectionFilters, CollectionSort, CollectionView } from './useCollectionFilters';
 import styles from './CollectionPage.module.css';
+
+// The filters a fresh /collection/coins (no query string at all) starts
+// from — reused as what the mobile drawer's own "Скинути" resets its draft
+// to, since that reset must not touch the real, applied filters until
+// "Застосувати" does (docs/08-ui-map.md: apply-on-confirm, phone only).
+const EMPTY_FILTERS = parseCollectionFilters(new URLSearchParams());
 
 const SORT_LABELS: Record<CollectionSort, string> = {
   title: 'collection.sortTitle',
@@ -66,8 +77,22 @@ export function CollectionPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { filters, update, reset } = useCollectionFilters();
+
+  // The phone's filters drawer edits this instead of the real, applied
+  // filters directly — see CatalogPage.tsx for why. The desktop filters bar
+  // is unaffected — it keeps applying straight to `filters` below
+  // (docs/08-ui-map.md: apply-on-confirm, phone only).
+  const [draft, setDraft] = useState<CollectionFilters>(filters);
   const [drawerOpen, setDrawerOpen] = useState(false);
   useDismissable(drawerOpen, () => setDrawerOpen(false));
+  const openDrawer = () => {
+    setDraft(filters);
+    setDrawerOpen(true);
+  };
+  const applyDraft = () => {
+    update(draft);
+    setDrawerOpen(false);
+  };
 
   const [searchParams] = useSearchParams();
   const viewMode = useStoredViewMode('ck.viewMode.collection');
@@ -122,74 +147,91 @@ export function CollectionPage() {
   // (no coins and no personal items), not a locally derived "zero rows" guess.
   const collectionEmpty = dashboard?.isEmpty === true && !hasActiveFilters(filters);
 
-  const activeChips = useMemo(() => {
+  // Shared between the real, applied filters and the drawer's own draft —
+  // each chip's onRemove writes back through whichever `apply` it was built
+  // with, so the same chip row works unchanged in both places.
+  function buildChips(
+    source: CollectionFilters,
+    apply: (changes: Partial<CollectionFilters>) => void,
+  ): ActiveFilterChip[] {
     const chips: ActiveFilterChip[] = [];
-    if (filters.q) {
-      chips.push({ key: 'q', label: filters.q, onRemove: () => update({ q: '' }) });
+    if (source.q) {
+      chips.push({ key: 'q', label: source.q, onRemove: () => apply({ q: '' }) });
     }
-    if (filters.countryId !== undefined) {
-      const country = (countriesQuery.data ?? []).find((c) => c.id === filters.countryId);
+    if (source.countryId !== undefined) {
+      const country = (countriesQuery.data ?? []).find((c) => c.id === source.countryId);
       if (country) {
         chips.push({
           key: 'country',
           label: country.name,
           onRemove: () =>
-            update({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
+            apply({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
         });
       }
     }
-    if (filters.seriesId !== undefined) {
-      const series = (seriesQuery.data ?? []).find((s) => s.id === filters.seriesId);
+    if (source.seriesId !== undefined) {
+      const series = (seriesQuery.data ?? []).find((s) => s.id === source.seriesId);
       if (series) {
         chips.push({
           key: 'series',
           label: series.name,
-          onRemove: () => update({ seriesId: undefined }),
+          onRemove: () => apply({ seriesId: undefined }),
         });
       }
     }
-    if (filters.yearFrom !== undefined || filters.yearTo !== undefined) {
+    if (source.yearFrom !== undefined || source.yearTo !== undefined) {
       chips.push({
         key: 'years',
-        label: `${t('catalog.years')}: ${filters.yearFrom ?? '…'}–${filters.yearTo ?? '…'}`,
-        onRemove: () => update({ yearFrom: undefined, yearTo: undefined }),
+        label: `${t('catalog.years')}: ${source.yearFrom ?? '…'}–${source.yearTo ?? '…'}`,
+        onRemove: () => apply({ yearFrom: undefined, yearTo: undefined }),
       });
     }
-    if (filters.denominationId !== undefined) {
+    if (source.denominationId !== undefined) {
       const denomination = (denominationsQuery.data ?? []).find(
-        (d) => d.id === filters.denominationId,
+        (d) => d.id === source.denominationId,
       );
       if (denomination) {
         chips.push({
           key: 'denomination',
           label: denomination.label,
-          onRemove: () => update({ denominationId: undefined }),
+          onRemove: () => apply({ denominationId: undefined }),
         });
       }
     }
-    if (filters.group) {
+    if (source.group) {
       chips.push({
         key: 'group',
-        label: t(GROUP_LABELS[filters.group]),
-        onRemove: () => update({ group: undefined }),
+        label: t(GROUP_LABELS[source.group]),
+        onRemove: () => apply({ group: undefined }),
       });
     }
-    if (filters.metalKind) {
+    if (source.metalKind) {
       chips.push({
         key: 'metal',
-        label: t(METAL_LABELS[filters.metalKind]),
-        onRemove: () => update({ metalKind: undefined }),
+        label: t(METAL_LABELS[source.metalKind]),
+        onRemove: () => apply({ metalKind: undefined }),
       });
     }
-    if (filters.grade) {
+    if (source.grade) {
       chips.push({
         key: 'grade',
-        label: filters.grade,
-        onRemove: () => update({ grade: undefined }),
+        label: source.grade,
+        onRemove: () => apply({ grade: undefined }),
       });
     }
     return chips;
-  }, [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t]);
+  }
+
+  const activeChips = useMemo(
+    () => buildChips(filters, update),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
+    [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t],
+  );
+  const draftChips = useMemo(
+    () => buildChips(draft, (changes) => setDraft((current) => ({ ...current, ...changes }))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
+    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, t],
+  );
 
   const filtersPanel = (
     <CollectionFiltersPanel
@@ -201,6 +243,19 @@ export function CollectionPage() {
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
       activeFilters={activeChips}
+    />
+  );
+
+  const draftFiltersPanel = (
+    <CollectionFiltersPanel
+      filters={draft}
+      update={(changes) => setDraft((current) => ({ ...current, ...changes }))}
+      reset={() => setDraft(EMPTY_FILTERS)}
+      countries={countriesQuery.data ?? []}
+      series={seriesQuery.data ?? []}
+      seriesLoading={seriesQuery.isLoading}
+      denominations={denominationsQuery.data ?? []}
+      activeFilters={draftChips}
     />
   );
 
@@ -327,7 +382,7 @@ export function CollectionPage() {
             onSortChange={(sort) => update({ sort: sort as CollectionSort })}
             order={filters.order}
             onOrderChange={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
-            onOpenFilters={() => setDrawerOpen(true)}
+            onOpenFilters={openDrawer}
           />
 
           {collectionQuery.isError ? (
@@ -400,8 +455,8 @@ export function CollectionPage() {
                 <X size={20} aria-hidden="true" />
               </button>
             </div>
-            {filtersPanel}
-            <Button block onClick={() => setDrawerOpen(false)}>
+            {draftFiltersPanel}
+            <Button block onClick={applyDraft}>
               {t('catalog.applyFilters')}
             </Button>
           </div>

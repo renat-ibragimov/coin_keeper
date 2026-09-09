@@ -23,6 +23,10 @@
   }
 }
 
+.drawerOverlay {
+  display: none;
+}
+
 @media (max-width: 900px) {
   .filtersBar {
     display: none;
@@ -69,8 +73,4 @@
     padding: var(--space-2);
     border-radius: var(--radius-sm);
   }
-}
-
-.drawerOverlay {
-  display: none;
 }
