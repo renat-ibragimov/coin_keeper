@@ -1,6 +1,8 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import { scrollPageToTop } from '@/shared/lib/pageScroll';
+
 import { Button } from './Button';
 import { pageItems } from './pageItems';
 import styles from './Pagination.module.css';
@@ -21,7 +23,7 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
   // (docs/08-ui-map.md).
   const goTo = (next: number) => {
     onChange(next);
-    window.scrollTo({ top: 0 });
+    scrollPageToTop();
   };
   return (
     <nav className={styles.pagination} aria-label={t('pagination.label')}>

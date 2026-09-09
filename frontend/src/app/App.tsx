@@ -21,6 +21,7 @@ import { ExpensesPage } from '@/features/expenses/ExpensesPage';
 import { SeriesDetailPage } from '@/features/series/SeriesDetailPage';
 import { SeriesListPage } from '@/features/series/SeriesListPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
+import { scrollPageToTop } from '@/shared/lib/pageScroll';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 import { ToastProvider } from '@/shared/ui';
 
@@ -66,7 +67,7 @@ function LocaleCacheReset() {
 function ScrollToTop() {
   const { pathname, search } = useLocation();
   useEffect(() => {
-    window.scrollTo(0, 0);
+    scrollPageToTop();
   }, [pathname, search]);
   return null;
 }

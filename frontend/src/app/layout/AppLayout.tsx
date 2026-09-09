@@ -115,24 +115,31 @@ export function AppLayout() {
         </div>
       </header>
 
-      {inCollection ? (
-        <nav className={styles.subnav} aria-label={t('nav.collectionLabel')}>
-          {COLLECTION_TABS.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              end={tab.end}
-              className={navClass(styles.subnavLink, styles.subnavLinkActive)}
-            >
-              {t(tab.key)}
-            </NavLink>
-          ))}
-        </nav>
-      ) : null}
+      {/* Everything below the header scrolls in here rather than in the
+          window, so the scrollbar and its reserved gutter never reach the
+          header — data-scroll-area is what shared/lib/pageScroll.ts steers by
+          (docs/08-ui-map.md). On the phone layout the CSS hands scrolling
+          back to the document. */}
+      <div className={styles.scrollArea} data-scroll-area>
+        {inCollection ? (
+          <nav className={styles.subnav} aria-label={t('nav.collectionLabel')}>
+            {COLLECTION_TABS.map((tab) => (
+              <NavLink
+                key={tab.to}
+                to={tab.to}
+                end={tab.end}
+                className={navClass(styles.subnavLink, styles.subnavLinkActive)}
+              >
+                {t(tab.key)}
+              </NavLink>
+            ))}
+          </nav>
+        ) : null}
 
-      <main className={styles.main}>
-        <Outlet />
-      </main>
+        <main className={styles.main}>
+          <Outlet />
+        </main>
+      </div>
 
       <nav className={styles.bottomNav} aria-label={t('nav.label')}>
         {MOBILE_PRIMARY.map((section) => (

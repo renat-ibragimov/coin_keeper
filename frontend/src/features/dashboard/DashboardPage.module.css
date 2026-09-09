@@ -142,28 +142,9 @@
   flex: 1 1 auto;
   min-height: 0;
   max-height: 520px;
+  /* The thin thumb is the application-wide default (shared/theme/tokens.css);
+     this list only decides where it scrolls. */
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border-strong) transparent;
-}
-
-.seriesList::-webkit-scrollbar {
-  width: 8px;
-}
-
-.seriesList::-webkit-scrollbar-thumb {
-  background-color: var(--color-border-strong);
-  border-radius: 4px;
-}
-
-.seriesList::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-/* The default up/down arrow buttons read as a stray native control on an
- * otherwise custom-styled track — a plain thin thumb reads calmer. */
-.seriesList::-webkit-scrollbar-button {
-  display: none;
 }
 
 .seriesRow {

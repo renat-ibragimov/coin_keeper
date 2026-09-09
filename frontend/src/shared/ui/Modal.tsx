@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { lockPageScroll } from '@/shared/lib/pageScroll';
 import { useDismissable } from '@/shared/lib/useDismissable';
 
 import { Button } from './Button';
@@ -26,11 +27,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
 
   useEffect(() => {
     if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
+    return lockPageScroll();
   }, [open]);
 
   if (!open) return null;
