@@ -110,4 +110,15 @@
   .filtersButton {
     display: inline-flex;
   }
+
+  /* The counter and the filters button share the first line; the view
+   * switch and sort controls that don't fit wrap to their own line below —
+   * flush against the page's own edge padding, which on a phone lands right
+   * inside iOS's edge-swipe-back zone. A tap on the leftmost control (the
+   * view switch) then reads as a system back-swipe and leaves the page
+   * instead of switching it (docs/08-ui-map.md). The extra inset only has
+   * to clear that zone; nothing here is meant to look indented. */
+  .toolbar {
+    padding-left: var(--space-2);
+  }
 }
