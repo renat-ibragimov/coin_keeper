@@ -27,9 +27,15 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
   };
   return (
     <nav className={styles.pagination} aria-label={t('pagination.label')}>
-      <Button variant="secondary" size="sm" disabled={page <= 1} onClick={() => goTo(page - 1)}>
+      <Button
+        variant="secondary"
+        size="sm"
+        disabled={page <= 1}
+        onClick={() => goTo(page - 1)}
+        aria-label={t('pagination.previous')}
+      >
         <ChevronLeft size={15} aria-hidden="true" />
-        {t('pagination.previous')}
+        <span className={styles.navLabel}>{t('pagination.previous')}</span>
       </Button>
       {pageItems(page, pageCount).map((item, index) =>
         item === 'gap' ? (
@@ -53,8 +59,9 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
         size="sm"
         disabled={page >= pageCount}
         onClick={() => goTo(page + 1)}
+        aria-label={t('pagination.next')}
       >
-        {t('pagination.next')}
+        <span className={styles.navLabel}>{t('pagination.next')}</span>
         <ChevronRight size={15} aria-hidden="true" />
       </Button>
     </nav>

@@ -48,3 +48,14 @@
   color: var(--color-text-muted);
   padding: 0 var(--space-1);
 }
+
+/* "Назад"/"Вперед" next to a chevron is redundant once the row is already
+ * fighting page-number buttons for width — the arrow alone reads fine, and
+ * one less wide button leaves the number strip more room before it wraps
+ * (docs/08-ui-map.md). The label stays for assistive tech via the button's
+ * own aria-label (Pagination.tsx). */
+@media (max-width: 480px) {
+  .navLabel {
+    display: none;
+  }
+}
