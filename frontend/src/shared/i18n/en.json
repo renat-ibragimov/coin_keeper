@@ -12,7 +12,6 @@
     "coins": "Coins",
     "settings": "Settings",
     "admin": "Administration",
-    "more": "More",
     "expenses": "Money"
   },
   "header": {
@@ -460,6 +459,7 @@
     "theme": "Theme",
     "themeLight": "Light",
     "themeDark": "Dark",
+    "themeSystem": "System",
     "themeNote": "The theme is remembered in this browser; without a choice the system one applies.",
     "gradesTitle": "Default grade",
     "gradeCommemorative": "Commemorative and collector",

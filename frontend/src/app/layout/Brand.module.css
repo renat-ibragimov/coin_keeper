@@ -24,9 +24,13 @@
 }
 
 @media (max-width: 900px) {
-  /* The same full logo, scaled to the slimmer mobile header. */
+  /* The same full logo, scaled to the slimmer mobile header — as tall as
+   * --header-height (68px) comfortably allows once its own vertical margin
+   * is accounted for, now that the header's other side is a single compact
+   * avatar button rather than a name, a language switch and a theme toggle
+   * in a row. */
   .fullImage,
   .brand.hero .fullImage {
-    height: 50px;
+    height: 58px;
   }
 }

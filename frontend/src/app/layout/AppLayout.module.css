@@ -124,6 +124,12 @@
   gap: var(--space-4);
 }
 
+.headerSwitches {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .account {
   position: relative;
 }
@@ -170,13 +176,34 @@
   white-space: nowrap;
 }
 
+/* The empty seat for a photo the app doesn't have yet — a plain silhouette
+ * on a recessed disc, not a coloured initial, so it reads as "no photo set"
+ * rather than as a deliberate monogram (docs/08-ui-map.md). */
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--color-surface-control);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.avatarLarge {
+  width: 40px;
+  height: 40px;
+}
+
 .accountMenu {
   position: absolute;
   top: calc(100% + var(--space-2));
   right: 0;
   display: flex;
   flex-direction: column;
-  min-width: 180px;
+  min-width: 240px;
   background: var(--color-surface-raised);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -185,7 +212,65 @@
   z-index: 25;
 }
 
+.accountMenuProfile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* The mirror image of .headerSwitches: language and theme live in the menu
+ * only where they aren't already sitting in the header next to the avatar. */
+.accountMenuMobileOnly {
+  display: none;
+}
+
+.accountMenuProfileText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.accountMenuProfileName {
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountMenuProfileEmail {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountMenuRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+}
+
+.accountMenuRowLabel {
+  color: var(--color-text-secondary);
+  font-size: 13.5px;
+}
+
+.accountMenuDivider {
+  height: 1px;
+  margin: var(--space-1) 0;
+  background: var(--color-border-subtle);
+}
+
 .accountMenuLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
   padding: 10px 16px;
   color: var(--color-text);
   text-decoration: none;
@@ -196,6 +281,11 @@
   font-size: 14.5px;
   cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.accountMenuLink svg {
+  color: var(--color-text-muted);
+  flex: none;
 }
 
 .accountMenuLink:hover,
@@ -258,10 +348,6 @@
   display: none;
 }
 
-.moreSheet {
-  display: none;
-}
-
 @media (max-width: 900px) {
   /* The document scrolls on the phone: an inner scroller would keep the
    * browser's URL bar from collapsing, and there is nothing to fix anyway —
@@ -279,9 +365,21 @@
   }
 
   .nav,
-  .account,
-  .subnav {
+  .subnav,
+  .headerSwitches {
     display: none;
+  }
+
+  /* The name gives way to the bigger logo and the avatar beside it — the
+   * full account menu (email, language, theme, settings) is one tap away
+   * regardless of how much of the name made it onto the button. */
+  .accountName {
+    max-width: 84px;
+  }
+
+  .accountMenuMobileOnly {
+    display: flex;
+    flex-direction: column;
   }
 
   .main {
@@ -306,17 +404,19 @@
   .bottomLink {
     flex: 1;
     height: var(--bottom-nav-height);
-    padding: 0 4px;
-    display: inline-flex;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 2px;
     text-align: center;
     border: none;
     background: none;
     color: var(--color-text-secondary);
     text-decoration: none;
     font-family: var(--font-body);
-    font-size: 13px;
+    font-size: 11.5px;
     font-weight: 600;
     cursor: pointer;
     transition: color var(--duration-fast) var(--ease-standard);
@@ -341,42 +441,5 @@
 
   :root[data-theme='dark'] .bottomLinkActive {
     color: var(--color-accent);
-  }
-
-  .moreSheet {
-    display: flex;
-    flex-direction: column;
-    position: fixed;
-    right: var(--space-3);
-    bottom: calc(var(--bottom-nav-inset) + var(--space-2));
-    background: var(--color-surface-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    z-index: 31;
-    min-width: 200px;
-    overflow: hidden;
-  }
-
-  .moreLink {
-    padding: 12px 18px;
-    color: var(--color-text);
-    text-decoration: none;
-    border: none;
-    background: none;
-    text-align: left;
-    font-family: var(--font-body);
-    font-size: 15px;
-    cursor: pointer;
-  }
-
-  .moreLink:hover,
-  .moreLink:focus-visible {
-    background: var(--color-surface-hover);
-  }
-
-  .moreLinkActive {
-    color: var(--color-accent-strong);
-    font-weight: 700;
   }
 }

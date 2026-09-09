@@ -34,7 +34,7 @@ import styles from './SettingsPage.module.css';
 export function SettingsPage() {
   const { t, i18n } = useTranslation();
   const { user, updateUser, signOut } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  const { preference, setPreference } = useTheme();
   const toast = useToast();
 
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
@@ -113,16 +113,15 @@ export function SettingsPage() {
           <FormStack>
             <div>
               <div className={styles.label}>{t('settings.theme')}</div>
-              <Tabs<'light' | 'dark'>
+              <Tabs<'light' | 'dark' | 'system'>
                 aria-label={t('settings.theme')}
                 options={[
                   { value: 'light', label: `☀ ${t('settings.themeLight')}` },
                   { value: 'dark', label: `☾ ${t('settings.themeDark')}` },
+                  { value: 'system', label: t('settings.themeSystem') },
                 ]}
-                value={theme}
-                onChange={(value) => {
-                  if (value !== theme) toggleTheme();
-                }}
+                value={preference}
+                onChange={setPreference}
               />
               <p className={styles.note}>{t('settings.themeNote')}</p>
             </div>

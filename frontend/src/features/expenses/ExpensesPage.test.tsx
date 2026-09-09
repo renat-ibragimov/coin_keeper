@@ -118,7 +118,9 @@ function renderPage() {
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
       {/* jsdom has no matchMedia, so the theme is provided directly rather than via ThemeProvider. */}
-      <ThemeContext.Provider value={{ theme: 'light', toggleTheme: () => {} }}>
+      <ThemeContext.Provider
+        value={{ theme: 'light', preference: 'light', setPreference: () => {} }}
+      >
         <MemoryRouter>
           <ExpensesPage />
         </MemoryRouter>

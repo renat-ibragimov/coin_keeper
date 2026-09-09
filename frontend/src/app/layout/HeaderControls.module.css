@@ -1,10 +1,11 @@
-/* The language and theme controls sit side by side in the header, so they
- * share one control shell: the same surface, border, radius and height
+/* Language and theme live as two rows inside the account dropdown
+ * (AppLayout.tsx), not as standalone header buttons — one control shell
+ * shared between them: the same surface, border, radius and height
  * (docs/08-ui-map.md). */
 .locales {
   display: inline-flex;
   align-items: center;
-  height: 36px;
+  height: 34px;
   padding: 0 2px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -40,29 +41,4 @@
 
 .divider {
   color: var(--color-border-strong);
-}
-
-.themeToggle {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-control);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    border-color var(--duration-fast) var(--ease-standard),
-    color var(--duration-fast) var(--ease-standard);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .themeToggle:hover {
-    background: var(--color-surface-hover);
-    color: var(--color-accent);
-    border-color: var(--color-border-hover);
-  }
 }

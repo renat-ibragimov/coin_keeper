@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Outlet } from 'react-router-dom';
 
 import { Brand } from '@/app/layout/Brand';
-import { LocaleSwitcher, ThemeToggle } from '@/app/layout/HeaderControls';
+import { LocaleSwitcher, ThemeSwitcher } from '@/app/layout/HeaderControls';
 
 import styles from './AuthLayout.module.css';
 
@@ -20,7 +20,7 @@ export function AuthLayout() {
         <Brand size="hero" to="/login" />
         <div className={styles.controls}>
           <LocaleSwitcher />
-          <ThemeToggle />
+          <ThemeSwitcher />
         </div>
       </header>
       <div className={styles.card}>

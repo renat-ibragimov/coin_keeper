@@ -18,7 +18,7 @@ import { Brand } from './Brand';
 // jsdom has no matchMedia, so the theme is provided directly instead of via ThemeProvider.
 function renderWithTheme(ui: ReactElement, theme: Theme = 'light') {
   return render(
-    <ThemeContext.Provider value={{ theme, toggleTheme: () => {} }}>
+    <ThemeContext.Provider value={{ theme, preference: theme, setPreference: () => {} }}>
       <MemoryRouter>{ui}</MemoryRouter>
     </ThemeContext.Provider>,
   );
