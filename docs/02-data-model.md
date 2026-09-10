@@ -771,6 +771,34 @@ created_at   timestamptz NOT NULL DEFAULT now()
 
 Создаём сразу, заполнять начинаем на операциях удаления и массового импорта.
 
+### job_runs
+
+```
+id           bigserial PK
+job          text NOT NULL              -- 'update-prices', дальше 'nbu-catalog-sync'
+status       text NOT NULL              -- running | ok | partial | failed
+started_at   timestamptz NOT NULL
+finished_at  timestamptz                -- NULL ровно тогда, когда status = 'running'
+run_date     date                       -- день, о котором прогон, а не день запуска
+summary      text                       -- строка самоотчёта задачи
+stats        jsonb                      -- счётчики задачи, как она их посчитала
+details      text                       -- только при не-ok
+exit_code    smallint
+created_at   timestamptz NOT NULL DEFAULT now()
+updated_at   timestamptz NOT NULL DEFAULT now()
+```
+
+Одна строка на прогон фоновой задачи (`13-admin.md`). Открывается со `status = 'running'`
+до начала работы и закрывается исходом после — поэтому прогон, убитый на середине,
+оставляет строку в `running`, а не пустоту. Слова статусов — те же, что уже печатает
+парсер (`ok | partial | failed`), наше здесь только `running`. Два CHECK: допустимый
+статус и связка «`finished_at` пуст ровно у незавершённых».
+
+Таблица ни с чем не связана внешними ключами: задача отчитывается о себе, а не о записях.
+`stats` хранит счётчики как есть — схема не знает, что считает конкретная задача.
+`run_date` отличается от даты запуска намеренно: ночной прогон цен датируется заголовком
+таблицы ua-coins, который утром может быть ещё вчерашним.
+
 ## Схема связей
 
 ```

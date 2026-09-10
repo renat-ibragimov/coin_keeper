@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     )
     uacoins_base: str = Field(default="https://www.ua-coins.info", alias="UACOINS_BASE")
 
+    # --- job reporting, docs/13-admin.md ---
+    # Shared with the coin-parser container, which reads it from the same
+    # .env this stack uses. Empty means job reporting is switched off and the
+    # internal endpoint refuses everything.
+    job_report_token: str = Field(default="", alias="JOB_REPORT_TOKEN")
+
     # --- LLM translation, scripts/ukraine_pipeline.py --steps translate-c ---
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
 

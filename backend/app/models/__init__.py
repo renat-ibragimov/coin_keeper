@@ -22,6 +22,7 @@ from app.models.collection import (
     PurchaseOffer,
     Sale,
 )
+from app.models.jobs import JobRun
 from app.models.media import MediaFile
 from app.models.pricing import MarketPriceSnapshot, PriceSourceLink
 from app.models.user import (
@@ -48,6 +49,7 @@ __all__ = [
     "Denomination",
     "ExchangeRate",
     "Expense",
+    "JobRun",
     "MarketPriceSnapshot",
     "Material",
     "MediaFile",

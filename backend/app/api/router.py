@@ -11,6 +11,7 @@ from app.api.v1 import (
     collection,
     expenses,
     health,
+    jobs,
     reference,
     series,
 )
@@ -24,3 +25,4 @@ api_router.include_router(collection.router)
 api_router.include_router(expenses.router)
 api_router.include_router(series.router)
 api_router.include_router(reference.router)
+api_router.include_router(jobs.router)

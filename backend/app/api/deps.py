@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import secrets
 from typing import Annotated
 
-from fastapi import Depends, Query, Request, status
+from fastapi import Depends, Header, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -130,6 +131,35 @@ async def get_admin_user(user: CurrentUser) -> User:
 
 
 AdminUser = Annotated[User, Depends(get_admin_user)]
+
+
+async def require_job_token(
+    settings: AppSettings,
+    token: Annotated[str | None, Header(alias="X-Job-Token")] = None,
+) -> None:
+    """Authenticates a scheduled job reporting on itself (docs/13-admin.md).
+
+    Not a user and not a session: the caller is a container on the same docker
+    network holding a shared secret. Compared in constant time, and an unset
+    secret disables the endpoint outright rather than accepting anything.
+    """
+    if not settings.job_report_token:
+        raise ProblemError(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "job-reporting-disabled",
+            "Service unavailable",
+            "Job reporting is not configured on this server.",
+        )
+    if token is None or not secrets.compare_digest(token, settings.job_report_token):
+        raise ProblemError(
+            status.HTTP_401_UNAUTHORIZED,
+            "invalid-job-token",
+            "Not authenticated",
+            "A valid job token is required.",
+        )
+
+
+JobToken = Annotated[None, Depends(require_job_token)]
 
 
 class PageParams:

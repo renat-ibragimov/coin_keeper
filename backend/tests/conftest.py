@@ -40,6 +40,9 @@ ADMIN_URL_ENV = "TEST_POSTGRES_ADMIN_URL"
 DEFAULT_ADMIN_URL = "postgresql+asyncpg://coinkeeper:devpass@localhost:5432/postgres"
 DEFAULT_REDIS_URL = "redis://localhost:6379/15"
 
+# The shared secret a scheduled job reports with (docs/13-admin.md).
+JOB_TOKEN = "test-job-token-not-used-anywhere-else"
+
 
 class RecordingMailBackend(ConsoleMailBackend):
     """The console backend plus a list the tests can read.
@@ -76,6 +79,7 @@ def _configure_environment(url: str) -> None:
     os.environ["COOKIE_SECURE"] = "false"
     # Tests must never send real email. A test that would is a broken test.
     os.environ["MAIL_BACKEND"] = "console"
+    os.environ["JOB_REPORT_TOKEN"] = JOB_TOKEN
 
     from app.core.config import get_settings
 
