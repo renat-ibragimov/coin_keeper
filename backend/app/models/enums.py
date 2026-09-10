@@ -85,3 +85,4 @@ class ExpenseCategory(enum.StrEnum):
 class AuthTokenKind(enum.StrEnum):
     EMAIL_VERIFY = "email_verify"
     PASSWORD_RESET = "password_reset"  # noqa: S105 - token kind, not a secret
+    TELEGRAM_LINK = "telegram_link"

@@ -14,6 +14,7 @@ from app.core.config import Settings, get_settings
 from app.core.locale import normalize_locale
 from app.core.mail import MailBackend, get_mail_backend
 from app.core.security import InvalidTokenError, decode_access_token
+from app.core.telegram import TelegramSender, get_telegram_sender
 from app.db.session import get_db_session
 from app.models import User
 from app.models.enums import UserRole
@@ -25,6 +26,7 @@ bearer_scheme = HTTPBearer(auto_error=False)
 DbSession = Annotated[AsyncSession, Depends(get_db_session)]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 Mail = Annotated[MailBackend, Depends(get_mail_backend)]
+Telegram = Annotated[TelegramSender, Depends(get_telegram_sender)]
 
 
 def get_auth_service(session: DbSession, settings: AppSettings, mail: Mail) -> AuthService:

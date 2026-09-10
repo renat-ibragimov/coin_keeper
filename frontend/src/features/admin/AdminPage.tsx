@@ -20,6 +20,7 @@ import {
 import styles from './AdminPage.module.css';
 import { fetchJobRuns, isStale, PAGE_SIZE } from './api';
 import { JobRunDialog } from './JobRunDialog';
+import { TelegramCard } from './TelegramCard';
 import { formatDuration, formatMoment, statusTone } from './jobRunView';
 
 const ALL_JOBS = '';
@@ -51,6 +52,8 @@ export function AdminPage() {
   return (
     <div className={styles.page}>
       <PageHeader title={t('admin.title')} subtitle={t('admin.subtitle')} />
+
+      <TelegramCard />
 
       <Card variant="panel">
         <div className={styles.sectionHead}>

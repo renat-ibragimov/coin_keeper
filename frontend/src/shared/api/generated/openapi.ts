@@ -55,6 +55,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/telegram": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Telegram Status */
+        get: operations["telegram_status_api_v1_admin_telegram_get"];
+        put?: never;
+        post?: never;
+        /** Unlink Telegram */
+        delete: operations["unlink_telegram_api_v1_admin_telegram_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/telegram/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Telegram Link
+         * @description A one-time code wrapped in a t.me link. Pressing Start in that chat is
+         *     what actually connects it (docs/13-admin.md, 2.5).
+         */
+        post: operations["create_telegram_link_api_v1_admin_telegram_link_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -648,6 +687,23 @@ export interface paths {
         head?: never;
         /** Finish Job Run */
         patch: operations["finish_job_run_api_v1_internal_job_runs__run_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/telegram/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Telegram Webhook */
+        post: operations["telegram_webhook_api_v1_telegram_webhook_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
 }
@@ -1727,6 +1783,30 @@ export interface components {
             defaultGradeCirculation: string;
         };
         /**
+         * TelegramLinkOut
+         * @description The t.me link carrying a one-time code, and when it stops working.
+         */
+        TelegramLinkOut: {
+            /** Url */
+            url: string;
+            /**
+             * Expiresat
+             * Format: date-time
+             */
+            expiresAt: string;
+        };
+        /**
+         * TelegramStatusOut
+         * @description Whether this administrator has a chat connected. The chat id itself is
+         *     not sent: the screen has no use for it.
+         */
+        TelegramStatusOut: {
+            /** Connected */
+            connected: boolean;
+            /** Chats */
+            chats: number;
+        };
+        /**
          * TokensOut
          * @description The refresh token is never in the body — it lives in an httpOnly cookie.
          */
@@ -1874,6 +1954,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    telegram_status_api_v1_admin_telegram_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramStatusOut"];
+                };
+            };
+        };
+    };
+    unlink_telegram_api_v1_admin_telegram_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_telegram_link_api_v1_admin_telegram_link_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TelegramLinkOut"];
                 };
             };
         };
@@ -3252,6 +3390,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    telegram_webhook_api_v1_telegram_webhook_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Telegram-Bot-Api-Secret-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

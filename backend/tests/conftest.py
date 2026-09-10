@@ -33,6 +33,7 @@ from sqlalchemy.ext.asyncio import (
 from alembic import command
 from app.core.mail.base import EmailMessage
 from app.core.mail.console import ConsoleMailBackend
+from app.core.telegram.base import TelegramMessage, TelegramSender
 
 BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
@@ -42,6 +43,8 @@ DEFAULT_REDIS_URL = "redis://localhost:6379/15"
 
 # The shared secret a scheduled job reports with (docs/13-admin.md).
 JOB_TOKEN = "test-job-token-not-used-anywhere-else"
+# What telegram would put in X-Telegram-Bot-Api-Secret-Token.
+WEBHOOK_SECRET = "test-webhook-secret-not-used-anywhere-else"
 
 
 class RecordingMailBackend(ConsoleMailBackend):
@@ -80,6 +83,11 @@ def _configure_environment(url: str) -> None:
     # Tests must never send real email. A test that would is a broken test.
     os.environ["MAIL_BACKEND"] = "console"
     os.environ["JOB_REPORT_TOKEN"] = JOB_TOKEN
+    # No bot token: nothing can reach a real chat even by mistake. The webhook
+    # secret and the username are set, so the routes behind them are testable.
+    os.environ["TELEGRAM_BOT_TOKEN"] = ""
+    os.environ["TELEGRAM_BOT_USERNAME"] = "bakost_test_bot"
+    os.environ["TELEGRAM_WEBHOOK_SECRET"] = WEBHOOK_SECRET
 
     from app.core.config import get_settings
 
@@ -190,13 +198,30 @@ def mail_outbox() -> list[EmailMessage]:
     return []
 
 
+class RecordingTelegramSender(TelegramSender):
+    """Keeps what the bot would have said. Nothing leaves the process."""
+
+    def __init__(self) -> None:
+        self.sent: list[TelegramMessage] = []
+
+    async def send(self, message: TelegramMessage) -> None:
+        self.sent.append(message)
+
+
+@pytest.fixture
+def telegram_sender() -> RecordingTelegramSender:
+    return RecordingTelegramSender()
+
+
 @pytest.fixture
 async def client(
     db_session: AsyncSession,
     redis_client: None,
     mail_outbox: list[EmailMessage],
+    telegram_sender: RecordingTelegramSender,
 ) -> AsyncIterator[AsyncClient]:
     from app.core.mail import get_mail_backend
+    from app.core.telegram import get_telegram_sender
     from app.db.session import get_db_session
     from app.main import create_app
 
@@ -216,6 +241,7 @@ async def client(
 
     app.dependency_overrides[get_db_session] = override_session
     app.dependency_overrides[get_mail_backend] = lambda: RecordingMailBackend(mail_outbox)
+    app.dependency_overrides[get_telegram_sender] = lambda: telegram_sender
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as http:

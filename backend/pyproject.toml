@@ -84,6 +84,11 @@ ignore = ["S101"]
 "app/ukraine_pipeline/*" = ["RUF001", "RUF002", "RUF003"]
 "scripts/ukraine_pipeline.py" = ["RUF001", "RUF002", "RUF003"]
 "scripts/recon_ukraine.py" = ["RUF001", "RUF002", "RUF003"]
+# The admin bot's own wording is Ukrainian by decision (docs/13-admin.md, 2.6):
+# it is not part of the application interface and has no locale files to live
+# in. Only the message strings are exempt -- comments and docstrings in this
+# module stay plain English like everywhere else.
+"app/core/telegram/messages.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"

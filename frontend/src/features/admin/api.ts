@@ -1,5 +1,5 @@
 import { api, toQuery } from '@/shared/api/client';
-import type { JobRunOut, JobRunsPage } from '@/shared/api/types';
+import type { JobRunOut, JobRunsPage, TelegramLink, TelegramStatus } from '@/shared/api/types';
 
 export const PAGE_SIZE = 20;
 
@@ -29,4 +29,16 @@ export function isStale(run: JobRunOut, now: number = Date.now()): boolean {
 export function runDuration(run: JobRunOut): number | null {
   if (!run.finishedAt) return null;
   return new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime();
+}
+
+export function fetchTelegramStatus(): Promise<TelegramStatus> {
+  return api<TelegramStatus>('/admin/telegram');
+}
+
+export function createTelegramLink(): Promise<TelegramLink> {
+  return api<TelegramLink>('/admin/telegram/link', { method: 'POST' });
+}
+
+export function unlinkTelegram(): Promise<void> {
+  return api<void>('/admin/telegram', { method: 'DELETE' });
 }

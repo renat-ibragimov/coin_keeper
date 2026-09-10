@@ -513,6 +513,19 @@
         "partial": "Partial",
         "failed": "Failed"
       }
+    },
+    "telegram": {
+      "title": "Telegram notifications",
+      "on": "Connected",
+      "off": "Not connected",
+      "textOn": "Background job reports arrive in your chat. /last shows the latest run.",
+      "textOff": "Connect a chat to get background job reports as soon as a run finishes.",
+      "connect": "Connect Telegram",
+      "disconnect": "Disconnect",
+      "waiting": "Opened the bot? Press Start there — the chat connects itself as soon as you do.",
+      "connected": "Telegram connected.",
+      "disconnected": "Telegram disconnected.",
+      "linkFailed": "Could not create the link. Try again."
     }
   }
 }

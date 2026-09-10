@@ -15,6 +15,7 @@ from app.api.v1 import (
     jobs,
     reference,
     series,
+    telegram,
 )
 
 api_router = APIRouter(prefix="/api/v1")
@@ -28,3 +29,4 @@ api_router.include_router(expenses.router)
 api_router.include_router(series.router)
 api_router.include_router(reference.router)
 api_router.include_router(jobs.router)
+api_router.include_router(telegram.router)

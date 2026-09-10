@@ -49,3 +49,5 @@ export type ExpenseMonthTotal = components['schemas']['ExpenseMonthTotal'];
 
 export type JobRunOut = components['schemas']['JobRunOut'];
 export type JobRunsPage = components['schemas']['JobRunsOut'];
+export type TelegramStatus = components['schemas']['TelegramStatusOut'];
+export type TelegramLink = components['schemas']['TelegramLinkOut'];

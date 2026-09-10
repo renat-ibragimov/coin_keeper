@@ -62,6 +62,16 @@ class Settings(BaseSettings):
     )
     uacoins_base: str = Field(default="https://www.ua-coins.info", alias="UACOINS_BASE")
 
+    # --- admin telegram bot, docs/13-admin.md ---
+    # No token means the bot is switched off: messages go to the log and the
+    # webhook refuses everything, so a dev machine can never reach a real chat.
+    telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
+    # Used to build the t.me link behind the "connect" button.
+    telegram_bot_username: str = Field(default="", alias="TELEGRAM_BOT_USERNAME")
+    # Checked against X-Telegram-Bot-Api-Secret-Token on every update.
+    telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")
+    telegram_link_ttl_minutes: int = 15
+
     # --- job reporting, docs/13-admin.md ---
     # Shared with the coin-parser container, which reads it from the same
     # .env this stack uses. Empty means job reporting is switched off and the
