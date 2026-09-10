@@ -21,6 +21,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Job Runs */
+        get: operations["list_job_runs_api_v1_admin_jobs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/jobs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job Run */
+        get: operations["get_job_run_api_v1_admin_jobs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/register": {
         parameters: {
             query?: never;
@@ -580,6 +614,40 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/internal/job-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Open Job Run */
+        post: operations["open_job_run_api_v1_internal_job_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/internal/job-runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Finish Job Run */
+        patch: operations["finish_job_run_api_v1_internal_job_runs__run_id__patch"];
         trace?: never;
     };
 }
@@ -1368,6 +1436,106 @@ export interface components {
             redis: components["schemas"]["ComponentHealth"];
             storage: components["schemas"]["ComponentHealth"];
         };
+        /**
+         * JobRunFinishIn
+         * @description Closing report: the outcome, the counters and, when it went badly, why.
+         */
+        JobRunFinishIn: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "partial" | "failed";
+            /** Rundate */
+            runDate?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Stats */
+            stats?: {
+                [key: string]: unknown;
+            } | null;
+            /** Details */
+            details?: string | null;
+            /** Exitcode */
+            exitCode?: number | null;
+        };
+        /**
+         * JobRunIn
+         * @description Opening report: sent before the work starts.
+         *
+         *     A job that could not open its run -- the API was down for a moment -- may
+         *     also post an already finished one, which is why the final fields are
+         *     accepted here too.
+         */
+        JobRunIn: {
+            /** Job */
+            job: string;
+            /**
+             * Status
+             * @default running
+             * @enum {string}
+             */
+            status: "running" | "ok" | "partial" | "failed";
+            /** Startedat */
+            startedAt?: string | null;
+            /** Rundate */
+            runDate?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Stats */
+            stats?: {
+                [key: string]: unknown;
+            } | null;
+            /** Details */
+            details?: string | null;
+            /** Exitcode */
+            exitCode?: number | null;
+        };
+        /** JobRunOut */
+        JobRunOut: {
+            /** Id */
+            id: number;
+            /** Job */
+            job: string;
+            /** Status */
+            status: string;
+            /**
+             * Startedat
+             * Format: date-time
+             */
+            startedAt: string;
+            /** Finishedat */
+            finishedAt: string | null;
+            /** Rundate */
+            runDate: string | null;
+            /** Summary */
+            summary: string | null;
+            /** Stats */
+            stats: {
+                [key: string]: unknown;
+            } | null;
+            /** Details */
+            details: string | null;
+            /** Exitcode */
+            exitCode: number | null;
+        };
+        /**
+         * JobRunsOut
+         * @description The paginated list plus the job names seen so far, so the screen can
+         *     offer a filter without a second request.
+         */
+        JobRunsOut: {
+            /** Items */
+            items: components["schemas"]["JobRunOut"][];
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Pagesize */
+            pageSize: number;
+            /** Jobs */
+            jobs: string[];
+        };
         /** LoginRequest */
         LoginRequest: {
             /**
@@ -1642,6 +1810,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+        };
+    };
+    list_job_runs_api_v1_admin_jobs_get: {
+        parameters: {
+            query?: {
+                job?: string | null;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_run_api_v1_admin_jobs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2010,7 +2242,7 @@ export interface operations {
                 owned?: boolean | null;
                 scope?: "all" | "shared" | "own";
                 archived?: boolean;
-                sort?: "title" | "country" | "series" | "year" | "denomination" | "owned" | "purchase" | "price";
+                sort?: "title" | "country" | "series" | "year" | "denomination" | "material" | "owned" | "purchase" | "price";
                 order?: "asc" | "desc";
                 locale?: string | null;
                 page?: number;
@@ -2327,7 +2559,7 @@ export interface operations {
                 group?: components["schemas"]["CollectionGroup"] | null;
                 metalKind?: components["schemas"]["MetalKind"] | null;
                 grade?: string | null;
-                sort?: "date" | "title" | "total";
+                sort?: "date" | "title" | "country" | "series" | "quantity" | "total" | "valuation" | "grade";
                 order?: "asc" | "desc";
                 locale?: string | null;
                 page?: number;
@@ -2596,6 +2828,8 @@ export interface operations {
                 category?: components["schemas"]["ExpenseCategory"] | null;
                 dateFrom?: string | null;
                 dateTo?: string | null;
+                sort?: "date" | "category" | "description" | "vendor" | "amount";
+                order?: "asc" | "desc";
                 locale?: string | null;
                 page?: number;
                 pageSize?: number;
@@ -2955,6 +3189,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CurrencyOut"][];
+                };
+            };
+        };
+    };
+    open_job_run_api_v1_internal_job_runs_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Job-Token"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobRunIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    finish_job_run_api_v1_internal_job_runs__run_id__patch: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Job-Token"?: string | null;
+            };
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobRunFinishIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobRunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

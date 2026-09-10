@@ -3,8 +3,10 @@ import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 
+import { AdminPage } from '@/features/admin/AdminPage';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { AuthLayout } from '@/features/auth/AuthLayout';
+import { useAuth } from '@/features/auth/useAuth';
 import { CheckEmailPage } from '@/features/auth/pages/CheckEmailPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
@@ -70,6 +72,14 @@ function ScrollToTop() {
     scrollPageToTop();
   }, [pathname, search]);
   return null;
+}
+
+/** The admin section is the one place a signed-in user can be turned away:
+ *  the role is checked here as well as on every endpoint behind it. */
+function AdminRoute() {
+  const { user } = useAuth();
+  if (user?.role !== 'admin') return <Navigate to="/collection" replace />;
+  return <AdminPage />;
 }
 
 /** Redirects a retired path to `to`, keeping the query string and hash. */
@@ -159,7 +169,7 @@ export function App() {
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
                     <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
                     <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/admin" element={<ComingSoon titleKey="settings.adminTitle" />} />
+                    <Route path="/admin" element={<AdminRoute />} />
 
                     {/* Retired paths, kept as redirects for old bookmarks and links. */}
                     <Route path="/" element={<Navigate to="/collection" replace />} />

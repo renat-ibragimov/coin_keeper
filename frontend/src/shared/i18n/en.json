@@ -480,7 +480,39 @@
     "roleAdmin": "Administrator",
     "roleUser": "User",
     "adminTitle": "Administration",
-    "adminText": "Archiving shared items and curating the catalog from the interface arrive in the next stages.",
+    "adminText": "Background job reports are already there. Catalogue curation and users come next.",
     "adminLink": "Administration"
+  },
+  "admin": {
+    "title": "Administration",
+    "subtitle": "Background jobs, catalogue and users.",
+    "jobs": {
+      "title": "Background jobs",
+      "job": "Job",
+      "status": "Status",
+      "started": "Started",
+      "finished": "Finished",
+      "duration": "Duration",
+      "runDate": "Data date",
+      "exitCode": "Exit code",
+      "summary": "Summary",
+      "counters": "Counters",
+      "details": "Details",
+      "runTitle": "Run #{{id}}",
+      "filterLabel": "Job",
+      "allJobs": "All jobs",
+      "emptyTitle": "No runs yet",
+      "emptyText": "Reports from scheduled jobs will appear here once they have run.",
+      "stale": "Looks stopped — this run never finished",
+      "seconds": "{{count}}s",
+      "minutes": "{{count}} min",
+      "hours": "{{count}} h",
+      "statuses": {
+        "running": "Running",
+        "ok": "Succeeded",
+        "partial": "Partial",
+        "failed": "Failed"
+      }
+    }
   }
 }

@@ -1,0 +1,56 @@
+.title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.subhead {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.summary,
+.details {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3);
+  background: var(--color-surface-sunken);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Roboto Mono', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.details {
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+}
+
+.counter {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+  padding: var(--space-2) 0;
+}
+
+.counter dt {
+  color: var(--color-text-muted);
+  font-size: 13.5px;
+}
+
+.counter dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
