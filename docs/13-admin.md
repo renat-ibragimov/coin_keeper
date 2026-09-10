@@ -178,7 +178,8 @@
       `X-Job-Token`, 11 тестов (`02-data-model.md`, `03-api-contract.md`, `10-infra.md`)
 - [ ] `coin-parser` пишет прогон: строка `running` в начале, закрытие с итогом в конце
       (правка в репозитории парсера)
-- [ ] `GET /admin/jobs`, `GET /admin/jobs/{id}` — под `require_admin`
+- [x] `GET /admin/jobs` (фильтр по задаче, список известных имён в ответе) и
+      `GET /admin/jobs/{id}` под ролью admin, 6 тестов (`03-api-contract.md`)
 - [ ] Экран `/admin/jobs`: список прогонов, статус, счётчики, карточка прогона
 - [ ] Модуль админского бота: транспорт `sendMessage`, реестр получателей, формат
       сообщений

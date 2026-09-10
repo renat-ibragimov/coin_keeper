@@ -579,7 +579,21 @@ PATCH /internal/job-runs/{id}    → 200 {…, status, finishedAt, summary, stat
 завершённый прогон (если открыть не удалось, но работа прошла — отчёт не должен пропасть),
 а повторный `PATCH` по тому же прогону разрешён (повтор после сетевой ошибки).
 
-Чтение — `GET /admin/jobs` и `GET /admin/jobs/{id}` под ролью admin.
+Чтение — под ролью admin, обычный `403` всем остальным:
+
+```
+GET /admin/jobs?job=&page=&pageSize=
+  → {
+      items: [{id, job, status, startedAt, finishedAt, runDate,
+               summary, stats, details, exitCode}],
+      total, page, pageSize,
+      jobs: ["update-prices", ...]   // имена задач, которые уже отчитывались
+    }
+GET /admin/jobs/{id}  → одна такая запись, 404 если нет
+```
+
+`jobs` в ответе списка — чтобы экран показал фильтр по задачам, не делая второго запроса.
+Сортировка всегда «сначала свежие»: список отвечает на вопрос «как прошла эта ночь».
 
 ## Справочники
 

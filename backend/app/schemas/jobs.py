@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import Field
 
 from app.schemas.base import CamelModel
+from app.schemas.common import Page
 
 # Lowercase, dash-separated, matching the step names the parser already uses
 # on its command line ("update-prices").
@@ -56,3 +57,10 @@ class JobRunOut(CamelModel):
     stats: dict[str, object] | None
     details: str | None
     exit_code: int | None
+
+
+class JobRunsOut(Page[JobRunOut]):
+    """The paginated list plus the job names seen so far, so the screen can
+    offer a filter without a second request."""
+
+    jobs: list[str]
