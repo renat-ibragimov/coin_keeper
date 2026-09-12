@@ -43,7 +43,12 @@ export function SeriesDetailPage() {
   const itemsQuery = useQuery({
     queryKey: ['catalog', 'series-items', seriesId, page],
     queryFn: () =>
-      fetchCatalog({ ...parseFilters(new URLSearchParams()), seriesId, sort: 'year', page }),
+      fetchCatalog({
+        ...parseFilters(new URLSearchParams()),
+        seriesIds: [seriesId],
+        sort: 'year',
+        page,
+      }),
     enabled: valid,
     placeholderData: keepPreviousData,
   });
