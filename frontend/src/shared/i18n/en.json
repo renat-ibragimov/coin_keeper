@@ -280,6 +280,7 @@
     "specShape": "Shape",
     "specEdge": "Edge",
     "specOrientation": "Orientation",
+    "specQuality": "Strike quality",
     "priceHistory": "Price history",
     "priceSource": "Source: {{source}}",
     "priceUpdated": "Updated: {{date}}",

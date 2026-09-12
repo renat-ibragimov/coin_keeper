@@ -68,8 +68,11 @@ function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
     diameterMm: '31.000',
     thicknessMm: null,
     shape: null,
+    edgeType: null,
     edge: 'рифлений',
     orientation: null,
+    qualityType: null,
+    quality: null,
     catalogKm: '123',
     catalogUc: null,
     catalogNumista: null,
@@ -161,6 +164,32 @@ describe('CoinCardPage', () => {
     expect(screen.getByText('2017')).toBeInTheDocument();
     expect(screen.getByText('Номінал')).toBeInTheDocument();
     expect(screen.getByText('2 гривні')).toBeInTheDocument();
+  });
+
+  it('shows the edge/quality dictionary name over the raw text, and the raw text when there is no dictionary row', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({
+        edgeType: { id: 1, code: 'reeded', name: 'Рифлений' },
+        edge: 'reeded',
+        qualityType: { id: 1, code: 'proof', name: 'Пруф' },
+        quality: 'proof',
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Гурт')).toBeInTheDocument();
+    expect(screen.getByText('Рифлений')).toBeInTheDocument();
+    expect(screen.queryByText('reeded')).not.toBeInTheDocument();
+    expect(screen.getByText('Категорія якості карбування')).toBeInTheDocument();
+    expect(screen.getByText('Пруф')).toBeInTheDocument();
+  });
+
+  it('falls back to the raw edge text when there is no dictionary row for it', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ edgeType: null, edge: 'Незвичайний гурт' }));
+    renderPage();
+
+    expect(await screen.findByText('Гурт')).toBeInTheDocument();
+    expect(screen.getByText('Незвичайний гурт')).toBeInTheDocument();
   });
 
   it('shows the status, quantity and current price in the sidebar when owned', async () => {

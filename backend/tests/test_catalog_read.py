@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
-from app.models import Material
+from app.models import EdgeType, Material, QualityType
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
@@ -344,8 +344,8 @@ async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
     nickel_silver = (
         await db_session.execute(select(Material).where(Material.code == "nickel_silver"))
     ).scalar_one()
-    silver_925 = (
-        await db_session.execute(select(Material).where(Material.code == "silver_925"))
+    silver = (
+        await db_session.execute(select(Material).where(Material.code == "silver"))
     ).scalar_one()
 
     dictionary_late = await make_catalog_item(
@@ -359,7 +359,7 @@ async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
         db_session, country=refs.ukraine, title="Вільний текст", year=2002, material="Алюміній"
     )
     dictionary_early = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Срібло", year=2003, composition_id=silver_925.id
+        db_session, country=refs.ukraine, title="Срібло", year=2003, composition_id=silver.id
     )
     nothing = await make_catalog_item(
         db_session, country=refs.ukraine, title="Без матеріалу", year=2004
@@ -385,6 +385,50 @@ async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
         dictionary_late.id,
         free_text.id,
     ]
+
+
+async def test_card_resolves_edge_and_quality_dictionaries(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md §13a: edge and quality behave like material —
+    a dictionary row where one is known, the record's own text where not."""
+    refs = ctx.refs
+    reeded = (
+        await db_session.execute(select(EdgeType).where(EdgeType.code == "reeded"))
+    ).scalar_one()
+    proof = (
+        await db_session.execute(select(QualityType).where(QualityType.code == "proof"))
+    ).scalar_one()
+
+    dictionary_linked = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Довідник",
+        year=2010,
+        edge_type_id=reeded.id,
+        quality_type_id=proof.id,
+    )
+    raw_text_only = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Вільний текст",
+        year=2011,
+        edge="Незвичайний гурт",
+        quality="Незвичайна якість",
+    )
+
+    headers = auth(ctx.token_a)
+    linked = (await client.get(f"/api/v1/catalog/{dictionary_linked.id}", headers=headers)).json()
+    assert linked["edgeType"] == {"id": reeded.id, "code": "reeded", "name": "Рифлений"}
+    assert linked["edge"] is None
+    assert linked["qualityType"] == {"id": proof.id, "code": "proof", "name": "Пруф"}
+    assert linked["quality"] is None
+
+    raw = (await client.get(f"/api/v1/catalog/{raw_text_only.id}", headers=headers)).json()
+    assert raw["edgeType"] is None
+    assert raw["edge"] == "Незвичайний гурт"
+    assert raw["qualityType"] is None
+    assert raw["quality"] == "Незвичайна якість"
 
 
 async def test_card_and_own_instances(

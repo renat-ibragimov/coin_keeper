@@ -496,13 +496,13 @@ def test_a_circulation_commemorative_matches_through_its_roll_card() -> None:
 
 def test_the_nbu_material_words_are_read() -> None:
     """Nine words, all Ukrainian; the general parser only knows the Russian ones."""
-    assert nbu_metal("срібло") == (None, MetalKind.PRECIOUS)
-    assert nbu_metal("золото") == (None, MetalKind.PRECIOUS)
+    assert nbu_metal("срібло") == ("silver", MetalKind.PRECIOUS)
+    assert nbu_metal("золото") == ("gold", MetalKind.PRECIOUS)
     assert nbu_metal("нейзильбер") == ("nickel_silver", MetalKind.BASE)
     assert nbu_metal("біметалеві із недорогоцінних металів") == ("bimetal", MetalKind.BASE)
     assert nbu_metal("біметалеві із дорогоцінних металів") == ("bimetal", MetalKind.PRECIOUS)
-    assert nbu_metal("не вказується (набір)") == (None, MetalKind.UNKNOWN)
+    assert nbu_metal("не вказується (набір)") == ("not_specified", MetalKind.UNKNOWN)
     # An unreadable material is unknown, not base metal.
     assert nbu_metal(None) == (None, MetalKind.UNKNOWN)
     # The uCoin-shaped strings our own catalogue carries still work.
-    assert nbu_metal("AgСеребро 0.925, 33.62g") == ("silver_925", MetalKind.PRECIOUS)
+    assert nbu_metal("AgСеребро 0.925, 33.62g") == ("silver", MetalKind.PRECIOUS)

@@ -19,8 +19,10 @@ from app.models import (
     CoinSeries,
     Country,
     Denomination,
+    EdgeType,
     Material,
     MediaFile,
+    QualityType,
     User,
 )
 from app.models.enums import TranslationSource, UserRole
@@ -36,8 +38,10 @@ from app.schemas.catalog import (
     CatalogItemUpdate,
     CatalogListItem,
     CoinDenomination,
+    CoinEdgeType,
     CoinImageOut,
     CoinMaterial,
+    CoinQualityType,
     PriceHistoryItem,
 )
 from app.services.media_urls import CatalogImages, CoinImage, MediaUrlBuilder
@@ -118,6 +122,26 @@ def material_out(material: Material | None, locale: str) -> CoinMaterial | None:
         id=material.id,
         code=material.code,
         name=material.name_uk if locale == "uk" else material.name_en,
+    )
+
+
+def edge_type_out(edge_type: EdgeType | None, locale: str) -> CoinEdgeType | None:
+    if edge_type is None:
+        return None
+    return CoinEdgeType(
+        id=edge_type.id,
+        code=edge_type.code,
+        name=edge_type.name_uk if locale == "uk" else edge_type.name_en,
+    )
+
+
+def quality_type_out(quality_type: QualityType | None, locale: str) -> CoinQualityType | None:
+    if quality_type is None:
+        return None
+    return CoinQualityType(
+        id=quality_type.id,
+        code=quality_type.code,
+        name=quality_type.name_uk if locale == "uk" else quality_type.name_en,
     )
 
 
@@ -422,8 +446,11 @@ class CatalogService:
             diameter_mm=item.diameter_mm,
             thickness_mm=item.thickness_mm,
             shape=item.shape,
+            edge_type=edge_type_out(row.edge_type, self._locale),
             edge=item.edge,
             orientation=item.orientation,
+            quality_type=quality_type_out(row.quality_type, self._locale),
+            quality=item.quality,
             catalog_km=item.catalog_km,
             catalog_uc=item.catalog_uc,
             catalog_numista=item.catalog_numista,

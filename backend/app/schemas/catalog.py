@@ -28,6 +28,18 @@ class CoinMaterial(CamelModel):
     name: str
 
 
+class CoinEdgeType(CamelModel):
+    id: int
+    code: str
+    name: str
+
+
+class CoinQualityType(CamelModel):
+    id: int
+    code: str
+    name: str
+
+
 class CoinImageOut(CamelModel):
     """One side of a coin at the sizes stored for it, plus who to credit."""
 
@@ -84,8 +96,11 @@ class CatalogCard(CatalogListItem):
     diameter_mm: Rate | None
     thickness_mm: Rate | None
     shape: str | None
+    edge_type: CoinEdgeType | None
     edge: str | None
     orientation: str | None
+    quality_type: CoinQualityType | None
+    quality: str | None
     catalog_km: str | None
     catalog_uc: str | None
     catalog_numista: str | None
@@ -116,8 +131,11 @@ class CatalogItemCreate(CamelModel):
     diameter_mm: Decimal | None = Field(default=None, ge=0)
     thickness_mm: Decimal | None = Field(default=None, ge=0)
     shape: str | None = Field(default=None, max_length=100)
+    edge_type_id: int | None = None
     edge: str | None = Field(default=None, max_length=200)
     orientation: str | None = Field(default=None, max_length=100)
+    quality_type_id: int | None = None
+    quality: str | None = Field(default=None, max_length=200)
     catalog_km: str | None = Field(default=None, max_length=100)
     catalog_uc: str | None = Field(default=None, max_length=100)
     catalog_numista: str | None = Field(default=None, max_length=100)
@@ -151,8 +169,11 @@ class CatalogItemUpdate(CamelModel):
     diameter_mm: Decimal | None = Field(default=None, ge=0)
     thickness_mm: Decimal | None = Field(default=None, ge=0)
     shape: str | None = Field(default=None, max_length=100)
+    edge_type_id: int | None = None
     edge: str | None = Field(default=None, max_length=200)
     orientation: str | None = Field(default=None, max_length=100)
+    quality_type_id: int | None = None
+    quality: str | None = Field(default=None, max_length=200)
     catalog_km: str | None = Field(default=None, max_length=100)
     catalog_uc: str | None = Field(default=None, max_length=100)
     catalog_numista: str | None = Field(default=None, max_length=100)

@@ -282,6 +282,7 @@
     "specShape": "Форма",
     "specEdge": "Гурт",
     "specOrientation": "Орієнтація",
+    "specQuality": "Категорія якості карбування",
     "priceHistory": "Історія цін",
     "priceSource": "Джерело: {{source}}",
     "priceUpdated": "Оновлено: {{date}}",

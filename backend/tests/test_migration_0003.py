@@ -333,7 +333,7 @@ async def test_the_material_dictionary_is_seeded(
     migrated_connection: AsyncConnection,
 ) -> None:
     codes = {row["code"] for row in await _rows(migrated_connection, "SELECT code FROM materials")}
-    assert {"silver_925", "nickel_silver", "bimetal", "copper_plated_zinc"} <= codes
+    assert {"silver", "nickel_silver", "bimetal", "copper_plated_zinc"} <= codes
 
 
 async def test_the_missing_currencies_are_added(

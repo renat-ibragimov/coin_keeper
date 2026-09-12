@@ -193,10 +193,10 @@ def test_label_is_rendered_per_locale(value: str, unit: str, uk: str, en: str) -
         ("Цинк с медным покрытием, 2.5g, ø 19mm", "copper_plated_zinc", "2.5", "19"),
         ("Медь-Цинк-Никель", "nickel_silver", None, None),
         ("Нейзильбер", "nickel_silver", None, None),
-        ("Silver 0.900", "silver_900", None, None),
-        ("AgСеребро 0.925", "silver_925", None, None),
-        ("AgСеребро с золотым покрытием 0.999", "silver_gilded_999", None, None),
-        ("AuЗолото 1.000", "gold_1000", None, None),
+        ("Silver 0.900", "silver", None, None),
+        ("AgСеребро 0.925", "silver", None, None),
+        ("AgСеребро с золотым покрытием 0.999", "silver_gilded", None, None),
+        ("AuЗолото 1.000", "gold", None, None),
         ("Copper-Nickel plated Copper", "copper_nickel_plated_copper", None, None),
         (
             "Медь с медно-никелевым покрытием, 5.67g, ø 24.26mm",
@@ -205,7 +205,7 @@ def test_label_is_rendered_per_locale(value: str, unit: str, uk: str, en: str) -
             "24.26",
         ),
         ("Zinc plated Steel", "zinc_plated_steel", None, None),
-        ("10 гривен, 2023 Звонок - Концерт AgСеребро 0.999, 31.1g", "silver_999", "31.1", None),
+        ("10 гривен, 2023 Звонок - Концерт AgСеребро 0.999, 31.1g", "silver", "31.1", None),
     ],
 )
 def test_material_is_read_from_the_end_of_the_string(
@@ -218,7 +218,7 @@ def test_material_is_read_from_the_end_of_the_string(
     assert parsed.diameter_mm == (None if diameter is None else Decimal(diameter))
 
 
-@pytest.mark.parametrize("text", ["nickel_silver", "Nickel_Silver", " silver_925 "])
+@pytest.mark.parametrize("text", ["nickel_silver", "Nickel_Silver", " silver "])
 def test_a_dictionary_code_standing_in_for_a_name_resolves_to_its_row(text: str) -> None:
     """The legacy base holds our own codes in the free-text material field."""
     assert parse_material(text).composition == text.strip().casefold()
@@ -227,15 +227,13 @@ def test_a_dictionary_code_standing_in_for_a_name_resolves_to_its_row(text: str)
 @pytest.mark.parametrize(
     ("text", "stored"),
     [
-        ("silver", "срібло"),
-        ("Gold", "золото"),
         ("Unobtainium", "Unobtainium"),
         ("  срібло  ", "срібло"),
         ("   ", None),
         (None, None),
     ],
 )
-def test_unparsed_material_text_keeps_its_wording_except_for_a_bare_metal(
+def test_unparsed_material_text_keeps_its_wording_verbatim(
     text: str | None, stored: str | None
 ) -> None:
     assert plain_material(text) == stored

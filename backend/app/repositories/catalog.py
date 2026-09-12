@@ -43,11 +43,13 @@ from app.models import (
     CollectionItem,
     Country,
     Denomination,
+    EdgeType,
     ExchangeRate,
     Expense,
     MarketPriceSnapshot,
     Material,
     PriceSourceLink,
+    QualityType,
 )
 from app.models.enums import CollectionGroup, MetalKind
 from app.repositories.localization import localized
@@ -84,6 +86,9 @@ class CatalogRow:
     price_source: str | None
     price_observed_at: datetime | None
     source_url: str | None
+    # Card-only: the listing never selects these (docs/08-ui-map.md).
+    edge_type: EdgeType | None = None
+    quality_type: QualityType | None = None
 
 
 @dataclass
@@ -527,6 +532,8 @@ class CatalogRepository:
                 self._series_name().label("series_name"),
                 Denomination,
                 Material,
+                EdgeType,
+                QualityType,
                 owned.c.quantity_owned,
                 owned.c.purchase_total_uah,
                 price.c.price_uah,
@@ -538,6 +545,8 @@ class CatalogRepository:
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
             .outerjoin(Material, Material.id == CatalogItem.composition_id)
+            .outerjoin(EdgeType, EdgeType.id == CatalogItem.edge_type_id)
+            .outerjoin(QualityType, QualityType.id == CatalogItem.quality_type_id)
             .outerjoin(owned, true())
             .outerjoin(price, true())
             .where(
@@ -558,6 +567,8 @@ class CatalogRepository:
             series_name=row.series_name,
             denomination=row.Denomination,
             composition=row.Material,
+            edge_type=row.EdgeType,
+            quality_type=row.QualityType,
             quantity_owned=int(row.quantity_owned or 0),
             purchase_total_uah=Decimal(row.purchase_total_uah or 0),
             market_price_uah=row.price_uah,

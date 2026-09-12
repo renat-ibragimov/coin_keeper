@@ -134,6 +134,38 @@ class Material(Base):
     name_en: Mapped[str] = mapped_column(Text, nullable=False)
 
 
+class EdgeType(Base):
+    """The edge dictionary behind catalog_items.edge_type_id.
+
+    Same shape and role as `Material`: `code` is the technical identifier
+    (`reeded`, `plain`), `name_uk`/`name_en` the two locales the interface
+    shows. No `name_original` slot — an edge type is universal numismatic
+    vocabulary, not something owned by one issuer's language
+    (docs/04-business-rules.md, rule 14).
+    """
+
+    __tablename__ = "edge_types"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name_uk: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class QualityType(Base):
+    """The strike-quality dictionary behind catalog_items.quality_type_id.
+
+    Same shape and role as `Material`/`EdgeType` (`proof`, `uncirculated`, ...).
+    """
+
+    __tablename__ = "quality_types"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    code: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    name_uk: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class CoinSeries(Base):
     __tablename__ = "coin_series"
 
@@ -209,10 +241,18 @@ class CatalogItem(Base):
     diameter_mm: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     thickness_mm: Mapped[Decimal | None] = mapped_column(Numeric(8, 2))
     shape: Mapped[str | None] = mapped_column(Text)
+    edge_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey("edge_types.id", ondelete="SET NULL")
+    )
+    # What the edge dictionary could not read, kept verbatim rather than
+    # guessed at -- same role as `material` for `composition_id`.
     edge: Mapped[str | None] = mapped_column(Text)
     orientation: Mapped[str | None] = mapped_column(Text)
-    # Strike quality as a canonical code ('proof', 'uncirculated', ...). The
-    # dictionary lives in coin-parser and grows there, so no CHECK guards it.
+    quality_type_id: Mapped[int | None] = mapped_column(
+        ForeignKey("quality_types.id", ondelete="SET NULL")
+    )
+    # Strike quality as a canonical code ('proof', 'uncirculated', ...), kept
+    # verbatim where the quality dictionary does not cover it.
     quality: Mapped[str | None] = mapped_column(Text)
     catalog_km: Mapped[str | None] = mapped_column(Text)
     catalog_uc: Mapped[str | None] = mapped_column(Text)

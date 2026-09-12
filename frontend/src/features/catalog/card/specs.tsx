@@ -34,6 +34,16 @@ function metalMaterial(card: CatalogCard, t: TFunction): string | null {
   return card.metalKind === 'unknown' ? null : t(METAL_LABELS[card.metalKind]);
 }
 
+/** The edge/quality dictionary name where known, the record's own text otherwise —
+ * same fallback `coinMaterial` uses for composition vs. free-text material. */
+function edgeName(card: CatalogCard): string | null {
+  return card.edgeType?.name ?? card.edge;
+}
+
+function qualityName(card: CatalogCard): string | null {
+  return card.qualityType?.name ?? card.quality;
+}
+
 /** "Основна інформація": the coin's identity — country, series, category, year, denomination. */
 export function identitySpecRows(card: CatalogCard, t: TFunction): PropertyRow[] {
   return [
@@ -91,9 +101,10 @@ export function technicalSpecRows(card: CatalogCard, t: TFunction, locale: strin
       label: t('card.specThickness'),
       value: unit(card.thicknessMm, t('units.mm')),
     },
-    { key: 'edge', label: t('card.specEdge'), value: card.edge },
+    { key: 'edge', label: t('card.specEdge'), value: edgeName(card) },
     { key: 'shape', label: t('card.specShape'), value: card.shape },
     { key: 'orientation', label: t('card.specOrientation'), value: card.orientation },
+    { key: 'quality', label: t('card.specQuality'), value: qualityName(card) },
   ];
 }
 

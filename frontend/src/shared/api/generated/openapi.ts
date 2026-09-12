@@ -708,10 +708,14 @@ export interface components {
             thicknessMm: string | null;
             /** Shape */
             shape: string | null;
+            edgeType: components["schemas"]["CoinEdgeType"] | null;
             /** Edge */
             edge: string | null;
             /** Orientation */
             orientation: string | null;
+            qualityType: components["schemas"]["CoinQualityType"] | null;
+            /** Quality */
+            quality: string | null;
             /** Catalogkm */
             catalogKm: string | null;
             /** Cataloguc */
@@ -802,10 +806,16 @@ export interface components {
             thicknessMm?: number | string | null;
             /** Shape */
             shape?: string | null;
+            /** Edgetypeid */
+            edgeTypeId?: number | null;
             /** Edge */
             edge?: string | null;
             /** Orientation */
             orientation?: string | null;
+            /** Qualitytypeid */
+            qualityTypeId?: number | null;
+            /** Quality */
+            quality?: string | null;
             /** Catalogkm */
             catalogKm?: string | null;
             /** Cataloguc */
@@ -860,10 +870,16 @@ export interface components {
             thicknessMm?: number | string | null;
             /** Shape */
             shape?: string | null;
+            /** Edgetypeid */
+            edgeTypeId?: number | null;
             /** Edge */
             edge?: string | null;
             /** Orientation */
             orientation?: string | null;
+            /** Qualitytypeid */
+            qualityTypeId?: number | null;
+            /** Quality */
+            quality?: string | null;
             /** Catalogkm */
             catalogKm?: string | null;
             /** Cataloguc */
@@ -951,6 +967,15 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** CoinEdgeType */
+        CoinEdgeType: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+        };
         /**
          * CoinImageOut
          * @description One side of a coin at the sizes stored for it, plus who to credit.
@@ -967,6 +992,15 @@ export interface components {
         };
         /** CoinMaterial */
         CoinMaterial: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+        };
+        /** CoinQualityType */
+        CoinQualityType: {
             /** Id */
             id: number;
             /** Code */
@@ -2010,7 +2044,7 @@ export interface operations {
                 owned?: boolean | null;
                 scope?: "all" | "shared" | "own";
                 archived?: boolean;
-                sort?: "title" | "country" | "series" | "year" | "denomination" | "owned" | "purchase" | "price";
+                sort?: "title" | "country" | "series" | "year" | "denomination" | "material" | "owned" | "purchase" | "price";
                 order?: "asc" | "desc";
                 locale?: string | null;
                 page?: number;
@@ -2327,7 +2361,7 @@ export interface operations {
                 group?: components["schemas"]["CollectionGroup"] | null;
                 metalKind?: components["schemas"]["MetalKind"] | null;
                 grade?: string | null;
-                sort?: "date" | "title" | "total";
+                sort?: "date" | "title" | "country" | "series" | "quantity" | "total" | "valuation" | "grade";
                 order?: "asc" | "desc";
                 locale?: string | null;
                 page?: number;
@@ -2596,6 +2630,8 @@ export interface operations {
                 category?: components["schemas"]["ExpenseCategory"] | null;
                 dateFrom?: string | null;
                 dateTo?: string | null;
+                sort?: "date" | "category" | "description" | "vendor" | "amount";
+                order?: "asc" | "desc";
                 locale?: string | null;
                 page?: number;
                 pageSize?: number;

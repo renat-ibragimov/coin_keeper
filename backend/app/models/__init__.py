@@ -12,8 +12,10 @@ from app.models.catalog import (
     CoinSeries,
     Country,
     Denomination,
+    EdgeType,
     ExchangeRate,
     Material,
+    QualityType,
 )
 from app.models.collection import (
     CollectionGoal,
@@ -46,6 +48,7 @@ __all__ = [
     "Country",
     "Currency",
     "Denomination",
+    "EdgeType",
     "ExchangeRate",
     "Expense",
     "MarketPriceSnapshot",
@@ -53,6 +56,7 @@ __all__ = [
     "MediaFile",
     "PriceSourceLink",
     "PurchaseOffer",
+    "QualityType",
     "RefreshToken",
     "Sale",
     "UcoinCatalogSource",
