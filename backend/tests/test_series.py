@@ -272,12 +272,13 @@ async def test_storefront_hides_series_of_deactivated_country(
     _ = unowned_item
 
 
-async def test_series_of_an_unconfirmed_country_never_shows(
+async def test_series_of_an_unconfirmed_country_still_shows(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/04-business-rules.md, §13a: an unconfirmed country's series never
-    shows as "catalogue", even one the user already owns coins in — unlike a
-    merely deactivated country, there is no escape hatch."""
+    """docs/04-business-rules.md, §13a: the `catalog_confirmed` gate is
+    `GET /catalog`-only. The series screens are about the user's own
+    collection, so an unconfirmed country's series still shows there when
+    the user actually owns something in it (owner's call, 2026-09-12)."""
     refs = ctx.refs
     await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
 
@@ -290,13 +291,13 @@ async def test_series_of_an_unconfirmed_country_never_shows(
     headers_a = auth(ctx.token_a)
 
     listing_a = await client.get("/api/v1/series", headers=headers_a)
-    assert series_usa.name_original not in {row["name"] for row in listing_a.json()}
+    assert series_usa.name_original in {row["name"] for row in listing_a.json()}
 
     progress_a = (await client.get("/api/v1/series/summary", headers=headers_a)).json()
-    assert series_usa.name_original not in {row["series"]["name"] for row in progress_a}
+    assert series_usa.name_original in {row["series"]["name"] for row in progress_a}
 
     direct_a = await client.get(f"/api/v1/series/{series_usa.id}/summary", headers=headers_a)
-    assert direct_a.status_code == 404
+    assert direct_a.status_code == 200
 
 
 async def test_own_price_snapshot_feeds_value(

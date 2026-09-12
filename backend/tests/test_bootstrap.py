@@ -194,12 +194,14 @@ async def test_dashboard_hides_a_deactivated_country_from_aggregates(
     _ = shared_usa
 
 
-async def test_dashboard_hides_an_unconfirmed_country_from_aggregates(
+async def test_dashboard_still_counts_an_unconfirmed_country(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/04-business-rules.md, §13a: an unconfirmed country's coins never
-    reach the dashboard KPIs or breakdowns, even ones the user already owns —
-    unlike a merely deactivated country, there is no escape hatch."""
+    """docs/04-business-rules.md, §13a: the `catalog_confirmed` gate is
+    `GET /catalog`-only. The dashboard is the user's own collection overview,
+    so it keeps counting an unconfirmed country's coins the user owns —
+    deliberately diverging from what `GET /catalog` itself would show
+    (owner's call, 2026-09-12)."""
     refs = ctx.refs
     await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
 
@@ -214,15 +216,15 @@ async def test_dashboard_hides_an_unconfirmed_country_from_aggregates(
         "dashboard"
     ]
 
-    assert dashboard["catalogItems"] == 1
-    assert dashboard["countries"] == 1
-    assert dashboard["completedItems"] == 0
+    assert dashboard["catalogItems"] == 2
+    assert dashboard["countries"] == 2
+    assert dashboard["completedItems"] == 1
 
     countries = {row["name"] for row in dashboard["countryBreakdown"]}
-    assert "Сполучені Штати" not in countries
+    assert "Сполучені Штати" in countries
 
     series = {row["name"] for row in dashboard["seriesBreakdown"]}
-    assert "Standing Liberty" not in series
+    assert "Standing Liberty" in series
 
 
 async def test_finance_at_purchase_rates(

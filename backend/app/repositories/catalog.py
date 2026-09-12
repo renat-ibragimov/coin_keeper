@@ -119,19 +119,25 @@ def _search_vector() -> ColumnElement[Any]:
     return func.to_tsvector("simple", joined)
 
 
-def storefront_visible(user_id: int) -> ColumnElement[bool]:
+def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> ColumnElement[bool]:
     """Storefront visibility for a shared catalog record (docs/04-business-rules.md, §13, §13a).
 
-    A record appears in listings and aggregates only for a `catalog_confirmed`
-    country (§13a) — no exception, not even for a personal item or an owned
-    instance: an unconfirmed country never shows as "catalogue", however much
-    of it a user has collected. Within a confirmed country, the record shows
-    when the country is also active, when it is the user's own personal item,
-    or when the user already holds at least one instance of it — an owner
-    keeps finding their coins from a deactivated-but-confirmed country in the
-    catalog. Independent of `_visible()` (read permission) and of the archive
-    flag; never applied to the single-item card or price/instance
-    sub-resources, which stay reachable by id.
+    A record shows when its country is active, when it is the user's own
+    personal item, or when the user already holds at least one instance of
+    it — an owner keeps finding their coins from a deactivated country.
+    Independent of `_visible()` (read permission) and of the archive flag;
+    never applied to the single-item card or price/instance sub-resources,
+    which stay reachable by id.
+
+    `require_confirmed` (default on) adds the harder gate from §13a on top,
+    with no exception for a personal item or an owned instance: an
+    unconfirmed country never shows as *the catalogue*, however much of it a
+    user has collected. This is what makes `GET /catalog` Ukraine-only today.
+    Callers about the user's own collection rather than the catalogue browse
+    experience — the dashboard, the series screens — pass `False`: a
+    personal collection shows everything its owner actually has, regardless
+    of which countries the catalogue project has gotten around to confirming
+    (owner's call, 2026-09-12).
 
     Self-contained EXISTS checks so the caller need not join Country: reused
     verbatim by the series and dashboard repositories. Each subquery pins its
@@ -139,28 +145,31 @@ def storefront_visible(user_id: int) -> ColumnElement[bool]:
     Country and CollectionItem directly, and without this SQLAlchemy
     auto-correlates those same tables out of these subqueries entirely.
     """
+    visible = or_(
+        exists(
+            select(Country.id)
+            .where(Country.id == CatalogItem.country_id, Country.is_active)
+            .correlate(CatalogItem)
+        ),
+        CatalogItem.created_by == user_id,
+        exists(
+            select(CollectionItem.id)
+            .where(
+                CollectionItem.catalog_item_id == CatalogItem.id,
+                CollectionItem.owner_id == user_id,
+            )
+            .correlate(CatalogItem)
+        ),
+    )
+    if not require_confirmed:
+        return visible
     return and_(
         exists(
             select(Country.id)
             .where(Country.id == CatalogItem.country_id, Country.catalog_confirmed)
             .correlate(CatalogItem)
         ),
-        or_(
-            exists(
-                select(Country.id)
-                .where(Country.id == CatalogItem.country_id, Country.is_active)
-                .correlate(CatalogItem)
-            ),
-            CatalogItem.created_by == user_id,
-            exists(
-                select(CollectionItem.id)
-                .where(
-                    CollectionItem.catalog_item_id == CatalogItem.id,
-                    CollectionItem.owner_id == user_id,
-                )
-                .correlate(CatalogItem)
-            ),
-        ),
+        visible,
     )
 
 
