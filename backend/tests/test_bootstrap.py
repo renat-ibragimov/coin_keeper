@@ -19,6 +19,7 @@ from tests.seed import (
     make_series,
     seed_reference,
     set_country_active,
+    set_country_catalog_confirmed,
     user_id_by_email,
 )
 
@@ -191,6 +192,37 @@ async def test_dashboard_hides_a_deactivated_country_from_aggregates(
     assert series["Standing Liberty"]["owned"] == 1
 
     _ = shared_usa
+
+
+async def test_dashboard_hides_an_unconfirmed_country_from_aggregates(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13a: an unconfirmed country's coins never
+    reach the dashboard KPIs or breakdowns, even ones the user already owns —
+    unlike a merely deactivated country, there is no escape hatch."""
+    refs = ctx.refs
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+
+    series_usa = await make_series(db_session, country=refs.usa, name="Standing Liberty")
+    await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
+    owned_usa = await make_catalog_item(
+        db_session, country=refs.usa, title="Quarter", year=1920, series=series_usa
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa, price="10")
+
+    dashboard = (await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))).json()[
+        "dashboard"
+    ]
+
+    assert dashboard["catalogItems"] == 1
+    assert dashboard["countries"] == 1
+    assert dashboard["completedItems"] == 0
+
+    countries = {row["name"] for row in dashboard["countryBreakdown"]}
+    assert "Сполучені Штати" not in countries
+
+    series = {row["name"] for row in dashboard["seriesBreakdown"]}
+    assert "Standing Liberty" not in series
 
 
 async def test_finance_at_purchase_rates(

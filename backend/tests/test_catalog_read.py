@@ -20,6 +20,7 @@ from tests.seed import (
     promote_to_admin,
     seed_reference,
     set_country_active,
+    set_country_catalog_confirmed,
     user_id_by_email,
 )
 
@@ -549,6 +550,42 @@ async def test_storefront_hides_records_of_a_deactivated_country(
     assert card_b.status_code == 200
 
     _ = shared_usa  # never owned or authored by A or B: visible to neither.
+
+
+async def test_catalog_hides_records_of_an_unconfirmed_country(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13a: an unconfirmed country's records never
+    show as "catalogue", even ones the user authored or already owns — unlike
+    a merely deactivated country, there is no escape hatch."""
+    refs = ctx.refs
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+
+    shared_ua = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018
+    )
+    owned_usa = await make_catalog_item(
+        db_session, country=refs.usa, title="Lincoln cent", year=1970
+    )
+    personal_usa_a = await make_catalog_item(
+        db_session, country=refs.usa, title="Особиста А", year=1980, created_by=ctx.id_a
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa, price="10")
+
+    headers_a = auth(ctx.token_a)
+
+    listing_a = (await client.get("/api/v1/catalog", headers=headers_a)).json()
+    assert {i["id"] for i in listing_a["items"]} == {shared_ua.id}
+    assert listing_a["total"] == 1
+
+    # The direct card and the collection stay reachable — only the catalogue
+    # listing is gated, not the user's own coins.
+    card = await client.get(f"/api/v1/catalog/{owned_usa.id}", headers=headers_a)
+    assert card.status_code == 200
+    personal_card = await client.get(f"/api/v1/catalog/{personal_usa_a.id}", headers=headers_a)
+    assert personal_card.status_code == 200
+    collection = (await client.get("/api/v1/collection", headers=headers_a)).json()
+    assert owned_usa.id in {i["catalogItemId"] for i in collection["items"]}
 
 
 async def test_storefront_for_a_user_with_no_coins_at_all(

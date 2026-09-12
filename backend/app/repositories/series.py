@@ -13,7 +13,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy import ColumnElement, exists, func, not_, or_, select
+from sqlalchemy import ColumnElement, and_, exists, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
@@ -23,25 +23,35 @@ from app.repositories.localization import localized
 
 
 def series_storefront_visible(user_id: int) -> ColumnElement[bool]:
-    """Storefront visibility for a series (docs/04-business-rules.md, §13).
+    """Storefront visibility for a series (docs/04-business-rules.md, §13, §13a).
 
-    A series is visible when its country is active, or when the user already
-    owns at least one instance of a catalog item that belongs to it — an
-    owner's series from a deactivated country stays findable. Series have no
-    personal layer, so unlike `storefront_visible()` there is no created_by
-    branch.
+    A series is visible only for a `catalog_confirmed` country (§13a) — no
+    exception, not even for a series the user already owns coins of: an
+    unconfirmed country's series never shows as "catalogue". Within a
+    confirmed country, the series shows when the country is also active, or
+    when the user already owns at least one instance of a catalog item that
+    belongs to it — an owner's series from a deactivated-but-confirmed
+    country stays findable. Series have no personal layer, so unlike
+    `storefront_visible()` there is no created_by branch.
     """
-    return or_(
+    return and_(
         exists(
             select(Country.id)
-            .where(Country.id == CoinSeries.country_id, Country.is_active)
+            .where(Country.id == CoinSeries.country_id, Country.catalog_confirmed)
             .correlate(CoinSeries)
         ),
-        exists(
-            select(CollectionItem.id)
-            .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
-            .where(CatalogItem.series_id == CoinSeries.id, CollectionItem.owner_id == user_id)
-            .correlate(CoinSeries)
+        or_(
+            exists(
+                select(Country.id)
+                .where(Country.id == CoinSeries.country_id, Country.is_active)
+                .correlate(CoinSeries)
+            ),
+            exists(
+                select(CollectionItem.id)
+                .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+                .where(CatalogItem.series_id == CoinSeries.id, CollectionItem.owner_id == user_id)
+                .correlate(CoinSeries)
+            ),
         ),
     )
 

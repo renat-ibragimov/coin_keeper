@@ -10,6 +10,13 @@ Visibility follows docs/04-business-rules.md: `is_active` drives the storefront
 (country chips, the default shared catalogue), while the personal-item form
 offers every country regardless. Only Ukraine is seeded active; a country the
 database already holds keeps whatever state it has.
+
+`catalog_confirmed` is the harder gate added in migration 0008: whether the
+country's catalogue is built out enough to browse as *the* catalogue at all,
+with no escape hatch for a personal position or an owned instance. Only
+Ukraine is seeded confirmed, for the same reason it is the only one seeded
+active — everything else, including the countries the legacy migration
+seeded as shared (USA, USSR), stays unconfirmed until someone finishes it.
 """
 
 from __future__ import annotations
@@ -47,6 +54,10 @@ class CountrySeed:
 
     @property
     def is_active(self) -> bool:
+        return self.code == UKRAINE_CODE
+
+    @property
+    def catalog_confirmed(self) -> bool:
         return self.code == UKRAINE_CODE
 
     def matches(self, name: str) -> bool:

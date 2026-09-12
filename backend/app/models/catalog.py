@@ -51,6 +51,13 @@ class Country(Base):
     whether the country appears on the storefront (chips, the default shared
     catalogue); the personal-item form offers all of them regardless
     (docs/04-business-rules.md).
+
+    `catalog_confirmed` is a harder, separate gate: whether this country's
+    catalogue is considered built out and fit to browse as *the* catalogue at
+    all. Unlike `is_active` it has no escape hatch for an owned or personal
+    item — a country stays out of every catalogue listing until someone
+    flips this, however many personal positions or instances a user holds
+    against it (docs/04-business-rules.md, §13a).
     """
 
     __tablename__ = "countries"
@@ -66,6 +73,9 @@ class Country(Base):
     )
     is_active: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
+    )
+    catalog_confirmed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
     sort_order: Mapped[int] = mapped_column(
         Integer, nullable=False, default=100, server_default="100"

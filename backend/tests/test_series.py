@@ -19,6 +19,7 @@ from tests.seed import (
     promote_to_admin,
     seed_reference,
     set_country_active,
+    set_country_catalog_confirmed,
     user_id_by_email,
 )
 
@@ -269,6 +270,33 @@ async def test_storefront_hides_series_of_deactivated_country(
     assert direct_b.status_code == 404
 
     _ = unowned_item
+
+
+async def test_series_of_an_unconfirmed_country_never_shows(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13a: an unconfirmed country's series never
+    shows as "catalogue", even one the user already owns coins in — unlike a
+    merely deactivated country, there is no escape hatch."""
+    refs = ctx.refs
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+
+    series_usa = await make_series(db_session, country=refs.usa, name="Standing Liberty")
+    owned_item = await make_catalog_item(
+        db_session, country=refs.usa, title="Quarter", year=1920, series=series_usa
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_item, price="10")
+
+    headers_a = auth(ctx.token_a)
+
+    listing_a = await client.get("/api/v1/series", headers=headers_a)
+    assert series_usa.name_original not in {row["name"] for row in listing_a.json()}
+
+    progress_a = (await client.get("/api/v1/series/summary", headers=headers_a)).json()
+    assert series_usa.name_original not in {row["series"]["name"] for row in progress_a}
+
+    direct_a = await client.get(f"/api/v1/series/{series_usa.id}/summary", headers=headers_a)
+    assert direct_a.status_code == 404
 
 
 async def test_own_price_snapshot_feeds_value(

@@ -74,7 +74,7 @@ async def list_catalog(
     owned: Annotated[bool | None, Query()] = None,
     scope: Annotated[Literal["all", "shared", "own"], Query()] = "all",
     archived: Annotated[bool, Query()] = False,
-    sort: Annotated[SortField, Query()] = "country",
+    sort: Annotated[SortField, Query()] = "title",
     order: Annotated[Literal["asc", "desc"], Query()] = "asc",
 ) -> Page[CatalogListItem]:
     filters = CatalogFilters(

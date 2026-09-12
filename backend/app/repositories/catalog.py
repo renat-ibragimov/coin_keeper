@@ -67,7 +67,7 @@ class CatalogFilters:
     owned: bool | None = None
     scope: str = "all"  # all | shared | own
     archived: bool = False
-    sort: str = "country"
+    sort: str = "title"
     order: str = "asc"
 
 
@@ -115,14 +115,18 @@ def _search_vector() -> ColumnElement[Any]:
 
 
 def storefront_visible(user_id: int) -> ColumnElement[bool]:
-    """Storefront visibility for a shared catalog record (docs/04-business-rules.md, §13).
+    """Storefront visibility for a shared catalog record (docs/04-business-rules.md, §13, §13a).
 
-    A record appears in listings and aggregates when its country is active,
-    when it is the user's own personal item, or when the user already holds
-    at least one instance of it — an owner keeps finding their coins from a
-    deactivated country in the catalog. Independent of `_visible()` (read
-    permission) and of the archive flag; never applied to the single-item
-    card or price/instance sub-resources, which stay reachable by id.
+    A record appears in listings and aggregates only for a `catalog_confirmed`
+    country (§13a) — no exception, not even for a personal item or an owned
+    instance: an unconfirmed country never shows as "catalogue", however much
+    of it a user has collected. Within a confirmed country, the record shows
+    when the country is also active, when it is the user's own personal item,
+    or when the user already holds at least one instance of it — an owner
+    keeps finding their coins from a deactivated-but-confirmed country in the
+    catalog. Independent of `_visible()` (read permission) and of the archive
+    flag; never applied to the single-item card or price/instance
+    sub-resources, which stay reachable by id.
 
     Self-contained EXISTS checks so the caller need not join Country: reused
     verbatim by the series and dashboard repositories. Each subquery pins its
@@ -130,20 +134,27 @@ def storefront_visible(user_id: int) -> ColumnElement[bool]:
     Country and CollectionItem directly, and without this SQLAlchemy
     auto-correlates those same tables out of these subqueries entirely.
     """
-    return or_(
+    return and_(
         exists(
             select(Country.id)
-            .where(Country.id == CatalogItem.country_id, Country.is_active)
+            .where(Country.id == CatalogItem.country_id, Country.catalog_confirmed)
             .correlate(CatalogItem)
         ),
-        CatalogItem.created_by == user_id,
-        exists(
-            select(CollectionItem.id)
-            .where(
-                CollectionItem.catalog_item_id == CatalogItem.id,
-                CollectionItem.owner_id == user_id,
-            )
-            .correlate(CatalogItem)
+        or_(
+            exists(
+                select(Country.id)
+                .where(Country.id == CatalogItem.country_id, Country.is_active)
+                .correlate(CatalogItem)
+            ),
+            CatalogItem.created_by == user_id,
+            exists(
+                select(CollectionItem.id)
+                .where(
+                    CollectionItem.catalog_item_id == CatalogItem.id,
+                    CollectionItem.owner_id == user_id,
+                )
+                .correlate(CatalogItem)
+            ),
         ),
     )
 
@@ -435,7 +446,7 @@ class CatalogRepository:
             "purchase": [owned.c.purchase_total_uah],
             "price": [price.c.price_uah],
         }
-        columns = by_sort.get(filters.sort, by_sort["country"])
+        columns = by_sort.get(filters.sort, by_sort["title"])
         ordering: list[Any] = [direction(column) for column in columns]
         # Stable tiebreakers, mirroring the legacy default listing order.
         if filters.sort == "country":

@@ -380,7 +380,7 @@ async def test_listing_filters_and_sorting(
     assert by_metal.json()["total"] == 1
     assert by_metal.json()["items"][0]["title"] == "Lincoln cent"
 
-    newest_first = await client.get("/api/v1/collection?sort=date", headers=headers)
+    newest_first = await client.get("/api/v1/collection?sort=date&order=desc", headers=headers)
     assert [row["title"] for row in newest_first.json()["items"]] == [
         "Lincoln cent",
         "Дельфін",

@@ -9,7 +9,7 @@ describe('catalog filters ↔ URL', () => {
       q: '',
       scope: 'all',
       archived: false,
-      sort: 'country',
+      sort: 'title',
       order: 'asc',
       page: 1,
       view: 'cards',
@@ -56,7 +56,7 @@ describe('catalog filters ↔ URL', () => {
     const filters = parseFilters(params);
     expect(filters.countryId).toBeUndefined();
     expect(filters.group).toBeUndefined();
-    expect(filters.sort).toBe('country');
+    expect(filters.sort).toBe('title');
     expect(filters.page).toBe(1);
     expect(filters.owned).toBeUndefined();
   });

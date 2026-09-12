@@ -152,6 +152,7 @@ original_lang     text NOT NULL
 name_uk, name_en  text
 collect_variants  boolean NOT NULL DEFAULT false
 is_active         boolean NOT NULL DEFAULT true
+catalog_confirmed boolean NOT NULL DEFAULT false
 sort_order        int NOT NULL DEFAULT 100
 created_at, updated_at timestamptz
 UNIQUE (name_original)
@@ -168,6 +169,12 @@ UNIQUE (name_original)
 позиция может быть монетой какого угодно эмитента (`04-business-rules.md`, п. 2).
 Сид активирует только Украину; страна, которая уже была в базе, сохраняет своё состояние
 и, что важнее, свой `id`.
+
+`catalog_confirmed` — независимый и более жёсткий признак: страна, чей каталог реально
+собран и подтверждён, единственная ось, определяющая, показывается ли страна как «каталог»
+вообще, без исключений для личных позиций и уже купленных монет (`04-business-rules.md`,
+п. 13a). Заведена миграцией `0008`, сегодня `true` только у Украины — даже у США и СССР,
+попавших в общий каталог затравкой (`09-data-migration.md`), она `false`.
 
 **Факт из боевой диагностики 2026-09-05:** в базе владельца `is_active = true` у ТРЁХ
 стран (id 1, 2, 3), не только у Украины — легаси-миграция или ручная правка активировали

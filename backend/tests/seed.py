@@ -66,13 +66,26 @@ async def set_country_active(session: AsyncSession, country: Country, active: bo
     await session.commit()
 
 
+async def set_country_catalog_confirmed(
+    session: AsyncSession, country: Country, confirmed: bool
+) -> None:
+    """Flips `catalog_confirmed` for the hard-gate tests (docs/04, §13a)."""
+    await session.execute(
+        update(Country).where(Country.id == country.id).values(catalog_confirmed=confirmed)
+    )
+    await session.commit()
+
+
 async def seed_reference(session: AsyncSession) -> ReferenceData:
     await seed_currencies(session)
 
     ukraine = await country_by_code(session, "UA")
     usa = await country_by_code(session, "US")
-    # Only Ukraine is seeded active; the storefront tests expect both.
+    # Only Ukraine is seeded active and catalog_confirmed; the storefront
+    # tests expect both, and catalog_confirmed is orthogonal to what most of
+    # them actually exercise (docs/04-business-rules.md, §13a).
     usa.is_active = True
+    usa.catalog_confirmed = True
     await session.flush()
 
     uah_2 = Denomination(

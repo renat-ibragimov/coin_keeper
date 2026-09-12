@@ -7,7 +7,7 @@ import {
 } from './useCollectionFilters';
 
 describe('collection filters', () => {
-  it('defaults to newest purchases first in the card view', () => {
+  it('defaults to alphabetical order by title in the card view', () => {
     expect(parseCollectionFilters(new URLSearchParams())).toEqual({
       q: '',
       countryId: undefined,
@@ -18,8 +18,8 @@ describe('collection filters', () => {
       group: undefined,
       metalKind: undefined,
       grade: undefined,
-      sort: 'date',
-      order: 'desc',
+      sort: 'title',
+      order: 'asc',
       page: 1,
       view: 'cards',
     });
@@ -28,7 +28,7 @@ describe('collection filters', () => {
   it('round-trips a full filter set through the URL', () => {
     const params = new URLSearchParams(
       'q=owl&countryId=1&seriesId=3&yearFrom=2010&yearTo=2020&denominationId=5' +
-        '&group=commemorative&metalKind=base&grade=UNC&sort=total&order=asc&page=2&view=table',
+        '&group=commemorative&metalKind=base&grade=UNC&sort=total&order=desc&page=2&view=table',
     );
     const filters = parseCollectionFilters(params);
     expect(filters).toMatchObject({
@@ -42,7 +42,7 @@ describe('collection filters', () => {
       metalKind: 'base',
       grade: 'UNC',
       sort: 'total',
-      order: 'asc',
+      order: 'desc',
       page: 2,
       view: 'table',
     });
@@ -56,7 +56,7 @@ describe('collection filters', () => {
     const filters = parseCollectionFilters(
       new URLSearchParams('sort=price&countryId=abc&group=bogus&metalKind=bogus&page=0'),
     );
-    expect(filters.sort).toBe('date');
+    expect(filters.sort).toBe('title');
     expect(filters.countryId).toBeUndefined();
     expect(filters.group).toBeUndefined();
     expect(filters.metalKind).toBeUndefined();

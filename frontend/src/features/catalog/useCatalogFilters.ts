@@ -4,8 +4,8 @@ import { useSearchParams } from 'react-router-dom';
 import type { CollectionGroup, MetalKind } from '@/shared/api/types';
 
 export const SORT_FIELDS = [
-  'country',
   'title',
+  'country',
   'series',
   'year',
   'denomination',
@@ -68,7 +68,7 @@ export function parseFilters(params: URLSearchParams): CatalogFilters {
     owned: ownedRaw === 'true' ? true : ownedRaw === 'false' ? false : undefined,
     scope: scope === 'shared' || scope === 'own' ? scope : 'all',
     archived: params.get('archived') === 'true',
-    sort: SORT_FIELDS.includes(sort as SortField) ? (sort as SortField) : 'country',
+    sort: SORT_FIELDS.includes(sort as SortField) ? (sort as SortField) : 'title',
     order: params.get('order') === 'desc' ? 'desc' : 'asc',
     page: intParam(params, 'page') ?? 1,
     // A stale `?view=map` (the completeness map was removed) quietly degrades to cards.
@@ -93,7 +93,7 @@ export function serializeFilters(filters: CatalogFilters): URLSearchParams {
   if (filters.owned !== undefined) params.set('owned', String(filters.owned));
   setIf('scope', filters.scope, 'all');
   if (filters.archived) params.set('archived', 'true');
-  setIf('sort', filters.sort, 'country');
+  setIf('sort', filters.sort, 'title');
   setIf('order', filters.order, 'asc');
   setIf('page', filters.page, 1);
   setIf('view', filters.view, 'cards');

@@ -61,8 +61,8 @@ export function parseCollectionFilters(params: URLSearchParams): CollectionFilte
     group: GROUPS.includes(group as CollectionGroup) ? (group as CollectionGroup) : undefined,
     metalKind: METALS.includes(metalKind as MetalKind) ? (metalKind as MetalKind) : undefined,
     grade: grade || undefined,
-    sort: COLLECTION_SORTS.includes(sort as CollectionSort) ? (sort as CollectionSort) : 'date',
-    order: params.get('order') === 'asc' ? 'asc' : 'desc',
+    sort: COLLECTION_SORTS.includes(sort as CollectionSort) ? (sort as CollectionSort) : 'title',
+    order: params.get('order') === 'desc' ? 'desc' : 'asc',
     page: intParam(params, 'page') ?? 1,
     view: view === 'table' ? 'table' : 'cards',
   };
@@ -83,8 +83,8 @@ export function serializeCollectionFilters(filters: CollectionFilters): URLSearc
   setIf('group', filters.group);
   setIf('metalKind', filters.metalKind);
   setIf('grade', filters.grade);
-  if (filters.sort !== 'date') params.set('sort', filters.sort);
-  if (filters.order !== 'desc') params.set('order', filters.order);
+  if (filters.sort !== 'title') params.set('sort', filters.sort);
+  if (filters.order !== 'asc') params.set('order', filters.order);
   if (filters.page > 1) params.set('page', String(filters.page));
   if (filters.view !== 'cards') params.set('view', filters.view);
   return params;

@@ -59,8 +59,8 @@ async def list_collection(
     sort: Annotated[
         Literal["date", "title", "country", "series", "quantity", "total", "valuation", "grade"],
         Query(),
-    ] = "date",
-    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
+    ] = "title",
+    order: Annotated[Literal["asc", "desc"], Query()] = "asc",
 ) -> Page[CollectionPositionOut]:
     filters = CollectionFilters(
         q=q,
