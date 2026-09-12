@@ -73,7 +73,7 @@ class CatalogFilters:
     sort: str = "title"
     order: str = "asc"
     # Set by CatalogService from the viewer's settings, not a client filter.
-    show_packaging_variants: bool = False
+    show_packaging_variants: bool = True
 
 
 @dataclass

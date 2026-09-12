@@ -119,7 +119,7 @@ async def test_scope_filter(
     assert {i["id"] for i in only_own.json()["items"]} == {own.id}
 
 
-async def test_packaging_variant_hidden_unless_the_viewer_opted_in(
+async def test_packaging_variant_hidden_after_the_viewer_opts_out(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
     refs = ctx.refs
@@ -133,26 +133,26 @@ async def test_packaging_variant_hidden_unless_the_viewer_opted_in(
     )
 
     default = await client.get("/api/v1/catalog", headers=auth(ctx.token_a))
-    ids = {i["id"] for i in default.json()["items"]}
-    assert bare.id in ids
-    assert packaged.id not in ids
+    assert {i["id"] for i in default.json()["items"]} == {bare.id, packaged.id}
 
     settings = await client.patch(
         "/api/v1/bootstrap/settings",
         headers=auth(ctx.token_a),
-        json={"showPackagingVariants": True},
+        json={"showPackagingVariants": False},
     )
     assert settings.status_code == 200
-    assert settings.json()["showPackagingVariants"] is True
+    assert settings.json()["showPackagingVariants"] is False
 
-    opted_in = await client.get("/api/v1/catalog", headers=auth(ctx.token_a))
-    assert {i["id"] for i in opted_in.json()["items"]} == {bare.id, packaged.id}
+    opted_out = await client.get("/api/v1/catalog", headers=auth(ctx.token_a))
+    ids = {i["id"] for i in opted_out.json()["items"]}
+    assert bare.id in ids
+    assert packaged.id not in ids
 
-    # Per-user: user B never toggled the setting and still sees only the bare card.
+    # Per-user: user B never toggled the setting and still sees both cards.
     other_user = await client.get("/api/v1/catalog", headers=auth(ctx.token_b))
     other_ids = {i["id"] for i in other_user.json()["items"]}
     assert bare.id in other_ids
-    assert packaged.id not in other_ids
+    assert packaged.id in other_ids
 
 
 async def test_filters(client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace) -> None:

@@ -104,7 +104,7 @@ class BootstrapService:
                 display_currency="UAH",
                 default_grade_commemorative="UNC",
                 default_grade_circulation="VF",
-                show_packaging_variants=False,
+                show_packaging_variants=True,
             )
         return SettingsOut(
             locale=row.locale,

@@ -165,7 +165,7 @@ class CatalogService:
         self, filters: CatalogFilters, *, limit: int, offset: int
     ) -> tuple[list[CatalogListItem], int]:
         settings = await self._users.get_settings(self._user.id)
-        filters.show_packaging_variants = bool(settings and settings.show_packaging_variants)
+        filters.show_packaging_variants = settings is None or settings.show_packaging_variants
         page = await self._repo.list_items(filters, limit=limit, offset=offset)
         images = await self._images_for([row.item.id for row in page.rows])
         items = [

@@ -63,7 +63,7 @@ async def test_empty_dashboard_for_new_user(
     assert body["user"]["email"] == ctx.email_a
     assert body["settings"]["locale"] == "uk"
     assert body["settings"]["displayCurrency"] == "UAH"
-    assert body["settings"]["showPackagingVariants"] is False
+    assert body["settings"]["showPackagingVariants"] is True
 
     finance = body["finance"]
     assert finance["coinSpendUah"] == "0.00"
@@ -338,14 +338,14 @@ async def test_update_settings_persists_and_is_per_user(
     response = await client.patch(
         "/api/v1/bootstrap/settings",
         headers=auth(ctx.token_a),
-        json={"showPackagingVariants": True},
+        json={"showPackagingVariants": False},
     )
     assert response.status_code == 200
-    assert response.json()["showPackagingVariants"] is True
+    assert response.json()["showPackagingVariants"] is False
 
     refetched = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
-    assert refetched.json()["settings"]["showPackagingVariants"] is True
+    assert refetched.json()["settings"]["showPackagingVariants"] is False
 
-    # Untouched for user B.
+    # Untouched for user B: still the default, on.
     body_b = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_b))
-    assert body_b.json()["settings"]["showPackagingVariants"] is False
+    assert body_b.json()["settings"]["showPackagingVariants"] is True

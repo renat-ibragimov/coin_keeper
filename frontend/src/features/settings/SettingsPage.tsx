@@ -191,7 +191,7 @@ export function SettingsPage() {
           </h2>
           <FormStack>
             <Toggle
-              checked={settings?.showPackagingVariants ?? false}
+              checked={settings?.showPackagingVariants ?? true}
               disabled={!settings || packagingMutation.isPending}
               onChange={(checked) => packagingMutation.mutate(checked)}
               label={t('settings.showPackagingVariants')}
