@@ -18,7 +18,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, Numeric, Select, case, cast, func, not_, or_, select
+from sqlalchemy import ColumnElement, Select, case, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
@@ -244,11 +244,18 @@ class DashboardRepository:
             for row in result
         ]
 
-    async def series_breakdown(self, limit: int = 12) -> list[BreakdownRow]:
+    async def series_breakdown(self) -> list[BreakdownRow]:
+        """Every series the viewer has started — "Мої серії" on the overview
+        shows all of them (`myCollectionSeries` on the front end drops
+        anything with `owned == 0` anyway, so this only ever selects rows it
+        would keep), not a small "nearest to completion" teaser. No LIMIT:
+        the front end does its own sort (least complete first, a finished
+        series last, alphabetical among ties) over the whole set — trimming
+        here would silently drop series from a personal collection instead
+        of merely reordering them (owner's call, 2026-09-12)."""
         owned = CollectionItem
         count_expr = func.count(CatalogItem.id.distinct())
         owned_expr = func.count(owned.catalog_item_id.distinct())
-        has_owned = owned_expr > 0
         result = await self._session.execute(
             select(
                 CoinSeries.id,
@@ -266,25 +273,11 @@ class DashboardRepository:
             )
             .where(*self._visible_active())
             .group_by(CoinSeries.id, Country.id)
-            # The front end (nearestToCompletion) only sorts and trims the
-            # rows this query hands it — it never re-fetches to find series
-            # the user actually owns coins in. So the SQL order IS the
-            # selection: series with owned > 0 must sort first (by
-            # completion ratio, then by fewest missing) or a personal
-            # collection concentrated in a few small series never reaches
-            # the dashboard once bigger, untouched series fill LIMIT first.
-            # Empty series keep the original "biggest first" order after
-            # that. limit=12 leaves headroom over the 6 the front end shows,
-            # so a couple of fully completed owned series don't push an
-            # unfinished one out of the response.
-            .order_by(
-                case((has_owned, 0), else_=1),
-                case((has_owned, cast(owned_expr, Numeric) / count_expr)).desc(),
-                case((has_owned, count_expr - owned_expr)),
-                count_expr.desc(),
-                self._series_name(),
-            )
-            .limit(limit)
+            # The outer join keeps count_expr a true series total (every item,
+            # owned or not); having() is what actually restricts the result
+            # to started series, without shrinking the denominator too.
+            .having(owned_expr > 0)
+            .order_by(self._series_name())
         )
         return [
             BreakdownRow(

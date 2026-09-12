@@ -13,10 +13,13 @@ import type { CollectionFilters } from './useCollectionFilters';
 
 export const PAGE_SIZE = 24;
 
-export function fetchCollection(filters: CollectionFilters): Promise<CollectionPage> {
+export function fetchCollection(
+  filters: CollectionFilters,
+  pageSize: number = PAGE_SIZE,
+): Promise<CollectionPage> {
   const query = toQuery({
     page: filters.page,
-    pageSize: PAGE_SIZE,
+    pageSize,
     q: filters.q,
     countryId: filters.countryId,
     seriesId: filters.seriesId,

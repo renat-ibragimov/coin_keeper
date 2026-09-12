@@ -27,7 +27,6 @@ vi.mock('./api', () => ({
   fetchOwnedCountries: vi.fn(),
   fetchOwnedSeries: vi.fn(),
   fetchOwnedDenominations: vi.fn(),
-  PAGE_SIZE: 24,
 }));
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
 vi.mock('@/features/series/api', () => ({ fetchSeriesProgress: vi.fn() }));
@@ -157,6 +156,18 @@ describe('CollectionPage', () => {
     // No zero-value KPI tiles or filters above the empty state.
     expect(screen.queryByText('Монет у колекції')).toBeNull();
     expect(screen.queryByText('Поточна оцінка')).toBeNull();
+  });
+
+  it('fetches a page size that divides every grid column count evenly', async () => {
+    // 30: divisible by the fixed 1/2/3/5-column breakpoints
+    // (CollectionPage.module.css) — a mismatch strands a short last row
+    // before the pager even when later pages have more items.
+    vi.mocked(fetchCollection).mockResolvedValue(EMPTY_PAGE);
+    mockCommonQueries(false);
+    renderPage();
+
+    await screen.findByPlaceholderText('Пошук у колекції…');
+    expect(fetchCollection).toHaveBeenCalledWith(expect.anything(), 30);
   });
 
   it('shows the filters panel and header actions once the collection has coins', async () => {

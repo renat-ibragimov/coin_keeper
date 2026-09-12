@@ -29,7 +29,6 @@ import {
   fetchOwnedCountries,
   fetchOwnedDenominations,
   fetchOwnedSeries,
-  PAGE_SIZE,
 } from './api';
 import { CollectionFiltersPanel } from './CollectionFiltersPanel';
 import { PositionCard } from './PositionCard';
@@ -48,6 +47,12 @@ import styles from './CollectionPage.module.css';
 // to, since that reset must not touch the real, applied filters until
 // "Застосувати" does (docs/08-ui-map.md: apply-on-confirm, phone only).
 const EMPTY_FILTERS = parseCollectionFilters(new URLSearchParams());
+
+// Fixed column counts (1/2/3/5, CollectionPage.module.css) rather than an
+// auto-fill fluid grid: each one divides this evenly, so every page fills
+// complete rows instead of stranding a short one before the pager (same
+// fix as CatalogPage.tsx's GRID_PAGE_SIZE).
+const GRID_PAGE_SIZE = 30;
 
 const SORT_LABELS: Record<CollectionSort, string> = {
   title: 'collection.sortTitle',
@@ -105,8 +110,8 @@ export function CollectionPage() {
   }, []);
 
   const collectionQuery = useQuery({
-    queryKey: ['collection', filters],
-    queryFn: () => fetchCollection(filters),
+    queryKey: ['collection', filters, GRID_PAGE_SIZE],
+    queryFn: () => fetchCollection(filters, GRID_PAGE_SIZE),
     placeholderData: keepPreviousData,
   });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
@@ -132,8 +137,8 @@ export function CollectionPage() {
 
   const page = collectionQuery.data;
   const total = page?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const shown = page ? page.items.length + (page.page - 1) * PAGE_SIZE : 0;
+  const pageCount = Math.max(1, Math.ceil(total / GRID_PAGE_SIZE));
+  const shown = page ? page.items.length + (page.page - 1) * GRID_PAGE_SIZE : 0;
   const dashboard = bootstrapQuery.data?.dashboard;
   const seriesStats = seriesProgressQuery.data
     ? {

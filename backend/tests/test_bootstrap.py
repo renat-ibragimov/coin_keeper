@@ -150,6 +150,43 @@ async def test_dashboard_figures(
     assert series["Міста України"]["owned"] == 1
 
 
+async def test_series_breakdown_has_no_cap_and_keeps_the_true_total(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """ "Мої серії" on the overview used to cap at 12 rows ordered so that
+    several small, fully-completed series could push a large, still-open one
+    out of the response entirely — the front end is left to sort a complete
+    set now, not trim an already-truncated one (owner's call, 2026-09-12)."""
+    refs = ctx.refs
+    started_series = []
+    for i in range(15):
+        series = await make_series(db_session, country=refs.ukraine, name=f"Завершена {i}")
+        item = await make_catalog_item(
+            db_session, country=refs.ukraine, title=f"Готова {i}", year=2000 + i, series=series
+        )
+        await add_collection_item(db_session, owner_id=ctx.id_a, item=item, price="1")
+        started_series.append(series)
+
+    # A big series the owner has barely started: two items, one owned.
+    big_series = await make_series(db_session, country=refs.ukraine, name="Ще в процесі")
+    owned_item = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Перша", year=2020, series=big_series
+    )
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Друга", year=2021, series=big_series
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_item, price="1")
+
+    dashboard = (await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))).json()[
+        "dashboard"
+    ]
+    names = {row["name"] for row in dashboard["seriesBreakdown"]}
+    assert {series.name_original for series in started_series} <= names
+    assert "Ще в процесі" in names
+    in_progress = next(row for row in dashboard["seriesBreakdown"] if row["name"] == "Ще в процесі")
+    assert (in_progress["count"], in_progress["owned"]) == (2, 1)
+
+
 async def test_dashboard_hides_a_deactivated_country_from_aggregates(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
