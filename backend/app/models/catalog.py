@@ -207,6 +207,12 @@ class CatalogItem(Base):
     )
     country_id: Mapped[int] = mapped_column(ForeignKey("countries.id"), nullable=False)
     series_id: Mapped[int | None] = mapped_column(ForeignKey("coin_series.id", ondelete="SET NULL"))
+    # The bare (non-packaged) catalog item this one is a souvenir-packaging
+    # variant of, when coin-parser's weight/diameter match found one
+    # (docs/04-business-rules.md). Not surfaced anywhere yet.
+    packaging_of_id: Mapped[int | None] = mapped_column(
+        ForeignKey("catalog_items.id", ondelete="SET NULL")
+    )
     denomination_id: Mapped[int | None] = mapped_column(
         ForeignKey("denominations.id", ondelete="SET NULL")
     )
@@ -295,6 +301,11 @@ class CatalogItem(Base):
         Index(
             "ix_catalog_items_series_id",
             "series_id",
+            postgresql_where=text("NOT is_archived"),
+        ),
+        Index(
+            "ix_catalog_items_packaging_of_id",
+            "packaging_of_id",
             postgresql_where=text("NOT is_archived"),
         ),
         Index("ix_catalog_items_created_by", "created_by"),
