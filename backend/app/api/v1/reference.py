@@ -62,15 +62,16 @@ async def list_countries(
 @router.get("/denominations")
 async def list_denominations(
     session: DbSession,
-    _user: CurrentUser,
+    user: CurrentUser,
     locale: RequestLocale,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
     scope: Annotated[Literal["all", "confirmed"], Query()] = "all",
 ) -> list[DenominationOut]:
     """`scope=confirmed` is the catalog's own filter panel: only a
-    `catalog_confirmed` country's denominations (§13a)."""
+    `catalog_confirmed` country's denominations that a catalog item actually
+    visible to this user still uses (§13a)."""
     denominations = await ReferenceRepository(session, locale).list_denominations(
-        country_id, confirmed_only=scope == "confirmed"
+        country_id, confirmed_only=scope == "confirmed", user_id=user.id
     )
     return [
         DenominationOut(

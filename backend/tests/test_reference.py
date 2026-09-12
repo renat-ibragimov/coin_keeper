@@ -174,6 +174,34 @@ async def test_confirmed_scope_is_a_harder_gate_than_active(
     assert denominations.json() == []
 
 
+async def test_confirmed_denominations_require_a_visible_catalog_item(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list
+) -> None:
+    """§13a's confirmed-scope gate applies per denomination, not just per
+    country: a denomination row can outlive every catalog item that used to
+    reference it (Ukraine pipeline merges/reassigns, docs/05-integrations.md),
+    and the catalog's filter panel must not offer it once nothing matches."""
+    refs = await seed_reference(db_session)
+    _, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Both denominations are active for a catalog_confirmed country, but
+    # neither has a catalog item yet.
+    empty = await client.get(
+        f"/api/v1/denominations?countryId={refs.ukraine.id}&scope=confirmed", headers=headers
+    )
+    assert empty.json() == []
+
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="2 гривні 2018", year=2018, denomination=refs.uah_2
+    )
+
+    confirmed = await client.get(
+        f"/api/v1/denominations?countryId={refs.ukraine.id}&scope=confirmed", headers=headers
+    )
+    assert [row["label"] for row in confirmed.json()] == ["2 гривні"]
+
+
 async def test_currencies(client: AsyncClient, db_session: AsyncSession, mail_outbox: list) -> None:
     await seed_reference(db_session)
     _, token = await register_and_verify(client, mail_outbox)

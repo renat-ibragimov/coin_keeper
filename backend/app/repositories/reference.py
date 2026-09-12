@@ -8,11 +8,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import exists, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
-from app.models import Country, Currency, Denomination
+from app.models import CatalogItem, Country, Currency, Denomination
+from app.repositories.catalog import storefront_visible
 from app.repositories.localization import localized
 
 
@@ -45,14 +46,38 @@ class ReferenceRepository:
         return (await self._session.execute(query)).scalars().all()
 
     async def list_denominations(
-        self, country_id: int | None = None, *, confirmed_only: bool = False
+        self,
+        country_id: int | None = None,
+        *,
+        confirmed_only: bool = False,
+        user_id: int | None = None,
     ) -> Sequence[Denomination]:
+        """`confirmed_only` is the catalog's own filter panel (§13a) — mirrors
+        `CatalogRepository.list_confirmed_materials`: offer only what a
+        catalog item actually visible to this user could match, not the
+        whole shared dictionary (a denomination can go orphaned when items
+        get merged/reassigned in the Ukraine pipeline, see docs/05-integrations.md)."""
         query = select(Denomination).where(Denomination.is_active)
         if country_id is not None:
             query = query.where(Denomination.country_id == country_id)
         if confirmed_only:
-            query = query.join(Country, Country.id == Denomination.country_id).where(
-                Country.catalog_confirmed
+            assert user_id is not None
+            query = (
+                query.join(Country, Country.id == Denomination.country_id)
+                .where(Country.catalog_confirmed)
+                .where(
+                    exists(
+                        select(CatalogItem.id).where(
+                            CatalogItem.denomination_id == Denomination.id,
+                            or_(
+                                CatalogItem.created_by.is_(None),
+                                CatalogItem.created_by == user_id,
+                            ),
+                            not_(CatalogItem.is_archived),
+                            storefront_visible(user_id),
+                        )
+                    )
+                )
             )
         # sort_order is the face value in the currency's smallest unit; value
         # separates units of equal worth (25 cents and a quarter dollar).
