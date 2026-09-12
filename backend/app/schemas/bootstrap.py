@@ -57,6 +57,11 @@ class SettingsOut(CamelModel):
     display_currency: str
     default_grade_commemorative: str
     default_grade_circulation: str
+    show_packaging_variants: bool
+
+
+class SettingsUpdate(CamelModel):
+    show_packaging_variants: bool
 
 
 class BootstrapOut(CamelModel):

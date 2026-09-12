@@ -221,6 +221,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bootstrap/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Settings */
+        patch: operations["update_settings_api_v1_bootstrap_settings_patch"];
+        trace?: never;
+    };
     "/api/v1/catalog": {
         parameters: {
             query?: never;
@@ -233,6 +250,27 @@ export interface paths {
         put?: never;
         /** Create Item */
         post: operations["create_item_api_v1_catalog_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Catalog Materials
+         * @description Materials the material filter offers on `GET /catalog` — only what a
+         *     `catalog_confirmed` item actually uses (docs/04-business-rules.md, §14).
+         */
+        get: operations["list_catalog_materials_api_v1_catalog_materials_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -399,6 +437,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/collection/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Owned Materials */
+        get: operations["list_owned_materials_api_v1_collection_materials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/collection/{item_id}": {
         parameters: {
             query?: never;
@@ -478,7 +533,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Series */
+        /**
+         * List Series
+         * @description `scope=mine` (default) is the user's own collection — the "Серії"
+         *     screen and the dashboard, unrestricted by which countries the catalogue
+         *     project has confirmed. `scope=catalog` is `GET /catalog`'s own series
+         *     filter: a harder, separate gate (§13a), only a `catalog_confirmed`
+         *     country's series.
+         */
         get: operations["list_series_api_v1_series_get"];
         put?: never;
         /** Create Series */
@@ -533,7 +595,8 @@ export interface paths {
         /**
          * List Countries
          * @description `scope=active` is the storefront; `scope=all` is the personal-item form,
-         *     where the user may enter a coin of any issuer ever.
+         *     where the user may enter a coin of any issuer ever; `scope=confirmed` is
+         *     the catalog's own filter panel — a harder, separate gate (§13a).
          *
          *     `minYear`/`maxYear` are the issue-year bounds of the catalog items
          *     actually visible to this user in that country (docs/03-api-contract.md) —
@@ -555,7 +618,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Denominations */
+        /**
+         * List Denominations
+         * @description `scope=confirmed` is the catalog's own filter panel: only a
+         *     `catalog_confirmed` country's denominations (§13a).
+         */
         get: operations["list_denominations_api_v1_denominations_get"];
         put?: never;
         post?: never;
@@ -1591,6 +1658,13 @@ export interface components {
             defaultGradeCommemorative: string;
             /** Defaultgradecirculation */
             defaultGradeCirculation: string;
+            /** Showpackagingvariants */
+            showPackagingVariants: boolean;
+        };
+        /** SettingsUpdate */
+        SettingsUpdate: {
+            /** Showpackagingvariants */
+            showPackagingVariants: boolean;
         };
         /**
          * TokensOut
@@ -2029,18 +2103,53 @@ export interface operations {
             };
         };
     };
+    update_settings_api_v1_bootstrap_settings_patch: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_catalog_api_v1_catalog_get: {
         parameters: {
             query?: {
                 q?: string | null;
-                countryId?: number | null;
-                seriesId?: number | null;
+                countryId?: number[] | null;
+                seriesId?: number[] | null;
                 year?: number | null;
                 yearFrom?: number | null;
                 yearTo?: number | null;
-                denominationId?: number | null;
-                group?: components["schemas"]["CollectionGroup"] | null;
-                metalKind?: components["schemas"]["MetalKind"] | null;
+                denominationId?: number[] | null;
+                group?: components["schemas"]["CollectionGroup"][] | null;
+                materialId?: number[] | null;
                 owned?: boolean | null;
                 scope?: "all" | "shared" | "own";
                 archived?: boolean;
@@ -2098,6 +2207,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogCard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_catalog_materials_api_v1_catalog_materials_get: {
+        parameters: {
+            query?: {
+                countryId?: number | null;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinMaterial"][];
                 };
             };
             /** @description Validation Error */
@@ -2352,14 +2493,14 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
-                countryId?: number | null;
-                seriesId?: number | null;
+                countryId?: number[] | null;
+                seriesId?: number[] | null;
                 year?: number | null;
                 yearFrom?: number | null;
                 yearTo?: number | null;
-                denominationId?: number | null;
-                group?: components["schemas"]["CollectionGroup"] | null;
-                metalKind?: components["schemas"]["MetalKind"] | null;
+                denominationId?: number[] | null;
+                group?: components["schemas"]["CollectionGroup"][] | null;
+                materialId?: number[] | null;
                 grade?: string | null;
                 sort?: "date" | "title" | "country" | "series" | "quantity" | "total" | "valuation" | "grade";
                 order?: "asc" | "desc";
@@ -2510,6 +2651,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DenominationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_owned_materials_api_v1_collection_materials_get: {
+        parameters: {
+            query?: {
+                countryId?: number | null;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinMaterial"][];
                 };
             };
             /** @description Validation Error */
@@ -2783,6 +2956,7 @@ export interface operations {
         parameters: {
             query?: {
                 countryId?: number | null;
+                scope?: "mine" | "catalog";
                 locale?: string | null;
             };
             header?: never;
@@ -2914,7 +3088,7 @@ export interface operations {
     list_countries_api_v1_countries_get: {
         parameters: {
             query?: {
-                scope?: "active" | "all";
+                scope?: "active" | "all" | "confirmed";
                 locale?: string | null;
             };
             header?: never;
@@ -2947,6 +3121,7 @@ export interface operations {
         parameters: {
             query?: {
                 countryId?: number | null;
+                scope?: "all" | "confirmed";
                 locale?: string | null;
             };
             header?: never;

@@ -119,6 +119,11 @@ GET /bootstrap
 пустое состояние. В legacy флаг считался по каталогу, но там каталог и был коллекцией
 владельца.
 
+`settings.showPackagingVariants` (по умолчанию `false`) правит `PATCH /bootstrap/settings`
+— единственное поле `user_settings`, которое меняется своим эндпоинтом, а не через
+`PATCH /auth/me` (как `locale`). Включает показ монет в сувенирной упаковке отдельной
+карточкой в `GET /catalog`, подробности — `04-business-rules.md`, п. 15.
+
 ## Каталог
 
 ```

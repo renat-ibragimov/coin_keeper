@@ -30,6 +30,7 @@ from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogFilters, CatalogRepository, CatalogRow
 from app.repositories.collection import CollectionRepository
 from app.repositories.media import MediaRepository
+from app.repositories.users import UserRepository
 from app.schemas.catalog import (
     ArchiveStateOut,
     CatalogCard,
@@ -155,6 +156,7 @@ class CatalogService:
             session, user_id=user.id, is_admin=self._is_admin, locale=locale
         )
         self._media = MediaRepository(session, user_id=user.id)
+        self._users = UserRepository(session)
         self._urls = MediaUrlBuilder()
 
     # --------------------------------------------------------------- reading
@@ -162,6 +164,8 @@ class CatalogService:
     async def list_catalog(
         self, filters: CatalogFilters, *, limit: int, offset: int
     ) -> tuple[list[CatalogListItem], int]:
+        settings = await self._users.get_settings(self._user.id)
+        filters.show_packaging_variants = bool(settings and settings.show_packaging_variants)
         page = await self._repo.list_items(filters, limit=limit, offset=offset)
         images = await self._images_for([row.item.id for row in page.rows])
         items = [

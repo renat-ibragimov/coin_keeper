@@ -26,6 +26,7 @@ function makeBootstrap(overrides: Partial<BootstrapOut['dashboard']> = {}): Boot
       displayCurrency: 'UAH',
       defaultGradeCommemorative: 'UNC',
       defaultGradeCirculation: 'VF',
+      showPackagingVariants: false,
     },
     dashboard: {
       catalogItems: 3063,

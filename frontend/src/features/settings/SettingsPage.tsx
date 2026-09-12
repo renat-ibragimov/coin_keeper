@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,10 +24,11 @@ import {
   PropertyList,
   Select,
   Tabs,
+  Toggle,
   useToast,
 } from '@/shared/ui';
 
-import { changePassword, updateProfile } from './api';
+import { changePassword, updateProfile, updateSettings } from './api';
 import { PasswordForm } from './PasswordForm';
 import styles from './SettingsPage.module.css';
 
@@ -36,6 +37,7 @@ export function SettingsPage() {
   const { user, updateUser, signOut } = useAuth();
   const { preference, setPreference } = useTheme();
   const toast = useToast();
+  const queryClient = useQueryClient();
 
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
@@ -62,6 +64,13 @@ export function SettingsPage() {
     mutationFn: ({ current, next }: { current: string; next: string }) =>
       changePassword(current, next),
     onSuccess: () => toast.show(t('settings.passwordChanged')),
+  });
+  const packagingMutation = useMutation({
+    mutationFn: (showPackagingVariants: boolean) => updateSettings({ showPackagingVariants }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['bootstrap'] });
+      void queryClient.invalidateQueries({ queryKey: ['catalog'] });
+    },
   });
 
   function saveProfile(event: FormEvent) {
@@ -176,6 +185,19 @@ export function SettingsPage() {
             ]}
           />
           <p className={styles.note}>{t('settings.gradesNote')}</p>
+
+          <h2 className={`${styles.sectionTitle} ${styles.spaced}`}>
+            {t('settings.catalogTitle')}
+          </h2>
+          <FormStack>
+            <Toggle
+              checked={settings?.showPackagingVariants ?? false}
+              disabled={!settings || packagingMutation.isPending}
+              onChange={(checked) => packagingMutation.mutate(checked)}
+              label={t('settings.showPackagingVariants')}
+            />
+            <p className={styles.note}>{t('settings.showPackagingVariantsNote')}</p>
+          </FormStack>
         </Card>
 
         <Card>

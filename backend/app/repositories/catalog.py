@@ -72,6 +72,8 @@ class CatalogFilters:
     archived: bool = False
     sort: str = "title"
     order: str = "asc"
+    # Set by CatalogService from the viewer's settings, not a client filter.
+    show_packaging_variants: bool = False
 
 
 @dataclass
@@ -339,6 +341,8 @@ class CatalogRepository:
             conditions.append(self._own_instance_exists())
         elif filters.owned is False:
             conditions.append(not_(self._own_instance_exists()))
+        if not filters.show_packaging_variants:
+            conditions.append(CatalogItem.packaging_of_id.is_(None))
         if filters.q:
             conditions.append(catalog_search_condition(filters.q))
         return conditions

@@ -105,6 +105,12 @@ class UserSettings(Base):
     default_grade_circulation: Mapped[str] = mapped_column(
         Text, nullable=False, default="VF", server_default="VF"
     )
+    # Off by default: a souvenir-packaging card (catalog_items.packaging_of_id
+    # points at the bare coin, docs/04-business-rules.md) stays out of catalog
+    # listings until the viewer opts in.
+    show_packaging_variants: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     updated_at: Mapped[datetime] = updated_at_column()
 
     user: Mapped[User] = relationship(back_populates="settings")

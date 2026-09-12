@@ -20,6 +20,8 @@ export type CollectionGroup = components['schemas']['CollectionGroup'];
 export type MetalKind = components['schemas']['MetalKind'];
 
 export type BootstrapOut = components['schemas']['BootstrapOut'];
+export type SettingsOut = components['schemas']['SettingsOut'];
+export type SettingsUpdate = components['schemas']['SettingsUpdate'];
 export type DashboardOut = components['schemas']['DashboardOut'];
 export type BreakdownEntry = components['schemas']['BreakdownEntry'];
 export type SeriesBreakdownEntry = components['schemas']['SeriesBreakdownEntry'];

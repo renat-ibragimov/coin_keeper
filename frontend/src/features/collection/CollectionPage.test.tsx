@@ -48,6 +48,7 @@ function makeBootstrap(isEmpty: boolean): BootstrapOut {
       displayCurrency: 'UAH',
       defaultGradeCommemorative: 'UNC',
       defaultGradeCirculation: 'VF',
+      showPackagingVariants: false,
     },
     dashboard: {
       catalogItems: 0,

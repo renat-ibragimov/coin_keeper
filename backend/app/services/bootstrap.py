@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
-from app.models import User, UserSettings
+from app.models import User
 from app.repositories.dashboard import BreakdownRow, DashboardRepository
+from app.repositories.users import UserRepository
 from app.schemas.auth import UserOut
 from app.schemas.bootstrap import (
     BootstrapOut,
@@ -32,6 +32,7 @@ class BootstrapService:
         self._session = session
         self._user = user
         self._repo = DashboardRepository(session, user_id=user.id, locale=locale)
+        self._users = UserRepository(session)
 
     async def bootstrap(self) -> BootstrapOut:
         data = await self._repo.dashboard()
@@ -96,21 +97,23 @@ class BootstrapService:
         )
 
     async def _settings(self) -> SettingsOut:
-        row = (
-            await self._session.execute(
-                select(UserSettings).where(UserSettings.user_id == self._user.id)
-            )
-        ).scalar_one_or_none()
+        row = await self._users.get_settings(self._user.id)
         if row is None:
             return SettingsOut(
                 locale=self._user.locale,
                 display_currency="UAH",
                 default_grade_commemorative="UNC",
                 default_grade_circulation="VF",
+                show_packaging_variants=False,
             )
         return SettingsOut(
             locale=row.locale,
             display_currency=row.display_currency,
             default_grade_commemorative=row.default_grade_commemorative,
             default_grade_circulation=row.default_grade_circulation,
+            show_packaging_variants=row.show_packaging_variants,
         )
+
+    async def update_settings(self, *, show_packaging_variants: bool) -> SettingsOut:
+        await self._users.set_show_packaging_variants(self._user.id, show_packaging_variants)
+        return await self._settings()

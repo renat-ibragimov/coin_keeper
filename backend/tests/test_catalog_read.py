@@ -119,6 +119,42 @@ async def test_scope_filter(
     assert {i["id"] for i in only_own.json()["items"]} == {own.id}
 
 
+async def test_packaging_variant_hidden_unless_the_viewer_opted_in(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    refs = ctx.refs
+    bare = await make_catalog_item(db_session, country=refs.ukraine, title="Голуб", year=2020)
+    packaged = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Голуб у сувенірній упаковці",
+        year=2020,
+        packaging_of_id=bare.id,
+    )
+
+    default = await client.get("/api/v1/catalog", headers=auth(ctx.token_a))
+    ids = {i["id"] for i in default.json()["items"]}
+    assert bare.id in ids
+    assert packaged.id not in ids
+
+    settings = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"showPackagingVariants": True},
+    )
+    assert settings.status_code == 200
+    assert settings.json()["showPackagingVariants"] is True
+
+    opted_in = await client.get("/api/v1/catalog", headers=auth(ctx.token_a))
+    assert {i["id"] for i in opted_in.json()["items"]} == {bare.id, packaged.id}
+
+    # Per-user: user B never toggled the setting and still sees only the bare card.
+    other_user = await client.get("/api/v1/catalog", headers=auth(ctx.token_b))
+    other_ids = {i["id"] for i in other_user.json()["items"]}
+    assert bare.id in other_ids
+    assert packaged.id not in other_ids
+
+
 async def test_filters(client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace) -> None:
     refs = ctx.refs
     ua = await make_catalog_item(

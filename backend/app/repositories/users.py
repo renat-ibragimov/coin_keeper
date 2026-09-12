@@ -40,6 +40,20 @@ class UserRepository:
         )
         await self._session.flush()
 
+    async def set_show_packaging_variants(self, user_id: int, value: bool) -> None:
+        await self._session.execute(
+            update(UserSettings)
+            .where(UserSettings.user_id == user_id)
+            .values(show_packaging_variants=value)
+        )
+        await self._session.flush()
+
+    async def get_settings(self, user_id: int) -> UserSettings | None:
+        result = await self._session.execute(
+            select(UserSettings).where(UserSettings.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
 
 class RefreshTokenRepository:
     def __init__(self, session: AsyncSession) -> None:
