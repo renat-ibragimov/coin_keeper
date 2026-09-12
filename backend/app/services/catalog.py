@@ -169,6 +169,10 @@ class CatalogService:
         ]
         return items, page.total
 
+    async def list_confirmed_materials(self, country_id: int | None) -> list[CoinMaterial]:
+        materials = await self._repo.list_confirmed_materials(country_id)
+        return [out for material in materials if (out := material_out(material, self._locale))]
+
     async def get_card(self, item_id: int) -> CatalogCard:
         row = await self._repo.get_row(item_id)
         if row is None:

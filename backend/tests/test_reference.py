@@ -6,7 +6,12 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.helpers import register_and_verify
-from tests.seed import make_catalog_item, seed_reference, user_id_by_email
+from tests.seed import (
+    make_catalog_item,
+    seed_reference,
+    set_country_catalog_confirmed,
+    user_id_by_email,
+)
 
 
 async def test_reference_endpoints_require_auth(client: AsyncClient) -> None:
@@ -143,6 +148,30 @@ async def test_denominations_filtered_by_country(
 
     everything = await client.get("/api/v1/denominations", headers=headers)
     assert len(everything.json()) == 3
+
+
+async def test_confirmed_scope_is_a_harder_gate_than_active(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list
+) -> None:
+    """docs/04-business-rules.md, §13a: `scope=confirmed` is the catalog's
+    own filter panel — active but unconfirmed is not enough."""
+    refs = await seed_reference(db_session)
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+    _, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    active = await client.get("/api/v1/countries?scope=active", headers=headers)
+    assert refs.usa.id in {row["id"] for row in active.json()}
+
+    confirmed = await client.get("/api/v1/countries?scope=confirmed", headers=headers)
+    confirmed_ids = {row["id"] for row in confirmed.json()}
+    assert refs.ukraine.id in confirmed_ids
+    assert refs.usa.id not in confirmed_ids
+
+    denominations = await client.get(
+        f"/api/v1/denominations?countryId={refs.usa.id}&scope=confirmed", headers=headers
+    )
+    assert denominations.json() == []
 
 
 async def test_currencies(client: AsyncClient, db_session: AsyncSession, mail_outbox: list) -> None:

@@ -300,6 +300,31 @@ async def test_series_of_an_unconfirmed_country_still_shows(
     assert direct_a.status_code == 200
 
 
+async def test_scope_catalog_is_the_confirmed_gate_for_the_series_filter(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13a: `GET /series?scope=catalog` backs the
+    catalog's own series filter — unlike the default `scope=mine`, an owned
+    instance does not let an unconfirmed country's series through."""
+    refs = ctx.refs
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+
+    series_usa = await make_series(db_session, country=refs.usa, name="Standing Liberty")
+    owned_item = await make_catalog_item(
+        db_session, country=refs.usa, title="Quarter", year=1920, series=series_usa
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_item, price="10")
+
+    headers_a = auth(ctx.token_a)
+
+    mine = await client.get("/api/v1/series?scope=mine", headers=headers_a)
+    assert series_usa.name_original in {row["name"] for row in mine.json()}
+
+    catalog_scope = await client.get("/api/v1/series?scope=catalog", headers=headers_a)
+    assert series_usa.name_original not in {row["name"] for row in catalog_scope.json()}
+    assert refs.fauna.name_original in {row["name"] for row in catalog_scope.json()}
+
+
 async def test_own_price_snapshot_feeds_value(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:

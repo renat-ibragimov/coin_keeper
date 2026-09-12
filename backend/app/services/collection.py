@@ -35,6 +35,7 @@ from app.repositories.collection import (
 )
 from app.repositories.media import MediaRepository
 from app.repositories.rates import RateRepository
+from app.schemas.catalog import CoinMaterial
 from app.schemas.collection import (
     CollectionItemCreate,
     CollectionItemOut,
@@ -43,7 +44,7 @@ from app.schemas.collection import (
 )
 from app.schemas.reference import CountryOut, DenominationOut
 from app.schemas.series import SeriesOut
-from app.services.catalog import display_title
+from app.services.catalog import display_title, material_out
 from app.services.media_urls import CatalogImages, MediaUrlBuilder
 
 
@@ -164,6 +165,10 @@ class CollectionService:
     async def list_owned_denominations(self, country_id: int | None) -> list[DenominationOut]:
         denominations = await self._repo.list_owned_denominations(country_id)
         return [_denomination_out(item, self._locale) for item in denominations]
+
+    async def list_owned_materials(self, country_id: int | None) -> list[CoinMaterial]:
+        materials = await self._repo.list_owned_materials(country_id)
+        return [out for material in materials if (out := material_out(material, self._locale))]
 
     async def get(self, item_id: int) -> CollectionItemOut:
         if await self._repo.get_row(item_id) is None:

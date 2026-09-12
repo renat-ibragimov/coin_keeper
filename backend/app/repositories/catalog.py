@@ -16,6 +16,7 @@ docstring.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -51,21 +52,21 @@ from app.models import (
     PriceSourceLink,
     QualityType,
 )
-from app.models.enums import CollectionGroup, MetalKind
+from app.models.enums import CollectionGroup
 from app.repositories.localization import localized
 
 
 @dataclass
 class CatalogFilters:
     q: str | None = None
-    country_id: int | None = None
-    series_id: int | None = None
+    country_ids: list[int] | None = None
+    series_ids: list[int] | None = None
     year: int | None = None
     year_from: int | None = None
     year_to: int | None = None
-    denomination_id: int | None = None
-    group: CollectionGroup | None = None
-    metal_kind: MetalKind | None = None
+    denomination_ids: list[int] | None = None
+    groups: list[CollectionGroup] | None = None
+    material_ids: list[int] | None = None
     owned: bool | None = None
     scope: str = "all"  # all | shared | own
     archived: bool = False
@@ -318,22 +319,22 @@ class CatalogRepository:
             conditions.append(CatalogItem.created_by.is_(None))
         elif filters.scope == "own":
             conditions.append(CatalogItem.created_by == self._user_id)
-        if filters.country_id is not None:
-            conditions.append(CatalogItem.country_id == filters.country_id)
-        if filters.series_id is not None:
-            conditions.append(CatalogItem.series_id == filters.series_id)
+        if filters.country_ids:
+            conditions.append(CatalogItem.country_id.in_(filters.country_ids))
+        if filters.series_ids:
+            conditions.append(CatalogItem.series_id.in_(filters.series_ids))
         if filters.year is not None:
             conditions.append(CatalogItem.issue_year == filters.year)
         if filters.year_from is not None:
             conditions.append(CatalogItem.issue_year >= filters.year_from)
         if filters.year_to is not None:
             conditions.append(CatalogItem.issue_year <= filters.year_to)
-        if filters.denomination_id is not None:
-            conditions.append(CatalogItem.denomination_id == filters.denomination_id)
-        if filters.group is not None:
-            conditions.append(CatalogItem.collection_group == filters.group)
-        if filters.metal_kind is not None:
-            conditions.append(CatalogItem.metal_kind == filters.metal_kind)
+        if filters.denomination_ids:
+            conditions.append(CatalogItem.denomination_id.in_(filters.denomination_ids))
+        if filters.groups:
+            conditions.append(CatalogItem.collection_group.in_(filters.groups))
+        if filters.material_ids:
+            conditions.append(CatalogItem.composition_id.in_(filters.material_ids))
         if filters.owned is True:
             conditions.append(self._own_instance_exists())
         elif filters.owned is False:
@@ -605,6 +606,30 @@ class CatalogRepository:
         )
         result = await self._session.execute(query)
         return {row[0]: (row[1], row[2]) for row in result}
+
+    async def list_confirmed_materials(self, country_id: int | None = None) -> Sequence[Material]:
+        """Materials actually used by a `catalog_confirmed` catalog item —
+        the catalog's material filter offers only what could possibly match,
+        not the whole shared dictionary (materials have no country_id of
+        their own, so this always goes through catalog_items)."""
+        condition: ColumnElement[bool] = CatalogItem.composition_id == Material.id
+        if country_id is not None:
+            condition = and_(condition, CatalogItem.country_id == country_id)
+        query = (
+            select(Material)
+            .where(
+                exists(
+                    select(CatalogItem.id).where(
+                        condition,
+                        self._visible(),
+                        self._archive_condition(archived=False),
+                        storefront_visible(self._user_id),
+                    )
+                )
+            )
+            .order_by(Material.name_uk if self._locale == LOCALE_UK else Material.name_en)
+        )
+        return (await self._session.execute(query)).scalars().all()
 
     async def get_visible(self, item_id: int) -> CatalogItem | None:
         """The bare item under the visibility filter, archive state ignored.

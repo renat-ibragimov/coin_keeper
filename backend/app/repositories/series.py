@@ -69,8 +69,25 @@ class SeriesRepository:
         self._user_id = user_id
         self._locale = locale
 
-    async def list_series(self, country_id: int | None = None) -> Sequence[CoinSeries]:
-        query = select(CoinSeries).where(series_storefront_visible(self._user_id))
+    async def list_series(
+        self, country_id: int | None = None, *, confirmed_only: bool = False
+    ) -> Sequence[CoinSeries]:
+        """`confirmed_only` is the catalog's own filter panel — a harder,
+        separate gate (§13a): only a `catalog_confirmed` country's series,
+        no exception for one the user already owns coins of. The default
+        (off) is every other caller — the series screens and the dashboard,
+        which are about the user's own collection (owner's call,
+        2026-09-12)."""
+        if confirmed_only:
+            query = select(CoinSeries).where(
+                exists(
+                    select(Country.id)
+                    .where(Country.id == CoinSeries.country_id, Country.catalog_confirmed)
+                    .correlate(CoinSeries)
+                )
+            )
+        else:
+            query = select(CoinSeries).where(series_storefront_visible(self._user_id))
         if country_id is not None:
             query = query.where(CoinSeries.country_id == country_id)
         query = query.order_by(

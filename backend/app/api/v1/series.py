@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
 
@@ -26,8 +26,16 @@ async def list_series(
     user: CurrentUser,
     locale: RequestLocale,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
+    scope: Annotated[Literal["mine", "catalog"], Query()] = "mine",
 ) -> list[SeriesOut]:
-    return await SeriesService(session, user, locale).list_series(country_id)
+    """`scope=mine` (default) is the user's own collection — the "Серії"
+    screen and the dashboard, unrestricted by which countries the catalogue
+    project has confirmed. `scope=catalog` is `GET /catalog`'s own series
+    filter: a harder, separate gate (§13a), only a `catalog_confirmed`
+    country's series."""
+    return await SeriesService(session, user, locale).list_series(
+        country_id, confirmed_only=scope == "catalog"
+    )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

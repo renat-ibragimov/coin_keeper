@@ -15,9 +15,17 @@ from typing import Any
 from sqlalchemy import ColumnElement, and_, exists, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.locale import DEFAULT_LOCALE
-from app.models import CatalogItem, CoinSeries, CollectionItem, Country, Denomination, Expense
-from app.models.enums import CollectionGroup, ExpenseCategory, MetalKind
+from app.core.locale import DEFAULT_LOCALE, LOCALE_UK
+from app.models import (
+    CatalogItem,
+    CoinSeries,
+    CollectionItem,
+    Country,
+    Denomination,
+    Expense,
+    Material,
+)
+from app.models.enums import CollectionGroup, ExpenseCategory
 from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
 from app.repositories.localization import localized
 
@@ -25,14 +33,14 @@ from app.repositories.localization import localized
 @dataclass
 class CollectionFilters:
     q: str | None = None
-    country_id: int | None = None
-    series_id: int | None = None
+    country_ids: list[int] | None = None
+    series_ids: list[int] | None = None
     year: int | None = None
     year_from: int | None = None
     year_to: int | None = None
-    denomination_id: int | None = None
-    group: CollectionGroup | None = None
-    metal_kind: MetalKind | None = None
+    denomination_ids: list[int] | None = None
+    groups: list[CollectionGroup] | None = None
+    material_ids: list[int] | None = None
     grade: str | None = None
     # Every column of the "Мої монети" table sorts (docs/08-ui-map.md).
     sort: str = "title"  # date | title | country | series | quantity | total | valuation | grade
@@ -99,22 +107,22 @@ class CollectionRepository:
         conditions: list[ColumnElement[bool]] = [self._owns_catalog_item()]
         if filters.grade is not None:
             conditions.append(self._owns_catalog_item(grade=filters.grade))
-        if filters.country_id is not None:
-            conditions.append(CatalogItem.country_id == filters.country_id)
-        if filters.series_id is not None:
-            conditions.append(CatalogItem.series_id == filters.series_id)
+        if filters.country_ids:
+            conditions.append(CatalogItem.country_id.in_(filters.country_ids))
+        if filters.series_ids:
+            conditions.append(CatalogItem.series_id.in_(filters.series_ids))
         if filters.year is not None:
             conditions.append(CatalogItem.issue_year == filters.year)
         if filters.year_from is not None:
             conditions.append(CatalogItem.issue_year >= filters.year_from)
         if filters.year_to is not None:
             conditions.append(CatalogItem.issue_year <= filters.year_to)
-        if filters.denomination_id is not None:
-            conditions.append(CatalogItem.denomination_id == filters.denomination_id)
-        if filters.group is not None:
-            conditions.append(CatalogItem.collection_group == filters.group)
-        if filters.metal_kind is not None:
-            conditions.append(CatalogItem.metal_kind == filters.metal_kind)
+        if filters.denomination_ids:
+            conditions.append(CatalogItem.denomination_id.in_(filters.denomination_ids))
+        if filters.groups:
+            conditions.append(CatalogItem.collection_group.in_(filters.groups))
+        if filters.material_ids:
+            conditions.append(CatalogItem.composition_id.in_(filters.material_ids))
         if filters.q:
             conditions.append(catalog_search_condition(filters.q))
         return conditions
@@ -317,6 +325,20 @@ class CollectionRepository:
             select(Denomination)
             .where(self._owns_via(catalog_condition))
             .order_by(Denomination.sort_order, Denomination.value, Denomination.unit)
+        )
+        return (await self._session.execute(query)).scalars().all()
+
+    async def list_owned_materials(self, country_id: int | None = None) -> Sequence[Material]:
+        """Materials the material filter offers on "Мої монети" — only what
+        the owner actually has, regardless of which countries the catalogue
+        project has confirmed (docs/04-business-rules.md, §13a, §14)."""
+        catalog_condition = CatalogItem.composition_id == Material.id
+        if country_id is not None:
+            catalog_condition = and_(catalog_condition, CatalogItem.country_id == country_id)
+        query = (
+            select(Material)
+            .where(self._owns_via(catalog_condition))
+            .order_by(Material.name_uk if self._locale == LOCALE_UK else Material.name_en)
         )
         return (await self._session.execute(query)).scalars().all()
 

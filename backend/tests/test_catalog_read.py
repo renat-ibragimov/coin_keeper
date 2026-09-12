@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
 from app.models import EdgeType, Material, QualityType
+from app.models.enums import CollectionGroup
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
@@ -385,6 +386,89 @@ async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
         dictionary_late.id,
         free_text.id,
     ]
+
+
+async def test_multi_select_filters_union_within_a_facet(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """countryId=A,B (etc.) is an OR within the facet: either matches."""
+    refs = ctx.refs
+    silver = (
+        await db_session.execute(select(Material).where(Material.code == "silver"))
+    ).scalar_one()
+    gold = (await db_session.execute(select(Material).where(Material.code == "gold"))).scalar_one()
+
+    dolphin = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Дельфін",
+        year=2018,
+        series=refs.fauna,
+        denomination=refs.uah_2,
+        group=CollectionGroup.COMMEMORATIVE,
+        composition_id=silver.id,
+    )
+    kyiv = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Київ",
+        year=2020,
+        series=refs.cities,
+        denomination=refs.uah_5,
+        group=CollectionGroup.OTHER,
+        composition_id=gold.id,
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Third",
+        year=2021,
+        group=CollectionGroup.CIRCULATION,
+    )
+
+    headers = auth(ctx.token_a)
+
+    by_series = await client.get(
+        f"/api/v1/catalog?seriesId={refs.fauna.id}&seriesId={refs.cities.id}", headers=headers
+    )
+    assert {i["id"] for i in by_series.json()["items"]} == {dolphin.id, kyiv.id}
+
+    by_denomination = await client.get(
+        f"/api/v1/catalog?denominationId={refs.uah_2.id}&denominationId={refs.uah_5.id}",
+        headers=headers,
+    )
+    assert {i["id"] for i in by_denomination.json()["items"]} == {dolphin.id, kyiv.id}
+
+    by_group = await client.get("/api/v1/catalog?group=commemorative&group=other", headers=headers)
+    assert {i["id"] for i in by_group.json()["items"]} == {dolphin.id, kyiv.id}
+
+    by_material = await client.get(
+        f"/api/v1/catalog?materialId={silver.id}&materialId={gold.id}", headers=headers
+    )
+    assert {i["id"] for i in by_material.json()["items"]} == {dolphin.id, kyiv.id}
+
+
+async def test_catalog_materials_only_offers_what_the_confirmed_catalog_uses(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §14: the material filter offers only
+    materials a `catalog_confirmed` item actually uses — the whole shared
+    dictionary is much bigger than what Ukraine's catalog uses today."""
+    refs = ctx.refs
+    silver = (
+        await db_session.execute(select(Material).where(Material.code == "silver"))
+    ).scalar_one()
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018, composition_id=silver.id
+    )
+
+    headers = auth(ctx.token_a)
+    response = await client.get("/api/v1/catalog/materials", headers=headers)
+    codes = {row["code"] for row in response.json()}
+    assert codes == {"silver"}
+
+    scoped = await client.get(f"/api/v1/catalog/materials?countryId={refs.usa.id}", headers=headers)
+    assert scoped.json() == []
 
 
 async def test_card_resolves_edge_and_quality_dictionaries(

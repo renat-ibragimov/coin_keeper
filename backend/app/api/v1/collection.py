@@ -8,8 +8,9 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
 from app.api.errors import ProblemError
-from app.models.enums import CollectionGroup, MetalKind
+from app.models.enums import CollectionGroup
 from app.repositories.collection import CollectionFilters
+from app.schemas.catalog import CoinMaterial
 from app.schemas.collection import (
     CollectionItemCreate,
     CollectionItemOut,
@@ -47,14 +48,14 @@ async def list_collection(
     locale: RequestLocale,
     pagination: Pagination,
     q: Annotated[str | None, Query(max_length=200)] = None,
-    country_id: Annotated[int | None, Query(alias="countryId")] = None,
-    series_id: Annotated[int | None, Query(alias="seriesId")] = None,
+    country_id: Annotated[list[int] | None, Query(alias="countryId")] = None,
+    series_id: Annotated[list[int] | None, Query(alias="seriesId")] = None,
     year: Annotated[int | None, Query()] = None,
     year_from: Annotated[int | None, Query(alias="yearFrom")] = None,
     year_to: Annotated[int | None, Query(alias="yearTo")] = None,
-    denomination_id: Annotated[int | None, Query(alias="denominationId")] = None,
-    group: Annotated[CollectionGroup | None, Query()] = None,
-    metal_kind: Annotated[MetalKind | None, Query(alias="metalKind")] = None,
+    denomination_id: Annotated[list[int] | None, Query(alias="denominationId")] = None,
+    group: Annotated[list[CollectionGroup] | None, Query()] = None,
+    material_id: Annotated[list[int] | None, Query(alias="materialId")] = None,
     grade: Annotated[str | None, Query(max_length=50)] = None,
     sort: Annotated[
         Literal["date", "title", "country", "series", "quantity", "total", "valuation", "grade"],
@@ -64,14 +65,14 @@ async def list_collection(
 ) -> Page[CollectionPositionOut]:
     filters = CollectionFilters(
         q=q,
-        country_id=country_id,
-        series_id=series_id,
+        country_ids=country_id,
+        series_ids=series_id,
         year=year,
         year_from=year_from,
         year_to=year_to,
-        denomination_id=denomination_id,
-        group=group,
-        metal_kind=metal_kind,
+        denomination_ids=denomination_id,
+        groups=group,
+        material_ids=material_id,
         grade=grade,
         sort=sort,
         order=order,
@@ -125,9 +126,19 @@ async def list_owned_denominations(
     return await CollectionService(session, user, locale).list_owned_denominations(country_id)
 
 
-# NOTE: these three literal routes must stay registered before /{item_id} —
-# otherwise FastAPI tries to parse "countries"/"series"/"denominations" as
-# item_id and 422s instead of matching the routes above.
+@router.get("/materials")
+async def list_owned_materials(
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    country_id: Annotated[int | None, Query(alias="countryId")] = None,
+) -> list[CoinMaterial]:
+    return await CollectionService(session, user, locale).list_owned_materials(country_id)
+
+
+# NOTE: these four literal routes must stay registered before /{item_id} —
+# otherwise FastAPI tries to parse "countries"/"series"/"denominations"/
+# "materials" as item_id and 422s instead of matching the routes above.
 @router.get("/{item_id}")
 async def get_item(
     session: DbSession, user: CurrentUser, locale: RequestLocale, item_id: int

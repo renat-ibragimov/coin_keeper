@@ -22,17 +22,18 @@ async def list_countries(
     session: DbSession,
     user: CurrentUser,
     locale: RequestLocale,
-    scope: Annotated[Literal["active", "all"], Query()] = "active",
+    scope: Annotated[Literal["active", "all", "confirmed"], Query()] = "active",
 ) -> list[CountryOut]:
     """`scope=active` is the storefront; `scope=all` is the personal-item form,
-    where the user may enter a coin of any issuer ever.
+    where the user may enter a coin of any issuer ever; `scope=confirmed` is
+    the catalog's own filter panel — a harder, separate gate (§13a).
 
     `minYear`/`maxYear` are the issue-year bounds of the catalog items
     actually visible to this user in that country (docs/03-api-contract.md) —
     feeds the year filter's dropdown range, not a global catalog fact.
     """
     countries = await ReferenceRepository(session, locale).list_countries(
-        active_only=scope == "active"
+        active_only=scope == "active", confirmed_only=scope == "confirmed"
     )
     year_bounds = await CatalogRepository(
         session, user_id=user.id, is_admin=user.role == UserRole.ADMIN
@@ -64,8 +65,13 @@ async def list_denominations(
     _user: CurrentUser,
     locale: RequestLocale,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
+    scope: Annotated[Literal["all", "confirmed"], Query()] = "all",
 ) -> list[DenominationOut]:
-    denominations = await ReferenceRepository(session, locale).list_denominations(country_id)
+    """`scope=confirmed` is the catalog's own filter panel: only a
+    `catalog_confirmed` country's denominations (§13a)."""
+    denominations = await ReferenceRepository(session, locale).list_denominations(
+        country_id, confirmed_only=scope == "confirmed"
+    )
     return [
         DenominationOut(
             id=denomination.id,

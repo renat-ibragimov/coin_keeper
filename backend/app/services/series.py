@@ -61,8 +61,11 @@ class SeriesService:
         self._locale = locale
         self._repo = SeriesRepository(session, user_id=user.id, locale=locale)
 
-    async def list_series(self, country_id: int | None) -> list[SeriesOut]:
-        return [_out(series, self._locale) for series in await self._repo.list_series(country_id)]
+    async def list_series(
+        self, country_id: int | None, *, confirmed_only: bool = False
+    ) -> list[SeriesOut]:
+        series = await self._repo.list_series(country_id, confirmed_only=confirmed_only)
+        return [_out(item, self._locale) for item in series]
 
     async def create(self, payload: SeriesCreate) -> SeriesOut:
         if self._user.role != UserRole.ADMIN:
