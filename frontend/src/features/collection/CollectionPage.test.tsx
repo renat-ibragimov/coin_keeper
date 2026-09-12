@@ -18,6 +18,7 @@ import {
   fetchCollection,
   fetchOwnedCountries,
   fetchOwnedDenominations,
+  fetchOwnedMaterials,
   fetchOwnedSeries,
 } from './api';
 import { CollectionPage } from './CollectionPage';
@@ -27,6 +28,7 @@ vi.mock('./api', () => ({
   fetchOwnedCountries: vi.fn(),
   fetchOwnedSeries: vi.fn(),
   fetchOwnedDenominations: vi.fn(),
+  fetchOwnedMaterials: vi.fn(),
 }));
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
 vi.mock('@/features/series/api', () => ({ fetchSeriesProgress: vi.fn() }));
@@ -128,6 +130,7 @@ function mockCommonQueries(isEmpty: boolean) {
   vi.mocked(fetchOwnedCountries).mockResolvedValue([]);
   vi.mocked(fetchOwnedSeries).mockResolvedValue([]);
   vi.mocked(fetchOwnedDenominations).mockResolvedValue([]);
+  vi.mocked(fetchOwnedMaterials).mockResolvedValue([]);
 }
 
 describe('CollectionPage', () => {

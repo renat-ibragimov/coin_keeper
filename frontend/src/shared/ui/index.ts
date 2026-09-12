@@ -13,6 +13,8 @@ export type { ActiveFilterChip } from './FiltersShell';
 export { FormActions, FormError, FormRow, FormSection, FormStack } from './FormLayout';
 export { Input } from './Input';
 export { Lightbox } from './Lightbox';
+export { MultiSelect } from './MultiSelect';
+export type { MultiSelectOption } from './MultiSelect';
 export { ConfirmDialog, Modal } from './Modal';
 export { PageHeader } from './PageHeader';
 export { pageItems } from './pageItems';

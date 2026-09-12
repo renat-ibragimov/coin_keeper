@@ -9,6 +9,7 @@ export type TokensOut = components['schemas']['TokensOut'];
 export type CatalogListItem = components['schemas']['CatalogListItem'];
 export type CatalogCard = components['schemas']['CatalogCard'];
 export type CatalogPage = components['schemas']['Page_CatalogListItem_'];
+export type CoinMaterial = components['schemas']['CoinMaterial'];
 
 export type CountryOut = components['schemas']['CountryOut'];
 export type DenominationOut = components['schemas']['DenominationOut'];

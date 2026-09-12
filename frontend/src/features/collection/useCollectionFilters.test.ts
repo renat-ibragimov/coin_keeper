@@ -10,13 +10,13 @@ describe('collection filters', () => {
   it('defaults to alphabetical order by title in the card view', () => {
     expect(parseCollectionFilters(new URLSearchParams())).toEqual({
       q: '',
-      countryId: undefined,
-      seriesId: undefined,
+      countryIds: [],
+      seriesIds: [],
       yearFrom: undefined,
       yearTo: undefined,
-      denominationId: undefined,
-      group: undefined,
-      metalKind: undefined,
+      denominationIds: [],
+      groups: [],
+      materialIds: [],
       grade: undefined,
       sort: 'title',
       order: 'asc',
@@ -25,21 +25,22 @@ describe('collection filters', () => {
     });
   });
 
-  it('round-trips a full filter set through the URL', () => {
+  it('round-trips a full filter set, including repeated multi-select keys', () => {
     const params = new URLSearchParams(
-      'q=owl&countryId=1&seriesId=3&yearFrom=2010&yearTo=2020&denominationId=5' +
-        '&group=commemorative&metalKind=base&grade=UNC&sort=total&order=desc&page=2&view=table',
+      'q=owl&countryId=1&countryId=2&seriesId=3&yearFrom=2010&yearTo=2020&denominationId=5' +
+        '&group=commemorative&group=other&materialId=7&materialId=8&grade=UNC' +
+        '&sort=total&order=desc&page=2&view=table',
     );
     const filters = parseCollectionFilters(params);
     expect(filters).toMatchObject({
       q: 'owl',
-      countryId: 1,
-      seriesId: 3,
+      countryIds: [1, 2],
+      seriesIds: [3],
       yearFrom: 2010,
       yearTo: 2020,
-      denominationId: 5,
-      group: 'commemorative',
-      metalKind: 'base',
+      denominationIds: [5],
+      groups: ['commemorative', 'other'],
+      materialIds: [7, 8],
       grade: 'UNC',
       sort: 'total',
       order: 'desc',
@@ -54,13 +55,18 @@ describe('collection filters', () => {
 
   it('ignores unknown sorts, groups and malformed ids', () => {
     const filters = parseCollectionFilters(
-      new URLSearchParams('sort=price&countryId=abc&group=bogus&metalKind=bogus&page=0'),
+      new URLSearchParams('sort=price&countryId=abc&group=bogus&materialId=abc&page=0'),
     );
     expect(filters.sort).toBe('title');
-    expect(filters.countryId).toBeUndefined();
-    expect(filters.group).toBeUndefined();
-    expect(filters.metalKind).toBeUndefined();
+    expect(filters.countryIds).toEqual([]);
+    expect(filters.groups).toEqual([]);
+    expect(filters.materialIds).toEqual([]);
     expect(filters.page).toBe(1);
+  });
+
+  it('de-duplicates a repeated value', () => {
+    const filters = parseCollectionFilters(new URLSearchParams('countryId=1&countryId=1'));
+    expect(filters.countryIds).toEqual([1]);
   });
 
   it('knows whether anything narrows the listing', () => {

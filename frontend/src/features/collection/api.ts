@@ -1,5 +1,6 @@
 import { api, toQuery } from '@/shared/api/client';
 import type {
+  CoinMaterial,
   CollectionItem,
   CollectionItemCreate,
   CollectionItemUpdate,
@@ -21,13 +22,13 @@ export function fetchCollection(
     page: filters.page,
     pageSize,
     q: filters.q,
-    countryId: filters.countryId,
-    seriesId: filters.seriesId,
+    countryId: filters.countryIds,
+    seriesId: filters.seriesIds,
     yearFrom: filters.yearFrom,
     yearTo: filters.yearTo,
-    denominationId: filters.denominationId,
-    group: filters.group,
-    metalKind: filters.metalKind,
+    denominationId: filters.denominationIds,
+    group: filters.groups,
+    materialId: filters.materialIds,
     grade: filters.grade,
     sort: filters.sort,
     order: filters.order,
@@ -47,6 +48,12 @@ export function fetchOwnedSeries(countryId?: number): Promise<SeriesOut[]> {
 
 export function fetchOwnedDenominations(countryId?: number): Promise<DenominationOut[]> {
   return api<DenominationOut[]>(`/collection/denominations${toQuery({ countryId })}`);
+}
+
+/** Materials the user actually owns a coin of — for the "Мої монети" filters
+ *  panel's material multi-select. */
+export function fetchOwnedMaterials(countryId?: number): Promise<CoinMaterial[]> {
+  return api<CoinMaterial[]>(`/collection/materials${toQuery({ countryId })}`);
 }
 
 export function fetchCollectionItem(id: number): Promise<CollectionItem> {

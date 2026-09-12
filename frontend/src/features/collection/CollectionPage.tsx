@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { fetchSeriesProgress } from '@/features/series/api';
 import { ApiError } from '@/shared/api/client';
+import type { CollectionGroup } from '@/shared/api/types';
 import { useDismissable } from '@/shared/lib/useDismissable';
 import { formatNumber, formatPercent, formatUah } from '@/shared/lib/format';
 import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
@@ -28,6 +29,7 @@ import {
   fetchCollection,
   fetchOwnedCountries,
   fetchOwnedDenominations,
+  fetchOwnedMaterials,
   fetchOwnedSeries,
 } from './api';
 import { CollectionFiltersPanel } from './CollectionFiltersPanel';
@@ -65,17 +67,11 @@ const SORT_LABELS: Record<CollectionSort, string> = {
   grade: 'collection.sortGrade',
 };
 
-const GROUP_LABELS: Record<NonNullable<CollectionFilters['group']>, string> = {
+const GROUP_LABELS: Record<CollectionGroup, string> = {
   circulation: 'catalog.typeCirculation',
   commemorative: 'catalog.typeCommemorative',
   collector: 'catalog.typeCollector',
   other: 'catalog.typeOther',
-};
-
-const METAL_LABELS: Record<NonNullable<CollectionFilters['metalKind']>, string> = {
-  precious: 'catalog.metalPrecious',
-  base: 'catalog.metalBase',
-  unknown: 'catalog.metalUnknown',
 };
 
 export function CollectionPage() {
@@ -126,13 +122,21 @@ export function CollectionPage() {
     queryKey: ['collection', 'countries'],
     queryFn: () => fetchOwnedCountries(),
   });
+  // The panel only ever narrows against one country's own facets — a
+  // multi-country selection just shows the whole owned-scope list unnarrowed
+  // (same call as the catalog's own soleCountryId, CatalogPage.tsx).
+  const narrowCountryId = filters.countryIds.length === 1 ? filters.countryIds[0] : undefined;
   const seriesQuery = useQuery({
-    queryKey: ['collection', 'series', filters.countryId],
-    queryFn: () => fetchOwnedSeries(filters.countryId),
+    queryKey: ['collection', 'series', narrowCountryId],
+    queryFn: () => fetchOwnedSeries(narrowCountryId),
   });
   const denominationsQuery = useQuery({
-    queryKey: ['collection', 'denominations', filters.countryId],
-    queryFn: () => fetchOwnedDenominations(filters.countryId),
+    queryKey: ['collection', 'denominations', narrowCountryId],
+    queryFn: () => fetchOwnedDenominations(narrowCountryId),
+  });
+  const materialsQuery = useQuery({
+    queryKey: ['collection', 'materials', narrowCountryId],
+    queryFn: () => fetchOwnedMaterials(narrowCountryId),
   });
 
   const page = collectionQuery.data;
@@ -163,26 +167,26 @@ export function CollectionPage() {
     if (source.q) {
       chips.push({ key: 'q', label: source.q, onRemove: () => apply({ q: '' }) });
     }
-    if (source.countryId !== undefined) {
-      const country = (countriesQuery.data ?? []).find((c) => c.id === source.countryId);
-      if (country) {
-        chips.push({
-          key: 'country',
-          label: country.name,
-          onRemove: () =>
-            apply({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
-        });
-      }
+    for (const countryId of source.countryIds) {
+      const country = (countriesQuery.data ?? []).find((c) => c.id === countryId);
+      if (!country) continue;
+      chips.push({
+        key: `country-${countryId}`,
+        label: country.name,
+        onRemove: () => {
+          const countryIds = source.countryIds.filter((id) => id !== countryId);
+          apply({ countryIds, seriesIds: [], denominationIds: [], materialIds: [] });
+        },
+      });
     }
-    if (source.seriesId !== undefined) {
-      const series = (seriesQuery.data ?? []).find((s) => s.id === source.seriesId);
-      if (series) {
-        chips.push({
-          key: 'series',
-          label: series.name,
-          onRemove: () => apply({ seriesId: undefined }),
-        });
-      }
+    for (const seriesId of source.seriesIds) {
+      const series = (seriesQuery.data ?? []).find((s) => s.id === seriesId);
+      if (!series) continue;
+      chips.push({
+        key: `series-${seriesId}`,
+        label: series.name,
+        onRemove: () => apply({ seriesIds: source.seriesIds.filter((id) => id !== seriesId) }),
+      });
     }
     if (source.yearFrom !== undefined || source.yearTo !== undefined) {
       chips.push({
@@ -191,30 +195,31 @@ export function CollectionPage() {
         onRemove: () => apply({ yearFrom: undefined, yearTo: undefined }),
       });
     }
-    if (source.denominationId !== undefined) {
-      const denomination = (denominationsQuery.data ?? []).find(
-        (d) => d.id === source.denominationId,
-      );
-      if (denomination) {
-        chips.push({
-          key: 'denomination',
-          label: denomination.label,
-          onRemove: () => apply({ denominationId: undefined }),
-        });
-      }
-    }
-    if (source.group) {
+    for (const denominationId of source.denominationIds) {
+      const denomination = (denominationsQuery.data ?? []).find((d) => d.id === denominationId);
+      if (!denomination) continue;
       chips.push({
-        key: 'group',
-        label: t(GROUP_LABELS[source.group]),
-        onRemove: () => apply({ group: undefined }),
+        key: `denomination-${denominationId}`,
+        label: denomination.label,
+        onRemove: () =>
+          apply({ denominationIds: source.denominationIds.filter((id) => id !== denominationId) }),
       });
     }
-    if (source.metalKind) {
+    for (const group of source.groups) {
       chips.push({
-        key: 'metal',
-        label: t(METAL_LABELS[source.metalKind]),
-        onRemove: () => apply({ metalKind: undefined }),
+        key: `group-${group}`,
+        label: t(GROUP_LABELS[group]),
+        onRemove: () => apply({ groups: source.groups.filter((g) => g !== group) }),
+      });
+    }
+    for (const materialId of source.materialIds) {
+      const material = (materialsQuery.data ?? []).find((m) => m.id === materialId);
+      if (!material) continue;
+      chips.push({
+        key: `material-${materialId}`,
+        label: material.name,
+        onRemove: () =>
+          apply({ materialIds: source.materialIds.filter((id) => id !== materialId) }),
       });
     }
     if (source.grade) {
@@ -230,12 +235,20 @@ export function CollectionPage() {
   const activeChips = useMemo(
     () => buildChips(filters, update),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
-    [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t],
+    [
+      filters,
+      countriesQuery.data,
+      seriesQuery.data,
+      denominationsQuery.data,
+      materialsQuery.data,
+      update,
+      t,
+    ],
   );
   const draftChips = useMemo(
     () => buildChips(draft, (changes) => setDraft((current) => ({ ...current, ...changes }))),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
-    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, t],
+    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, materialsQuery.data, t],
   );
 
   const filtersPanel = (
@@ -247,6 +260,7 @@ export function CollectionPage() {
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
+      materials={materialsQuery.data ?? []}
       activeFilters={activeChips}
     />
   );
@@ -260,6 +274,7 @@ export function CollectionPage() {
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
+      materials={materialsQuery.data ?? []}
       activeFilters={draftChips}
     />
   );

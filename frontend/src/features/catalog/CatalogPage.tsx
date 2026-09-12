@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
+import type { CollectionGroup } from '@/shared/api/types';
 import { useDismissable } from '@/shared/lib/useDismissable';
 import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
 import type { ActiveFilterChip } from '@/shared/ui';
@@ -20,7 +21,13 @@ import {
   TableIcon,
 } from '@/shared/ui';
 
-import { fetchCatalog, fetchCountries, fetchDenominations, fetchSeries } from './api';
+import {
+  fetchCatalog,
+  fetchCatalogMaterials,
+  fetchCountries,
+  fetchDenominations,
+  fetchSeries,
+} from './api';
 import { CatalogTable } from './CatalogTable';
 import { CoinCard } from './CoinCard';
 import { FiltersPanel } from './FiltersPanel';
@@ -46,18 +53,21 @@ const SORT_LABELS: Record<SortField, string> = {
   price: 'catalog.sortPrice',
 };
 
-const GROUP_LABELS: Record<NonNullable<CatalogFilters['group']>, string> = {
+const GROUP_LABELS: Record<CollectionGroup, string> = {
   circulation: 'catalog.typeCirculation',
   commemorative: 'catalog.typeCommemorative',
   collector: 'catalog.typeCollector',
   other: 'catalog.typeOther',
 };
 
-const METAL_LABELS: Record<NonNullable<CatalogFilters['metalKind']>, string> = {
-  precious: 'catalog.metalPrecious',
-  base: 'catalog.metalBase',
-  unknown: 'catalog.metalUnknown',
-};
+// The catalog's own filter panel only ever offers a `catalog_confirmed`
+// country's own facets (§13a) — narrowed further to one country when
+// exactly one is picked, same as the single-select filters used to (a
+// multi-country selection just shows the whole confirmed-scope list
+// unnarrowed, owner's call, 2026-09-12).
+function soleCountryId(countryIds: number[]): number | undefined {
+  return countryIds.length === 1 ? countryIds[0] : undefined;
+}
 
 // A multiple of every column count the grid uses (1/2/3/5, see
 // CatalogPage.module.css), so a full page always fills complete rows instead
@@ -103,14 +113,22 @@ export function CatalogPage() {
     queryFn: () => fetchCatalog(filters, GRID_PAGE_SIZE),
     placeholderData: keepPreviousData,
   });
-  const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
+  const countriesQuery = useQuery({
+    queryKey: ['countries', 'confirmed'],
+    queryFn: () => fetchCountries('confirmed'),
+  });
+  const narrowCountryId = soleCountryId(filters.countryIds);
   const denominationsQuery = useQuery({
-    queryKey: ['denominations', filters.countryId],
-    queryFn: () => fetchDenominations(filters.countryId),
+    queryKey: ['denominations', 'confirmed', narrowCountryId],
+    queryFn: () => fetchDenominations(narrowCountryId, 'confirmed'),
   });
   const seriesQuery = useQuery({
-    queryKey: ['series', 'catalog', filters.countryId],
-    queryFn: () => fetchSeries(filters.countryId),
+    queryKey: ['series', 'catalog', narrowCountryId],
+    queryFn: () => fetchSeries(narrowCountryId, 'catalog'),
+  });
+  const materialsQuery = useQuery({
+    queryKey: ['catalog', 'materials', narrowCountryId],
+    queryFn: () => fetchCatalogMaterials(narrowCountryId),
   });
 
   // The same series list already fetched for the "Серія" filter, keyed by
@@ -137,26 +155,28 @@ export function CatalogPage() {
     if (source.q) {
       chips.push({ key: 'q', label: source.q, onRemove: () => apply({ q: '' }) });
     }
-    if (source.countryId !== undefined) {
-      const country = (countriesQuery.data ?? []).find((c) => c.id === source.countryId);
-      if (country) {
-        chips.push({
-          key: 'country',
-          label: country.name,
-          onRemove: () =>
-            apply({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
-        });
-      }
+    for (const countryId of source.countryIds) {
+      const country = (countriesQuery.data ?? []).find((c) => c.id === countryId);
+      if (!country) continue;
+      chips.push({
+        key: `country-${countryId}`,
+        label: country.name,
+        onRemove: () => {
+          const countryIds = source.countryIds.filter((id) => id !== countryId);
+          // Removing a country invalidates the series, denomination and
+          // material chosen under it too, same as changing the selection does.
+          apply({ countryIds, seriesIds: [], denominationIds: [], materialIds: [] });
+        },
+      });
     }
-    if (source.seriesId !== undefined) {
-      const series = (seriesQuery.data ?? []).find((s) => s.id === source.seriesId);
-      if (series) {
-        chips.push({
-          key: 'series',
-          label: series.name,
-          onRemove: () => apply({ seriesId: undefined }),
-        });
-      }
+    for (const seriesId of source.seriesIds) {
+      const item = (seriesQuery.data ?? []).find((s) => s.id === seriesId);
+      if (!item) continue;
+      chips.push({
+        key: `series-${seriesId}`,
+        label: item.name,
+        onRemove: () => apply({ seriesIds: source.seriesIds.filter((id) => id !== seriesId) }),
+      });
     }
     if (source.yearFrom !== undefined || source.yearTo !== undefined) {
       chips.push({
@@ -165,30 +185,31 @@ export function CatalogPage() {
         onRemove: () => apply({ yearFrom: undefined, yearTo: undefined }),
       });
     }
-    if (source.denominationId !== undefined) {
-      const denomination = (denominationsQuery.data ?? []).find(
-        (d) => d.id === source.denominationId,
-      );
-      if (denomination) {
-        chips.push({
-          key: 'denomination',
-          label: denomination.label,
-          onRemove: () => apply({ denominationId: undefined }),
-        });
-      }
-    }
-    if (source.group) {
+    for (const denominationId of source.denominationIds) {
+      const denomination = (denominationsQuery.data ?? []).find((d) => d.id === denominationId);
+      if (!denomination) continue;
       chips.push({
-        key: 'group',
-        label: t(GROUP_LABELS[source.group]),
-        onRemove: () => apply({ group: undefined }),
+        key: `denomination-${denominationId}`,
+        label: denomination.label,
+        onRemove: () =>
+          apply({ denominationIds: source.denominationIds.filter((id) => id !== denominationId) }),
       });
     }
-    if (source.metalKind) {
+    for (const group of source.groups) {
       chips.push({
-        key: 'metal',
-        label: t(METAL_LABELS[source.metalKind]),
-        onRemove: () => apply({ metalKind: undefined }),
+        key: `group-${group}`,
+        label: t(GROUP_LABELS[group]),
+        onRemove: () => apply({ groups: source.groups.filter((g) => g !== group) }),
+      });
+    }
+    for (const materialId of source.materialIds) {
+      const material = (materialsQuery.data ?? []).find((m) => m.id === materialId);
+      if (!material) continue;
+      chips.push({
+        key: `material-${materialId}`,
+        label: material.name,
+        onRemove: () =>
+          apply({ materialIds: source.materialIds.filter((id) => id !== materialId) }),
       });
     }
     if (source.owned !== undefined) {
@@ -204,12 +225,20 @@ export function CatalogPage() {
   const activeChips = useMemo(
     () => buildChips(filters, update),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
-    [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t],
+    [
+      filters,
+      countriesQuery.data,
+      seriesQuery.data,
+      denominationsQuery.data,
+      materialsQuery.data,
+      update,
+      t,
+    ],
   );
   const draftChips = useMemo(
     () => buildChips(draft, (changes) => setDraft((current) => ({ ...current, ...changes }))),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
-    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, t],
+    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, materialsQuery.data, t],
   );
 
   const filtersPanel = (
@@ -221,6 +250,7 @@ export function CatalogPage() {
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
+      materials={materialsQuery.data ?? []}
       activeFilters={activeChips}
     />
   );
@@ -234,6 +264,7 @@ export function CatalogPage() {
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
+      materials={materialsQuery.data ?? []}
       activeFilters={draftChips}
     />
   );

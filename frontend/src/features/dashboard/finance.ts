@@ -28,9 +28,9 @@ export interface SeriesProgress extends SeriesBreakdownEntry {
 }
 
 /**
- * Every series the viewer has started (at least one coin owned), closest to
- * completion first — a finished series (ratio 1) sorts to the end instead of
- * the top, since "nearest to completion" has nothing left to say about it.
+ * Every series the viewer has started (at least one coin owned), by how
+ * filled it is — least complete first, a finished series (ratio 1) last
+ * since it is the highest possible value. Equal fill breaks alphabetically.
  * A series with no coins owned at all is left out entirely.
  */
 export function myCollectionSeries(entries: SeriesBreakdownEntry[]): SeriesProgress[] {
@@ -41,10 +41,5 @@ export function myCollectionSeries(entries: SeriesBreakdownEntry[]): SeriesProgr
       ratio: entry.owned / entry.count,
       missing: entry.count - entry.owned,
     }))
-    .sort((a, b) => {
-      const aDone = a.missing === 0;
-      const bDone = b.missing === 0;
-      if (aDone !== bDone) return aDone ? 1 : -1;
-      return b.ratio - a.ratio || a.missing - b.missing || a.name.localeCompare(b.name);
-    });
+    .sort((a, b) => a.ratio - b.ratio || a.name.localeCompare(b.name));
 }

@@ -24,6 +24,7 @@
   },
   "common": {
     "loading": "Loading…",
+    "selectedCount": "{{count}} selected",
     "comingSoon": "This section arrives in the next part.",
     "comingSoonTitle": "Coming soon",
     "backToCatalog": "Go to the catalog",

@@ -24,6 +24,7 @@
   },
   "common": {
     "loading": "Завантаження…",
+    "selectedCount": "Обрано: {{count}}",
     "comingSoon": "Цей розділ з'явиться в наступній частині.",
     "comingSoonTitle": "Скоро",
     "backToCatalog": "Перейти до каталогу",

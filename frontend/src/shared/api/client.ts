@@ -136,10 +136,19 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
 }
 
 /** Serialise defined, non-empty values into a query string. */
-export function toQuery(params: Record<string, string | number | boolean | undefined>): string {
+export function toQuery(
+  params: Record<string, string | number | boolean | undefined | (string | number)[]>,
+): string {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value === undefined || value === '') continue;
+    if (Array.isArray(value)) {
+      // Repeated keys (?countryId=1&countryId=2) — the shape a multi-select
+      // filter sends and the backend's list[int] query params read
+      // (docs/03-api-contract.md, 2026-09-12).
+      for (const item of value) search.append(key, String(item));
+      continue;
+    }
     search.set(key, String(value));
   }
   const encoded = search.toString();

@@ -25,7 +25,7 @@ describe('valueDelta', () => {
 });
 
 describe('myCollectionSeries', () => {
-  it('orders started series by share, closest to completion first, drops untouched ones', () => {
+  it('orders started series by share, least complete first, drops untouched ones', () => {
     const result = myCollectionSeries([
       { id: 2, name: 'Half', country: 'Ukraine', count: 10, owned: 5 },
       { id: 3, name: 'Almost', country: 'Ukraine', count: 20, owned: 19 },
@@ -33,19 +33,19 @@ describe('myCollectionSeries', () => {
       { id: 5, name: 'Started', country: 'USA', count: 3, owned: 1 },
       { id: 6, name: 'Untouched', country: 'USA', count: 5, owned: 0 },
     ]);
-    expect(result.map((entry) => entry.name)).toEqual(['Almost', 'Half', 'Started']);
-    expect(result[0]).toMatchObject({ ratio: 0.95, missing: 1 });
+    expect(result.map((entry) => entry.name)).toEqual(['Started', 'Half', 'Almost']);
+    expect(result[2]).toMatchObject({ ratio: 0.95, missing: 1 });
   });
 
-  it('breaks a tie by the number of coins still missing', () => {
+  it('breaks a tie in fill percentage alphabetically', () => {
     const result = myCollectionSeries([
       { id: 1, name: 'Big', country: 'Ukraine', count: 100, owned: 50 },
       { id: 2, name: 'Small', country: 'Ukraine', count: 2, owned: 1 },
     ]);
-    expect(result.map((entry) => entry.name)).toEqual(['Small', 'Big']);
+    expect(result.map((entry) => entry.name)).toEqual(['Big', 'Small']);
   });
 
-  it('keeps completed series in the list, pushed to the end', () => {
+  it('keeps completed series in the list, last since 100% is the highest share', () => {
     const result = myCollectionSeries([
       { id: 1, name: 'Done', country: 'Ukraine', count: 4, owned: 4 },
       { id: 2, name: 'Half', country: 'Ukraine', count: 10, owned: 5 },
