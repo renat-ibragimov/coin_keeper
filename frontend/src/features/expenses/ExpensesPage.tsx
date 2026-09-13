@@ -9,6 +9,8 @@ import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { ExpenseCategory, ExpenseOut } from '@/shared/api/types';
 import { formatDate, formatMoney, formatSignedUah, formatUah } from '@/shared/lib/format';
+import type { SecondaryCurrency } from '@/shared/lib/secondaryAmount';
+import { pickSecondary } from '@/shared/lib/secondaryAmount';
 import { useChartPalette } from '@/shared/theme/useChartPalette';
 import type { SortOrder } from '@/shared/ui';
 import {
@@ -107,6 +109,8 @@ export function ExpensesPage() {
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const collectionEmpty = bootstrapQuery.data?.dashboard.isEmpty === true;
+  const secondaryCurrency: SecondaryCurrency =
+    bootstrapQuery.data?.settings.secondaryCurrency === 'EUR' ? 'EUR' : 'USD';
 
   const invalidate = () =>
     Promise.all(DEPENDENT_KEYS.map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
@@ -373,7 +377,11 @@ export function ExpensesPage() {
                   {/* By the NBU rate on the expense's own date, so the spending
                       reads in a currency that does not move under your feet
                       (docs/BACKLOG.md). Nothing sorts by it yet. */}
-                  <th className={styles.usdColumn}>{t('expenses.amountUsdHeader')}</th>
+                  <th className={styles.usdColumn}>
+                    {t('expenses.amountSecondaryHeader', {
+                      currency: t(`common.currencyNames.${secondaryCurrency}`),
+                    })}
+                  </th>
                   <th className={styles.actionsColumn}>{t('catalog.tableActions')}</th>
                 </tr>
               </thead>
@@ -406,8 +414,11 @@ export function ExpensesPage() {
                         {formatMoney(expense.amount, expense.currencyCode, locale)}
                       </td>
                       <td className={`${cellAlign.center} ${styles.secondary} tabular`}>
-                        {formatMoney(expense.amountUsd, 'USD', locale) ??
-                          t('dashboard.rateMissing')}
+                        {formatMoney(
+                          pickSecondary(expense.amountUsd, expense.amountEur, secondaryCurrency),
+                          secondaryCurrency,
+                          locale,
+                        ) ?? t('dashboard.rateMissing')}
                       </td>
                       <td className={styles.actions}>
                         {/* A purchase's expense is maintained by the purchase

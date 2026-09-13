@@ -99,8 +99,9 @@ class ExpenseService:
                 expense,
                 coin_title=title if expense.category == ExpenseCategory.COIN_PURCHASE else None,
                 amount_usd=amount_usd,
+                amount_eur=amount_eur,
             )
-            for expense, title, amount_usd in rows
+            for expense, title, amount_usd, amount_eur in rows
         ]
         return items, total
 
@@ -122,7 +123,11 @@ class ExpenseService:
             description=payload.description,
         )
         await self._repo.add(expense)
-        return self._out(expense, amount_usd=await self._amount_usd_for(expense))
+        return self._out(
+            expense,
+            amount_usd=await self._amount_usd_for(expense),
+            amount_eur=await self._amount_eur_for(expense),
+        )
 
     async def update(self, expense_id: int, payload: ExpenseUpdate) -> ExpenseOut:
         expense = await self._get_editable(expense_id)
@@ -142,7 +147,11 @@ class ExpenseService:
         if rate_needed:
             expense.rate_uah = await self._resolve_rate(expense.currency_code, expense.expense_date)
         await self._session.flush()
-        return self._out(expense, amount_usd=await self._amount_usd_for(expense))
+        return self._out(
+            expense,
+            amount_usd=await self._amount_usd_for(expense),
+            amount_eur=await self._amount_eur_for(expense),
+        )
 
     async def delete(self, expense_id: int) -> None:
         expense = await self._get_editable(expense_id)
@@ -295,9 +304,21 @@ class ExpenseService:
         amount_uah = expense.amount * (expense.rate_uah or Decimal(1))
         return amount_uah / usd_rate
 
+    async def _amount_eur_for(self, expense: Expense) -> Decimal | None:
+        """Same as _amount_usd_for(), converted by the EUR rate instead."""
+        eur_rate = await self._rates.rate_on("EUR", expense.expense_date)
+        if eur_rate is None:
+            return None
+        amount_uah = expense.amount * (expense.rate_uah or Decimal(1))
+        return amount_uah / eur_rate
+
     @staticmethod
     def _out(
-        expense: Expense, *, coin_title: str | None = None, amount_usd: Decimal | None = None
+        expense: Expense,
+        *,
+        coin_title: str | None = None,
+        amount_usd: Decimal | None = None,
+        amount_eur: Decimal | None = None,
     ) -> ExpenseOut:
         return ExpenseOut(
             id=expense.id,
@@ -307,6 +328,7 @@ class ExpenseService:
             rate_uah=expense.rate_uah,
             amount_uah=expense.amount * (expense.rate_uah or Decimal(1)),
             amount_usd=amount_usd,
+            amount_eur=amount_eur,
             expense_date=expense.expense_date,
             catalog_item_id=expense.catalog_item_id,
             collection_item_id=expense.collection_item_id,

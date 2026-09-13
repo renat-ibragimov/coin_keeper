@@ -642,6 +642,8 @@ async def test_purchase_total_usd_uses_the_purchase_own_date_not_a_later_rate(
     item = await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
     await add_rate(db_session, "USD", "27.50", date(2020, 7, 20))
     await add_rate(db_session, "USD", "44.55", date(2026, 9, 1))
+    await add_rate(db_session, "EUR", "25.00", date(2020, 7, 20))
+    await add_rate(db_session, "EUR", "48.00", date(2026, 9, 1))
     await add_collection_item(
         db_session,
         owner_id=ctx.id_a,
@@ -655,11 +657,14 @@ async def test_purchase_total_usd_uses_the_purchase_own_date_not_a_later_rate(
     card = (await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))).json()
     # 55 / 27.50 = 2.00 -- the 2020 rate, not 55 / 44.55 the 2026 one.
     assert card["purchaseTotalUsd"] == "2.00"
+    # 55 / 25.00 = 2.20 -- same rule, the EUR side of it.
+    assert card["purchaseTotalEur"] == "2.20"
 
     instances = (
         await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a))
     ).json()
     assert instances[0]["totalUsd"] == "2.00"
+    assert instances[0]["totalEur"] == "2.20"
 
 
 async def test_purchase_total_usd_null_without_a_rate_that_far_back(
@@ -679,11 +684,13 @@ async def test_purchase_total_usd_null_without_a_rate_that_far_back(
 
     card = (await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))).json()
     assert card["purchaseTotalUsd"] is None
+    assert card["purchaseTotalEur"] is None
 
     instances = (
         await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a))
     ).json()
     assert instances[0]["totalUsd"] is None
+    assert instances[0]["totalEur"] is None
 
 
 async def test_snapshot_in_foreign_currency_converted(

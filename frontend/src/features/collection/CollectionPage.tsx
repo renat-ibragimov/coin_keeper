@@ -96,7 +96,7 @@ export function CollectionPage() {
   };
 
   const [searchParams] = useSearchParams();
-  const viewMode = useStoredViewMode('ck.viewMode.collection');
+  const viewMode = useStoredViewMode('ck.viewMode.collection', 'collectionViewMode');
   useEffect(() => {
     // Only on mount, and only when the URL itself says nothing: a shared
     // link's own `?view=` always wins over what was remembered here.

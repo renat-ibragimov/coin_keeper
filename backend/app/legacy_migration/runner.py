@@ -754,13 +754,14 @@ class MigrationRunner:
         display_currency = _unwrap_json(settings.get("display_currency"))
         if isinstance(display_currency, str) and display_currency:
             values["display_currency"] = display_currency
-        for legacy_key, column in (
-            ("default_grade_commemorative", "default_grade_commemorative"),
-            ("default_grade_circulation", "default_grade_circulation"),
-        ):
+        # The legacy split into per-group defaults is gone (migration 0014):
+        # one default now covers every new purchase. Prefer the commemorative
+        # value — historically the better of the two as a starting suggestion.
+        for legacy_key in ("default_grade_commemorative", "default_grade_circulation"):
             value = _unwrap_json(settings.get(legacy_key))
             if isinstance(value, str) and value:
-                values[column] = value
+                values["default_grade"] = value
+                break
 
         self._report.migrated["user_settings"] = 1
         if not values or self._options.dry_run or self._owner_id is None:

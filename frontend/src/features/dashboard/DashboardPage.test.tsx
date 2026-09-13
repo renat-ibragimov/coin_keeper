@@ -24,9 +24,12 @@ function makeBootstrap(overrides: Partial<BootstrapOut['dashboard']> = {}): Boot
     settings: {
       locale: 'uk',
       displayCurrency: 'UAH',
-      defaultGradeCommemorative: 'UNC',
-      defaultGradeCirculation: 'VF',
+      defaultGrade: 'UNC',
       showPackagingVariants: false,
+      theme: 'system',
+      catalogViewMode: 'cards',
+      collectionViewMode: 'cards',
+      secondaryCurrency: 'USD',
     },
     dashboard: {
       catalogItems: 3063,

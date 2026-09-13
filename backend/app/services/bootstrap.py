@@ -102,18 +102,26 @@ class BootstrapService:
             return SettingsOut(
                 locale=self._user.locale,
                 display_currency="UAH",
-                default_grade_commemorative="UNC",
-                default_grade_circulation="VF",
+                default_grade="UNC",
                 show_packaging_variants=True,
+                theme="system",
+                catalog_view_mode="cards",
+                collection_view_mode="cards",
+                secondary_currency="USD",
             )
         return SettingsOut(
             locale=row.locale,
             display_currency=row.display_currency,
-            default_grade_commemorative=row.default_grade_commemorative,
-            default_grade_circulation=row.default_grade_circulation,
+            default_grade=row.default_grade,
             show_packaging_variants=row.show_packaging_variants,
+            theme=row.theme,
+            catalog_view_mode=row.catalog_view_mode,
+            collection_view_mode=row.collection_view_mode,
+            secondary_currency=row.secondary_currency,
         )
 
-    async def update_settings(self, *, show_packaging_variants: bool) -> SettingsOut:
-        await self._users.set_show_packaging_variants(self._user.id, show_packaging_variants)
+    async def update_settings(self, **fields: object) -> SettingsOut:
+        changes = {key: value for key, value in fields.items() if value is not None}
+        if changes:
+            await self._users.update_settings(self._user.id, **changes)
         return await self._settings()

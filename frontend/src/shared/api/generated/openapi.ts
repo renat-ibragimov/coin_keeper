@@ -783,6 +783,8 @@ export interface components {
             purchaseTotalUah: string;
             /** Purchasetotalusd */
             purchaseTotalUsd: string | null;
+            /** Purchasetotaleur */
+            purchaseTotalEur: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
@@ -877,6 +879,8 @@ export interface components {
             totalUah: string;
             /** Totalusd */
             totalUsd: string | null;
+            /** Totaleur */
+            totalEur: string | null;
             /** Notes */
             notes: string | null;
         };
@@ -1051,6 +1055,8 @@ export interface components {
             purchaseTotalUah: string;
             /** Purchasetotalusd */
             purchaseTotalUsd: string | null;
+            /** Purchasetotaleur */
+            purchaseTotalEur: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
@@ -1456,6 +1462,8 @@ export interface components {
             amountUah: string;
             /** Amountusd */
             amountUsd: string | null;
+            /** Amounteur */
+            amountEur: string | null;
             /**
              * Expensedate
              * Format: date
@@ -1755,17 +1763,36 @@ export interface components {
             locale: string;
             /** Displaycurrency */
             displayCurrency: string;
-            /** Defaultgradecommemorative */
-            defaultGradeCommemorative: string;
-            /** Defaultgradecirculation */
-            defaultGradeCirculation: string;
+            /** Defaultgrade */
+            defaultGrade: string;
             /** Showpackagingvariants */
             showPackagingVariants: boolean;
+            /** Theme */
+            theme: string;
+            /** Catalogviewmode */
+            catalogViewMode: string;
+            /** Collectionviewmode */
+            collectionViewMode: string;
+            /** Secondarycurrency */
+            secondaryCurrency: string;
         };
-        /** SettingsUpdate */
+        /**
+         * SettingsUpdate
+         * @description Partial update: only the fields the caller sends are changed.
+         */
         SettingsUpdate: {
             /** Showpackagingvariants */
-            showPackagingVariants: boolean;
+            showPackagingVariants?: boolean | null;
+            /** Defaultgrade */
+            defaultGrade?: string | null;
+            /** Theme */
+            theme?: ("light" | "dark" | "system") | null;
+            /** Catalogviewmode */
+            catalogViewMode?: ("cards" | "table") | null;
+            /** Collectionviewmode */
+            collectionViewMode?: ("cards" | "table") | null;
+            /** Secondarycurrency */
+            secondaryCurrency?: ("USD" | "EUR") | null;
         };
         /**
          * TokensOut

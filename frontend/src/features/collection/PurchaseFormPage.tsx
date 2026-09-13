@@ -23,7 +23,6 @@ import {
 
 import { createCollectionItem, fetchCollectionItem, updateCollectionItem } from './api';
 import { CatalogItemPicker } from './CatalogItemPicker';
-import { defaultGradeFor } from './grades';
 import { COLLECTION_DEPENDENT_KEYS } from './model';
 import { PurchaseForm } from './PurchaseForm';
 import type { PurchaseValues } from './PurchaseForm';
@@ -198,10 +197,7 @@ export function PurchaseFormPage() {
               <PurchaseForm
                 key={editing ? `edit-${editId}` : `new-${catalogItemId}`}
                 initial={editing ? instanceQuery.data : undefined}
-                defaultGrade={defaultGradeFor(
-                  cardQuery.data.collectionGroup,
-                  bootstrapQuery.data.settings,
-                )}
+                defaultGrade={bootstrapQuery.data.settings.defaultGrade}
                 currencies={currenciesQuery.data ?? []}
                 busy={mutation.isPending}
                 submitError={mutation.error}

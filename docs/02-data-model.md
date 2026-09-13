@@ -755,13 +755,33 @@ UNIQUE (owner_id, url)
 user_id     bigint PK FK users ON DELETE CASCADE
 locale      text NOT NULL DEFAULT 'uk'   -- 'uk' | 'en'
 display_currency text NOT NULL DEFAULT 'UAH'
-default_grade_commemorative text NOT NULL DEFAULT 'UNC'
-default_grade_circulation   text NOT NULL DEFAULT 'VF'
+default_grade text NOT NULL DEFAULT 'UNC'
+show_packaging_variants boolean NOT NULL DEFAULT true
+theme       text NOT NULL DEFAULT 'system'   -- 'light' | 'dark' | 'system'
+catalog_view_mode     text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
+collection_view_mode  text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
+secondary_currency    text NOT NULL DEFAULT 'USD'     -- 'USD' | 'EUR'
 updated_at  timestamptz
 ```
 
-Значения по умолчанию — из ТЗ (раздел 6): памятные и коллекционные считаются в UNC,
-обиходные в VF.
+Один дефолт на все монеты, редактируемый в настройках (`PATCH /bootstrap/settings`),
+подставляется в форму покупки независимо от группы каталога. До миграции 0014 было два
+раздельных столбца по группе каталога (`default_grade_commemorative` = 'UNC' из ТЗ, раздел
+6, `default_grade_circulation` = 'VF') без интерфейса для правки; объединены в одно
+редактируемое поле — разделение по группе не оправдывало сложность.
+
+`theme`, `catalog_view_mode`, `collection_view_mode` (миграция 0015) — кросс-девайсные
+версии того, что раньше жило только в localStorage браузера. Клиент по-прежнему держит
+локальную копию для мгновенной отрисовки до ответа `GET /bootstrap` (и для экранов входа,
+где юзера ещё нет), но именно эта колонка переживает новый браузер или устройство.
+
+`secondary_currency` (миграция 0016) — какая валюта показывается вторым числом рядом с
+гривневой суммой («≈ …») в карточке монеты, в «Мої монети» и в «Гроші». Гривна остаётся
+основной осью расчётов всюду; вторичная валюта — только слой отображения. Только `USD`
+или `EUR`: история курсов НБУ (`exchange_rates`) покрывает лишь эти две.
+
+`display_currency` де-факто мёртвое поле: всегда `'UAH'`, ни UI, ни PATCH-параметра для
+его изменения нет.
 
 ### auth_tokens
 

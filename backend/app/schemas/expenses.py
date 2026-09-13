@@ -21,6 +21,7 @@ class ExpenseOut(CamelModel):
     rate_uah: Rate | None
     amount_uah: Money
     amount_usd: Money | None
+    amount_eur: Money | None
     expense_date: date
     catalog_item_id: int | None
     collection_item_id: int | None

@@ -133,6 +133,8 @@ async def test_amount_usd_uses_the_expense_own_date_not_a_later_rate(
     dollar figure (owner-reported bug, 2026-09-13)."""
     await add_rate(db_session, "USD", "27.50", date(2020, 7, 20))
     await add_rate(db_session, "USD", "44.55", date(2026, 9, 1))
+    await add_rate(db_session, "EUR", "25.00", date(2020, 7, 20))
+    await add_rate(db_session, "EUR", "48.00", date(2026, 9, 1))
     headers = auth(ctx.token_a)
 
     created = await client.post(
@@ -148,9 +150,12 @@ async def test_amount_usd_uses_the_expense_own_date_not_a_later_rate(
     assert created.status_code == 201, created.text
     # 55 / 27.50 = 2.00 -- the 2020 rate, not 55 / 44.55 the 2026 one.
     assert created.json()["amountUsd"] == "2.00"
+    # 55 / 25.00 = 2.20 -- same rule, the EUR side of it.
+    assert created.json()["amountEur"] == "2.20"
 
     listing = await client.get("/api/v1/expenses", headers=headers)
     assert listing.json()["items"][0]["amountUsd"] == "2.00"
+    assert listing.json()["items"][0]["amountEur"] == "2.20"
 
 
 async def test_amount_usd_is_null_without_a_rate_that_far_back(
@@ -169,6 +174,7 @@ async def test_amount_usd_is_null_without_a_rate_that_far_back(
     )
     assert created.status_code == 201, created.text
     assert created.json()["amountUsd"] is None
+    assert created.json()["amountEur"] is None
 
 
 async def test_coin_purchase_guard(client: AsyncClient, ctx: SimpleNamespace) -> None:

@@ -8,7 +8,14 @@ export function updateProfile(body: {
   return api<UserOut>('/auth/me', { method: 'PATCH', body });
 }
 
-export function updateSettings(body: { showPackagingVariants: boolean }): Promise<SettingsOut> {
+export function updateSettings(body: {
+  showPackagingVariants?: boolean;
+  defaultGrade?: string;
+  theme?: 'light' | 'dark' | 'system';
+  catalogViewMode?: 'cards' | 'table';
+  collectionViewMode?: 'cards' | 'table';
+  secondaryCurrency?: 'USD' | 'EUR';
+}): Promise<SettingsOut> {
   return api<SettingsOut>('/bootstrap/settings', { method: 'PATCH', body });
 }
 

@@ -85,6 +85,7 @@ class CatalogListItem(CamelModel):
     quantity_owned: int
     purchase_total_uah: Money
     purchase_total_usd: Money | None
+    purchase_total_eur: Money | None
     obverse_image: CoinImageOut | None
     reverse_image: CoinImageOut | None
     thumbnail_url: str | None
@@ -230,4 +231,5 @@ class CatalogCollectionItemOut(CamelModel):
     purchase_rate_uah: Rate | None
     total_uah: Money
     total_usd: Money | None
+    total_eur: Money | None
     notes: str | None

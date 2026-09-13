@@ -339,6 +339,11 @@ button.photoFrame {
   color: var(--color-text-muted);
 }
 
+.priceApprox {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 /* A touch more physical than a plain link: a firmer underline on hover,
  * eased in rather than snapping. */
 .sourceLink {

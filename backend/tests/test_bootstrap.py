@@ -349,3 +349,47 @@ async def test_update_settings_persists_and_is_per_user(
     # Untouched for user B: still the default, on.
     body_b = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_b))
     assert body_b.json()["settings"]["showPackagingVariants"] is True
+
+
+async def test_update_settings_theme_and_view_mode_default_and_persist(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    fresh = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
+    settings = fresh.json()["settings"]
+    assert settings["theme"] == "system"
+    assert settings["catalogViewMode"] == "cards"
+    assert settings["collectionViewMode"] == "cards"
+
+    response = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"theme": "dark", "catalogViewMode": "table"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["theme"] == "dark"
+    assert body["catalogViewMode"] == "table"
+    # Untouched field keeps its previous value — a partial update.
+    assert body["collectionViewMode"] == "cards"
+
+
+async def test_update_settings_secondary_currency_default_and_persist(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    fresh = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
+    assert fresh.json()["settings"]["secondaryCurrency"] == "USD"
+
+    response = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"secondaryCurrency": "EUR"},
+    )
+    assert response.status_code == 200
+    assert response.json()["secondaryCurrency"] == "EUR"
+
+    rejected = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"secondaryCurrency": "GBP"},
+    )
+    assert rejected.status_code == 422

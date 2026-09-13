@@ -45,7 +45,11 @@
     "actions": "Actions",
     "all": "All",
     "none": "—",
-    "optional": "optional"
+    "optional": "optional",
+    "currencyNames": {
+      "USD": "dollars",
+      "EUR": "euros"
+    }
   },
   "pagination": {
     "label": "Pages",
@@ -303,7 +307,7 @@
     "instanceNotes": "Note",
     "instanceOwnedFor": "Owned for",
     "rateFormat": "{{rate}} ₴ per 1 {{symbol}}",
-    "approxUsd": "≈ {{value}} $",
+    "approxSecondary": "≈ {{value}} {{symbol}}",
     "durationToday": "Today",
     "durationYears_one": "{{count}} year",
     "durationYears_other": "{{count}} years",
@@ -390,6 +394,18 @@
     "updated": "Purchase updated.",
     "instanceNotFound": "Instance not found"
   },
+  "grades": {
+    "UNC": "UNC — Uncirculated",
+    "BU": "BU — Brilliant Uncirculated, full mint luster",
+    "PROOF": "PROOF — specially struck for collectors",
+    "PL": "PL — Proof-like, mirror surfaces, uncirculated",
+    "AU": "AU — About Uncirculated, barely any wear",
+    "XF": "XF — Extremely Fine, light circulation wear",
+    "VF": "VF — Very Fine, noticeable but moderate wear",
+    "F": "F — Fine, details still clear",
+    "VG": "VG — Very Good, heavy wear",
+    "G": "G — Good, worn, details barely readable"
+  },
   "series": {
     "title": "Series",
     "subtitle": "Completeness by series: what is collected, what is left and what it costs.",
@@ -458,7 +474,7 @@
     },
     "amount": "Amount, {{symbol}}",
     "amountHeader": "Cost",
-    "amountUsdHeader": "In dollars",
+    "amountSecondaryHeader": "In {{currency}}",
     "amountInvalid": "Enter the amount as a number above 0.",
     "date": "Date",
     "vendor": "Vendor",
@@ -478,7 +494,7 @@
   },
   "settings": {
     "title": "Settings",
-    "subtitle": "Profile, appearance, password and default grades.",
+    "subtitle": "Profile, password, appearance and catalog.",
     "profileTitle": "Profile",
     "email": "Email",
     "displayName": "Name",
@@ -486,7 +502,10 @@
     "locale": "Interface language",
     "localeUk": "Українська",
     "localeEn": "English",
-    "localeAppliesOnSave": "The language switches after saving.",
+    "secondaryCurrency": "Secondary currency",
+    "secondaryCurrencyNote": "Shown next to the UAH amount — purchases, current value, expenses.",
+    "secondaryCurrencyUsd": "US Dollar (USD)",
+    "secondaryCurrencyEur": "Euro (EUR)",
     "profileSaved": "Profile saved.",
     "appearanceTitle": "Appearance",
     "theme": "Theme",
@@ -495,10 +514,9 @@
     "themeSystem": "System",
     "themeNote": "The theme is remembered in this browser; without a choice the system one applies.",
     "gradesTitle": "Default grade",
-    "gradeCommemorative": "Commemorative and collector",
-    "gradeCirculation": "Circulation",
-    "gradesNote": "Pre-filled in the purchase form; change it right there.",
-    "catalogTitle": "Catalog",
+    "gradesNote": "Pre-filled in the purchase form for any coin; change it right there.",
+    "catalogPrefsTitle": "Catalog & collection",
+    "packagingTitle": "Packaging",
     "showPackagingVariants": "Show souvenir-packaging coins as their own card",
     "showPackagingVariantsNote": "When off, a souvenir-packaging card is hidden — only the plain card of the same coin shows.",
     "viewModeTitle": "Default view",

@@ -28,6 +28,7 @@ import { ToastProvider } from '@/shared/ui';
 import { ComingSoon } from './ComingSoon';
 import { AppLayout } from './layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
+import { ThemeSettingsSync } from './ThemeSettingsSync';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -137,11 +138,12 @@ function RedirectMissingToCatalog() {
 
 export function App() {
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
         <LocaleCacheReset />
         <ToastProvider>
           <AuthProvider>
+            <ThemeSettingsSync />
             <BrowserRouter>
               <ScrollToTop />
               <Routes>
@@ -188,7 +190,7 @@ export function App() {
             </BrowserRouter>
           </AuthProvider>
         </ToastProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

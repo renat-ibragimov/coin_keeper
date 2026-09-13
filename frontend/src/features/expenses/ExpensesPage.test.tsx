@@ -80,9 +80,12 @@ function makeBootstrap(isEmpty: boolean): BootstrapOut {
     settings: {
       locale: 'uk',
       displayCurrency: 'UAH',
-      defaultGradeCommemorative: 'UNC',
-      defaultGradeCirculation: 'VF',
+      defaultGrade: 'UNC',
       showPackagingVariants: false,
+      theme: 'system',
+      catalogViewMode: 'cards',
+      collectionViewMode: 'cards',
+      secondaryCurrency: 'USD',
     },
     dashboard: {
       catalogItems: 0,
@@ -177,6 +180,7 @@ function makeExpense(overrides: Partial<ExpenseOut>): ExpenseOut {
     rateUah: '1',
     amountUah: '100.00',
     amountUsd: null,
+    amountEur: null,
     expenseDate: '2024-01-01',
     catalogItemId: null,
     collectionItemId: null,

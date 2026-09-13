@@ -1,6 +1,11 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
+import { fetchBootstrap } from '@/features/dashboard/api';
+import { updateSettings } from '@/features/settings/api';
+
 export type ViewMode = 'cards' | 'table';
+type ViewModeSettingsField = 'catalogViewMode' | 'collectionViewMode';
 
 function isViewMode(value: string | null | undefined): value is ViewMode {
   return value === 'cards' || value === 'table';
@@ -16,19 +21,36 @@ function readStoredView(key: string): ViewMode | undefined {
 }
 
 /**
- * Remembers which view (cards or table) the viewer last picked for a page —
- * same localStorage pattern as ThemeProvider. The URL stays authoritative: an
- * explicit `?view=` always wins; storage only supplies the default when the
- * URL doesn't say, and every explicit switch is written back to it so the
- * choice survives the next visit.
+ * Remembers which view (cards or table) the viewer last picked for a page.
+ *
+ * `user_settings.{catalog,collection}_view_mode` (docs/03-api-contract.md) is
+ * the value that survives a new browser or device; localStorage is only a
+ * fast local cache so a returning visit doesn't wait on the network before
+ * picking a default. The URL stays authoritative over both: an explicit
+ * `?view=` always wins, storage/server only supply the default when the URL
+ * doesn't say, and every explicit switch is written to both.
  */
-export function useStoredViewMode(storageKey: string) {
+export function useStoredViewMode(storageKey: string, settingsField: ViewModeSettingsField) {
+  const queryClient = useQueryClient();
+  // Shares the cache with every other `['bootstrap']` query in the app — this
+  // never fires an extra network request on its own.
+  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const mutation = useMutation({
+    mutationFn: (view: ViewMode) =>
+      settingsField === 'catalogViewMode'
+        ? updateSettings({ catalogViewMode: view })
+        : updateSettings({ collectionViewMode: view }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['bootstrap'] }),
+  });
+
   const resolve = useCallback(
     (urlView: string | undefined): ViewMode => {
       if (isViewMode(urlView)) return urlView;
+      const serverView = bootstrapQuery.data?.settings[settingsField];
+      if (isViewMode(serverView)) return serverView;
       return readStoredView(storageKey) ?? 'cards';
     },
-    [storageKey],
+    [storageKey, settingsField, bootstrapQuery.data],
   );
 
   const remember = useCallback(
@@ -36,10 +58,11 @@ export function useStoredViewMode(storageKey: string) {
       try {
         localStorage.setItem(storageKey, view);
       } catch {
-        /* remembering is a convenience, not a requirement */
+        /* remembering locally is a convenience, not a requirement */
       }
+      mutation.mutate(view);
     },
-    [storageKey],
+    [storageKey, mutation],
   );
 
   return { resolve, remember };

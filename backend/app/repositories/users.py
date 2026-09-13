@@ -40,11 +40,15 @@ class UserRepository:
         )
         await self._session.flush()
 
-    async def set_show_packaging_variants(self, user_id: int, value: bool) -> None:
+    async def update_settings(self, user_id: int, **fields: object) -> None:
+        """Generic partial update: pass only the `user_settings` columns that
+        changed. Keeps adding a new setting (currency, storage locations, …)
+        a one-line change in the schema rather than a new repository method
+        each time."""
+        if not fields:
+            return
         await self._session.execute(
-            update(UserSettings)
-            .where(UserSettings.user_id == user_id)
-            .values(show_packaging_variants=value)
+            update(UserSettings).where(UserSettings.user_id == user_id).values(**fields)
         )
         await self._session.flush()
 

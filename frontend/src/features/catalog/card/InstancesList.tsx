@@ -16,7 +16,13 @@ import {
 } from '@/shared/lib/format';
 import { Badge, Button, CoinImage, EmptyState, Skeleton } from '@/shared/ui';
 
-import { formatUsd, formatUsdSigned, toUsd } from './usdApprox';
+import type { SecondaryCurrency } from '@/shared/lib/secondaryAmount';
+import {
+  formatSecondary,
+  formatSecondarySigned,
+  pickSecondary,
+  toSecondary,
+} from '@/shared/lib/secondaryAmount';
 import styles from './InstancesList.module.css';
 
 interface InstancePhoto {
@@ -37,11 +43,13 @@ interface InstancesListProps {
   photo: InstancePhoto;
   /** The catalog item's current market price, same for every instance. */
   currentPriceUah: string | null;
-  /** The live NBU USD/UAH rate (bootstrap's exchangeRates) — only for a
-   *  row's current value, which has no purchase date of its own to convert
-   *  by. Its purchase total uses item.totalUsd instead, the backend's own
-   *  historical-rate conversion. null renders a ≈$ as "no data". */
-  usdRate: number | null;
+  /** Which currency the ≈ figures convert to (settings.secondaryCurrency). */
+  secondaryCurrency: SecondaryCurrency;
+  /** The live NBU rate for that currency (bootstrap's exchangeRates) — only
+   *  for a row's current value, which has no purchase date of its own to
+   *  convert by. Its purchase total uses item.totalUsd/totalEur instead, the
+   *  backend's own historical-rate conversion. null renders "no data". */
+  secondaryRate: number | null;
 }
 
 /** "Скільки часу монета вже в колекції" — the single largest whole unit, not
@@ -66,7 +74,8 @@ export function InstancesList({
   coinTitle,
   photo,
   currentPriceUah,
-  usdRate,
+  secondaryCurrency,
+  secondaryRate,
 }: InstancesListProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -95,8 +104,9 @@ export function InstancesList({
   }
 
   const currentPrice = currentPriceUah !== null ? Number(currentPriceUah) : null;
-  const usdText = (value: string | null) =>
-    value !== null ? t('card.approxUsd', { value }) : t('dashboard.rateMissing');
+  const symbol = currencySymbol(secondaryCurrency);
+  const approxText = (value: string | null) =>
+    value !== null ? t('card.approxSecondary', { value, symbol }) : t('dashboard.rateMissing');
 
   return (
     <>
@@ -133,15 +143,21 @@ export function InstancesList({
               const change = rowCurrentValue !== null ? rowCurrentValue - purchaseTotal : null;
               const changePercent =
                 change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
-              // The backend's own historical-rate conversion (item.totalUsd)
-              // for what was spent then; the live rate only for a value with
-              // no purchase date of its own (see the prop doc above).
-              const purchaseTotalUsd = item.totalUsd !== null ? Number(item.totalUsd) : null;
-              const rowCurrentValueUsd =
-                rowCurrentValue !== null ? toUsd(rowCurrentValue, usdRate) : null;
-              const changeUsd =
-                rowCurrentValueUsd !== null && purchaseTotalUsd !== null
-                  ? rowCurrentValueUsd - purchaseTotalUsd
+              // The backend's own historical-rate conversion (item.totalUsd/
+              // totalEur) for what was spent then; the live rate only for a
+              // value with no purchase date of its own (see the prop doc above).
+              const purchaseTotalSecondary = pickSecondary(
+                item.totalUsd,
+                item.totalEur,
+                secondaryCurrency,
+              );
+              const purchaseTotalApprox =
+                purchaseTotalSecondary !== null ? Number(purchaseTotalSecondary) : null;
+              const rowCurrentValueApprox =
+                rowCurrentValue !== null ? toSecondary(rowCurrentValue, secondaryRate) : null;
+              const changeApprox =
+                rowCurrentValueApprox !== null && purchaseTotalApprox !== null
+                  ? rowCurrentValueApprox - purchaseTotalApprox
                   : null;
               const editHref = `/collection/coins/${item.id}/edit`;
 
@@ -170,7 +186,7 @@ export function InstancesList({
                   <td className="tabular">
                     <span className={styles.price}>{formatUah(purchaseTotal, locale) ?? '—'}</span>
                     <span className={styles.secondary}>
-                      {usdText(formatUsd(purchaseTotalUsd, locale))}
+                      {approxText(formatSecondary(purchaseTotalApprox, locale))}
                     </span>
                     {rate ? (
                       <span className={styles.secondary}>
@@ -186,7 +202,7 @@ export function InstancesList({
                       <>
                         <span className={styles.price}>{formatUah(rowCurrentValue, locale)}</span>
                         <span className={styles.secondary}>
-                          {usdText(formatUsd(rowCurrentValueUsd, locale))}
+                          {approxText(formatSecondary(rowCurrentValueApprox, locale))}
                         </span>
                       </>
                     ) : (
@@ -215,7 +231,11 @@ export function InstancesList({
                           </span>
                         ) : null}
                         <span className={styles.secondary}>
-                          {usdText(changeUsd !== null ? formatUsdSigned(changeUsd, locale) : null)}
+                          {approxText(
+                            changeApprox !== null
+                              ? formatSecondarySigned(changeApprox, locale)
+                              : null,
+                          )}
                         </span>
                       </>
                     ) : (

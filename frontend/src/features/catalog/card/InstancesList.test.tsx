@@ -24,10 +24,12 @@ const INSTANCES: CatalogCollectionItem[] = [
     purchaseCurrency: 'USD',
     purchaseRateUah: '35.0000',
     totalUah: '350.00',
-    // Independent of purchaseRateUah on purpose: totalUsd is the backend's
-    // own NBU-rate-on-purchase-date conversion, not a mirror of the
-    // purchase's own currency math (see InstancesList's usdRate prop doc).
+    // Independent of purchaseRateUah on purpose: totalUsd/totalEur are the
+    // backend's own NBU-rate-on-purchase-date conversions, not a mirror of
+    // the purchase's own currency math (see InstancesList's secondaryRate
+    // prop doc).
     totalUsd: '8.40',
+    totalEur: '7.70',
     notes: null,
   },
 ];
@@ -43,7 +45,8 @@ function renderList(overrides: Partial<Parameters<typeof InstancesList>[0]> = {}
           coinTitle="Дельфін"
           photo={{ src: null }}
           currentPriceUah="460.00"
-          usdRate={41.5}
+          secondaryCurrency="USD"
+          secondaryRate={41.5}
           {...overrides}
         />
       </MemoryRouter>
@@ -80,9 +83,9 @@ describe('InstancesList', () => {
       expect(screen.getByText('1 рік')).toBeInTheDocument();
 
       // Purchased total: item.totalUsd (8.40) — the backend's historical-rate
-      // conversion, not a division by usdRate.
+      // conversion, not a division by secondaryRate.
       expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
-      // Current value: 460 (quantity 1) at the live usdRate=41.5 -> 11.08.
+      // Current value: 460 (quantity 1) at the live secondaryRate=41.5 -> 11.08.
       expect(screen.getByText('≈ 11,1 $')).toBeInTheDocument();
       // Change: 11.08 (current, live rate) − 8.40 (purchased, historical) = 2.68.
       expect(screen.getByText('≈ +2,7 $')).toBeInTheDocument();
@@ -92,9 +95,9 @@ describe('InstancesList', () => {
   });
 
   it('keeps the purchased total in dollars when only the live rate is missing', () => {
-    // usdRate feeds current value/change, not the purchased total (item.totalUsd) --
+    // secondaryRate feeds current value/change, not the purchased total (item.totalUsd) --
     // losing today's rate should not blank out what was already known historically.
-    renderList({ usdRate: null });
+    renderList({ secondaryRate: null });
     expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
     expect(screen.getAllByText('немає даних').length).toBe(2); // current value, change
   });

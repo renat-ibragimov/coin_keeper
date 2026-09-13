@@ -21,5 +21,5 @@ async def update_settings(
     payload: SettingsUpdate, session: DbSession, user: CurrentUser, locale: RequestLocale
 ) -> SettingsOut:
     return await BootstrapService(session, user, locale).update_settings(
-        show_packaging_variants=payload.show_packaging_variants
+        **payload.model_dump(exclude_unset=True)
     )

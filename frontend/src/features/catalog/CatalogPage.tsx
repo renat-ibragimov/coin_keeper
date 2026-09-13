@@ -99,7 +99,7 @@ export function CatalogPage() {
   };
 
   const [searchParams] = useSearchParams();
-  const viewMode = useStoredViewMode('ck.viewMode.catalog');
+  const viewMode = useStoredViewMode('ck.viewMode.catalog', 'catalogViewMode');
   useEffect(() => {
     // Only on mount, and only when the URL itself says nothing: a shared
     // link's own `?view=` always wins over what was remembered here.

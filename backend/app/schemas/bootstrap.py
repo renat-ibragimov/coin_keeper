@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 from datetime import date
+from typing import Literal
+
+from pydantic import Field
 
 from app.schemas.auth import UserOut
 from app.schemas.base import CamelModel
@@ -52,16 +55,34 @@ class FinanceOut(CamelModel):
     purchases_without_historical_eur_rate: int
 
 
+Theme = Literal["light", "dark", "system"]
+ViewMode = Literal["cards", "table"]
+SecondaryCurrency = Literal["USD", "EUR"]
+
+
 class SettingsOut(CamelModel):
     locale: str
     display_currency: str
-    default_grade_commemorative: str
-    default_grade_circulation: str
+    default_grade: str
     show_packaging_variants: bool
+    # Widened to str, unlike SettingsUpdate's Literal: the value always comes
+    # from a column we ourselves wrote through that Literal, so this is a
+    # trusted read rather than something to re-validate on the way out.
+    theme: str
+    catalog_view_mode: str
+    collection_view_mode: str
+    secondary_currency: str
 
 
 class SettingsUpdate(CamelModel):
-    show_packaging_variants: bool
+    """Partial update: only the fields the caller sends are changed."""
+
+    show_packaging_variants: bool | None = None
+    default_grade: str | None = Field(default=None, max_length=50)
+    theme: Theme | None = None
+    catalog_view_mode: ViewMode | None = None
+    collection_view_mode: ViewMode | None = None
+    secondary_currency: SecondaryCurrency | None = None
 
 
 class BootstrapOut(CamelModel):

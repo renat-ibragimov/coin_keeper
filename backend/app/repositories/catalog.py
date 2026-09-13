@@ -86,6 +86,7 @@ class CatalogRow:
     quantity_owned: int
     purchase_total_uah: Decimal
     purchase_total_usd: Decimal | None
+    purchase_total_eur: Decimal | None
     market_price_uah: Decimal | None
     price_source: str | None
     price_observed_at: datetime | None
@@ -356,27 +357,33 @@ class CatalogRepository:
             * func.coalesce(CollectionItem.purchase_price, 0)
             * func.coalesce(CollectionItem.purchase_rate_uah, 1)
         )
+
         # The rate on each instance's OWN acquisition date, not today's --
         # this is what was spent then, not a mix of purchase cost and a
         # live rate (docs/BACKLOG.md, NBU rates follow-up). Division by
         # NULL (no rate that far back) yields NULL, which SUM simply skips
         # rather than propagating -- a handful of missing rates cannot
         # blank out an otherwise-known total.
-        usd_rate_on_purchase = (
-            select(ExchangeRate.rate_uah)
-            .where(
-                ExchangeRate.currency_code == "USD",
-                ExchangeRate.effective_date <= CollectionItem.acquisition_date,
+        def rate_on_purchase(code: str) -> Any:
+            return (
+                select(ExchangeRate.rate_uah)
+                .where(
+                    ExchangeRate.currency_code == code,
+                    ExchangeRate.effective_date <= CollectionItem.acquisition_date,
+                )
+                .order_by(ExchangeRate.effective_date.desc())
+                .limit(1)
+                .scalar_subquery()
             )
-            .order_by(ExchangeRate.effective_date.desc())
-            .limit(1)
-            .scalar_subquery()
-        )
+
+        usd_rate_on_purchase = rate_on_purchase("USD")
+        eur_rate_on_purchase = rate_on_purchase("EUR")
         return (
             select(
                 func.coalesce(func.sum(CollectionItem.quantity), 0).label("quantity_owned"),
                 func.coalesce(func.sum(amount_uah), 0).label("purchase_total_uah"),
                 func.sum(amount_uah / usd_rate_on_purchase).label("purchase_total_usd"),
+                func.sum(amount_uah / eur_rate_on_purchase).label("purchase_total_eur"),
             )
             .where(
                 CollectionItem.catalog_item_id == CatalogItem.id,
@@ -520,6 +527,7 @@ class CatalogRepository:
                 owned.c.quantity_owned,
                 owned.c.purchase_total_uah,
                 owned.c.purchase_total_usd,
+                owned.c.purchase_total_eur,
                 price.c.price_uah,
                 price.c.price_source,
                 price.c.price_observed_at,
@@ -547,6 +555,7 @@ class CatalogRepository:
                 quantity_owned=int(row.quantity_owned or 0),
                 purchase_total_uah=Decimal(row.purchase_total_uah or 0),
                 purchase_total_usd=row.purchase_total_usd,
+                purchase_total_eur=row.purchase_total_eur,
                 market_price_uah=row.price_uah,
                 price_source=row.price_source,
                 price_observed_at=row.price_observed_at,
@@ -578,6 +587,7 @@ class CatalogRepository:
                 owned.c.quantity_owned,
                 owned.c.purchase_total_uah,
                 owned.c.purchase_total_usd,
+                owned.c.purchase_total_eur,
                 price.c.price_uah,
                 price.c.price_source,
                 price.c.price_observed_at,
@@ -614,6 +624,7 @@ class CatalogRepository:
             quantity_owned=int(row.quantity_owned or 0),
             purchase_total_uah=Decimal(row.purchase_total_uah or 0),
             purchase_total_usd=row.purchase_total_usd,
+            purchase_total_eur=row.purchase_total_eur,
             market_price_uah=row.price_uah,
             price_source=row.price_source,
             price_observed_at=row.price_observed_at,

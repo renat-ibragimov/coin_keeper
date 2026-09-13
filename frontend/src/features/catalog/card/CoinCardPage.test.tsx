@@ -69,9 +69,12 @@ function makeBootstrap(usdRate: string | null = '41.5000'): BootstrapOut {
     settings: {
       locale: 'uk',
       displayCurrency: 'UAH',
-      defaultGradeCommemorative: 'UNC',
-      defaultGradeCirculation: 'VF',
+      defaultGrade: 'UNC',
       showPackagingVariants: false,
+      theme: 'system',
+      catalogViewMode: 'cards',
+      collectionViewMode: 'cards',
+      secondaryCurrency: 'USD',
     },
     dashboard: {
       catalogItems: 0,
@@ -136,6 +139,7 @@ function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
     quantityOwned: 2,
     purchaseTotalUah: '640.00',
     purchaseTotalUsd: '15.42',
+    purchaseTotalEur: '14.00',
     obverseImage: null,
     reverseImage: null,
     thumbnailUrl: null,
@@ -187,6 +191,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     purchaseRateUah: '35.0000',
     totalUah: '350.00',
     totalUsd: '10.00',
+    totalEur: '9.20',
     notes: 'Без капсули',
   },
   {
@@ -201,6 +206,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     purchaseRateUah: null,
     totalUah: '290.00',
     totalUsd: '7.25',
+    totalEur: '6.70',
     notes: null,
   },
 ];

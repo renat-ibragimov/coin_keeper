@@ -280,10 +280,13 @@ class CatalogService:
             # The rate on THIS instance's own purchase date, not today's --
             # what it cost then, not a live estimate (docs/BACKLOG.md,
             # NBU rates follow-up).
-            usd_rate = (
-                await self._rates.rate_on("USD", instance.acquisition_date)
+            usd_rate, eur_rate = (
+                (
+                    await self._rates.rate_on("USD", instance.acquisition_date),
+                    await self._rates.rate_on("EUR", instance.acquisition_date),
+                )
                 if instance.acquisition_date is not None
-                else None
+                else (None, None)
             )
             out.append(
                 CatalogCollectionItemOut(
@@ -298,6 +301,7 @@ class CatalogService:
                     purchase_rate_uah=instance.purchase_rate_uah,
                     total_uah=total_uah,
                     total_usd=total_uah / usd_rate if usd_rate else None,
+                    total_eur=total_uah / eur_rate if eur_rate else None,
                     notes=instance.notes,
                 )
             )
@@ -498,6 +502,7 @@ class CatalogService:
             "quantity_owned": row.quantity_owned,
             "purchase_total_uah": row.purchase_total_uah,
             "purchase_total_usd": row.purchase_total_usd,
+            "purchase_total_eur": row.purchase_total_eur,
             "obverse_image": _image_out(images.obverse),
             "reverse_image": _image_out(images.reverse),
             "thumbnail_url": images.thumbnail_url,

@@ -10,7 +10,13 @@ import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
 import { coinTitle, showsOriginal } from '@/shared/lib/coinTitle';
-import { formatDate, formatSignedPercent, formatSignedUah, formatUah } from '@/shared/lib/format';
+import {
+  currencySymbol,
+  formatDate,
+  formatSignedPercent,
+  formatSignedUah,
+  formatUah,
+} from '@/shared/lib/format';
 import { languageName } from '@/shared/lib/languageName';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
 import {
@@ -30,8 +36,15 @@ import type { ChartPoint } from './chartData';
 import { toChartPoints } from './chartData';
 import { InstancesList } from './InstancesList';
 import { PriceHistoryChart } from './PriceHistoryChart';
+import type { SecondaryCurrency } from '@/shared/lib/secondaryAmount';
+import {
+  formatSecondary,
+  formatSecondarySigned,
+  pickSecondary,
+  secondaryRateFrom,
+  toSecondary,
+} from '@/shared/lib/secondaryAmount';
 import { catalogSpecRows, identitySpecRows, issueSpecRows, technicalSpecRows } from './specs';
-import { formatUsd, formatUsdSigned, toUsd, usdRateFrom } from './usdApprox';
 import styles from './CoinCardPage.module.css';
 
 export function CoinCardPage() {
@@ -95,7 +108,9 @@ function CardBody({ card }: { card: CatalogCard }) {
   // Shares the 'bootstrap' cache key with the dashboard, so this is not a
   // second network round trip once that page has already loaded it.
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
-  const usdRate = usdRateFrom(bootstrapQuery.data?.exchangeRates);
+  const secondaryCurrency: SecondaryCurrency =
+    bootstrapQuery.data?.settings.secondaryCurrency === 'EUR' ? 'EUR' : 'USD';
+  const secondaryRate = secondaryRateFrom(bootstrapQuery.data?.exchangeRates, secondaryCurrency);
 
   const title = coinTitle(card, locale);
   const addUrl = `/collection/coins/new?catalogItemId=${card.id}`;
@@ -196,11 +211,25 @@ function CardBody({ card }: { card: CatalogCard }) {
           ))}
         </div>
 
-        <SidebarCard card={card} locale={locale} t={t} addUrl={addUrl} addState={addState} />
+        <SidebarCard
+          card={card}
+          locale={locale}
+          t={t}
+          addUrl={addUrl}
+          addState={addState}
+          secondaryCurrency={secondaryCurrency}
+          secondaryRate={secondaryRate}
+        />
       </div>
 
       {owned && hasInstances ? (
-        <ValueSummary card={card} locale={locale} t={t} usdRate={usdRate} />
+        <ValueSummary
+          card={card}
+          locale={locale}
+          t={t}
+          secondaryCurrency={secondaryCurrency}
+          secondaryRate={secondaryRate}
+        />
       ) : null}
 
       {owned ? (
@@ -219,7 +248,8 @@ function CardBody({ card }: { card: CatalogCard }) {
               coinTitle={title}
               photo={sides[0]!.card}
               currentPriceUah={card.marketPriceUah}
-              usdRate={usdRate}
+              secondaryCurrency={secondaryCurrency}
+              secondaryRate={secondaryRate}
             />
           )}
         </Card>
@@ -311,6 +341,8 @@ interface SidebarCardProps {
   t: TFunction;
   addUrl: string;
   addState: { from: string };
+  secondaryCurrency: SecondaryCurrency;
+  secondaryRate: number | null;
 }
 
 /**
@@ -319,13 +351,29 @@ interface SidebarCardProps {
  * own numbers, not the coin's, so they live in the "Мої екземпляри" section
  * instead (InstancesSummary below).
  */
-function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
+function SidebarCard({
+  card,
+  locale,
+  t,
+  addUrl,
+  addState,
+  secondaryCurrency,
+  secondaryRate,
+}: SidebarCardProps) {
   const owned = card.quantityOwned > 0;
   const sourceLabel = priceSourceLabel(card.priceSource, t);
   const observedDate = formatDate(card.priceObservedAt, locale);
   const openLabel = sourceLabel
     ? t('card.openOnSource', { source: sourceLabel })
     : t('catalog.sourceLink');
+  const priceApprox =
+    card.marketPriceUah !== null
+      ? formatSecondary(toSecondary(Number(card.marketPriceUah), secondaryRate), locale)
+      : null;
+  const priceApproxText =
+    priceApprox !== null
+      ? t('card.approxSecondary', { value: priceApprox, symbol: currencySymbol(secondaryCurrency) })
+      : t('dashboard.rateMissing');
 
   return (
     <Card className={styles.sidebarCard} padded={false}>
@@ -359,6 +407,7 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
         {card.marketPriceUah !== null ? (
           <>
             <p className={styles.priceValue}>{formatUah(card.marketPriceUah, locale)}</p>
+            <span className={styles.priceApprox}>{priceApproxText}</span>
             {sourceLabel || observedDate ? (
               <p className={styles.priceMeta}>
                 {sourceLabel ? t('card.priceSource', { source: sourceLabel }) : null}
@@ -393,24 +442,27 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
  * The strip above "Мої екземпляри": the visitor's own purchase and valuation
  * numbers, aggregated across every instance of this coin they own.
  *
- * The two ≈$ figures are NOT the same kind of number: "purchased total" is
- * card.purchaseTotalUsd, the backend's own conversion by the NBU rate on
- * each instance's purchase date — what was actually spent, in dollars, back
- * then. "Current value" has no purchase date of its own, so it converts by
- * today's live rate instead (usdRate, bootstrap's exchangeRates). The change
- * line is the difference of those two already-converted dollar figures, not
- * a third conversion of its own.
+ * The two ≈ figures are NOT the same kind of number: "purchased total" is
+ * card.purchaseTotalUsd/Eur, the backend's own conversion by the NBU rate on
+ * each instance's purchase date — what was actually spent, back then, in
+ * whichever secondary currency the viewer picked. "Current value" has no
+ * purchase date of its own, so it converts by today's live rate instead
+ * (secondaryRate, bootstrap's exchangeRates). The change line is the
+ * difference of those two already-converted figures, not a third conversion
+ * of its own.
  */
 function ValueSummary({
   card,
   locale,
   t,
-  usdRate,
+  secondaryCurrency,
+  secondaryRate,
 }: {
   card: CatalogCard;
   locale: string;
   t: TFunction;
-  usdRate: number | null;
+  secondaryCurrency: SecondaryCurrency;
+  secondaryRate: number | null;
 }) {
   const currentValue =
     card.marketPriceUah !== null ? Number(card.marketPriceUah) * card.quantityOwned : null;
@@ -418,14 +470,22 @@ function ValueSummary({
   const change = currentValue !== null ? currentValue - purchaseTotal : null;
   const changePercent =
     change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
-  const usdText = (value: string | null) =>
-    value !== null ? t('card.approxUsd', { value }) : t('dashboard.rateMissing');
+  const symbol = currencySymbol(secondaryCurrency);
+  const approxText = (value: string | null) =>
+    value !== null ? t('card.approxSecondary', { value, symbol }) : t('dashboard.rateMissing');
 
-  const purchaseTotalUsd = card.purchaseTotalUsd !== null ? Number(card.purchaseTotalUsd) : null;
-  const currentValueUsd = currentValue !== null ? toUsd(currentValue, usdRate) : null;
-  const changeUsd =
-    currentValueUsd !== null && purchaseTotalUsd !== null
-      ? currentValueUsd - purchaseTotalUsd
+  const purchaseTotalSecondary = pickSecondary(
+    card.purchaseTotalUsd,
+    card.purchaseTotalEur,
+    secondaryCurrency,
+  );
+  const purchaseTotalApprox =
+    purchaseTotalSecondary !== null ? Number(purchaseTotalSecondary) : null;
+  const currentValueApprox =
+    currentValue !== null ? toSecondary(currentValue, secondaryRate) : null;
+  const changeApprox =
+    currentValueApprox !== null && purchaseTotalApprox !== null
+      ? currentValueApprox - purchaseTotalApprox
       : null;
 
   return (
@@ -435,7 +495,9 @@ function ValueSummary({
           {t('card.purchasedTotal')} ({t('card.pieces', { count: card.quantityOwned })})
         </span>
         <p className={`${styles.valueBoxValue} tabular`}>{formatUah(purchaseTotal, locale)}</p>
-        <span className={styles.valueBoxUsd}>{usdText(formatUsd(purchaseTotalUsd, locale))}</span>
+        <span className={styles.valueBoxUsd}>
+          {approxText(formatSecondary(purchaseTotalApprox, locale))}
+        </span>
       </div>
 
       <div className={styles.valueBox}>
@@ -444,7 +506,7 @@ function ValueSummary({
           <>
             <p className={`${styles.valueBoxValue} tabular`}>{formatUah(currentValue, locale)}</p>
             <span className={styles.valueBoxUsd}>
-              {usdText(formatUsd(currentValueUsd, locale))}
+              {approxText(formatSecondary(currentValueApprox, locale))}
             </span>
           </>
         ) : (
@@ -472,7 +534,9 @@ function ValueSummary({
               ) : null}
             </p>
             <span className={styles.valueBoxUsd}>
-              {usdText(changeUsd !== null ? formatUsdSigned(changeUsd, locale) : null)}
+              {approxText(
+                changeApprox !== null ? formatSecondarySigned(changeApprox, locale) : null,
+              )}
             </span>
           </>
         ) : (

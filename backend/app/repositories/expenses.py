@@ -51,22 +51,30 @@ def _amount_uah() -> ColumnElement[Decimal]:
     return Expense.amount * func.coalesce(Expense.rate_uah, 1)
 
 
-def _amount_usd() -> ColumnElement[Decimal]:
-    """The UAH amount converted by the USD rate on the expense's OWN date --
-    what it cost then, not a live estimate (docs/BACKLOG.md, NBU rates
-    follow-up). NULL (no rate that far back) when there simply is none;
-    SQL division by NULL yields NULL rather than raising."""
-    usd_rate_on_date = (
+def _rate_on_expense_date(code: str) -> ColumnElement[Decimal]:
+    return (
         select(ExchangeRate.rate_uah)
         .where(
-            ExchangeRate.currency_code == "USD",
+            ExchangeRate.currency_code == code,
             ExchangeRate.effective_date <= Expense.expense_date,
         )
         .order_by(ExchangeRate.effective_date.desc())
         .limit(1)
         .scalar_subquery()
     )
-    return _amount_uah() / usd_rate_on_date
+
+
+def _amount_usd() -> ColumnElement[Decimal]:
+    """The UAH amount converted by the USD rate on the expense's OWN date --
+    what it cost then, not a live estimate (docs/BACKLOG.md, NBU rates
+    follow-up). NULL (no rate that far back) when there simply is none;
+    SQL division by NULL yields NULL rather than raising."""
+    return _amount_uah() / _rate_on_expense_date("USD")
+
+
+def _amount_eur() -> ColumnElement[Decimal]:
+    """Same as _amount_usd(), converted by the EUR rate instead."""
+    return _amount_uah() / _rate_on_expense_date("EUR")
 
 
 def _coin_title(locale: str) -> ColumnElement[str]:
@@ -116,13 +124,13 @@ class ExpenseRepository:
 
     async def list_page(
         self, filters: ExpenseFilters, *, limit: int, offset: int
-    ) -> tuple[list[tuple[Expense, str | None, Decimal | None]], int]:
+    ) -> tuple[list[tuple[Expense, str | None, Decimal | None, Decimal | None]], int]:
         conditions = self._conditions(filters)
         total = (
             await self._session.execute(select(func.count(Expense.id)).where(*conditions))
         ).scalar_one()
         result = await self._session.execute(
-            select(Expense, _coin_title(self._locale), _amount_usd())
+            select(Expense, _coin_title(self._locale), _amount_usd(), _amount_eur())
             .outerjoin(CatalogItem, CatalogItem.id == Expense.catalog_item_id)
             .where(*conditions)
             .order_by(*self._order_by(filters))
@@ -130,7 +138,7 @@ class ExpenseRepository:
             .offset(offset)
         )
         rows = result.all()
-        return [(row[0], row[1], row[2]) for row in rows], total
+        return [(row[0], row[1], row[2], row[3]) for row in rows], total
 
     async def get(self, expense_id: int) -> Expense | None:
         result = await self._session.execute(
