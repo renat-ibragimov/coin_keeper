@@ -126,6 +126,51 @@ async def test_expense_in_foreign_currency(
     assert "exchange-rate-missing" in no_rate.json()["type"]
 
 
+async def test_amount_usd_uses_the_expense_own_date_not_a_later_rate(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The ~40 UAH/USD of 2026 must never leak into a 2020 purchase's
+    dollar figure (owner-reported bug, 2026-09-13)."""
+    await add_rate(db_session, "USD", "27.50", date(2020, 7, 20))
+    await add_rate(db_session, "USD", "44.55", date(2026, 9, 1))
+    headers = auth(ctx.token_a)
+
+    created = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "55.00",
+            "currency": "UAH",
+            "expenseDate": "2020-07-23",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    # 55 / 27.50 = 2.00 -- the 2020 rate, not 55 / 44.55 the 2026 one.
+    assert created.json()["amountUsd"] == "2.00"
+
+    listing = await client.get("/api/v1/expenses", headers=headers)
+    assert listing.json()["items"][0]["amountUsd"] == "2.00"
+
+
+async def test_amount_usd_is_null_without_a_rate_that_far_back(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    created = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "50.00",
+            "currency": "UAH",
+            "expenseDate": "1990-01-01",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["amountUsd"] is None
+
+
 async def test_coin_purchase_guard(client: AsyncClient, ctx: SimpleNamespace) -> None:
     headers = auth(ctx.token_a)
 

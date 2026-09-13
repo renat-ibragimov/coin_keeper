@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -16,6 +16,7 @@ from app.models.enums import CollectionGroup
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
+    add_rate,
     add_snapshot,
     make_catalog_item,
     promote_to_admin,
@@ -631,13 +632,63 @@ async def test_card_and_own_instances(
     assert instances_b == []
 
 
+async def test_purchase_total_usd_uses_the_purchase_own_date_not_a_later_rate(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The ~40 UAH/USD of 2026 must never leak into a 2020 purchase's
+    dollar figure (owner-reported bug, 2026-09-13) -- neither on the
+    card's aggregate nor on the instance row."""
+    refs = ctx.refs
+    item = await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
+    await add_rate(db_session, "USD", "27.50", date(2020, 7, 20))
+    await add_rate(db_session, "USD", "44.55", date(2026, 9, 1))
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="55",
+        rate_uah="1",
+        acquisition_date=date(2020, 7, 23),
+    )
+
+    card = (await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))).json()
+    # 55 / 27.50 = 2.00 -- the 2020 rate, not 55 / 44.55 the 2026 one.
+    assert card["purchaseTotalUsd"] == "2.00"
+
+    instances = (
+        await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a))
+    ).json()
+    assert instances[0]["totalUsd"] == "2.00"
+
+
+async def test_purchase_total_usd_null_without_a_rate_that_far_back(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    refs = ctx.refs
+    item = await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="50",
+        rate_uah="1",
+        acquisition_date=date(1990, 1, 1),
+    )
+
+    card = (await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))).json()
+    assert card["purchaseTotalUsd"] is None
+
+    instances = (
+        await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a))
+    ).json()
+    assert instances[0]["totalUsd"] is None
+
+
 async def test_snapshot_in_foreign_currency_converted(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    from datetime import date
-
-    from tests.seed import add_rate
-
     refs = ctx.refs
     item = await make_catalog_item(db_session, country=refs.usa, title="Morgan dollar", year=1921)
     await add_rate(db_session, "USD", "41.50", date(2026, 8, 1))

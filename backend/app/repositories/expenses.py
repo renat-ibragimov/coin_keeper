@@ -11,7 +11,7 @@ from sqlalchemy import ColumnElement, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
-from app.models import CatalogItem, Expense
+from app.models import CatalogItem, ExchangeRate, Expense
 from app.models.enums import ExpenseCategory
 from app.repositories.localization import localized
 
@@ -49,6 +49,24 @@ class DailyTotal:
 
 def _amount_uah() -> ColumnElement[Decimal]:
     return Expense.amount * func.coalesce(Expense.rate_uah, 1)
+
+
+def _amount_usd() -> ColumnElement[Decimal]:
+    """The UAH amount converted by the USD rate on the expense's OWN date --
+    what it cost then, not a live estimate (docs/BACKLOG.md, NBU rates
+    follow-up). NULL (no rate that far back) when there simply is none;
+    SQL division by NULL yields NULL rather than raising."""
+    usd_rate_on_date = (
+        select(ExchangeRate.rate_uah)
+        .where(
+            ExchangeRate.currency_code == "USD",
+            ExchangeRate.effective_date <= Expense.expense_date,
+        )
+        .order_by(ExchangeRate.effective_date.desc())
+        .limit(1)
+        .scalar_subquery()
+    )
+    return _amount_uah() / usd_rate_on_date
 
 
 def _coin_title(locale: str) -> ColumnElement[str]:
@@ -98,13 +116,13 @@ class ExpenseRepository:
 
     async def list_page(
         self, filters: ExpenseFilters, *, limit: int, offset: int
-    ) -> tuple[list[tuple[Expense, str | None]], int]:
+    ) -> tuple[list[tuple[Expense, str | None, Decimal | None]], int]:
         conditions = self._conditions(filters)
         total = (
             await self._session.execute(select(func.count(Expense.id)).where(*conditions))
         ).scalar_one()
         result = await self._session.execute(
-            select(Expense, _coin_title(self._locale))
+            select(Expense, _coin_title(self._locale), _amount_usd())
             .outerjoin(CatalogItem, CatalogItem.id == Expense.catalog_item_id)
             .where(*conditions)
             .order_by(*self._order_by(filters))
@@ -112,7 +130,7 @@ class ExpenseRepository:
             .offset(offset)
         )
         rows = result.all()
-        return [(row[0], row[1]) for row in rows], total
+        return [(row[0], row[1], row[2]) for row in rows], total
 
     async def get(self, expense_id: int) -> Expense | None:
         result = await self._session.execute(

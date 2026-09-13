@@ -30,6 +30,7 @@ from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogFilters, CatalogRepository, CatalogRow
 from app.repositories.collection import CollectionRepository
 from app.repositories.media import MediaRepository
+from app.repositories.rates import RateRepository
 from app.repositories.users import UserRepository
 from app.schemas.catalog import (
     ArchiveStateOut,
@@ -201,6 +202,7 @@ class CatalogService:
         )
         self._media = MediaRepository(session, user_id=user.id)
         self._users = UserRepository(session)
+        self._rates = RateRepository(session)
         self._urls = MediaUrlBuilder()
 
     # --------------------------------------------------------------- reading
@@ -257,24 +259,38 @@ class CatalogService:
         instances = await CollectionRepository(self._session, owner_id=self._user.id).list_for_item(
             item_id
         )
-        return [
-            CatalogCollectionItemOut(
-                id=instance.id,
-                catalog_item_id=instance.catalog_item_id,
-                quantity=instance.quantity,
-                grade=instance.grade,
-                acquisition_date=instance.acquisition_date,
-                seller=instance.seller,
-                purchase_price=instance.purchase_price,
-                purchase_currency=instance.purchase_currency,
-                purchase_rate_uah=instance.purchase_rate_uah,
-                total_uah=(instance.purchase_price or Decimal(0))
+        out = []
+        for instance in instances:
+            total_uah = (
+                (instance.purchase_price or Decimal(0))
                 * (instance.purchase_rate_uah or Decimal(1))
-                * instance.quantity,
-                notes=instance.notes,
+                * instance.quantity
             )
-            for instance in instances
-        ]
+            # The rate on THIS instance's own purchase date, not today's --
+            # what it cost then, not a live estimate (docs/BACKLOG.md,
+            # NBU rates follow-up).
+            usd_rate = (
+                await self._rates.rate_on("USD", instance.acquisition_date)
+                if instance.acquisition_date is not None
+                else None
+            )
+            out.append(
+                CatalogCollectionItemOut(
+                    id=instance.id,
+                    catalog_item_id=instance.catalog_item_id,
+                    quantity=instance.quantity,
+                    grade=instance.grade,
+                    acquisition_date=instance.acquisition_date,
+                    seller=instance.seller,
+                    purchase_price=instance.purchase_price,
+                    purchase_currency=instance.purchase_currency,
+                    purchase_rate_uah=instance.purchase_rate_uah,
+                    total_uah=total_uah,
+                    total_usd=total_uah / usd_rate if usd_rate else None,
+                    notes=instance.notes,
+                )
+            )
+        return out
 
     # --------------------------------------------------------------- writing
 
@@ -470,6 +486,7 @@ class CatalogService:
             "price_observed_at": row.price_observed_at,
             "quantity_owned": row.quantity_owned,
             "purchase_total_uah": row.purchase_total_uah,
+            "purchase_total_usd": row.purchase_total_usd,
             "obverse_image": _image_out(images.obverse),
             "reverse_image": _image_out(images.reverse),
             "thumbnail_url": images.thumbnail_url,

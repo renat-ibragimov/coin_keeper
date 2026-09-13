@@ -98,8 +98,9 @@ class ExpenseService:
             self._out(
                 expense,
                 coin_title=title if expense.category == ExpenseCategory.COIN_PURCHASE else None,
+                amount_usd=amount_usd,
             )
-            for expense, title in rows
+            for expense, title, amount_usd in rows
         ]
         return items, total
 
@@ -121,7 +122,7 @@ class ExpenseService:
             description=payload.description,
         )
         await self._repo.add(expense)
-        return self._out(expense)
+        return self._out(expense, amount_usd=await self._amount_usd_for(expense))
 
     async def update(self, expense_id: int, payload: ExpenseUpdate) -> ExpenseOut:
         expense = await self._get_editable(expense_id)
@@ -141,7 +142,7 @@ class ExpenseService:
         if rate_needed:
             expense.rate_uah = await self._resolve_rate(expense.currency_code, expense.expense_date)
         await self._session.flush()
-        return self._out(expense)
+        return self._out(expense, amount_usd=await self._amount_usd_for(expense))
 
     async def delete(self, expense_id: int) -> None:
         expense = await self._get_editable(expense_id)
@@ -284,8 +285,20 @@ class ExpenseService:
         if series_id is not None and await self._session.get(CoinSeries, series_id) is None:
             raise BadReferenceError("Unknown seriesId.")
 
+    async def _amount_usd_for(self, expense: Expense) -> Decimal | None:
+        """The rate on the expense's OWN date, not today's -- what it cost
+        then (docs/BACKLOG.md, NBU rates follow-up). None if NBU has no
+        rate that far back, rather than a live-rate guess."""
+        usd_rate = await self._rates.rate_on("USD", expense.expense_date)
+        if usd_rate is None:
+            return None
+        amount_uah = expense.amount * (expense.rate_uah or Decimal(1))
+        return amount_uah / usd_rate
+
     @staticmethod
-    def _out(expense: Expense, *, coin_title: str | None = None) -> ExpenseOut:
+    def _out(
+        expense: Expense, *, coin_title: str | None = None, amount_usd: Decimal | None = None
+    ) -> ExpenseOut:
         return ExpenseOut(
             id=expense.id,
             category=expense.category,
@@ -293,6 +306,7 @@ class ExpenseService:
             currency_code=expense.currency_code,
             rate_uah=expense.rate_uah,
             amount_uah=expense.amount * (expense.rate_uah or Decimal(1)),
+            amount_usd=amount_usd,
             expense_date=expense.expense_date,
             catalog_item_id=expense.catalog_item_id,
             collection_item_id=expense.collection_item_id,

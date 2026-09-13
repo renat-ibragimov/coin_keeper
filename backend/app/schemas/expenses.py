@@ -20,6 +20,7 @@ class ExpenseOut(CamelModel):
     currency_code: str
     rate_uah: Rate | None
     amount_uah: Money
+    amount_usd: Money | None
     expense_date: date
     catalog_item_id: int | None
     collection_item_id: int | None
