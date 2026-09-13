@@ -231,11 +231,13 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                 label={t('dashboard.delta')}
                 hint={t('dashboard.deltaHint')}
                 value={
-                  <span className={styles[deltaTone]} data-testid="dashboard-delta">
-                    {formatSignedUah(delta.diffUah, locale)}
+                  <span
+                    className={[styles.financeValueStack, styles[deltaTone]].join(' ')}
+                    data-testid="dashboard-delta"
+                  >
+                    <span>{formatSignedUah(delta.diffUah, locale)}</span>
                     {delta.percent !== null ? (
                       <span className={styles.deltaPercent}>
-                        {' '}
                         {formatSignedPercent(delta.percent, locale)}
                       </span>
                     ) : null}
@@ -324,7 +326,9 @@ function ExchangeRates({ rates }: { rates: ExchangeRateOut[] }) {
   const { t, i18n } = useTranslation();
   const shown = rates.filter((rate) => rate.code === 'USD' || rate.code === 'EUR');
   const list = shown.length > 0 ? shown : rates;
-  if (list.length === 0) return <p className={styles.muted}>{t('dashboard.rateMissing')}</p>;
+  if (list.length === 0) {
+    return <p className={`${styles.muted} ${styles.ratesEmpty}`}>{t('dashboard.rateMissing')}</p>;
+  }
   return (
     <ul className={styles.rates}>
       {list.map((rate) => {

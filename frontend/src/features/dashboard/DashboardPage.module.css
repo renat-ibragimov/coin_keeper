@@ -261,7 +261,11 @@
 .financeRow {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  /* Centered, not baseline: a row whose label carries a hint (two lines)
+   * or whose value is the larger "strong" size is taller on one side than
+   * the other, and baseline pinned the shorter side to the top line
+   * instead of the middle of the row (owner, 2026-09-13). */
+  align-items: center;
   gap: var(--space-3);
   padding: var(--space-1) 0;
   border-top: 1px solid var(--color-border-subtle);
@@ -313,46 +317,75 @@
   color: var(--color-text);
 }
 
+/* "Різниця": UAH on top, percent below — always two lines, not one row
+ * squeezed onto a single line (owner, 2026-09-13). */
+.financeValueStack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
 .deltaPercent {
   font-size: 13px;
 }
 
 /* --- exchange rates --- */
 
+/* The no-rates-at-all fallback (.muted, shared elsewhere) fills and
+ * centers the same as the list it stands in for, rather than sitting at
+ * the top-left of the empty card. */
+.ratesEmpty {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Two rows is not much content for a panel this tall (stackCardGrow):
+ * rather than sitting at the top with the rest of the card blank
+ * underneath, the list grows to fill it and centers its rows in the
+ * middle, with bigger type standing in for the fill a longer list would
+ * have given it (owner, 2026-09-13). */
 .rates {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
-  gap: var(--space-1);
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-5);
 }
 
 .rateRow {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: baseline;
+  justify-content: center;
+  flex-wrap: wrap;
   gap: var(--space-3);
 }
 
 .rateCode {
   font-weight: 600;
+  font-size: 20px;
 }
 
 .rateIso {
   font-weight: 400;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text-muted);
 }
 
 .rateValue {
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: 32px;
   font-variant-numeric: tabular-nums;
 }
 
 .rateDate {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
