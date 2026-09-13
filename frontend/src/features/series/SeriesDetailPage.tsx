@@ -8,7 +8,6 @@ import { CoinCard } from '@/features/catalog/CoinCard';
 import { ApiError } from '@/shared/api/client';
 import { formatPercent, formatUah } from '@/shared/lib/format';
 import {
-  Breadcrumbs,
   Button,
   EmptyState,
   ErrorState,
@@ -83,14 +82,6 @@ export function SeriesDetailPage() {
     <div className={styles.page}>
       <PageHeader
         align="center"
-        above={
-          <Breadcrumbs
-            items={[
-              { label: t('nav.series'), to: '/collection/series' },
-              { label: series?.name ?? '…' },
-            ]}
-          />
-        }
         title={series?.name ?? <Skeleton width={280} height={36} />}
         subtitle={
           series
