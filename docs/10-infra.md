@@ -53,7 +53,6 @@ S3_SECRET_KEY=***
 JWT_SECRET=***
 CORS_ORIGINS=https://<домен>
 ALLOW_REGISTRATION=true
-NBU_API_BASE=https://bank.gov.ua/NBUStatService/v1/statdirectory
 NBU_CATALOG_BASE=https://bank.gov.ua/ua/numismatic-products
 UACOINS_BASE=https://www.ua-coins.info
 PUBLIC_BASE_URL=https://<домен>
