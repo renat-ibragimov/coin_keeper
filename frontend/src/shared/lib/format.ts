@@ -104,6 +104,15 @@ export function formatMonthShort(value: string, locale: string): string {
   return new Intl.DateTimeFormat(intlLocale(locale), { month: 'short' }).format(date);
 }
 
+/** Chart axis tick for a "YYYY-MM-DD" day: "5 січ" / "Jan 5", no year. */
+export function formatDayShort(value: string, locale: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(intlLocale(locale), { day: 'numeric', month: 'short' }).format(
+    date,
+  );
+}
+
 /** Today's calendar date as "YYYY-MM-DD" in the local time zone. */
 export function todayIso(): string {
   const now = new Date();

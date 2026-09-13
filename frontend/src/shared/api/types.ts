@@ -50,3 +50,5 @@ export type ExpensePage = components['schemas']['Page_ExpenseOut_'];
 export type ExpensesSummary = components['schemas']['ExpensesSummaryOut'];
 export type ExpenseCategorySummary = components['schemas']['ExpenseCategorySummary'];
 export type ExpenseMonthTotal = components['schemas']['ExpenseMonthTotal'];
+export type ExpensePeriodTotal = components['schemas']['ExpensePeriodTotal'];
+export type ExpensesChart = components['schemas']['ExpensesChartOut'];

@@ -5,8 +5,8 @@ import { useTranslation } from 'react-i18next';
 import type { ExpenseCategorySummary } from '@/shared/api/types';
 import { formatPercent, formatUah } from '@/shared/lib/format';
 import type { ChartPalette } from '@/shared/theme/useChartPalette';
+import styles from '@/shared/ui/ChartTooltip.module.css';
 
-import styles from './ChartTooltip.module.css';
 import donutStyles from './ExpensesByCategoryChart.module.css';
 
 interface Props {
@@ -25,6 +25,9 @@ function shareFor(index: number, count: number): number {
 
 export function ExpensesByCategoryChart({ data, locale, palette }: Props) {
   const { t } = useTranslation();
+  if (data.length === 0) {
+    return <p className={donutStyles.empty}>{t('expenses.chartPeriodEmpty')}</p>;
+  }
   const total = data.reduce((sum, row) => sum + Number(row.totalUah), 0);
   const colors = data.map((_, index) => palette.shade(shareFor(index, data.length)));
 

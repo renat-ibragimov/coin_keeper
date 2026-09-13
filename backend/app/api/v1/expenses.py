@@ -15,6 +15,7 @@ from app.schemas.common import Page
 from app.schemas.expenses import (
     ExpenseCreate,
     ExpenseOut,
+    ExpensesChartOut,
     ExpensesSummaryOut,
     ExpenseUpdate,
 )
@@ -72,6 +73,18 @@ async def list_expenses(
 @router.get("/summary")
 async def expenses_summary(session: DbSession, user: CurrentUser) -> ExpensesSummaryOut:
     return await ExpenseService(session, user).summary()
+
+
+@router.get("/chart-summary")
+async def expenses_chart_summary(
+    session: DbSession,
+    user: CurrentUser,
+    date_from: Annotated[date, Query(alias="dateFrom")],
+    date_to: Annotated[date, Query(alias="dateTo")],
+) -> ExpensesChartOut:
+    if date_from > date_to:
+        raise _unprocessable("invalid-date-range", "dateFrom must not be after dateTo.")
+    return await ExpenseService(session, user).chart_summary(date_from, date_to)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

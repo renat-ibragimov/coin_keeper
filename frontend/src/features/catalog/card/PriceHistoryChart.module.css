@@ -2,7 +2,7 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
 .empty {
@@ -10,57 +10,61 @@
   color: var(--color-text-muted);
 }
 
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chartWrap {
+  position: relative;
+}
+
 .chart {
   width: 100%;
-  height: auto;
-  display: block;
-  font-family: var(--font-body);
 }
 
-.grid {
-  stroke: var(--color-chart-grid);
-  stroke-dasharray: 2 4;
+.tooltipTags {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-muted);
+  font-size: 12px;
 }
 
-.axisLabel {
-  fill: var(--color-chart-axis);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
 }
 
-.area {
-  fill: var(--color-chart-series-1);
-  opacity: 0.1;
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
-.line {
-  fill: none;
-  stroke: var(--color-chart-series-1);
-  stroke-width: 1.8;
-  stroke-linejoin: round;
-  stroke-linecap: round;
+.legendLine {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  flex: none;
 }
 
-.point {
-  fill: var(--color-surface-raised);
-  stroke: var(--color-chart-series-1);
-  stroke-width: 1.6;
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
 }
 
-.ownPoint {
-  fill: var(--color-chart-series-1);
-  stroke: var(--color-surface-raised);
-  stroke-width: 1.6;
-}
+@media (max-width: 700px) {
+  .toolbar {
+    justify-content: center;
+  }
 
-.suspect {
-  fill: var(--color-surface-raised);
-  stroke: var(--color-danger);
-  stroke-width: 1.4;
-}
-
-.suspectCross {
-  stroke: var(--color-danger);
-  stroke-width: 1.2;
-  fill: none;
+  .legend {
+    justify-content: center;
+  }
 }

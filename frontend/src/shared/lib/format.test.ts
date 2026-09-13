@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatDate, formatMoney, formatSignedPercent, formatSignedUah, formatUah } from './format';
+import {
+  formatDate,
+  formatDayShort,
+  formatMoney,
+  formatSignedPercent,
+  formatSignedUah,
+  formatUah,
+} from './format';
 
 describe('format helpers', () => {
   it('formats hryvnia amounts from API strings', () => {
@@ -29,5 +36,10 @@ describe('format helpers', () => {
     expect(formatDate('2025-04-02', 'uk')).toBe('02.04.2025');
     expect(formatDate('2025-04-02T10:00:00Z', 'en')).toBe('02/04/2025');
     expect(formatDate(null, 'en')).toBeNull();
+  });
+
+  it('formats a short day-of-month chart tick', () => {
+    expect(formatDayShort('2025-04-02', 'en')).toBe('2 Apr');
+    expect(formatDayShort('not-a-date', 'en')).toBe('not-a-date');
   });
 });

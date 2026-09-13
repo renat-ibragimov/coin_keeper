@@ -8,6 +8,7 @@ import '@/shared/i18n';
 import { ApiError } from '@/shared/api/client';
 import type { CatalogCard, CatalogCollectionItem, PriceHistoryItem } from '@/shared/api/types';
 import type { CoinImageOut } from '@/shared/lib/coinImage';
+import { ThemeContext } from '@/shared/theme/themeContext';
 
 import { fetchCard, fetchOwnInstances, fetchPrices } from '../api';
 import { CoinCardPage } from './CoinCardPage';
@@ -16,6 +17,34 @@ vi.mock('../api', () => ({
   fetchCard: vi.fn(),
   fetchPrices: vi.fn(),
   fetchOwnInstances: vi.fn(),
+}));
+
+const lwcMocks = vi.hoisted(() => {
+  const timeScale = { fitContent: vi.fn(), setVisibleRange: vi.fn() };
+  const series = { setData: vi.fn() };
+  const chart = {
+    addSeries: vi.fn(() => series),
+    timeScale: vi.fn(() => timeScale),
+    subscribeCrosshairMove: vi.fn(),
+    unsubscribeCrosshairMove: vi.fn(),
+    remove: vi.fn(),
+  };
+  return {
+    createChart: vi.fn(() => chart),
+    createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn() })),
+  };
+});
+
+// PriceHistoryChart draws on a <canvas>, which jsdom does not implement; the
+// page's own tests only need to know the chart was asked to render, not that
+// it actually painted (that lives in PriceHistoryChart.test.tsx).
+vi.mock('lightweight-charts', () => ({
+  createChart: lwcMocks.createChart,
+  createSeriesMarkers: lwcMocks.createSeriesMarkers,
+  AreaSeries: 'Area',
+  ColorType: { Solid: 'solid' },
+  CrosshairMode: { Magnet: 1 },
+  LineStyle: { Dotted: 2, Solid: 0 },
 }));
 
 function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
@@ -136,11 +165,16 @@ function renderPage(path = '/catalog/7') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/catalog/:id" element={<CoinCardPage />} />
-        </Routes>
-      </MemoryRouter>
+      {/* jsdom has no matchMedia, so the theme is provided directly rather than via ThemeProvider. */}
+      <ThemeContext.Provider
+        value={{ theme: 'light', preference: 'light', setPreference: () => {} }}
+      >
+        <MemoryRouter initialEntries={[path]}>
+          <Routes>
+            <Route path="/catalog/:id" element={<CoinCardPage />} />
+          </Routes>
+        </MemoryRouter>
+      </ThemeContext.Provider>
     </QueryClientProvider>,
   );
 }
@@ -292,11 +326,11 @@ describe('CoinCardPage', () => {
 
     await screen.findByRole('heading', { name: 'Історія цін' });
 
-    expect(screen.queryByTestId('trend-line')).toBeNull();
+    expect(screen.queryByRole('img', { name: /Графік цін/ })).toBeNull();
     expect(screen.getAllByText('460 ₴').length).toBeGreaterThan(0);
   });
 
-  it('renders the trend line for two or more price points', async () => {
+  it('renders the chart for two or more price points', async () => {
     vi.mocked(fetchCard).mockResolvedValue(makeCard());
     vi.mocked(fetchPrices).mockResolvedValue([
       priceSnapshot({ id: 1, observedAt: '2024-01-10T00:00:00Z', priceUah: '400.00' }),
@@ -304,7 +338,8 @@ describe('CoinCardPage', () => {
     ]);
     renderPage();
 
-    expect(await screen.findByTestId('trend-line')).toBeInTheDocument();
+    await screen.findByRole('heading', { name: 'Історія цін' });
+    expect(await screen.findByRole('img', { name: /Графік цін/ })).toBeInTheDocument();
   });
 
   it('shows the empty state when there is no price history', async () => {

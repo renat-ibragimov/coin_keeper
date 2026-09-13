@@ -40,6 +40,13 @@ class MonthlyTotal:
     supporting_uah: Decimal
 
 
+@dataclass
+class DailyTotal:
+    day: date
+    coins_uah: Decimal
+    supporting_uah: Decimal
+
+
 def _amount_uah() -> ColumnElement[Decimal]:
     return Expense.amount * func.coalesce(Expense.rate_uah, 1)
 
@@ -122,14 +129,21 @@ class ExpenseRepository:
         await self._session.delete(expense)
         await self._session.flush()
 
-    async def summary(self) -> list[CategoryTotal]:
+    async def summary(
+        self, *, date_from: date | None = None, date_to: date | None = None
+    ) -> list[CategoryTotal]:
+        conditions = [Expense.owner_id == self._owner_id]
+        if date_from is not None:
+            conditions.append(Expense.expense_date >= date_from)
+        if date_to is not None:
+            conditions.append(Expense.expense_date <= date_to)
         result = await self._session.execute(
             select(
                 Expense.category,
                 func.count(Expense.id),
                 func.coalesce(func.sum(_amount_uah()), 0),
             )
-            .where(Expense.owner_id == self._owner_id)
+            .where(*conditions)
             .group_by(Expense.category)
         )
         return [
@@ -137,7 +151,7 @@ class ExpenseRepository:
             for row in result
         ]
 
-    async def monthly_totals(self, *, start: date) -> list[MonthlyTotal]:
+    async def monthly_totals(self, *, start: date, end: date | None = None) -> list[MonthlyTotal]:
         month_col = func.date_trunc("month", Expense.expense_date)
         coin_amount = case(
             (Expense.category == ExpenseCategory.COIN_PURCHASE, _amount_uah()), else_=0
@@ -145,13 +159,16 @@ class ExpenseRepository:
         supporting_amount = case(
             (Expense.category != ExpenseCategory.COIN_PURCHASE, _amount_uah()), else_=0
         )
+        conditions = [Expense.owner_id == self._owner_id, Expense.expense_date >= start]
+        if end is not None:
+            conditions.append(Expense.expense_date <= end)
         result = await self._session.execute(
             select(
                 month_col,
                 func.coalesce(func.sum(coin_amount), 0),
                 func.coalesce(func.sum(supporting_amount), 0),
             )
-            .where(Expense.owner_id == self._owner_id, Expense.expense_date >= start)
+            .where(*conditions)
             .group_by(month_col)
         )
         return [
@@ -160,5 +177,30 @@ class ExpenseRepository:
                 coins_uah=Decimal(row[1]),
                 supporting_uah=Decimal(row[2]),
             )
+            for row in result
+        ]
+
+    async def daily_totals(self, *, start: date, end: date) -> list[DailyTotal]:
+        coin_amount = case(
+            (Expense.category == ExpenseCategory.COIN_PURCHASE, _amount_uah()), else_=0
+        )
+        supporting_amount = case(
+            (Expense.category != ExpenseCategory.COIN_PURCHASE, _amount_uah()), else_=0
+        )
+        result = await self._session.execute(
+            select(
+                Expense.expense_date,
+                func.coalesce(func.sum(coin_amount), 0),
+                func.coalesce(func.sum(supporting_amount), 0),
+            )
+            .where(
+                Expense.owner_id == self._owner_id,
+                Expense.expense_date >= start,
+                Expense.expense_date <= end,
+            )
+            .group_by(Expense.expense_date)
+        )
+        return [
+            DailyTotal(day=row[0], coins_uah=Decimal(row[1]), supporting_uah=Decimal(row[2]))
             for row in result
         ]

@@ -1,0 +1,33 @@
+.picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.customRange {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.dateField {
+  width: 152px;
+}
+
+.dash {
+  color: var(--color-text-muted);
+}
+
+.error {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+@media (max-width: 700px) {
+  .picker {
+    justify-content: center;
+  }
+}

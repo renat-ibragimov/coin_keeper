@@ -508,6 +508,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/expenses/chart-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Expenses Chart Summary */
+        get: operations["expenses_chart_summary_api_v1_expenses_chart_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/expenses/{expense_id}": {
         parameters: {
             query?: never;
@@ -1423,6 +1440,19 @@ export interface components {
             /** Cointitle */
             coinTitle: string | null;
         };
+        /**
+         * ExpensePeriodTotal
+         * @description One point on the chart: `period` is "YYYY-MM-DD" for day granularity,
+         *     "YYYY-MM" for month granularity — zero-filled where there is no spending.
+         */
+        ExpensePeriodTotal: {
+            /** Period */
+            period: string;
+            /** Coinsuah */
+            coinsUah: string;
+            /** Supportinguah */
+            supportingUah: string;
+        };
         /** ExpenseUpdate */
         ExpenseUpdate: {
             category?: components["schemas"]["ExpenseCategory"] | null;
@@ -1440,6 +1470,23 @@ export interface components {
             vendor?: string | null;
             /** Description */
             description?: string | null;
+        };
+        /**
+         * ExpensesChartOut
+         * @description The two chart widgets on the money screen, scoped to a caller-picked
+         *     date range (`GET /expenses/chart-summary?dateFrom&dateTo`) — unlike
+         *     `ExpensesSummaryOut`, whose `byMonth`/`byCategory` are fixed windows.
+         */
+        ExpensesChartOut: {
+            /**
+             * Granularity
+             * @enum {string}
+             */
+            granularity: "day" | "month";
+            /** Byperiod */
+            byPeriod: components["schemas"]["ExpensePeriodTotal"][];
+            /** Bycategory */
+            byCategory: components["schemas"]["ExpenseCategorySummary"][];
         };
         /** ExpensesSummaryOut */
         ExpensesSummaryOut: {
@@ -2904,6 +2951,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExpensesSummaryOut"];
+                };
+            };
+        };
+    };
+    expenses_chart_summary_api_v1_expenses_chart_summary_get: {
+        parameters: {
+            query: {
+                dateFrom: string;
+                dateTo: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpensesChartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

@@ -6,10 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/shared/i18n';
 import { fetchCurrencies } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
-import type { BootstrapOut, ExpenseOut, ExpensePage, ExpensesSummary } from '@/shared/api/types';
+import type {
+  BootstrapOut,
+  ExpenseOut,
+  ExpensePage,
+  ExpensesChart,
+  ExpensesSummary,
+} from '@/shared/api/types';
 import { ThemeContext } from '@/shared/theme/themeContext';
 
-import { fetchExpenses, fetchExpensesSummary } from './api';
+import { fetchExpenses, fetchExpensesChart, fetchExpensesSummary } from './api';
 import { ExpensesPage } from './ExpensesPage';
 
 // recharts measures its container through ResizeObserver + getBoundingClientRect,
@@ -36,6 +42,10 @@ beforeEach(() => {
       return {};
     },
   });
+  // The period picker's own chart query fires on every mount regardless of
+  // what the test cares about; give it a harmless default and let the one
+  // test that actually checks the charts override it.
+  vi.mocked(fetchExpensesChart).mockResolvedValue(EMPTY_CHART);
 });
 
 afterEach(() => {
@@ -46,6 +56,7 @@ afterEach(() => {
 vi.mock('./api', () => ({
   fetchExpenses: vi.fn(),
   fetchExpensesSummary: vi.fn(),
+  fetchExpensesChart: vi.fn(),
   createExpense: vi.fn(),
   updateExpense: vi.fn(),
   deleteExpense: vi.fn(),
@@ -112,6 +123,7 @@ const EMPTY_SUMMARY: ExpensesSummary = {
   thisMonthUah: '0.00',
   prevMonthUah: '0.00',
 };
+const EMPTY_CHART: ExpensesChart = { granularity: 'month', byPeriod: [], byCategory: [] };
 
 function renderPage() {
   return render(
@@ -146,6 +158,14 @@ function makeByMonth(thisMonthCoins: string, prevMonthSupporting: string) {
       supportingUah: offset === -1 ? prevMonthSupporting : '0.00',
     };
   });
+}
+
+/** Same shape as `makeByMonth`, but keyed `period` — what `/expenses/chart-summary` sends. */
+function makeByPeriod(thisMonthCoins: string, prevMonthSupporting: string) {
+  return makeByMonth(thisMonthCoins, prevMonthSupporting).map(({ month, ...rest }) => ({
+    period: month,
+    ...rest,
+  }));
 }
 
 function makeExpense(overrides: Partial<ExpenseOut>): ExpenseOut {
@@ -191,7 +211,7 @@ describe('ExpensesPage', () => {
     // No header action, zero-value KPI tiles, charts or category chips above the empty state.
     expect(screen.queryByRole('button', { name: /Додати витрату/ })).toBeNull();
     expect(screen.queryByText('Разом на хобі')).toBeNull();
-    expect(screen.queryByText('Витрати за місяцями')).toBeNull();
+    expect(screen.queryByText('Витрати за період')).toBeNull();
     expect(screen.queryByText('Усі категорії')).toBeNull();
   });
 
@@ -354,11 +374,19 @@ describe('ExpensesPage', () => {
       thisMonthUah: '300.00',
       prevMonthUah: '50.00',
     });
+    vi.mocked(fetchExpensesChart).mockResolvedValue({
+      granularity: 'month',
+      byPeriod: makeByPeriod('300.00', '50.00'),
+      byCategory: [
+        { category: 'coin_purchase', count: 1, totalUah: '300.00' },
+        { category: 'album', count: 1, totalUah: '100.00' },
+      ],
+    });
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
     vi.mocked(fetchCurrencies).mockResolvedValue([]);
     const { container } = renderPage();
 
-    expect(await screen.findByText('Витрати за місяцями')).toBeInTheDocument();
+    expect(await screen.findByText('Витрати за період')).toBeInTheDocument();
     expect(screen.getByText('За категоріями')).toBeInTheDocument();
     await waitFor(() => {
       expect(container.querySelectorAll('.recharts-surface').length).toBeGreaterThanOrEqual(2);

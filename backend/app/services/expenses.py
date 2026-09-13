@@ -8,8 +8,9 @@ purchase expenses would silently break (docs/04-business-rules.md, rule 4).
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,16 +18,22 @@ from app.core.locale import DEFAULT_LOCALE
 from app.models import CoinSeries, Currency, Expense, User
 from app.models.enums import ExpenseCategory, UserRole
 from app.repositories.catalog import CatalogRepository
-from app.repositories.expenses import ExpenseFilters, ExpenseRepository, MonthlyTotal
+from app.repositories.expenses import DailyTotal, ExpenseFilters, ExpenseRepository, MonthlyTotal
 from app.repositories.rates import RateRepository
 from app.schemas.expenses import (
     ExpenseCategorySummary,
     ExpenseCreate,
     ExpenseMonthTotal,
     ExpenseOut,
+    ExpensePeriodTotal,
+    ExpensesChartOut,
     ExpensesSummaryOut,
     ExpenseUpdate,
 )
+
+# A day-by-day chart beyond this span would draw hundreds of bars with
+# nothing to read; past it the chart switches to one bar per month.
+DAILY_GRANULARITY_MAX_DAYS = 31
 
 
 def _shift_month(day: date, months: int) -> date:
@@ -171,7 +178,69 @@ class ExpenseService:
             prev_month_uah=prev_month,
         )
 
+    async def chart_summary(self, date_from: date, date_to: date) -> ExpensesChartOut:
+        span_days = (date_to - date_from).days
+        granularity: Literal["day", "month"]
+        if span_days <= DAILY_GRANULARITY_MAX_DAYS:
+            by_period = await self._daily_series(date_from, date_to)
+            granularity = "day"
+        else:
+            by_period = await self._monthly_range_series(date_from, date_to)
+            granularity = "month"
+
+        totals = await self._repo.summary(date_from=date_from, date_to=date_to)
+        by_category = [
+            ExpenseCategorySummary(category=row.category, count=row.count, total_uah=row.total_uah)
+            for row in sorted(totals, key=lambda row: row.total_uah, reverse=True)
+        ]
+        return ExpensesChartOut(
+            granularity=granularity, by_period=by_period, by_category=by_category
+        )
+
     # ------------------------------------------------------------- internals
+
+    async def _daily_series(self, date_from: date, date_to: date) -> list[ExpensePeriodTotal]:
+        """Every day in the range, oldest first, zero-filled where empty."""
+        totals = {
+            row.day: row for row in await self._repo.daily_totals(start=date_from, end=date_to)
+        }
+        empty = DailyTotal(day=date_from, coins_uah=Decimal(0), supporting_uah=Decimal(0))
+        days = [
+            date_from + timedelta(days=offset) for offset in range((date_to - date_from).days + 1)
+        ]
+        return [
+            ExpensePeriodTotal(
+                period=day.isoformat(),
+                coins_uah=totals.get(day, empty).coins_uah,
+                supporting_uah=totals.get(day, empty).supporting_uah,
+            )
+            for day in days
+        ]
+
+    async def _monthly_range_series(
+        self, date_from: date, date_to: date
+    ) -> list[ExpensePeriodTotal]:
+        """Every calendar month touching the range, oldest first, zero-filled where empty."""
+        start_month = date_from.replace(day=1)
+        end_month = date_to.replace(day=1)
+        totals = {
+            row.month: row
+            for row in await self._repo.monthly_totals(start=start_month, end=date_to)
+        }
+        months = []
+        cursor = start_month
+        while cursor <= end_month:
+            months.append(cursor)
+            cursor = _shift_month(cursor, 1)
+        empty = MonthlyTotal(month=start_month, coins_uah=Decimal(0), supporting_uah=Decimal(0))
+        return [
+            ExpensePeriodTotal(
+                period=month.strftime("%Y-%m"),
+                coins_uah=totals.get(month, empty).coins_uah,
+                supporting_uah=totals.get(month, empty).supporting_uah,
+            )
+            for month in months
+        ]
 
     async def _monthly_series(self) -> list[ExpenseMonthTotal]:
         """Last 12 calendar months, oldest first, zero-filled where empty."""

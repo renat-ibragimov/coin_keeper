@@ -326,6 +326,123 @@ async def test_summary_by_month_zero_filled(client: AsyncClient, ctx: SimpleName
     assert outside_window not in by_month
 
 
+async def test_chart_summary_daily_granularity_for_a_short_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "75.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-05",
+        },
+        headers=headers,
+    )
+
+    response = await client.get(
+        "/api/v1/expenses/chart-summary?dateFrom=2024-03-01&dateTo=2024-03-10",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["granularity"] == "day"
+    by_day = {row["period"]: row for row in body["byPeriod"]}
+    assert len(body["byPeriod"]) == 10
+    assert by_day["2024-03-05"]["supportingUah"] == "75.00"
+    # A day with no activity is a solid zero, not a missing key.
+    assert by_day["2024-03-01"]["supportingUah"] == "0.00"
+    assert by_day["2024-03-01"]["coinsUah"] == "0.00"
+
+
+async def test_chart_summary_monthly_granularity_for_a_longer_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    await _add_purchase(client, ctx.token_a, ctx.item_id, "300.00", purchase_date="2024-01-15")
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "40.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-20",
+        },
+        headers=headers,
+    )
+
+    response = await client.get(
+        "/api/v1/expenses/chart-summary?dateFrom=2024-01-01&dateTo=2024-04-30",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["granularity"] == "month"
+    by_month = {row["period"]: row for row in body["byPeriod"]}
+    assert list(by_month) == ["2024-01", "2024-02", "2024-03", "2024-04"]
+    assert by_month["2024-01"]["coinsUah"] == "300.00"
+    assert by_month["2024-02"]["coinsUah"] == "0.00"
+    assert by_month["2024-03"]["supportingUah"] == "40.00"
+
+
+async def test_chart_summary_scopes_categories_to_the_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "10.00",
+            "currency": "UAH",
+            "expenseDate": "2023-01-01",
+        },
+        headers=headers,
+    )
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "delivery",
+            "amount": "20.00",
+            "currency": "UAH",
+            "expenseDate": "2024-06-01",
+        },
+        headers=headers,
+    )
+
+    body = (
+        await client.get(
+            "/api/v1/expenses/chart-summary?dateFrom=2024-01-01&dateTo=2024-12-31",
+            headers=headers,
+        )
+    ).json()
+    categories = {row["category"] for row in body["byCategory"]}
+    assert categories == {"delivery"}
+
+    # Isolated from other users, same as the rest of the money screen.
+    empty = (
+        await client.get(
+            "/api/v1/expenses/chart-summary?dateFrom=2024-01-01&dateTo=2024-12-31",
+            headers=auth(ctx.token_b),
+        )
+    ).json()
+    assert empty["byCategory"] == []
+    assert all(
+        row["coinsUah"] == "0.00" and row["supportingUah"] == "0.00" for row in empty["byPeriod"]
+    )
+
+
+async def test_chart_summary_rejects_a_backwards_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    response = await client.get(
+        "/api/v1/expenses/chart-summary?dateFrom=2024-06-01&dateTo=2024-01-01",
+        headers=auth(ctx.token_a),
+    )
+    assert response.status_code == 422
+
+
 async def test_coin_title_in_listing(client: AsyncClient, ctx: SimpleNamespace) -> None:
     headers = auth(ctx.token_a)
     await _add_purchase(client, ctx.token_a, ctx.item_id, "120.00")

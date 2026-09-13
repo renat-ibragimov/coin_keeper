@@ -35,6 +35,7 @@ import {
   deleteExpense,
   EXPENSE_SORTS,
   fetchExpenses,
+  fetchExpensesChart,
   fetchExpensesSummary,
   PAGE_SIZE,
   updateExpense,
@@ -44,6 +45,9 @@ import { ExpensesByCategoryChart } from './ExpensesByCategoryChart';
 import { ExpensesByMonthChart } from './ExpensesByMonthChart';
 import { ExpenseForm } from './ExpenseForm';
 import type { ExpenseValues } from './ExpenseForm';
+import { ExpensesPeriodPicker } from './ExpensesPeriodPicker';
+import { presetRange } from './period';
+import type { ExpensesPeriodPreset } from './period';
 import styles from './ExpensesPage.module.css';
 
 const DEPENDENT_KEYS = ['expenses', 'bootstrap'];
@@ -80,6 +84,11 @@ export function ExpensesPage() {
   const [editor, setEditor] = useState<Editor>({ mode: 'closed' });
   const [deleting, setDeleting] = useState<ExpenseOut | null>(null);
 
+  const [preset, setPreset] = useState<ExpensesPeriodPreset | null>('1y');
+  const [dateFrom, setDateFrom] = useState(() => presetRange('1y').dateFrom);
+  const [dateTo, setDateTo] = useState(() => presetRange('1y').dateTo);
+  const invalidRange = dateFrom > dateTo;
+
   const listQuery = useQuery({
     queryKey: ['expenses', 'list', category, page, sort, order],
     queryFn: () => fetchExpenses({ category, page, sort, order }),
@@ -88,6 +97,12 @@ export function ExpensesPage() {
   const summaryQuery = useQuery({
     queryKey: ['expenses', 'summary'],
     queryFn: fetchExpensesSummary,
+  });
+  const chartQuery = useQuery({
+    queryKey: ['expenses', 'chart', dateFrom, dateTo],
+    queryFn: () => fetchExpensesChart(dateFrom, dateTo),
+    enabled: !invalidRange,
+    placeholderData: keepPreviousData,
   });
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
@@ -236,20 +251,56 @@ export function ExpensesPage() {
           </section>
 
           {summary && summary.categories.length > 0 ? (
-            <div className={styles.charts}>
-              <Card variant="panel" aria-label={t('expenses.chartByMonthTitle')}>
-                <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
-                <ExpensesByMonthChart data={summary.byMonth} locale={locale} palette={palette} />
-              </Card>
-              <Card variant="panel" aria-label={t('expenses.chartByCategoryTitle')}>
-                <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
-                <ExpensesByCategoryChart
-                  data={summary.byCategory}
-                  locale={locale}
-                  palette={palette}
-                />
-              </Card>
-            </div>
+            <>
+              <ExpensesPeriodPicker
+                preset={preset}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                invalidRange={invalidRange}
+                onPreset={(next) => {
+                  setPreset(next);
+                  const range = presetRange(next);
+                  setDateFrom(range.dateFrom);
+                  setDateTo(range.dateTo);
+                }}
+                onCustomRange={(from, to) => {
+                  setPreset(null);
+                  setDateFrom(from);
+                  setDateTo(to);
+                }}
+              />
+              <div className={styles.charts}>
+                <Card variant="panel" aria-label={t('expenses.chartByMonthTitle')}>
+                  <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
+                  {chartQuery.isError ? (
+                    <ErrorState onRetry={() => void chartQuery.refetch()} />
+                  ) : chartQuery.data ? (
+                    <ExpensesByMonthChart
+                      data={chartQuery.data.byPeriod}
+                      granularity={chartQuery.data.granularity}
+                      locale={locale}
+                      palette={palette}
+                    />
+                  ) : (
+                    <Skeleton height={260} />
+                  )}
+                </Card>
+                <Card variant="panel" aria-label={t('expenses.chartByCategoryTitle')}>
+                  <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
+                  {chartQuery.isError ? (
+                    <ErrorState onRetry={() => void chartQuery.refetch()} />
+                  ) : chartQuery.data ? (
+                    <ExpensesByCategoryChart
+                      data={chartQuery.data.byCategory}
+                      locale={locale}
+                      palette={palette}
+                    />
+                  ) : (
+                    <Skeleton height={260} />
+                  )}
+                </Card>
+              </div>
+            </>
           ) : null}
 
           {summary && summary.categories.length > 0 ? (

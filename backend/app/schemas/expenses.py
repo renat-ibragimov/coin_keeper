@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import Field
 
@@ -73,3 +74,22 @@ class ExpensesSummaryOut(CamelModel):
     by_category: list[ExpenseCategorySummary]
     this_month_uah: Money
     prev_month_uah: Money
+
+
+class ExpensePeriodTotal(CamelModel):
+    """One point on the chart: `period` is "YYYY-MM-DD" for day granularity,
+    "YYYY-MM" for month granularity — zero-filled where there is no spending."""
+
+    period: str
+    coins_uah: Money
+    supporting_uah: Money
+
+
+class ExpensesChartOut(CamelModel):
+    """The two chart widgets on the money screen, scoped to a caller-picked
+    date range (`GET /expenses/chart-summary?dateFrom&dateTo`) — unlike
+    `ExpensesSummaryOut`, whose `byMonth`/`byCategory` are fixed windows."""
+
+    granularity: Literal["day", "month"]
+    by_period: list[ExpensePeriodTotal]
+    by_category: list[ExpenseCategorySummary]

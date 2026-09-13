@@ -37,9 +37,11 @@
   flex: 1;
   min-width: 0;
   color: var(--color-text);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  color: var(--color-text-muted);
 }
 
 .legendValue {

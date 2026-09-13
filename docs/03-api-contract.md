@@ -437,6 +437,7 @@ POST   /expenses
 PATCH  /expenses/{id}
 DELETE /expenses/{id}
 GET    /expenses/summary
+GET    /expenses/chart-summary?dateFrom&dateTo
 ```
 
 `sort` — `date` (по умолчанию) | `category` | `description` | `vendor` | `amount`,
@@ -459,6 +460,17 @@ GET    /expenses/summary
   нулями, а не пропускаются, чтобы ось графика была сплошной;
 - `thisMonthUah` / `prevMonthUah` — сумма (монеты + сопутствующие) за текущий и
   предыдущий календарный месяц; равны последним двум точкам `byMonth`.
+
+`GET /expenses/chart-summary?dateFrom&dateTo` (`ExpensesChartOut`, оба параметра обязательны,
+`dateFrom > dateTo` — `422`) — те же два виджета графика на странице «Гроші», но за диапазон,
+который выбирает сам пользователь (плашки «1М/3М/6М/1Р» и произвольные даты на фронте), в
+отличие от фиксированных окон `ExpensesSummaryOut`:
+
+- `granularity` — `day`, если диапазон не длиннее 31 дня, иначе `month`;
+- `byPeriod` — точки графика, от старой к новой, нулями там, где трат не было; `period` —
+  `"YYYY-MM-DD"` при дневной группировке, `"YYYY-MM"` при месячной;
+- `byCategory` — разбивка по категориям **только за этот диапазон** (не тот же список, что
+  `categories`/`byCategory` в `ExpensesSummaryOut`, которые всегда за всё время).
 
 ## Цены и курсы
 
