@@ -551,6 +551,43 @@ async def test_card_resolves_edge_and_quality_dictionaries(
     assert raw["quality"] == "Незвичайна якість"
 
 
+async def test_card_resolves_description_and_artists_to_the_requested_locale(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/02-data-model.md: coin-collector's descriptions/artists JSON is
+    fixed-shape and locale-keyed; the card resolves it to the caller's locale,
+    with a fallback to the other one when that slot has no text."""
+    refs = ctx.refs
+    item = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Архістратиг Михаїл",
+        year=2017,
+        descriptions={
+            "uk": {"general": "Опис", "obverse": "Аверс", "reverse": None},
+            "en": {"general": "Description", "obverse": None, "reverse": "Reverse"},
+        },
+        artists={
+            "designers": [{"uk": "Таран Володимир", "en": "Volodymyr Taran"}],
+            "sculptors": [],
+        },
+    )
+    untouched = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Не оброблена", year=2022
+    )
+
+    headers = auth(ctx.token_a)
+    card = (await client.get(f"/api/v1/catalog/{item.id}", headers=headers)).json()
+    assert card["description"] == {"general": "Опис", "obverse": "Аверс", "reverse": "Reverse"}
+    assert card["designers"] == ["Таран Володимир"]
+    assert card["sculptors"] == []
+
+    bare = (await client.get(f"/api/v1/catalog/{untouched.id}", headers=headers)).json()
+    assert bare["description"] is None
+    assert bare["designers"] == []
+    assert bare["sculptors"] == []
+
+
 async def test_card_and_own_instances(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:

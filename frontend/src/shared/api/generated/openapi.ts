@@ -621,7 +621,8 @@ export interface paths {
         /**
          * List Denominations
          * @description `scope=confirmed` is the catalog's own filter panel: only a
-         *     `catalog_confirmed` country's denominations (§13a).
+         *     `catalog_confirmed` country's denominations that a catalog item actually
+         *     visible to this user still uses (§13a).
          */
         get: operations["list_denominations_api_v1_denominations_get"];
         put?: never;
@@ -791,6 +792,11 @@ export interface components {
             catalogNumista: string | null;
             /** Notes */
             notes: string | null;
+            description: components["schemas"]["CoinDescriptions"] | null;
+            /** Designers */
+            designers: string[];
+            /** Sculptors */
+            sculptors: string[];
             /** Archivedat */
             archivedAt: string | null;
             /**
@@ -1033,6 +1039,20 @@ export interface components {
             currencyCode: string;
             /** Label */
             label: string;
+        };
+        /**
+         * CoinDescriptions
+         * @description The coin-collector parser's text for the requested locale
+         *     (docs/02-data-model.md). Any of the three may still be null — the parser
+         *     writes the key regardless of whether it found text for it.
+         */
+        CoinDescriptions: {
+            /** General */
+            general: string | null;
+            /** Obverse */
+            obverse: string | null;
+            /** Reverse */
+            reverse: string | null;
         };
         /** CoinEdgeType */
         CoinEdgeType: {

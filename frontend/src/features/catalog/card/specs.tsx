@@ -44,6 +44,12 @@ function qualityName(card: CatalogCard): string | null {
   return card.qualityType?.name ?? card.quality;
 }
 
+/** Several names read as one comma-separated line, same as a denomination or
+ * a catalog number — there is no per-name UI on this page. */
+function joinNames(names: string[]): string | null {
+  return names.length > 0 ? names.join(', ') : null;
+}
+
 /** "Основна інформація": the coin's identity — country, series, category, year, denomination. */
 export function identitySpecRows(card: CatalogCard, t: TFunction): PropertyRow[] {
   return [
@@ -83,6 +89,8 @@ export function issueSpecRows(card: CatalogCard, t: TFunction, locale: string): 
     },
     { key: 'variety', label: t('card.specVariety'), value: card.variety },
     { key: 'subtype', label: t('card.specSubtype'), value: card.subtype },
+    { key: 'designers', label: t('card.specDesigners'), value: joinNames(card.designers) },
+    { key: 'sculptors', label: t('card.specSculptors'), value: joinNames(card.sculptors) },
   ];
 }
 

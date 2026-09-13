@@ -49,6 +49,16 @@ class CoinImageOut(CamelModel):
     attribution: str | None
 
 
+class CoinDescriptions(CamelModel):
+    """The coin-collector parser's text for the requested locale
+    (docs/02-data-model.md). Any of the three may still be null — the parser
+    writes the key regardless of whether it found text for it."""
+
+    general: str | None
+    obverse: str | None
+    reverse: str | None
+
+
 class CatalogListItem(CamelModel):
     id: int
     country: str
@@ -105,6 +115,9 @@ class CatalogCard(CatalogListItem):
     catalog_uc: str | None
     catalog_numista: str | None
     notes: str | None
+    description: CoinDescriptions | None
+    designers: list[str]
+    sculptors: list[str]
     archived_at: datetime | None
     created_at: datetime
     updated_at: datetime

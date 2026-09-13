@@ -396,23 +396,25 @@ button.photoFrame {
 /* Editorial property rows, not a DataTable: a muted label, a slightly
  * heavier value, one soft rule between rows and none after the last one.
  * Targets the shared PropertyList's rendered <dl>/<dt>/<dd> by element
- * instead of touching PropertyList.module.css, which other pages use too. */
-.bottomPanel dt {
+ * instead of touching PropertyList.module.css, which other pages use too.
+ * Scoped to .page — the specs grid and the instances summary are the only
+ * two PropertyLists this page renders. */
+.page dt {
   color: var(--color-text-muted);
   font-weight: 400;
 }
 
-.bottomPanel dd {
+.page dd {
   color: var(--color-text);
   font-weight: 500;
 }
 
-.bottomPanel dl > div {
+.page dl > div {
   padding: 11px 0;
   border-bottom: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
 }
 
-.bottomPanel dl > div:last-child {
+.page dl > div:last-child {
   border-bottom: none;
 }
 
@@ -421,6 +423,37 @@ button.photoFrame {
   color: var(--color-text-secondary);
   font-size: 14.5px;
   white-space: pre-line;
+}
+
+/* ----------------------------------------------------------- description */
+
+.descriptionText {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.descriptionSides {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4) var(--space-5);
+  margin-top: var(--space-3);
+}
+
+.descriptionSide {
+  min-width: 0;
+}
+
+.descriptionSideTitle {
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
 }
 
 /* ------------------------------------------------------------- instances */
@@ -447,74 +480,23 @@ button.photoFrame {
   margin-bottom: var(--space-2);
 }
 
-/* Lighter tabs for this page only: a hairline under the whole row instead
- * of a boxed pill-container, the active tab picked out by colour and an
- * underline instead of a filled capsule. Selects the shared Tabs
- * component's own rendered output by role/aria attributes — stable,
- * unscoped by CSS Modules — rather than touching Tabs.module.css, which
- * four other pages use as-is. */
-/* overflow-x: auto rather than wrap: three short Ukrainian labels
- * ("Характеристики", "Історія цін", "Мої екземпляри") don't all fit a phone's
- * width, and wrapping them to a second line would shift the panel below
- * unpredictably. Scrolling the strip keeps the row one line everywhere and,
- * unlike letting it overflow, doesn't drag the whole page sideways with it. */
-.tabsWrapper [role='tablist'] {
-  display: flex;
-  gap: var(--space-4);
-  padding: 0;
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  border-bottom: 1px solid var(--color-border);
-  overflow-x: auto;
-}
+/* ----------------------------------------------------------- section cards */
 
-.tabsWrapper [role='tab'] {
-  position: relative;
-  flex: none;
-  padding: var(--space-2) var(--space-1) var(--space-3);
-  border: none;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
-}
-
-.tabsWrapper [role='tab'][aria-selected='true'] {
-  background: transparent;
-  box-shadow: none;
-  color: var(--color-accent-strong);
-}
-
-:root[data-theme='dark'] .tabsWrapper [role='tab'][aria-selected='true'] {
-  color: var(--color-accent);
-}
-
-.tabsWrapper [role='tab'][aria-selected='true']::after {
-  content: '';
-  position: absolute;
-  left: 2px;
-  right: 2px;
-  bottom: -1px;
-  height: 2px;
-  background: var(--color-accent);
-  border-radius: 2px;
-}
-
-/* ------------------------------------------------------------- bottom panel */
-
-.bottomCard {
+/* Every section below the hero — description, specs, price history,
+ * instances — is its own card with the same heading treatment, so the page
+ * reads as a sequence of always-visible sections instead of tabs hiding
+ * everything but one at a time. */
+.sectionCard {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
 }
 
-/* A floor, not a fixed height: switching tabs shouldn't visibly shrink the
- * panel for a short one (a single price point, an empty state) even though
- * a data-heavy one (many spec rows) can still grow past it. */
-.bottomPanel {
-  min-width: 0;
-  min-height: 220px;
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
 }
 
 .singlePrice {
@@ -535,7 +517,8 @@ button.photoFrame {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .specGrid {
+  .specGrid,
+  .descriptionSides {
     grid-template-columns: 1fr;
   }
 }

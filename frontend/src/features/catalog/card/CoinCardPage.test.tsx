@@ -77,6 +77,9 @@ function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
     catalogUc: null,
     catalogNumista: null,
     notes: null,
+    description: null,
+    designers: [],
+    sculptors: [],
     archivedAt: null,
     createdAt: '2026-09-01T00:00:00Z',
     updatedAt: '2026-09-01T00:00:00Z',
@@ -166,6 +169,47 @@ describe('CoinCardPage', () => {
     expect(screen.getByText('2 гривні')).toBeInTheDocument();
   });
 
+  it('shows the general, obverse and reverse descriptions when the parser found them', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({
+        description: {
+          general: 'Присвячена дельфінам Чорного моря.',
+          obverse: 'На аверсі — малий герб України.',
+          reverse: 'На реверсі — зображення дельфіна.',
+        },
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByRole('heading', { name: 'Опис' })).toBeInTheDocument();
+    expect(screen.getByText('Присвячена дельфінам Чорного моря.')).toBeInTheDocument();
+    expect(screen.getByText('На аверсі — малий герб України.')).toBeInTheDocument();
+    expect(screen.getByText('На реверсі — зображення дельфіна.')).toBeInTheDocument();
+  });
+
+  it('omits the description section entirely when the parser has not touched the coin', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ description: null }));
+    renderPage();
+
+    await screen.findByRole('heading', { level: 1, name: 'Дельфін' });
+    expect(screen.queryByRole('heading', { name: 'Опис' })).toBeNull();
+  });
+
+  it('shows designers and sculptors in the issue spec group', async () => {
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({
+        designers: ['Таран Володимир', 'Харук Олександр'],
+        sculptors: ['Чайковський Роман'],
+      }),
+    );
+    renderPage();
+
+    expect(await screen.findByText('Художники')).toBeInTheDocument();
+    expect(screen.getByText('Таран Володимир, Харук Олександр')).toBeInTheDocument();
+    expect(screen.getByText('Скульптори')).toBeInTheDocument();
+    expect(screen.getByText('Чайковський Роман')).toBeInTheDocument();
+  });
+
   it('shows the edge/quality dictionary name over the raw text, and the raw text when there is no dictionary row', async () => {
     vi.mocked(fetchCard).mockResolvedValue(
       makeCard({
@@ -221,7 +265,7 @@ describe('CoinCardPage', () => {
       '/collection/coins/new?catalogItemId=7',
     );
     // Nothing to show on "Мої екземпляри" for a coin the visitor doesn't own.
-    expect(screen.queryByRole('tab', { name: 'Мої екземпляри' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Мої екземпляри' })).toBeNull();
   });
 
   it('shows a calm empty state for the current price when there is none', async () => {
@@ -246,8 +290,7 @@ describe('CoinCardPage', () => {
     vi.mocked(fetchPrices).mockResolvedValue([priceSnapshot()]);
     renderPage();
 
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: 'Історія цін' }));
+    await screen.findByRole('heading', { name: 'Історія цін' });
 
     expect(screen.queryByTestId('trend-line')).toBeNull();
     expect(screen.getAllByText('460 ₴').length).toBeGreaterThan(0);
@@ -261,18 +304,12 @@ describe('CoinCardPage', () => {
     ]);
     renderPage();
 
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: 'Історія цін' }));
-
     expect(await screen.findByTestId('trend-line')).toBeInTheDocument();
   });
 
   it('shows the empty state when there is no price history', async () => {
     vi.mocked(fetchCard).mockResolvedValue(makeCard());
     renderPage();
-
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: 'Історія цін' }));
 
     expect(await screen.findByText('Цін ще немає.')).toBeInTheDocument();
   });
@@ -283,7 +320,7 @@ describe('CoinCardPage', () => {
     renderPage();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
+    await screen.findByRole('heading', { name: 'Мої екземпляри' });
 
     expect(await screen.findByText('640 ₴')).toBeInTheDocument();
     // current value = 460 × 2 = 920
@@ -318,7 +355,6 @@ describe('CoinCardPage', () => {
     renderPage();
 
     const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
     await user.click(await screen.findByText('Показати всі екземпляри (2)'));
 
     await waitFor(() =>
@@ -333,9 +369,6 @@ describe('CoinCardPage', () => {
     vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
     renderPage();
 
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
-
     expect(await screen.findByText('+920 ₴')).toBeInTheDocument();
     expect(screen.queryByText(/%/)).toBeNull();
   });
@@ -343,9 +376,6 @@ describe('CoinCardPage', () => {
   it('shows a compact empty state with a call to action on the instances tab when empty', async () => {
     vi.mocked(fetchCard).mockResolvedValue(makeCard());
     renderPage();
-
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('tab', { name: 'Мої екземпляри' }));
 
     expect(await screen.findByText('У вас ще немає екземплярів цієї монети.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Додати до колекції' })).toHaveAttribute(

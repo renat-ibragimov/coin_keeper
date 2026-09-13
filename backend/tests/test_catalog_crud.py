@@ -305,7 +305,10 @@ async def test_descriptions_and_artists_columns_round_trip(
             "uk": {"general": "Опис", "obverse": "Аверс", "reverse": "Реверс"},
             "en": {"general": None, "obverse": None, "reverse": None},
         },
-        artists={"designers": ["Чайковський Роман"], "sculptors": []},
+        artists={
+            "designers": [{"uk": "Чайковський Роман", "en": "Roman Chaikovskyi"}],
+            "sculptors": [],
+        },
     )
 
     stored_untouched = await db_session.get(CatalogItem, untouched.id)
@@ -319,7 +322,10 @@ async def test_descriptions_and_artists_columns_round_trip(
         "uk": {"general": "Опис", "obverse": "Аверс", "reverse": "Реверс"},
         "en": {"general": None, "obverse": None, "reverse": None},
     }
-    assert stored_parsed.artists == {"designers": ["Чайковський Роман"], "sculptors": []}
+    assert stored_parsed.artists == {
+        "designers": [{"uk": "Чайковський Роман", "en": "Roman Chaikovskyi"}],
+        "sculptors": [],
+    }
 
 
 async def test_status_quality_and_edited_fields_round_trip(

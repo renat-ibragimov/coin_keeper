@@ -21,9 +21,8 @@ import {
   Lightbox,
   PropertyList,
   Skeleton,
-  Tabs,
 } from '@/shared/ui';
-import type { PropertyRow, TabOption } from '@/shared/ui';
+import type { PropertyRow } from '@/shared/ui';
 
 import { fetchCard, fetchOwnInstances, fetchPrices } from '../api';
 import type { ChartPoint } from './chartData';
@@ -32,8 +31,6 @@ import { InstancesList } from './InstancesList';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { catalogSpecRows, identitySpecRows, issueSpecRows, technicalSpecRows } from './specs';
 import styles from './CoinCardPage.module.css';
-
-type PanelTab = 'specs' | 'instances' | 'prices';
 
 export function CoinCardPage() {
   const { t } = useTranslation();
@@ -84,7 +81,6 @@ function CardBody({ card }: { card: CatalogCard }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [enlarged, setEnlarged] = useState<'obverse' | 'reverse' | null>(null);
-  const [tab, setTab] = useState<PanelTab>('specs');
   const instancesDisclosureRef = useRef<HTMLDetailsElement>(null);
 
   const pricesQuery = useQuery({
@@ -122,12 +118,10 @@ function CardBody({ card }: { card: CatalogCard }) {
   const chartPoints = toChartPoints(priceItems);
   const hasInstances = (instancesQuery.data?.length ?? 0) > 0;
   const owned = card.quantityOwned > 0;
-  // No instances of a coin the visitor doesn't have — the tab has nothing to show.
-  const panelTabs: TabOption<PanelTab>[] = [
-    { value: 'specs', label: t('card.specs') },
-    { value: 'prices', label: t('card.priceHistory') },
-    ...(owned ? [{ value: 'instances' as const, label: t('card.instances') }] : []),
-  ];
+  const description = card.description;
+  const hasDescription = Boolean(
+    description && (description.general || description.obverse || description.reverse),
+  );
 
   return (
     <div className={styles.page}>
@@ -200,94 +194,104 @@ function CardBody({ card }: { card: CatalogCard }) {
         <SidebarCard card={card} locale={locale} t={t} addUrl={addUrl} addState={addState} />
       </div>
 
-      <Card className={styles.bottomCard} padded={false}>
-        {/* Restyled locally via role/aria selectors (CoinCardPage.module.css)
-            instead of touching the shared Tabs component used elsewhere. */}
-        <div className={styles.tabsWrapper}>
-          <Tabs
-            aria-label={t('card.detailsTabs')}
-            value={tab}
-            onChange={setTab}
-            options={panelTabs}
-          />
-        </div>
-        <div className={styles.bottomPanel}>
-          {tab === 'specs' ? (
-            <>
-              <div className={styles.specGrid}>
-                <SpecGroup title={t('card.specGroupIdentity')} rows={identitySpecRows(card, t)} />
-                <SpecGroup title={t('card.specGroupIssue')} rows={issueSpecRows(card, t, locale)} />
-                <SpecGroup
-                  title={t('card.specGroupTechnical')}
-                  rows={technicalSpecRows(card, t, locale)}
-                />
-                <SpecGroup title={t('card.specGroupCatalog')} rows={catalogSpecRows(card, t)} />
-              </div>
-              {card.notes ? <p className={styles.notes}>{card.notes}</p> : null}
-            </>
+      {hasDescription ? (
+        <Card className={styles.sectionCard}>
+          <h2 className={styles.sectionTitle}>{t('card.description')}</h2>
+          {description?.general ? (
+            <p className={styles.descriptionText}>{description.general}</p>
           ) : null}
-          {tab === 'instances' ? (
+          {description?.obverse || description?.reverse ? (
+            <div className={styles.descriptionSides}>
+              {description.obverse ? (
+                <div className={styles.descriptionSide}>
+                  <h3 className={styles.descriptionSideTitle}>{t('card.obverse')}</h3>
+                  <p className={styles.descriptionText}>{description.obverse}</p>
+                </div>
+              ) : null}
+              {description.reverse ? (
+                <div className={styles.descriptionSide}>
+                  <h3 className={styles.descriptionSideTitle}>{t('card.reverse')}</h3>
+                  <p className={styles.descriptionText}>{description.reverse}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
+
+      <Card className={styles.sectionCard}>
+        <h2 className={styles.sectionTitle}>{t('card.specs')}</h2>
+        <div className={styles.specGrid}>
+          <SpecGroup title={t('card.specGroupIdentity')} rows={identitySpecRows(card, t)} />
+          <SpecGroup title={t('card.specGroupIssue')} rows={issueSpecRows(card, t, locale)} />
+          <SpecGroup
+            title={t('card.specGroupTechnical')}
+            rows={technicalSpecRows(card, t, locale)}
+          />
+          <SpecGroup title={t('card.specGroupCatalog')} rows={catalogSpecRows(card, t)} />
+        </div>
+        {card.notes ? <p className={styles.notes}>{card.notes}</p> : null}
+      </Card>
+
+      <Card className={styles.sectionCard}>
+        <h2 className={styles.sectionTitle}>{t('card.priceHistory')}</h2>
+        {pricesQuery.isPending ? <Skeleton height={180} /> : null}
+        {pricesQuery.isError ? <ErrorState onRetry={() => void pricesQuery.refetch()} /> : null}
+        {pricesQuery.data && chartPoints.length === 0 ? (
+          <p className={styles.muted}>{t('card.pricesEmpty')}</p>
+        ) : null}
+        {chartPoints.length === 1 ? (
+          <SinglePricePoint point={chartPoints[0]!} locale={locale} t={t} />
+        ) : null}
+        {chartPoints.length >= 2 ? <PriceHistoryChart items={priceItems} /> : null}
+      </Card>
+
+      {owned ? (
+        <Card className={styles.sectionCard}>
+          <h2 className={styles.sectionTitle}>{t('card.instances')}</h2>
+          {instancesQuery.isError ? (
+            <ErrorState onRetry={() => void instancesQuery.refetch()} />
+          ) : hasInstances ? (
             <>
-              {instancesQuery.isError ? (
-                <ErrorState onRetry={() => void instancesQuery.refetch()} />
-              ) : hasInstances ? (
-                <>
-                  <InstancesSummary card={card} locale={locale} t={t} />
-                  <details
-                    ref={instancesDisclosureRef}
-                    className={styles.instancesDisclosure}
-                    onToggle={(event) => {
-                      // Wait a frame so the revealed list has already been
-                      // laid out — scrolling before that targets the old,
-                      // collapsed height and undershoots.
-                      if (event.currentTarget.open) {
-                        requestAnimationFrame(() => {
-                          instancesDisclosureRef.current?.scrollIntoView?.({
-                            behavior: 'smooth',
-                            block: 'end',
-                          });
-                        });
-                      }
-                    }}
-                  >
-                    <summary>
-                      {t('card.showAllInstances', { count: instancesQuery.data?.length ?? 0 })}
-                    </summary>
-                    <InstancesList
-                      items={instancesQuery.data}
-                      loading={instancesQuery.isPending}
-                      addHref={addUrl}
-                      coinTitle={title}
-                    />
-                  </details>
-                </>
-              ) : (
+              <InstancesSummary card={card} locale={locale} t={t} />
+              <details
+                ref={instancesDisclosureRef}
+                className={styles.instancesDisclosure}
+                onToggle={(event) => {
+                  // Wait a frame so the revealed list has already been
+                  // laid out — scrolling before that targets the old,
+                  // collapsed height and undershoots.
+                  if (event.currentTarget.open) {
+                    requestAnimationFrame(() => {
+                      instancesDisclosureRef.current?.scrollIntoView?.({
+                        behavior: 'smooth',
+                        block: 'end',
+                      });
+                    });
+                  }
+                }}
+              >
+                <summary>
+                  {t('card.showAllInstances', { count: instancesQuery.data?.length ?? 0 })}
+                </summary>
                 <InstancesList
                   items={instancesQuery.data}
                   loading={instancesQuery.isPending}
                   addHref={addUrl}
                   coinTitle={title}
                 />
-              )}
+              </details>
             </>
-          ) : null}
-          {tab === 'prices' ? (
-            <>
-              {pricesQuery.isPending ? <Skeleton height={180} /> : null}
-              {pricesQuery.isError ? (
-                <ErrorState onRetry={() => void pricesQuery.refetch()} />
-              ) : null}
-              {pricesQuery.data && chartPoints.length === 0 ? (
-                <p className={styles.muted}>{t('card.pricesEmpty')}</p>
-              ) : null}
-              {chartPoints.length === 1 ? (
-                <SinglePricePoint point={chartPoints[0]!} locale={locale} t={t} />
-              ) : null}
-              {chartPoints.length >= 2 ? <PriceHistoryChart items={priceItems} /> : null}
-            </>
-          ) : null}
-        </div>
-      </Card>
+          ) : (
+            <InstancesList
+              items={instancesQuery.data}
+              loading={instancesQuery.isPending}
+              addHref={addUrl}
+              coinTitle={title}
+            />
+          )}
+        </Card>
+      ) : null}
 
       <Lightbox
         open={enlargedSide !== undefined}
@@ -328,7 +332,7 @@ interface SidebarCardProps {
 /**
  * The sidebar answers one question only — "do I have it, and what does it
  * cost right now?". Purchase price, valuation and profit are the visitor's
- * own numbers, not the coin's, so they live on the "Мої екземпляри" tab
+ * own numbers, not the coin's, so they live in the "Мої екземпляри" section
  * instead (InstancesSummary below).
  */
 function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {

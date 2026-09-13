@@ -39,6 +39,7 @@ from app.schemas.catalog import (
     CatalogItemUpdate,
     CatalogListItem,
     CoinDenomination,
+    CoinDescriptions,
     CoinEdgeType,
     CoinImageOut,
     CoinMaterial,
@@ -144,6 +145,42 @@ def quality_type_out(quality_type: QualityType | None, locale: str) -> CoinQuali
         code=quality_type.code,
         name=quality_type.name_uk if locale == "uk" else quality_type.name_en,
     )
+
+
+def description_out(
+    descriptions: dict[str, object] | None, locale: str
+) -> CoinDescriptions | None:
+    """Text for the requested locale, falling back to the other one where the
+    parser found nothing to write there (docs/02-data-model.md)."""
+    if not descriptions:
+        return None
+    other = "en" if locale == "uk" else "uk"
+    primary = descriptions.get(locale) or {}
+    fallback = descriptions.get(other) or {}
+
+    def pick(key: str) -> str | None:
+        return primary.get(key) or fallback.get(key)  # type: ignore[union-attr]
+
+    general, obverse, reverse = pick("general"), pick("obverse"), pick("reverse")
+    if general is None and obverse is None and reverse is None:
+        return None
+    return CoinDescriptions(general=general, obverse=obverse, reverse=reverse)
+
+
+def _artist_name(entry: object, locale: str) -> str | None:
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        other = "en" if locale == "uk" else "uk"
+        return entry.get(locale) or entry.get(other)
+    return None
+
+
+def artist_names(artists: dict[str, object] | None, role: str, locale: str) -> list[str]:
+    if not artists:
+        return []
+    names = (_artist_name(entry, locale) for entry in artists.get(role) or [])  # type: ignore[union-attr]
+    return [name for name in names if name]
 
 
 class CatalogService:
@@ -463,6 +500,9 @@ class CatalogService:
             catalog_uc=item.catalog_uc,
             catalog_numista=item.catalog_numista,
             notes=item.notes,
+            description=description_out(item.descriptions, self._locale),
+            designers=artist_names(item.artists, "designers", self._locale),
+            sculptors=artist_names(item.artists, "sculptors", self._locale),
             archived_at=item.archived_at,
             created_at=item.created_at,
             updated_at=item.updated_at,
