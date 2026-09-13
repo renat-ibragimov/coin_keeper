@@ -147,19 +147,22 @@ def quality_type_out(quality_type: QualityType | None, locale: str) -> CoinQuali
     )
 
 
-def description_out(
-    descriptions: dict[str, object] | None, locale: str
-) -> CoinDescriptions | None:
+def description_out(descriptions: dict[str, object] | None, locale: str) -> CoinDescriptions | None:
     """Text for the requested locale, falling back to the other one where the
     parser found nothing to write there (docs/02-data-model.md)."""
     if not descriptions:
         return None
     other = "en" if locale == "uk" else "uk"
-    primary = descriptions.get(locale) or {}
-    fallback = descriptions.get(other) or {}
+    primary = descriptions.get(locale)
+    fallback = descriptions.get(other)
 
     def pick(key: str) -> str | None:
-        return primary.get(key) or fallback.get(key)  # type: ignore[union-attr]
+        for locale_texts in (primary, fallback):
+            if isinstance(locale_texts, dict):
+                value = locale_texts.get(key)
+                if isinstance(value, str):
+                    return value
+        return None
 
     general, obverse, reverse = pick("general"), pick("obverse"), pick("reverse")
     if general is None and obverse is None and reverse is None:
@@ -172,14 +175,18 @@ def _artist_name(entry: object, locale: str) -> str | None:
         return entry
     if isinstance(entry, dict):
         other = "en" if locale == "uk" else "uk"
-        return entry.get(locale) or entry.get(other)
+        value = entry.get(locale) or entry.get(other)
+        return value if isinstance(value, str) else None
     return None
 
 
 def artist_names(artists: dict[str, object] | None, role: str, locale: str) -> list[str]:
     if not artists:
         return []
-    names = (_artist_name(entry, locale) for entry in artists.get(role) or [])  # type: ignore[union-attr]
+    entries = artists.get(role)
+    if not isinstance(entries, list):
+        return []
+    names = (_artist_name(entry, locale) for entry in entries)
     return [name for name in names if name]
 
 
