@@ -7,10 +7,11 @@ import { fetchCard, fetchCurrencies } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { CatalogListItem } from '@/shared/api/types';
+import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle } from '@/shared/lib/coinTitle';
+import { imageSources } from '@/shared/lib/coinImage';
 import {
   Badge,
-  Breadcrumbs,
   Button,
   Card,
   CoinImage,
@@ -67,7 +68,11 @@ export function PurchaseFormPage() {
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
 
   const from = (location.state as { from?: string } | null)?.from;
-  const destination = from ?? (editing ? '/collection/coins' : `/catalog/${catalogItemId}`);
+  // The only entry point into editing is a coin's own page, so both the back
+  // button and the cancel button return there rather than to the full list.
+  const destination =
+    from ?? (catalogItemId !== null ? `/catalog/${catalogItemId}` : '/collection/coins');
+  const goBack = () => navigate(destination);
 
   const mutation = useMutation({
     mutationFn: (values: PurchaseValues) =>
@@ -82,11 +87,6 @@ export function PurchaseFormPage() {
       navigate(destination, { replace: true });
     },
   });
-
-  const crumbs = [
-    { label: t('nav.coins'), to: '/collection/coins' },
-    { label: editing ? t('purchase.editTitle') : t('card.addPurchase') },
-  ];
 
   if (editing && instanceQuery.isError) {
     const notFound = instanceQuery.error instanceof ApiError && instanceQuery.error.status === 404;
@@ -103,10 +103,18 @@ export function PurchaseFormPage() {
     );
   }
 
+  const sides = cardQuery.data
+    ? ([
+        { key: 'obverse' as const, image: cardQuery.data.obverseImage, label: t('card.obverse') },
+        { key: 'reverse' as const, image: cardQuery.data.reverseImage, label: t('card.reverse') },
+      ] as const)
+    : [];
+
   return (
     <div className={styles.page}>
       <PageHeader
-        above={<Breadcrumbs items={crumbs} />}
+        align="center"
+        onBack={catalogItemId !== null ? goBack : undefined}
         title={editing ? t('purchase.editTitle') : t('card.addPurchase')}
         subtitle={editing ? t('purchase.editSubtitle') : t('purchase.subtitle')}
       />
@@ -121,66 +129,69 @@ export function PurchaseFormPage() {
           />
         </Card>
       ) : (
-        <div className={styles.layout}>
-          <Card className={styles.item}>
-            {cardQuery.data ? (
-              <div className={styles.itemBody}>
-                <CoinImage
-                  src={cardQuery.data.thumbnailUrl ?? cardQuery.data.obverseImage?.preview ?? null}
-                  alt=""
-                  className={styles.itemImage}
-                />
-                <div>
-                  <div className={styles.itemBadges}>
-                    {cardQuery.data.isOwn ? (
-                      <Badge tone="accent">{t('catalog.badgeOwn')}</Badge>
-                    ) : null}
-                    {cardQuery.data.isArchived ? (
-                      <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
-                    ) : null}
-                  </div>
-                  <Link to={`/catalog/${cardQuery.data.id}`} className={styles.itemTitle}>
-                    {coinTitle(cardQuery.data, i18n.language)}
-                  </Link>
-                  <div className={styles.itemMeta}>
-                    {[
-                      cardQuery.data.denomination?.label,
-                      cardQuery.data.country,
-                      String(cardQuery.data.year),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                  {cardQuery.data.seriesName ? (
-                    <div className={styles.itemSeries}>{cardQuery.data.seriesName}</div>
-                  ) : null}
-                  {!editing ? (
-                    <button
-                      type="button"
-                      className={styles.changeItem}
-                      onClick={() => {
-                        setPicked(null);
-                        setSearchParams({}, { replace: true });
-                      }}
-                    >
-                      {t('purchase.changeItem')}
-                    </button>
-                  ) : null}
-                </div>
+        <div className={styles.content}>
+          {cardQuery.data ? (
+            <div className={styles.coinHeader}>
+              <div className={styles.coinBadges}>
+                {cardQuery.data.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
+                {cardQuery.data.isArchived ? (
+                  <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
+                ) : null}
               </div>
-            ) : cardQuery.isError ? (
-              <ErrorState
-                title={t('card.notFoundTitle')}
-                actions={
-                  <Link to="/catalog">
-                    <Button variant="secondary">{t('common.backToCatalog')}</Button>
-                  </Link>
-                }
-              />
-            ) : (
-              <Skeleton height={96} />
-            )}
-          </Card>
+              <Link to={`/catalog/${cardQuery.data.id}`} className={styles.coinTitle}>
+                {coinTitle(cardQuery.data, i18n.language)}
+              </Link>
+              <div className={styles.coinMeta}>
+                {[
+                  cardQuery.data.country,
+                  cardQuery.data.seriesName,
+                  String(cardQuery.data.year),
+                  cardQuery.data.denomination?.label,
+                  coinMaterial(cardQuery.data),
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
+              {!editing ? (
+                <button
+                  type="button"
+                  className={styles.changeItem}
+                  onClick={() => {
+                    setPicked(null);
+                    setSearchParams({}, { replace: true });
+                  }}
+                >
+                  {t('purchase.changeItem')}
+                </button>
+              ) : null}
+            </div>
+          ) : cardQuery.isError ? (
+            <ErrorState
+              title={t('card.notFoundTitle')}
+              actions={
+                <Link to="/catalog">
+                  <Button variant="secondary">{t('common.backToCatalog')}</Button>
+                </Link>
+              }
+            />
+          ) : (
+            <Skeleton width={280} height={32} style={{ margin: '0 auto' }} />
+          )}
+
+          {cardQuery.data ? (
+            <div className={styles.photos}>
+              {sides.map((side) => (
+                <figure key={side.key} className={styles.photo}>
+                  <CoinImage
+                    {...imageSources(side.image, 'card')}
+                    alt=""
+                    className={styles.photoImage}
+                  />
+                  <figcaption className={styles.photoLabel}>{side.label}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : null}
 
           <Card className={styles.form}>
             {cardQuery.data && bootstrapQuery.data && (!editing || instanceQuery.data) ? (
@@ -195,7 +206,7 @@ export function PurchaseFormPage() {
                 busy={mutation.isPending}
                 submitError={mutation.error}
                 onSubmit={(values) => mutation.mutate(values)}
-                onCancel={() => navigate(destination)}
+                onCancel={goBack}
               />
             ) : cardQuery.isError ? null : (
               <div className={styles.formSkeleton}>
