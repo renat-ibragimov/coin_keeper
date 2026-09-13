@@ -602,6 +602,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/series/{series_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Series Items
+         * @description The series detail screen's own tiles -- shared or personal, regardless
+         *     of catalog_confirmed. Deliberately not `GET /catalog?seriesId=`: that
+         *     endpoint is the catalogue browse experience and its harder gate (§13a)
+         *     would hide a user's own coins of a country the catalogue project has not
+         *     confirmed yet, same bug as summary() below would have if it used it.
+         */
+        get: operations["series_items_api_v1_series__series_id__items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/countries": {
         parameters: {
             query?: never;
@@ -1281,6 +1305,8 @@ export interface components {
             collectVariants: boolean;
             /** Isactive */
             isActive: boolean;
+            /** Catalogconfirmed */
+            catalogConfirmed: boolean;
             /** Sortorder */
             sortOrder: number;
             /** Minyear */
@@ -3179,6 +3205,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeriesSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    series_items_api_v1_series__series_id__items_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                series_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CatalogListItem_"];
                 };
             };
             /** @description Validation Error */

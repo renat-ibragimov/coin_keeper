@@ -74,6 +74,7 @@ const COUNTRY: CountryOut = {
   nameEn: 'Ukraine',
   collectVariants: false,
   isActive: true,
+  catalogConfirmed: true,
   sortOrder: 0,
   minYear: null,
   maxYear: null,

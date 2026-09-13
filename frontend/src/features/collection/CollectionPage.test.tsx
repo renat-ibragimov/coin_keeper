@@ -106,6 +106,7 @@ const OWNED_COUNTRY: CountryOut = {
   nameEn: 'Ukraine',
   collectVariants: false,
   isActive: true,
+  catalogConfirmed: true,
   sortOrder: 1,
   minYear: null,
   maxYear: null,

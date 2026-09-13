@@ -3,9 +3,8 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useParams } from 'react-router-dom';
 
-import { fetchCatalog, fetchCountries, fetchSeries, PAGE_SIZE } from '@/features/catalog/api';
+import { fetchCountries, fetchSeries, PAGE_SIZE } from '@/features/catalog/api';
 import { CoinCard } from '@/features/catalog/CoinCard';
-import { parseFilters } from '@/features/catalog/useCatalogFilters';
 import { ApiError } from '@/shared/api/client';
 import { formatPercent, formatUah } from '@/shared/lib/format';
 import {
@@ -19,7 +18,7 @@ import {
   StatTile,
 } from '@/shared/ui';
 
-import { fetchSeriesSummary } from './api';
+import { fetchSeriesItems, fetchSeriesSummary } from './api';
 import styles from './SeriesDetailPage.module.css';
 
 export function SeriesDetailPage() {
@@ -41,14 +40,8 @@ export function SeriesDetailPage() {
     enabled: valid,
   });
   const itemsQuery = useQuery({
-    queryKey: ['catalog', 'series-items', seriesId, page],
-    queryFn: () =>
-      fetchCatalog({
-        ...parseFilters(new URLSearchParams()),
-        seriesIds: [seriesId],
-        sort: 'year',
-        page,
-      }),
+    queryKey: ['series', 'items', seriesId, page],
+    queryFn: () => fetchSeriesItems(seriesId, page, PAGE_SIZE),
     enabled: valid,
     placeholderData: keepPreviousData,
   });
@@ -59,6 +52,11 @@ export function SeriesDetailPage() {
     [seriesQuery.data],
   );
   const country = countriesQuery.data?.find((row) => row.id === series?.countryId);
+  // Neither "confirmed" nor "not confirmed" is the right guess while this is
+  // still loading -- rendering nothing until it's known avoids a flash from
+  // one to the other (docs/04-business-rules.md, §13a).
+  const confirmedKnown = countriesQuery.data !== undefined && series !== undefined;
+  const catalogConfirmed = country?.catalogConfirmed === true;
   const notFound =
     !valid ||
     (summaryQuery.error instanceof ApiError && summaryQuery.error.status === 404) ||
@@ -107,13 +105,17 @@ export function SeriesDetailPage() {
             : undefined
         }
         actions={
-          series ? (
+          series && confirmedKnown && catalogConfirmed ? (
             <Link to={`/catalog?seriesId=${series.id}`}>
               <Button variant="secondary">{t('series.openInCatalog')}</Button>
             </Link>
           ) : undefined
         }
       />
+
+      {confirmedKnown && !catalogConfirmed ? (
+        <p className={styles.notConfirmedNotice}>{t('series.notInCatalogNotice')}</p>
+      ) : null}
 
       {series?.description ? <p className={styles.description}>{series.description}</p> : null}
 

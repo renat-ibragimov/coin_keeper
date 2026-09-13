@@ -411,6 +411,7 @@
     "emptyCollectionText": "Series will appear here once you add your first coins — we'll track completeness automatically.",
     "notFound": "Series not found",
     "openInCatalog": "Open in the catalog",
+    "notInCatalogNotice": "This country isn't in the general catalog yet, so only coins from your personal collection are shown here.",
     "noItemsTitle": "No items in this series yet",
     "noItemsText": "Items appear once the catalog is filled in."
   },

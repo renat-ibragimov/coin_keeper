@@ -15,6 +15,7 @@ function country(overrides: Partial<CountryOut>): CountryOut {
     nameEn: 'Test',
     collectVariants: false,
     isActive: true,
+    catalogConfirmed: true,
     sortOrder: 0,
     minYear: null,
     maxYear: null,
