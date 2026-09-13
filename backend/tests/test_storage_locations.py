@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.mail.base import EmailMessage
 from app.models import StorageLocation
 from app.models.enums import TranslationSource
+from app.repositories.storage_locations import StorageLocationRepository
 from app.services.storage_locations import apply_translation
 from app.services.translation import TranslationResult
 from tests.helpers import register_and_verify
@@ -302,3 +304,32 @@ def test_apply_translation_fills_both_slots_for_a_third_language() -> None:
     assert location.name_uk_source == TranslationSource.LLM
     assert location.name_en == "in a safe"
     assert location.name_en_source == TranslationSource.LLM
+
+
+async def test_add_commits_immediately_so_a_background_task_can_see_it(
+    db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """FastAPI runs BackgroundTasks as part of sending the response -- before
+    this request's own end-of-request commit, not after (confirmed 2026-09-13
+    by logging commit and background-task timestamps side by side against a
+    live server: every location created this way came back untranslated,
+    "vanished before translation ran" in the logs, because
+    translate_in_background's separate session opened before this one had
+    committed). add() must commit the row itself rather than leaving it for
+    that later commit."""
+    commit_spy = AsyncMock(wraps=db_session.commit)
+    db_session.commit = commit_spy  # type: ignore[method-assign]
+
+    repo = StorageLocationRepository(db_session, owner_id=ctx.id_a)
+    await repo.add(
+        StorageLocation(
+            owner_id=ctx.id_a,
+            name_original="Тестове місце",
+            name_uk="Тестове місце",
+            name_uk_source=TranslationSource.MANUAL,
+            name_en="Тестове місце",
+            name_en_source=TranslationSource.MANUAL,
+        )
+    )
+
+    commit_spy.assert_awaited_once()

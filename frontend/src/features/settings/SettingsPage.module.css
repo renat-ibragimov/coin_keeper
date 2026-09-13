@@ -65,26 +65,6 @@
   margin-bottom: var(--space-2);
 }
 
-.note {
-  margin: var(--space-2) 0 0;
-  font-size: 13.5px;
-  color: var(--color-text-muted);
-}
-
-/* An inset block inside a raised card: below the card's own surface, with
- * an inset top shadow and a smaller radius. */
-.adminBox {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-surface-control);
-  box-shadow: var(--shadow-inset);
-}
-
-.adminBox .note {
-  margin-bottom: var(--space-3);
-}
-
 @media (max-width: 900px) {
   .columns {
     flex-direction: column;

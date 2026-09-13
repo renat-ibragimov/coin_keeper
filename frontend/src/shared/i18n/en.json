@@ -534,8 +534,6 @@
     "wrongCurrentPassword": "The current password is wrong.",
     "roleAdmin": "Administrator",
     "roleUser": "User",
-    "adminTitle": "Administration",
-    "adminText": "Archiving shared items and curating the catalog from the interface arrive in the next stages.",
-    "adminLink": "Administration"
+    "adminTitle": "Administration"
   }
 }

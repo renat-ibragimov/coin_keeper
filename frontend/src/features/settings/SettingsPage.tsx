@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
 import { deleteStorageLocation, fetchStorageLocations } from '@/features/collection/api';
@@ -195,18 +194,6 @@ export function SettingsPage() {
                 passwordMutation.mutateAsync({ current, next }).then(() => {})
               }
             />
-
-            {user?.role === 'admin' ? (
-              <div className={`${styles.adminBox} ${styles.spaced}`}>
-                <div className={styles.label}>{t('settings.adminTitle')}</div>
-                <p className={styles.note}>{t('settings.adminText')}</p>
-                <Link to="/admin">
-                  <Button variant="secondary" size="sm">
-                    {t('settings.adminLink')}
-                  </Button>
-                </Link>
-              </div>
-            ) : null}
 
             <div className={`${styles.centerRow} ${styles.logoutRow}`}>
               <Button variant="danger" onClick={() => void signOut()}>
