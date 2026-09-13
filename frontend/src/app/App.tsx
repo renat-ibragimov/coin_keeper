@@ -59,16 +59,23 @@ function LocaleCacheReset() {
 }
 
 /**
- * The app never restores scroll position across navigations — every route
- * change (a new page, or a pagination query-string change on the same
- * path) should land at the top, not wherever the previous page was scrolled
- * to (docs/08-ui-map.md).
+ * The app never restores scroll position across navigations — a new route
+ * should land at the top, not wherever the previous page was scrolled to
+ * (docs/08-ui-map.md).
+ *
+ * Keyed on pathname alone, not the query string: a search-string change on
+ * the SAME path covers both "a new page of results" (pagination) and "the
+ * same rows, just re-sorted" (a sortable column header) — and only the
+ * first of those should jump the reader to the top. Pagination already
+ * gets its own explicit scrollPageToTop() (shared/ui/Pagination.tsx); a
+ * sort click clearing scroll position out from under someone reading the
+ * table was the actual bug (owner-reported, 2026-09-13).
  */
 function ScrollToTop() {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   useEffect(() => {
     scrollPageToTop();
-  }, [pathname, search]);
+  }, [pathname]);
   return null;
 }
 
