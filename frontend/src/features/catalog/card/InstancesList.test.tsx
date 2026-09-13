@@ -28,7 +28,7 @@ const INSTANCES: CatalogCollectionItem[] = [
   },
 ];
 
-function renderList() {
+function renderList(overrides: Partial<Parameters<typeof InstancesList>[0]> = {}) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
@@ -37,6 +37,9 @@ function renderList() {
           loading={false}
           addHref="/collection/coins/new?catalogItemId=7"
           coinTitle="Дельфін"
+          photo={{ src: null }}
+          currentPriceUah="460.00"
+          {...overrides}
         />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -50,6 +53,34 @@ describe('InstancesList', () => {
       'href',
       '/collection/coins/1/edit',
     );
+  });
+
+  it('shows the purchase total, the historical rate, and a dash for the storage place', () => {
+    renderList();
+    expect(screen.getByText('350 ₴')).toBeInTheDocument();
+    expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
+    const row = screen.getByTestId('instance-row');
+    // "Місце зберігання" has no field yet — every row shows a dash.
+    expect(row.textContent).toContain('—');
+  });
+
+  it('shows the seller, the ownership duration, and a mocked ≈$ next to every UAH figure', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-13T00:00:00Z'));
+    try {
+      renderList();
+
+      expect(screen.getByText('Аукціон Violity')).toBeInTheDocument();
+      // 529 days between the purchase and "today" — one full year.
+      expect(screen.getByText('1 рік')).toBeInTheDocument();
+
+      // purchaseTotal 350, currentValue 460 (quantity 1), change +110.
+      expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
+      expect(screen.getByText('≈ 11,1 $')).toBeInTheDocument();
+      expect(screen.getByText('≈ +2,7 $')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('confirms and deletes a purchase, naming the coin in the confirmation', async () => {

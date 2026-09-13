@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { ArrowLeft, CircleCheck, CircleMinus, Maximize2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
@@ -30,6 +30,7 @@ import { toChartPoints } from './chartData';
 import { InstancesList } from './InstancesList';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { catalogSpecRows, identitySpecRows, issueSpecRows, technicalSpecRows } from './specs';
+import { mockUsd, mockUsdSigned } from './mockUsd';
 import styles from './CoinCardPage.module.css';
 
 export function CoinCardPage() {
@@ -81,7 +82,6 @@ function CardBody({ card }: { card: CatalogCard }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [enlarged, setEnlarged] = useState<'obverse' | 'reverse' | null>(null);
-  const instancesDisclosureRef = useRef<HTMLDetailsElement>(null);
 
   const pricesQuery = useQuery({
     queryKey: ['catalog', 'prices', card.id],
@@ -194,28 +194,51 @@ function CardBody({ card }: { card: CatalogCard }) {
         <SidebarCard card={card} locale={locale} t={t} addUrl={addUrl} addState={addState} />
       </div>
 
+      {owned && hasInstances ? <ValueSummary card={card} locale={locale} t={t} /> : null}
+
+      {owned ? (
+        <Card className={styles.sectionCard}>
+          <h2 className={`${styles.sectionTitle} ${styles.instancesHeading}`}>
+            {t('card.instances')}
+            {hasInstances ? <Badge>{instancesQuery.data?.length ?? 0}</Badge> : null}
+          </h2>
+          {instancesQuery.isError ? (
+            <ErrorState onRetry={() => void instancesQuery.refetch()} />
+          ) : (
+            <InstancesList
+              items={instancesQuery.data}
+              loading={instancesQuery.isPending}
+              addHref={addUrl}
+              coinTitle={title}
+              photo={sides[0]!.card}
+              currentPriceUah={card.marketPriceUah}
+            />
+          )}
+        </Card>
+      ) : null}
+
       {hasDescription ? (
         <Card className={styles.sectionCard}>
           <h2 className={styles.sectionTitle}>{t('card.description')}</h2>
-          {description?.general ? (
-            <p className={styles.descriptionText}>{description.general}</p>
-          ) : null}
-          {description?.obverse || description?.reverse ? (
-            <div className={styles.descriptionSides}>
-              {description.obverse ? (
-                <div className={styles.descriptionSide}>
-                  <h3 className={styles.descriptionSideTitle}>{t('card.obverse')}</h3>
-                  <p className={styles.descriptionText}>{description.obverse}</p>
-                </div>
-              ) : null}
-              {description.reverse ? (
-                <div className={styles.descriptionSide}>
-                  <h3 className={styles.descriptionSideTitle}>{t('card.reverse')}</h3>
-                  <p className={styles.descriptionText}>{description.reverse}</p>
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          <div className={styles.descriptionSides}>
+            {description?.general ? (
+              <div className={styles.descriptionSide}>
+                <p className={styles.descriptionText}>{description.general}</p>
+              </div>
+            ) : null}
+            {description?.obverse ? (
+              <div className={styles.descriptionSide}>
+                <h3 className={styles.descriptionSideTitle}>{t('card.obverse')}</h3>
+                <p className={styles.descriptionText}>{description.obverse}</p>
+              </div>
+            ) : null}
+            {description?.reverse ? (
+              <div className={styles.descriptionSide}>
+                <h3 className={styles.descriptionSideTitle}>{t('card.reverse')}</h3>
+                <p className={styles.descriptionText}>{description.reverse}</p>
+              </div>
+            ) : null}
+          </div>
         </Card>
       ) : null}
 
@@ -245,53 +268,6 @@ function CardBody({ card }: { card: CatalogCard }) {
         ) : null}
         {chartPoints.length >= 2 ? <PriceHistoryChart items={priceItems} /> : null}
       </Card>
-
-      {owned ? (
-        <Card className={styles.sectionCard}>
-          <h2 className={styles.sectionTitle}>{t('card.instances')}</h2>
-          {instancesQuery.isError ? (
-            <ErrorState onRetry={() => void instancesQuery.refetch()} />
-          ) : hasInstances ? (
-            <>
-              <InstancesSummary card={card} locale={locale} t={t} />
-              <details
-                ref={instancesDisclosureRef}
-                className={styles.instancesDisclosure}
-                onToggle={(event) => {
-                  // Wait a frame so the revealed list has already been
-                  // laid out — scrolling before that targets the old,
-                  // collapsed height and undershoots.
-                  if (event.currentTarget.open) {
-                    requestAnimationFrame(() => {
-                      instancesDisclosureRef.current?.scrollIntoView?.({
-                        behavior: 'smooth',
-                        block: 'end',
-                      });
-                    });
-                  }
-                }}
-              >
-                <summary>
-                  {t('card.showAllInstances', { count: instancesQuery.data?.length ?? 0 })}
-                </summary>
-                <InstancesList
-                  items={instancesQuery.data}
-                  loading={instancesQuery.isPending}
-                  addHref={addUrl}
-                  coinTitle={title}
-                />
-              </details>
-            </>
-          ) : (
-            <InstancesList
-              items={instancesQuery.data}
-              loading={instancesQuery.isPending}
-              addHref={addUrl}
-              coinTitle={title}
-            />
-          )}
-        </Card>
-      ) : null}
 
       <Lightbox
         open={enlargedSide !== undefined}
@@ -406,18 +382,11 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
 }
 
 /**
- * Summary at the top of "Мої екземпляри": the visitor's own purchase and
- * valuation numbers, aggregated across every instance of this coin they own.
+ * The strip above "Мої екземпляри": the visitor's own purchase and valuation
+ * numbers, aggregated across every instance of this coin they own. The ≈$
+ * line is a flat mocked rate for now (see MOCK_UAH_PER_USD).
  */
-function InstancesSummary({
-  card,
-  locale,
-  t,
-}: {
-  card: CatalogCard;
-  locale: string;
-  t: TFunction;
-}) {
+function ValueSummary({ card, locale, t }: { card: CatalogCard; locale: string; t: TFunction }) {
   const currentValue =
     card.marketPriceUah !== null ? Number(card.marketPriceUah) * card.quantityOwned : null;
   const purchaseTotal = Number(card.purchaseTotalUah);
@@ -425,34 +394,39 @@ function InstancesSummary({
   const changePercent =
     change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
 
-  const rows: (PropertyRow | null)[] = [
-    {
-      key: 'quantity',
-      label: t('card.quantity'),
-      value: <span className="tabular">{t('card.pieces', { count: card.quantityOwned })}</span>,
-    },
-    {
-      key: 'purchaseTotal',
-      label: t('card.purchasedTotal'),
-      value: <span className="tabular">{formatUah(card.purchaseTotalUah, locale)}</span>,
-    },
-    {
-      key: 'currentValue',
-      label: t('card.currentValue'),
-      value:
-        currentValue !== null ? (
-          <span className="tabular">{formatUah(currentValue, locale)}</span>
+  return (
+    <Card className={styles.valueStrip}>
+      <div className={styles.valueBox}>
+        <span className={styles.valueBoxLabel}>
+          {t('card.purchasedTotal')} ({t('card.pieces', { count: card.quantityOwned })})
+        </span>
+        <p className={`${styles.valueBoxValue} tabular`}>{formatUah(purchaseTotal, locale)}</p>
+        <span className={styles.valueBoxUsd}>
+          {t('card.approxUsd', { value: mockUsd(purchaseTotal, locale) })}
+        </span>
+      </div>
+
+      <div className={styles.valueBox}>
+        <span className={styles.valueBoxLabel}>{t('card.currentValue')}</span>
+        {currentValue !== null ? (
+          <>
+            <p className={`${styles.valueBoxValue} tabular`}>{formatUah(currentValue, locale)}</p>
+            <span className={styles.valueBoxUsd}>
+              {t('card.approxUsd', { value: mockUsd(currentValue, locale) })}
+            </span>
+          </>
         ) : (
-          <span className={styles.muted}>{t('catalog.noPrice')}</span>
-        ),
-    },
-    change !== null
-      ? {
-          key: 'change',
-          label: t('card.valueChange'),
-          value: (
-            <span
+          <p className={styles.muted}>{t('catalog.noPrice')}</p>
+        )}
+      </div>
+
+      <div className={styles.valueBox}>
+        <span className={styles.valueBoxLabel}>{t('card.valueChange')}</span>
+        {change !== null ? (
+          <>
+            <p
               className={[
+                styles.valueBoxValue,
                 'tabular',
                 change > 0 ? styles.positive : change < 0 ? styles.negative : '',
               ].join(' ')}
@@ -464,17 +438,16 @@ function InstancesSummary({
                   ({formatSignedPercent(changePercent, locale)})
                 </span>
               ) : null}
+            </p>
+            <span className={styles.valueBoxUsd}>
+              {t('card.approxUsd', { value: mockUsdSigned(change, locale) })}
             </span>
-          ),
-        }
-      : null,
-  ];
-
-  return (
-    <PropertyList
-      className={styles.instancesSummary}
-      rows={rows.filter((row): row is PropertyRow => row !== null)}
-    />
+          </>
+        ) : (
+          <p className={styles.muted}>{t('catalog.noPrice')}</p>
+        )}
+      </div>
+    </Card>
   );
 }
 

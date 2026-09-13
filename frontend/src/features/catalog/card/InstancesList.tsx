@@ -1,19 +1,28 @@
+import type { TFunction } from 'i18next';
+import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { DeleteInstanceDialog } from '@/features/collection/DeleteInstanceDialog';
 import type { CatalogCollectionItem } from '@/shared/api/types';
 import {
   currencySymbol,
   formatDate,
-  formatMoney,
   formatNumber,
+  formatSignedPercent,
+  formatSignedUah,
   formatUah,
 } from '@/shared/lib/format';
-import { Badge, Button, EmptyState, Skeleton } from '@/shared/ui';
+import { Badge, Button, CoinImage, EmptyState, Skeleton } from '@/shared/ui';
 
+import { mockUsd, mockUsdSigned } from './mockUsd';
 import styles from './InstancesList.module.css';
+
+interface InstancePhoto {
+  src?: string | null;
+  srcSet?: string;
+}
 
 interface InstancesListProps {
   items: CatalogCollectionItem[] | undefined;
@@ -23,12 +32,39 @@ interface InstancesListProps {
   /** The coin's own title, for the delete-confirmation text — instances
    *  carry no title of their own (docs/03-api-contract.md). */
   coinTitle: string;
+  /** The catalog item's own obverse photo — instances have no photo of their
+   *  own yet, so every row shows the same coin picture. */
+  photo: InstancePhoto;
+  /** The catalog item's current market price, same for every instance. */
+  currentPriceUah: string | null;
 }
 
-/** "Мої екземпляри": one row per purchase of the current user. */
-export function InstancesList({ items, loading, addHref, coinTitle }: InstancesListProps) {
+/** "Скільки часу монета вже в колекції" — the single largest whole unit, not
+ *  a precise calendar breakdown: "2 роки" reads better here than "2 роки 3
+ *  місяці 12 днів" for a table cell. */
+function ownershipDuration(acquisitionDate: string | null, t: TFunction): string {
+  if (!acquisitionDate) return '—';
+  const start = new Date(`${acquisitionDate}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return '—';
+  const days = Math.floor((Date.now() - start.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 1) return t('card.durationToday');
+  if (days >= 365) return t('card.durationYears', { count: Math.floor(days / 365) });
+  if (days >= 30) return t('card.durationMonths', { count: Math.floor(days / 30) });
+  return t('card.durationDays', { count: days });
+}
+
+/** "Мої екземпляри": one row per purchase of the current user, as a table. */
+export function InstancesList({
+  items,
+  loading,
+  addHref,
+  coinTitle,
+  photo,
+  currentPriceUah,
+}: InstancesListProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
+  const navigate = useNavigate();
   const [deleting, setDeleting] = useState<CatalogCollectionItem | null>(null);
 
   if (loading) {
@@ -52,68 +88,157 @@ export function InstancesList({ items, loading, addHref, coinTitle }: InstancesL
     );
   }
 
+  const currentPrice = currentPriceUah !== null ? Number(currentPriceUah) : null;
+
   return (
     <>
-      <ul className={styles.list}>
-        {items.map((item) => {
-          const foreign = item.purchaseCurrency !== null && item.purchaseCurrency !== 'UAH';
-          const rate = foreign ? formatNumber(item.purchaseRateUah, locale, 4) : null;
-          return (
-            <li key={item.id} className={styles.row} data-testid="instance-row">
-              <div className={styles.cell}>
-                <span className={styles.cellLabel}>{t('card.instanceDate')}</span>
-                <span className={`${styles.cellValue} tabular`}>
-                  {item.acquisitionDate ? formatDate(item.acquisitionDate, locale) : '—'}
-                  <span className={styles.secondary}>
-                    {t('card.pieces', { count: item.quantity })}
-                  </span>
-                </span>
-              </div>
-              <div className={styles.cell}>
-                <span className={styles.cellLabel}>{t('card.instanceSeller')}</span>
-                <span className={styles.cellValue}>{item.seller || '—'}</span>
-              </div>
-              <div className={styles.cell}>
-                <span className={styles.cellLabel}>{t('card.instancePrice')}</span>
-                <span className={`${styles.cellValue} ${styles.price} tabular`}>
-                  {formatMoney(item.purchasePrice, item.purchaseCurrency, locale) ?? '—'}
-                  {foreign ? (
-                    <span className={styles.priceUah}> = {formatUah(item.totalUah, locale)}</span>
-                  ) : null}
-                </span>
-              </div>
-              <div className={styles.cell}>
-                <span className={styles.cellLabel}>{t('card.instanceRate')}</span>
-                <span className={`${styles.cellValue} tabular`}>
-                  {rate
-                    ? t('card.rateFormat', { rate, symbol: currencySymbol(item.purchaseCurrency) })
-                    : '—'}
-                </span>
-              </div>
-              <div className={styles.cell}>
-                <span className={styles.cellLabel}>{t('card.instanceGrade')}</span>
-                <span className={styles.cellValue}>
-                  {item.grade ? <Badge>{item.grade}</Badge> : '—'}
-                </span>
-              </div>
-              <div className={`${styles.cell} ${styles.notes}`}>
-                <span className={styles.cellLabel}>{t('card.instanceNotes')}</span>
-                <span className={styles.cellValue}>{item.notes || '—'}</span>
-              </div>
-              <div className={`${styles.cell} ${styles.actions}`}>
-                <Link to={`/collection/coins/${item.id}/edit`}>
-                  <Button variant="ghost" size="sm">
-                    {t('common.edit')}
-                  </Button>
-                </Link>
-                <Button variant="ghost" size="sm" onClick={() => setDeleting(item)}>
-                  {t('common.delete')}
-                </Button>
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th scope="col">
+                <span className={styles.srOnly}>{t('card.instancePhoto')}</span>
+              </th>
+              <th scope="col">{t('card.instanceGrade')}</th>
+              <th scope="col">{t('card.quantity')}</th>
+              <th scope="col">{t('card.instanceSeller')}</th>
+              <th scope="col">{t('card.instancePrice')}</th>
+              <th scope="col">{t('card.instanceCurrentPrice')}</th>
+              <th scope="col">{t('card.instanceChange')}</th>
+              <th scope="col">{t('card.instanceDate')}</th>
+              <th scope="col">{t('card.instanceOwnedFor')}</th>
+              <th scope="col">{t('card.instanceStorage')}</th>
+              <th scope="col" className={styles.notesHeader}>
+                {t('card.instanceNotes')}
+              </th>
+              <th scope="col">
+                <span className={styles.srOnly}>{t('common.actions')}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => {
+              const foreign = item.purchaseCurrency !== null && item.purchaseCurrency !== 'UAH';
+              const rate = foreign ? formatNumber(item.purchaseRateUah, locale, 4) : null;
+              const purchaseTotal = Number(item.totalUah);
+              const rowCurrentValue = currentPrice !== null ? currentPrice * item.quantity : null;
+              const change = rowCurrentValue !== null ? rowCurrentValue - purchaseTotal : null;
+              const changePercent =
+                change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
+              const editHref = `/collection/coins/${item.id}/edit`;
+
+              return (
+                <tr
+                  key={item.id}
+                  data-testid="instance-row"
+                  className={styles.row}
+                  onClick={() => navigate(editHref)}
+                >
+                  <td className={styles.photoCell}>
+                    <CoinImage
+                      src={photo.src}
+                      srcSet={photo.srcSet}
+                      alt=""
+                      className={styles.photo}
+                    />
+                  </td>
+                  <td>{item.grade ? <Badge>{item.grade}</Badge> : '—'}</td>
+                  <td className="tabular">
+                    <span className={styles.nowrap}>
+                      {t('card.pieces', { count: item.quantity })}
+                    </span>
+                  </td>
+                  <td>{item.seller || '—'}</td>
+                  <td className="tabular">
+                    <span className={styles.price}>{formatUah(purchaseTotal, locale) ?? '—'}</span>
+                    <span className={styles.secondary}>
+                      {t('card.approxUsd', { value: mockUsd(purchaseTotal, locale) })}
+                    </span>
+                    {rate ? (
+                      <span className={styles.secondary}>
+                        {t('card.rateFormat', {
+                          rate,
+                          symbol: currencySymbol(item.purchaseCurrency),
+                        })}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td className="tabular">
+                    {rowCurrentValue !== null ? (
+                      <>
+                        <span className={styles.price}>{formatUah(rowCurrentValue, locale)}</span>
+                        <span className={styles.secondary}>
+                          {t('card.approxUsd', { value: mockUsd(rowCurrentValue, locale) })}
+                        </span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="tabular">
+                    {change !== null ? (
+                      <>
+                        <span
+                          className={[
+                            styles.price,
+                            change > 0 ? styles.positive : change < 0 ? styles.negative : '',
+                          ].join(' ')}
+                        >
+                          {formatSignedUah(change, locale)}
+                        </span>
+                        {changePercent !== null ? (
+                          <span
+                            className={[
+                              styles.secondary,
+                              change > 0 ? styles.positive : change < 0 ? styles.negative : '',
+                            ].join(' ')}
+                          >
+                            {formatSignedPercent(changePercent, locale)}
+                          </span>
+                        ) : null}
+                        <span className={styles.secondary}>
+                          {t('card.approxUsd', { value: mockUsdSigned(change, locale) })}
+                        </span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
+                  </td>
+                  <td className="tabular">
+                    {item.acquisitionDate ? formatDate(item.acquisitionDate, locale) : '—'}
+                  </td>
+                  <td className="tabular">{ownershipDuration(item.acquisitionDate, t)}</td>
+                  <td>—</td>
+                  <td className={styles.notes}>{item.notes || '—'}</td>
+                  <td onClick={(event) => event.stopPropagation()}>
+                    {/* A plain block td, with the flex row nested inside it —
+                        a flex display on the td itself leaves its height
+                        driven by its own content instead of the row's
+                        tallest cell, so its border-bottom floats above the
+                        rest of the row's divider line. */}
+                    <div className={styles.actions}>
+                      <Link to={editHref} aria-label={t('common.edit')} className={styles.iconLink}>
+                        <Button variant="ghost" size="sm" className={styles.iconButton}>
+                          <Pencil size={16} aria-hidden="true" />
+                        </Button>
+                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={styles.iconButton}
+                        aria-label={t('common.delete')}
+                        onClick={() => setDeleting(item)}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <DeleteInstanceDialog
         item={deleting && { id: deleting.id, title: coinTitle, totalUah: deleting.totalUah }}

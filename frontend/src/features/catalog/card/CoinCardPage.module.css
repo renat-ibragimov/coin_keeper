@@ -458,26 +458,47 @@ button.photoFrame {
 
 /* ------------------------------------------------------------- instances */
 
-.instancesSummary {
-  margin-bottom: var(--space-3);
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-border-subtle);
+.valueStrip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-4);
 }
 
-.instancesDisclosure summary {
-  cursor: pointer;
-  padding: var(--space-2) 0;
-  font-size: 14px;
+.valueBox {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-surface-sunken) 40%, transparent);
+}
+
+.valueBoxLabel {
+  font-size: 11px;
   font-weight: 600;
-  color: var(--color-accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
-.instancesDisclosure summary:hover {
-  text-decoration: underline;
+.valueBoxValue {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
 }
 
-.instancesDisclosure[open] summary {
-  margin-bottom: var(--space-2);
+.valueBoxUsd {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.instancesHeading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* ----------------------------------------------------------- section cards */
@@ -518,7 +539,8 @@ button.photoFrame {
   }
 
   .specGrid,
-  .descriptionSides {
+  .descriptionSides,
+  .valueStrip {
     grid-template-columns: 1fr;
   }
 }

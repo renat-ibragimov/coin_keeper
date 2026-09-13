@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -314,12 +314,11 @@ describe('CoinCardPage', () => {
     expect(await screen.findByText('Цін ще немає.')).toBeInTheDocument();
   });
 
-  it('shows the purchase/valuation summary and reveals the instances behind the disclosure', async () => {
+  it('shows the purchase/valuation summary above the instances table', async () => {
     vi.mocked(fetchCard).mockResolvedValue(makeCard());
     vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
     renderPage();
 
-    const user = userEvent.setup();
     await screen.findByRole('heading', { name: 'Мої екземпляри' });
 
     expect(await screen.findByText('640 ₴')).toBeInTheDocument();
@@ -329,39 +328,13 @@ describe('CoinCardPage', () => {
     expect(screen.getByText('+280 ₴')).toBeInTheDocument();
     expect(screen.getByText('(+43,8 %)')).toBeInTheDocument();
 
-    await user.click(await screen.findByText('Показати всі екземпляри (2)'));
-
     const rows = await screen.findAllByTestId('instance-row');
     expect(rows).toHaveLength(2);
-    expect(screen.getByText('Аукціон Violity')).toBeInTheDocument();
     expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
 
-    // The purchase date is the primary value of the first cell, quantity a
-    // secondary line under it — shown even though every instance here owns 1.
     const [firstRow, secondRow] = rows;
-    expect(within(firstRow!).getByText('Дата покупки')).toBeInTheDocument();
-    expect(within(firstRow!).queryByText('Кількість')).toBeNull();
     expect(within(firstRow!).getByText('02.04.2025')).toBeInTheDocument();
-    expect(within(firstRow!).getByText('1 екземпляр')).toBeInTheDocument();
     expect(within(secondRow!).getByText('15.11.2023')).toBeInTheDocument();
-    expect(within(secondRow!).getByText('1 екземпляр')).toBeInTheDocument();
-  });
-
-  it('scrolls the newly revealed instances into view when the disclosure opens', async () => {
-    vi.mocked(fetchCard).mockResolvedValue(makeCard());
-    vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
-    renderPage();
-
-    const user = userEvent.setup();
-    await user.click(await screen.findByText('Показати всі екземпляри (2)'));
-
-    await waitFor(() =>
-      expect(scrollIntoView).toHaveBeenCalledWith(
-        expect.objectContaining({ behavior: 'smooth', block: 'end' }),
-      ),
-    );
   });
 
   it('skips the value-change percent when nothing was paid for the coin', async () => {
@@ -369,8 +342,11 @@ describe('CoinCardPage', () => {
     vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
     renderPage();
 
-    expect(await screen.findByText('+920 ₴')).toBeInTheDocument();
-    expect(screen.queryByText(/%/)).toBeNull();
+    const changeValue = await screen.findByText('+920 ₴');
+    // The value-change box has no percent when nothing was paid; the
+    // per-row percent in "Мої екземпляри" is unaffected — it is computed
+    // from each purchase's own price, not the card's aggregate total.
+    expect(changeValue.closest('div')?.textContent).not.toMatch(/%/);
   });
 
   it('shows a compact empty state with a call to action on the instances tab when empty', async () => {
