@@ -208,11 +208,22 @@ class CatalogService:
     # --------------------------------------------------------------- reading
 
     async def list_catalog(
-        self, filters: CatalogFilters, *, limit: int, offset: int
+        self,
+        filters: CatalogFilters,
+        *,
+        limit: int,
+        offset: int,
+        require_confirmed: bool = True,
     ) -> tuple[list[CatalogListItem], int]:
+        """`require_confirmed=False` is for a caller about the user's own
+        collection rather than the catalogue browse experience (a series
+        screen) -- never from a request filter, see storefront_visible()
+        (app/repositories/catalog.py, docs/04-business-rules.md §13a)."""
         settings = await self._users.get_settings(self._user.id)
         filters.show_packaging_variants = settings is None or settings.show_packaging_variants
-        page = await self._repo.list_items(filters, limit=limit, offset=offset)
+        page = await self._repo.list_items(
+            filters, limit=limit, offset=offset, require_confirmed=require_confirmed
+        )
         images = await self._images_for([row.item.id for row in page.rows])
         items = [
             self._list_item(row, images.get(row.item.id, CatalogImages())) for row in page.rows

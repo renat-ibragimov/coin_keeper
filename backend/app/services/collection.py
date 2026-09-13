@@ -63,6 +63,7 @@ def _country_out(
         name_en=country.name_en,
         collect_variants=country.collect_variants,
         is_active=country.is_active,
+        catalog_confirmed=country.catalog_confirmed,
         sort_order=country.sort_order,
         min_year=year_bounds[0] if year_bounds else None,
         max_year=year_bounds[1] if year_bounds else None,

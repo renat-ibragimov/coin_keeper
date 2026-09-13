@@ -312,11 +312,13 @@ class CatalogRepository:
 
     # --------------------------------------------------------------- listing
 
-    def _filter_conditions(self, filters: CatalogFilters) -> list[ColumnElement[bool]]:
+    def _filter_conditions(
+        self, filters: CatalogFilters, *, require_confirmed: bool = True
+    ) -> list[ColumnElement[bool]]:
         conditions: list[ColumnElement[bool]] = [
             self._visible(),
             self._archive_condition(filters.archived),
-            storefront_visible(self._user_id),
+            storefront_visible(self._user_id, require_confirmed=require_confirmed),
         ]
         if filters.scope == "shared":
             conditions.append(CatalogItem.created_by.is_(None))
@@ -489,8 +491,15 @@ class CatalogRepository:
         ordering.append(CatalogItem.id)
         return ordering
 
-    async def list_items(self, filters: CatalogFilters, *, limit: int, offset: int) -> CatalogPage:
-        conditions = self._filter_conditions(filters)
+    async def list_items(
+        self,
+        filters: CatalogFilters,
+        *,
+        limit: int,
+        offset: int,
+        require_confirmed: bool = True,
+    ) -> CatalogPage:
+        conditions = self._filter_conditions(filters, require_confirmed=require_confirmed)
 
         count_query = (
             select(func.count(CatalogItem.id))

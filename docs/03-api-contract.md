@@ -421,6 +421,8 @@ GET  /series/{id}/summary
   → {total, owned, missing, completionPercent, purchaseTotalUah, currentValueUah, unpricedMissing}
 GET  /series/summary?countryId
   → [{series: {...}, summary: {...}}]   — все серии (страны) со сводкой одним запросом
+GET  /series/{id}/items?page&pageSize
+  → Page<CatalogListItem>               — та же схема, что и у GET /catalog
 ```
 
 Серии — общий справочник, личных серий нет: серия описывает выпуск, а не коллекцию.
@@ -428,6 +430,16 @@ GET  /series/summary?countryId
 в пределах страны — `409`. В `summary` обе части дроби комплектности считаются по активным
 видимым пользователю позициям; деньги (`purchaseTotalUah`, `currentValueUah`) — по его
 экземплярам, включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10).
+
+`/series/{id}/items` — плитки монет для экрана деталей серии, **не** `GET /catalog?seriesId=`
+(добавлено 2026-09-13, `04-business-rules.md` §13a). Разница принципиальная:
+`storefront_visible(require_confirmed=False)` вместо жёсткого гейта `GET /catalog` — экран
+серии про личную коллекцию пользователя, а не про витрину каталога, поэтому не прячет
+позиции страны без `catalog_confirmed`, даже если это единственный способ увидеть свои же
+монеты (найдено на живых данных: серия США «50 State Quarters», 56 личных позиций, каталог
+США не подтверждён — до фикса плитки были пустыми несмотря на 100% комплектности в
+`summary`). `CountryOut.catalogConfirmed` — сигнал для фронта: `true` → показываем «Відкрити
+в каталозі», `false` → вместо кнопки поясняющий текст, что показана только особиста колекція.
 
 ## Расходы
 

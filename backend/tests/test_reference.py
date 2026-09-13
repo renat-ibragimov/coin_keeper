@@ -44,6 +44,7 @@ async def test_active_countries_lead_with_ukraine(
         "nameEn": "Ukraine",
         "collectVariants": False,
         "isActive": True,
+        "catalogConfirmed": True,
         "sortOrder": 0,
         "minYear": None,
         "maxYear": None,

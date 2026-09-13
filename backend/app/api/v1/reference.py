@@ -51,6 +51,7 @@ async def list_countries(
             name_en=country.name_en,
             collect_variants=country.collect_variants,
             is_active=country.is_active,
+            catalog_confirmed=country.catalog_confirmed,
             sort_order=country.sort_order,
             min_year=year_bounds.get(country.id, (None, None))[0],
             max_year=year_bounds.get(country.id, (None, None))[1],

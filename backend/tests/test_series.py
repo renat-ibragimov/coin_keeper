@@ -300,6 +300,49 @@ async def test_series_of_an_unconfirmed_country_still_shows(
     assert direct_a.status_code == 200
 
 
+async def test_series_items_of_an_unconfirmed_country_still_show(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The same rule as the summary/listing above (§13a), but for the series
+    detail screen's own tiles — the actual bug (owner-reported, 2026-09-13):
+    GET /catalog?seriesId= is the harder gate and stayed empty for a series
+    of an unconfirmed country however much of it the user owned."""
+    refs = ctx.refs
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+
+    series_usa = await make_series(db_session, country=refs.usa, name="50 State Quarters")
+    owned_item = await make_catalog_item(
+        db_session,
+        country=refs.usa,
+        title="Delaware",
+        year=1999,
+        series=series_usa,
+        created_by=ctx.id_a,
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_item, price="10")
+
+    headers_a = auth(ctx.token_a)
+
+    items = await client.get(f"/api/v1/series/{series_usa.id}/items", headers=headers_a)
+    assert items.status_code == 200
+    body = items.json()
+    assert body["total"] == 1
+    assert body["items"][0]["title"] == "Delaware"
+
+    # The bug this replaces: the catalogue's own gated endpoint still hides
+    # it -- proof the two are genuinely different visibility rules, not that
+    # the fix accidentally loosened GET /catalog itself.
+    via_catalog = await client.get(f"/api/v1/catalog?seriesId={series_usa.id}", headers=headers_a)
+    assert via_catalog.json()["total"] == 0
+
+
+async def test_series_items_404_for_an_unknown_series(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    response = await client.get("/api/v1/series/999999/items", headers=auth(ctx.token_a))
+    assert response.status_code == 404
+
+
 async def test_scope_catalog_is_the_confirmed_gate_for_the_series_filter(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
