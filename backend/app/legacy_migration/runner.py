@@ -564,9 +564,7 @@ class MigrationRunner:
         await self._insert_rows("collection_items", CollectionItem, rows, self._collection_row)
         await self._copy(connection, "expenses", Expense, self._expense_row)
 
-    async def _resolve_storage_locations(
-        self, rows: Sequence[Mapping[str, Any]]
-    ) -> dict[str, int]:
+    async def _resolve_storage_locations(self, rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
         """Get-or-create the dictionary entry for each distinct legacy text.
 
         Skipped in a dry run: nothing else about this preview writes to the
