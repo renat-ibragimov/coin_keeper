@@ -75,6 +75,7 @@ function makeBootstrap(usdRate: string | null = '41.5000'): BootstrapOut {
       catalogViewMode: 'cards',
       collectionViewMode: 'cards',
       secondaryCurrency: 'USD',
+      defaultStorageLocation: null,
     },
     dashboard: {
       catalogItems: 0,
@@ -192,6 +193,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     totalUah: '350.00',
     totalUsd: '10.00',
     totalEur: '9.20',
+    storageLocation: null,
     notes: 'Без капсули',
   },
   {
@@ -207,6 +209,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     totalUah: '290.00',
     totalUsd: '7.25',
     totalEur: '6.70',
+    storageLocation: null,
     notes: null,
   },
 ];

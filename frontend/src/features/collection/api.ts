@@ -8,6 +8,7 @@ import type {
   CountryOut,
   DenominationOut,
   SeriesOut,
+  StorageLocation,
 } from '@/shared/api/types';
 
 import type { CollectionFilters } from './useCollectionFilters';
@@ -54,6 +55,27 @@ export function fetchOwnedDenominations(countryId?: number): Promise<Denominatio
  *  panel's material multi-select. */
 export function fetchOwnedMaterials(countryId?: number): Promise<CoinMaterial[]> {
   return api<CoinMaterial[]>(`/collection/materials${toQuery({ countryId })}`);
+}
+
+/** Presets plus this owner's own, localized names — for the purchase form's
+ *  storage-location suggestions and the settings page's management list. A
+ *  name is a free-form suggestion, not an id the client has to track: a new
+ *  one is created server-side the moment it is used (docs/04-business-rules.md).
+ *  `custom` marks the ones the owner added themselves — only those delete. */
+export function fetchStorageLocations(): Promise<StorageLocation[]> {
+  return api<StorageLocation[]>('/collection/storage-locations');
+}
+
+/** Explicit "add to my list" from settings — the same find-or-create a
+ *  purchase's own storage location field triggers implicitly. */
+export function addStorageLocation(name: string): Promise<StorageLocation> {
+  return api<StorageLocation>('/collection/storage-locations', { method: 'POST', body: { name } });
+}
+
+/** 403 if `name` is one of the four shared presets — those cannot be
+ *  deleted by any single account. */
+export function deleteStorageLocation(name: string): Promise<void> {
+  return api<void>(`/collection/storage-locations${toQuery({ name })}`, { method: 'DELETE' });
 }
 
 export function fetchCollectionItem(id: number): Promise<CollectionItem> {

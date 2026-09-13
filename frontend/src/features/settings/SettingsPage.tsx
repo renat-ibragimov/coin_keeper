@@ -1,10 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
+import {
+  addStorageLocation,
+  deleteStorageLocation,
+  fetchStorageLocations,
+} from '@/features/collection/api';
 import { GRADES } from '@/features/collection/grades';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { setLocale } from '@/shared/i18n';
@@ -16,6 +22,8 @@ import {
   Badge,
   Button,
   Card,
+  Combobox,
+  ConfirmDialog,
   FormActions,
   FormError,
   FormRow,
@@ -40,7 +48,14 @@ export function SettingsPage() {
   const queryClient = useQueryClient();
 
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const storageLocationsQuery = useQuery({
+    queryKey: ['collection', 'storage-locations'],
+    queryFn: fetchStorageLocations,
+  });
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
+  const [storageLocationDraft, setStorageLocationDraft] = useState<string | null>(null);
+  const [newLocationName, setNewLocationName] = useState('');
+  const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
 
   const catalogViewMode = useStoredViewMode('ck.viewMode.catalog', 'catalogViewMode');
   const collectionViewMode = useStoredViewMode('ck.viewMode.collection', 'collectionViewMode');
@@ -87,6 +102,33 @@ export function SettingsPage() {
     mutationFn: (secondaryCurrency: 'USD' | 'EUR') => updateSettings({ secondaryCurrency }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['bootstrap'] }),
   });
+  const storageLocationMutation = useMutation({
+    mutationFn: (defaultStorageLocation: string) => updateSettings({ defaultStorageLocation }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['bootstrap'] });
+      void queryClient.invalidateQueries({ queryKey: ['collection', 'storage-locations'] });
+    },
+  });
+  const addLocationMutation = useMutation({
+    mutationFn: (name: string) => addStorageLocation(name),
+    onSuccess: () => {
+      setNewLocationName('');
+      void queryClient.invalidateQueries({ queryKey: ['collection', 'storage-locations'] });
+    },
+    onError: () => toast.show(t('errors.generic')),
+  });
+  const deleteLocationMutation = useMutation({
+    mutationFn: (name: string) => deleteStorageLocation(name),
+    onSuccess: () => {
+      setLocationToDelete(null);
+      void queryClient.invalidateQueries({ queryKey: ['collection', 'storage-locations'] });
+      void queryClient.invalidateQueries({ queryKey: ['bootstrap'] });
+    },
+    onError: () => {
+      toast.show(t('errors.generic'));
+      setLocationToDelete(null);
+    },
+  });
 
   function changeTheme(next: ThemePreference) {
     setPreference(next);
@@ -99,6 +141,24 @@ export function SettingsPage() {
   }
 
   const settings = bootstrapQuery.data?.settings;
+  const storageLocationValue = storageLocationDraft ?? settings?.defaultStorageLocation ?? '';
+
+  function saveDefaultStorageLocation() {
+    if (
+      storageLocationDraft === null ||
+      storageLocationDraft === settings?.defaultStorageLocation
+    ) {
+      return;
+    }
+    storageLocationMutation.mutate(storageLocationDraft);
+  }
+
+  function submitNewLocation(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = newLocationName.trim();
+    if (!trimmed) return;
+    addLocationMutation.mutate(trimmed);
+  }
 
   return (
     <div className={styles.page}>
@@ -156,7 +216,6 @@ export function SettingsPage() {
                   value={preference}
                   onChange={changeTheme}
                 />
-                <p className={styles.note}>{t('settings.themeNote')}</p>
               </div>
               <Select
                 label={t('settings.locale')}
@@ -172,7 +231,6 @@ export function SettingsPage() {
               </Select>
               <Select
                 label={t('settings.secondaryCurrency')}
-                hint={t('settings.secondaryCurrencyNote')}
                 value={settings?.secondaryCurrency === 'EUR' ? 'EUR' : 'USD'}
                 disabled={!settings || secondaryCurrencyMutation.isPending}
                 onChange={(event) =>
@@ -214,7 +272,6 @@ export function SettingsPage() {
                   <option value="table">{t('catalog.viewTable')}</option>
                 </Select>
               </FormRow>
-              <p className={styles.note}>{t('settings.viewModeNote')}</p>
             </FormStack>
 
             <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
@@ -233,7 +290,6 @@ export function SettingsPage() {
                   </option>
                 ))}
               </Select>
-              <p className={styles.note}>{t('settings.gradesNote')}</p>
             </FormStack>
 
             <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
@@ -247,6 +303,57 @@ export function SettingsPage() {
                 label={t('settings.showPackagingVariants')}
               />
               <p className={styles.note}>{t('settings.showPackagingVariantsNote')}</p>
+            </FormStack>
+
+            <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
+              {t('settings.defaultStorageLocationTitle')}
+            </h3>
+            <FormStack>
+              <Combobox
+                aria-label={t('settings.defaultStorageLocationTitle')}
+                placeholder={t('purchase.storageLocationPlaceholder')}
+                options={(storageLocationsQuery.data ?? []).map((location) => location.name)}
+                value={storageLocationValue}
+                disabled={!settings}
+                onChange={(event) => setStorageLocationDraft(event.target.value)}
+                onBlur={saveDefaultStorageLocation}
+              />
+            </FormStack>
+
+            <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
+              {t('settings.storageLocationsTitle')}
+            </h3>
+            <FormStack>
+              <ul className={styles.locationList}>
+                {(storageLocationsQuery.data ?? []).map((location) => (
+                  <li key={location.name} className={styles.locationItem}>
+                    <span>{location.name}</span>
+                    {location.custom ? (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={styles.iconButton}
+                        aria-label={t('common.delete')}
+                        onClick={() => setLocationToDelete(location.name)}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </Button>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              <form onSubmit={submitNewLocation} className={styles.addLocationForm}>
+                <Input
+                  aria-label={t('settings.storageLocationsTitle')}
+                  placeholder={t('purchase.storageLocationPlaceholder')}
+                  value={newLocationName}
+                  onChange={(event) => setNewLocationName(event.target.value)}
+                  maxLength={200}
+                />
+                <Button type="submit" size="sm" loading={addLocationMutation.isPending}>
+                  {t('common.add')}
+                </Button>
+              </form>
             </FormStack>
           </Card>
 
@@ -281,6 +388,20 @@ export function SettingsPage() {
           </Card>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={locationToDelete !== null}
+        title={t('settings.deleteStorageLocationTitle')}
+        confirmLabel={t('common.delete')}
+        onCancel={() => setLocationToDelete(null)}
+        onConfirm={() => locationToDelete && deleteLocationMutation.mutate(locationToDelete)}
+        busy={deleteLocationMutation.isPending}
+        danger
+      >
+        {locationToDelete ? (
+          <p>{t('settings.deleteStorageLocationText', { name: locationToDelete })}</p>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

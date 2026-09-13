@@ -72,6 +72,7 @@ class SettingsOut(CamelModel):
     catalog_view_mode: str
     collection_view_mode: str
     secondary_currency: str
+    default_storage_location: str | None
 
 
 class SettingsUpdate(CamelModel):
@@ -82,6 +83,7 @@ class SettingsUpdate(CamelModel):
     theme: Theme | None = None
     catalog_view_mode: ViewMode | None = None
     collection_view_mode: ViewMode | None = None
+    default_storage_location: str | None = Field(default=None, max_length=200)
     secondary_currency: SecondaryCurrency | None = None
 
 

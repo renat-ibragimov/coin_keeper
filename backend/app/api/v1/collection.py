@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, BackgroundTasks, Query, status
 
 from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
 from app.api.errors import ProblemError
@@ -16,6 +16,8 @@ from app.schemas.collection import (
     CollectionItemOut,
     CollectionItemUpdate,
     CollectionPositionOut,
+    StorageLocationCreate,
+    StorageLocationOut,
 )
 from app.schemas.common import Page
 from app.schemas.reference import CountryOut, DenominationOut
@@ -26,6 +28,10 @@ from app.services.collection import (
     CollectionService,
     MissingRateError,
     UnknownCurrencyError,
+)
+from app.services.storage_locations import (
+    StorageLocationForbiddenError,
+    StorageLocationNotFoundError,
 )
 
 router = APIRouter(prefix="/collection", tags=["collection"])
@@ -39,6 +45,10 @@ def _unprocessable(problem_type: str, detail: str) -> ProblemError:
     return ProblemError(
         status.HTTP_422_UNPROCESSABLE_CONTENT, problem_type, "Request rejected", detail
     )
+
+
+def _forbidden(problem_type: str, detail: str) -> ProblemError:
+    return ProblemError(status.HTTP_403_FORBIDDEN, problem_type, "Forbidden", detail)
 
 
 @router.get("")
@@ -85,10 +95,14 @@ async def list_collection(
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_item(
-    session: DbSession, user: CurrentUser, locale: RequestLocale, payload: CollectionItemCreate
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    payload: CollectionItemCreate,
+    background_tasks: BackgroundTasks,
 ) -> CollectionItemOut:
     try:
-        return await CollectionService(session, user, locale).create(payload)
+        return await CollectionService(session, user, locale, background_tasks).create(payload)
     except CatalogItemNotFoundError as exc:
         raise _not_found("catalog-item") from exc
     except UnknownCurrencyError as exc:
@@ -136,9 +150,53 @@ async def list_owned_materials(
     return await CollectionService(session, user, locale).list_owned_materials(country_id)
 
 
-# NOTE: these four literal routes must stay registered before /{item_id} —
+@router.get("/storage-locations")
+async def list_storage_locations(
+    session: DbSession, user: CurrentUser, locale: RequestLocale
+) -> list[StorageLocationOut]:
+    """The presets plus this owner's own, localized names only — a name here
+    is a free-form suggestion, not an id the client has to track. `custom`
+    marks the ones this owner can also delete."""
+    return await CollectionService(session, user, locale).list_storage_locations()
+
+
+@router.post("/storage-locations", status_code=status.HTTP_201_CREATED)
+async def add_storage_location(
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    payload: StorageLocationCreate,
+    background_tasks: BackgroundTasks,
+) -> StorageLocationOut:
+    """Explicit "add to my list" from settings — the same find-or-create a
+    purchase's own storageLocation field uses, so typing a name that already
+    exists (a preset or one's own) just confirms it rather than duplicating."""
+    return await CollectionService(session, user, locale, background_tasks).add_storage_location(
+        payload.name
+    )
+
+
+@router.delete("/storage-locations", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_storage_location(
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    name: Annotated[str, Query(min_length=1, max_length=200)],
+) -> None:
+    try:
+        await CollectionService(session, user, locale).delete_storage_location(name)
+    except StorageLocationNotFoundError as exc:
+        raise _not_found("storage-location") from exc
+    except StorageLocationForbiddenError as exc:
+        raise _forbidden(
+            "storage-location-shared", "A preset is shared by every account and cannot be deleted."
+        ) from exc
+
+
+# NOTE: these five literal routes must stay registered before /{item_id} —
 # otherwise FastAPI tries to parse "countries"/"series"/"denominations"/
-# "materials" as item_id and 422s instead of matching the routes above.
+# "materials"/"storage-locations" as item_id and 422s instead of matching the
+# routes above.
 @router.get("/{item_id}")
 async def get_item(
     session: DbSession, user: CurrentUser, locale: RequestLocale, item_id: int
@@ -156,9 +214,12 @@ async def update_item(
     locale: RequestLocale,
     item_id: int,
     payload: CollectionItemUpdate,
+    background_tasks: BackgroundTasks,
 ) -> CollectionItemOut:
     try:
-        return await CollectionService(session, user, locale).update(item_id, payload)
+        return await CollectionService(session, user, locale, background_tasks).update(
+            item_id, payload
+        )
     except CollectionItemNotFoundError as exc:
         raise _not_found("collection-item") from exc
     except UnknownCurrencyError as exc:

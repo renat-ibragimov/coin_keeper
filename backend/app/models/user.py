@@ -132,6 +132,11 @@ class UserSettings(Base):
     secondary_currency: Mapped[str] = mapped_column(
         Text, nullable=False, default="USD", server_default="USD"
     )
+    # Pre-fills the purchase form's storage location for a brand-new purchase,
+    # same idea as default_grade. NULL until the owner sets one.
+    default_storage_location_id: Mapped[int | None] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="SET NULL")
+    )
     updated_at: Mapped[datetime] = updated_at_column()
 
     user: Mapped[User] = relationship(back_populates="settings")

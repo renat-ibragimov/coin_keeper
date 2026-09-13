@@ -84,6 +84,9 @@ ignore = ["S101"]
 "app/ukraine_pipeline/*" = ["RUF001", "RUF002", "RUF003"]
 "scripts/ukraine_pipeline.py" = ["RUF001", "RUF002", "RUF003"]
 "scripts/recon_ukraine.py" = ["RUF001", "RUF002", "RUF003"]
+# The system prompt shows the model a real Ukrainian example phrase it needs
+# to recognise ("вдома") — an example of the data it translates, not prose.
+"app/services/translation.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"

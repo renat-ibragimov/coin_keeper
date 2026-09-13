@@ -15,6 +15,7 @@ export function updateSettings(body: {
   catalogViewMode?: 'cards' | 'table';
   collectionViewMode?: 'cards' | 'table';
   secondaryCurrency?: 'USD' | 'EUR';
+  defaultStorageLocation?: string;
 }): Promise<SettingsOut> {
   return api<SettingsOut>('/bootstrap/settings', { method: 'PATCH', body });
 }

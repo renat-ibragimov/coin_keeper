@@ -30,6 +30,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     // prop doc).
     totalUsd: '8.40',
     totalEur: '7.70',
+    storageLocation: 'Вдома',
     notes: null,
   },
 ];
@@ -63,12 +64,16 @@ describe('InstancesList', () => {
     );
   });
 
-  it('shows the purchase total, the historical rate, and a dash for the storage place', () => {
+  it('shows the purchase total, the historical rate, and the storage place', () => {
     renderList();
     expect(screen.getByText('350 ₴')).toBeInTheDocument();
     expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
+    expect(screen.getByText('Вдома')).toBeInTheDocument();
+  });
+
+  it('shows a dash when a purchase has no storage location', () => {
+    renderList({ items: [{ ...INSTANCES[0]!, storageLocation: null }] });
     const row = screen.getByTestId('instance-row');
-    // "Місце зберігання" has no field yet — every row shows a dash.
     expect(row.textContent).toContain('—');
   });
 

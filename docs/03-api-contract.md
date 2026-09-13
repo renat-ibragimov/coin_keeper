@@ -140,6 +140,9 @@ GET /bootstrap
   вторым числом («≈ …») рядом с гривневой суммой в карточке монеты, «Мої монети» и «Гроші».
   Гривна остаётся основной осью расчётов — вторичная валюта только выбирает, какое из уже
   посчитанных полей (`purchaseTotalUsd`/`purchaseTotalEur` и аналоги) показать.
+- `defaultStorageLocation` (по умолчанию `null`) — имя, не id: сервер резолвит его через
+  тот же get-or-create, что и `storageLocation` покупки (`04-business-rules.md`, п. 16).
+  Пустая строка/`null` очищает дефолт.
 
 ## Каталог
 
@@ -434,6 +437,25 @@ GET /collection/denominations?countryId
 стране (не по общему каталогу): своя пара границ для «Рік від/до» на этой панели.
 Порядок регистрации маршрутов важен: `/collection/countries` и соседние объявлены
 раньше `/collection/{id}`, иначе FastAPI пытается распарсить `"countries"` как id.
+
+### Місце зберігання
+
+```
+GET    /collection/storage-locations              → [{name, custom}]
+POST   /collection/storage-locations  {name}       → {name, custom}
+DELETE /collection/storage-locations?name=
+```
+
+Ресурс адресуется по имени, не по id — сервер резолвит имя в `storage_locations.id`
+прозрачно (`04-business-rules.md`, п. 16). `custom` — `true`, если запись принадлежит
+текущему владельцу (можно удалить), `false` — системный пресет («Вдома», единственный).
+`storageLocation` в `CollectionItemCreate`/`CollectionItemUpdate`/`CollectionItemOut` и
+`defaultStorageLocation` в `SettingsOut`/`SettingsUpdate` — тем же именем: набирая текст
+в форме покупки или в настройках, отдельно создавать место через `POST` не обязательно,
+первое же использование текста заводит личную запись сама.
+
+`DELETE` — `204` при успехе, `403` при попытке удалить пресет, `404`, если имя не видно
+этому владельцу вовсе (включая чужую личную запись — не подтверждаем её существование).
 
 ## Серии
 

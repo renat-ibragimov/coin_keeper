@@ -30,6 +30,7 @@ function makeBootstrap(overrides: Partial<BootstrapOut['dashboard']> = {}): Boot
       catalogViewMode: 'cards',
       collectionViewMode: 'cards',
       secondaryCurrency: 'USD',
+      defaultStorageLocation: null,
     },
     dashboard: {
       catalogItems: 3063,

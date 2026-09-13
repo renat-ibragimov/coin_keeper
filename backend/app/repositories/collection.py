@@ -24,6 +24,7 @@ from app.models import (
     Denomination,
     Expense,
     Material,
+    StorageLocation,
 )
 from app.models.enums import CollectionGroup, ExpenseCategory
 from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
@@ -70,6 +71,7 @@ class CollectionRow:
     series_name: str | None
     denomination: Denomination | None
     market_price_uah: Decimal | None = None
+    storage_location: str | None = None
 
 
 def _total_uah() -> ColumnElement[Any]:
@@ -363,11 +365,18 @@ class CollectionRepository:
                 ).label("series_name"),
                 Denomination,
                 latest_price_uah_for(CatalogItem.id, self._owner_id).label("market_price_uah"),
+                localized(
+                    self._locale,
+                    uk=StorageLocation.name_uk,
+                    en=StorageLocation.name_en,
+                    original=StorageLocation.name_original,
+                ).label("storage_location"),
             )
             .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
             .join(Country, Country.id == CatalogItem.country_id)
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
+            .outerjoin(StorageLocation, StorageLocation.id == CollectionItem.storage_location_id)
         )
 
     @staticmethod
@@ -379,6 +388,7 @@ class CollectionRepository:
             series_name=row.series_name,
             denomination=row.Denomination,
             market_price_uah=row.market_price_uah,
+            storage_location=row.storage_location,
         )
 
     async def get_row(self, item_id: int) -> CollectionRow | None:
@@ -388,16 +398,27 @@ class CollectionRepository:
         row = (await self._session.execute(query)).first()
         return None if row is None else self._to_row(row)
 
-    async def list_for_item(self, catalog_item_id: int) -> Sequence[CollectionItem]:
+    async def list_for_item(
+        self, catalog_item_id: int
+    ) -> Sequence[tuple[CollectionItem, str | None]]:
         result = await self._session.execute(
-            select(CollectionItem)
+            select(
+                CollectionItem,
+                localized(
+                    self._locale,
+                    uk=StorageLocation.name_uk,
+                    en=StorageLocation.name_en,
+                    original=StorageLocation.name_original,
+                ).label("storage_location"),
+            )
+            .outerjoin(StorageLocation, StorageLocation.id == CollectionItem.storage_location_id)
             .where(
                 CollectionItem.owner_id == self._owner_id,
                 CollectionItem.catalog_item_id == catalog_item_id,
             )
             .order_by(CollectionItem.acquisition_date.desc().nulls_last(), CollectionItem.id)
         )
-        return result.scalars().all()
+        return [(row.CollectionItem, row.storage_location) for row in result]
 
     async def get(self, item_id: int) -> CollectionItem | None:
         result = await self._session.execute(

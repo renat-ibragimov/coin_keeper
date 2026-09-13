@@ -23,6 +23,7 @@ from app.models.collection import (
     Expense,
     PurchaseOffer,
     Sale,
+    StorageLocation,
 )
 from app.models.media import MediaFile
 from app.models.pricing import MarketPriceSnapshot, PriceSourceLink
@@ -59,6 +60,7 @@ __all__ = [
     "QualityType",
     "RefreshToken",
     "Sale",
+    "StorageLocation",
     "UcoinCatalogSource",
     "User",
     "UserSettings",

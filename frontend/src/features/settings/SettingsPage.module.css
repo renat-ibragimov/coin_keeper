@@ -70,6 +70,41 @@
   margin-bottom: var(--space-3);
 }
 
+.locationList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.locationItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-control);
+  font-size: 14px;
+}
+
+.iconButton {
+  padding: 6px;
+  min-width: 32px;
+}
+
+.addLocationForm {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+}
+
+.addLocationForm > *:first-child {
+  flex: 1;
+}
+
 @media (max-width: 900px) {
   .columns {
     flex-direction: column;

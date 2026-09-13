@@ -21,7 +21,35 @@ from sqlalchemy.dialects.postgresql import ENUM, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, created_at_column, updated_at_column
-from app.models.enums import ExpenseCategory, OfferStatus
+from app.models.catalog import translation_source_enum
+from app.models.enums import ExpenseCategory, OfferStatus, TranslationSource
+
+
+class StorageLocation(Base):
+    """Where a purchase physically is.
+
+    System presets (`owner_id IS NULL`, e.g. "in transit") plus whatever each
+    owner types the first time they name a new one — get-or-created by
+    `StorageLocationService.resolve()`, never a direct user-facing CRUD
+    endpoint. `name_original` is what was actually typed; the untranslated
+    slot briefly mirrors it verbatim until a background task (docs/04) fills
+    in the other language via `TranslationSource.LLM`.
+    """
+
+    __tablename__ = "storage_locations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    name_original: Mapped[str] = mapped_column(Text, nullable=False)
+    name_uk: Mapped[str] = mapped_column(Text, nullable=False)
+    name_uk_source: Mapped[TranslationSource] = mapped_column(
+        translation_source_enum, nullable=False
+    )
+    name_en: Mapped[str] = mapped_column(Text, nullable=False)
+    name_en_source: Mapped[TranslationSource] = mapped_column(
+        translation_source_enum, nullable=False
+    )
+    created_at: Mapped[datetime] = created_at_column()
 
 
 class CollectionItem(Base):
@@ -50,7 +78,9 @@ class CollectionItem(Base):
     purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(14, 2))
     purchase_currency: Mapped[str | None] = mapped_column(ForeignKey("currencies.code"))
     purchase_rate_uah: Mapped[Decimal | None] = mapped_column(Numeric(14, 6))
-    storage_location: Mapped[str | None] = mapped_column(Text)
+    storage_location_id: Mapped[int | None] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="SET NULL")
+    )
     grading_company: Mapped[str | None] = mapped_column(Text)
     grading_number: Mapped[str | None] = mapped_column(Text)
     grading_grade: Mapped[str | None] = mapped_column(Text)

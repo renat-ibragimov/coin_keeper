@@ -246,7 +246,7 @@ export function InstancesList({
                     {item.acquisitionDate ? formatDate(item.acquisitionDate, locale) : '—'}
                   </td>
                   <td className="tabular">{ownershipDuration(item.acquisitionDate, t)}</td>
-                  <td>—</td>
+                  <td>{item.storageLocation || '—'}</td>
                   <td className={styles.notes}>{item.notes || '—'}</td>
                   <td onClick={(event) => event.stopPropagation()}>
                     {/* A plain block td, with the flex row nested inside it —

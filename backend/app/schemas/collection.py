@@ -12,6 +12,19 @@ from app.schemas.base import CamelModel
 from app.schemas.common import Money, Rate
 
 
+class StorageLocationOut(CamelModel):
+    """A name, not an id: the client never tracks storage-location ids
+    (docs/04-business-rules.md). `custom` is true for the owner's own entry —
+    only those can be deleted; the four system presets cannot."""
+
+    name: str
+    custom: bool
+
+
+class StorageLocationCreate(CamelModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
 class CollectionPositionOut(CamelModel):
     """One catalog item grouped from all of the owner's purchases of it.
 
@@ -55,6 +68,7 @@ class CollectionItemOut(CamelModel):
     currency: str | None
     rate_uah: Rate | None
     total_uah: Money
+    storage_location: str | None
     notes: str | None
     # Catalog context the collection screen needs without a second request:
     # the visible thumbnail and the latest visible market price of the item.
@@ -71,6 +85,7 @@ class CollectionItemCreate(CamelModel):
     seller: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=4000)
     grade: str | None = Field(default=None, max_length=50)
+    storage_location: str | None = Field(default=None, max_length=200)
 
 
 class CollectionItemUpdate(CamelModel):
@@ -81,3 +96,4 @@ class CollectionItemUpdate(CamelModel):
     seller: str | None = Field(default=None, max_length=500)
     notes: str | None = Field(default=None, max_length=4000)
     grade: str | None = Field(default=None, max_length=50)
+    storage_location: str | None = Field(default=None, max_length=200)

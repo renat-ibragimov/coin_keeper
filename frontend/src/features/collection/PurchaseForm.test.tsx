@@ -17,6 +17,8 @@ function renderForm(overrides: Partial<Parameters<typeof PurchaseForm>[0]> = {})
   render(
     <PurchaseForm
       defaultGrade="UNC"
+      defaultStorageLocation={null}
+      storageLocations={['Вдома', 'В дорозі']}
       currencies={CURRENCIES}
       busy={false}
       submitError={null}
@@ -54,6 +56,7 @@ describe('PurchaseForm', () => {
     const onSubmit = renderForm();
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '1 250,50');
     await userEvent.type(screen.getByLabelText('Продавець'), '  Violity  ');
+    await userEvent.type(screen.getByLabelText('Місце зберігання'), '  Вдома  ');
     await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
 
     expect(onSubmit).toHaveBeenCalledWith(
@@ -63,9 +66,15 @@ describe('PurchaseForm', () => {
         currency: 'UAH',
         seller: 'Violity',
         grade: 'UNC',
+        storageLocation: 'Вдома',
         notes: null,
       }),
     );
+  });
+
+  it('pre-fills the storage location from settings for a new purchase', () => {
+    renderForm({ defaultStorageLocation: 'В дорозі' });
+    expect(screen.getByLabelText('Місце зберігання')).toHaveValue('В дорозі');
   });
 
   it('shows a missing NBU rate under the date field, naming the currency', () => {
@@ -92,6 +101,7 @@ describe('PurchaseForm', () => {
         currency: 'USD',
         rateUah: null,
         totalUah: '0.00',
+        storageLocation: null,
         notes: null,
         thumbnailUrl: null,
         marketPriceUah: null,

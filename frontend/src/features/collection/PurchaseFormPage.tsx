@@ -21,7 +21,12 @@ import {
   useToast,
 } from '@/shared/ui';
 
-import { createCollectionItem, fetchCollectionItem, updateCollectionItem } from './api';
+import {
+  createCollectionItem,
+  fetchCollectionItem,
+  fetchStorageLocations,
+  updateCollectionItem,
+} from './api';
 import { CatalogItemPicker } from './CatalogItemPicker';
 import { COLLECTION_DEPENDENT_KEYS } from './model';
 import { PurchaseForm } from './PurchaseForm';
@@ -65,6 +70,10 @@ export function PurchaseFormPage() {
   });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
+  const storageLocationsQuery = useQuery({
+    queryKey: ['collection', 'storage-locations'],
+    queryFn: fetchStorageLocations,
+  });
 
   const from = (location.state as { from?: string } | null)?.from;
   // The only entry point into editing is a coin's own page, so both the back
@@ -198,6 +207,8 @@ export function PurchaseFormPage() {
                 key={editing ? `edit-${editId}` : `new-${catalogItemId}`}
                 initial={editing ? instanceQuery.data : undefined}
                 defaultGrade={bootstrapQuery.data.settings.defaultGrade}
+                defaultStorageLocation={bootstrapQuery.data.settings.defaultStorageLocation}
+                storageLocations={(storageLocationsQuery.data ?? []).map((l) => l.name)}
                 currencies={currenciesQuery.data ?? []}
                 busy={mutation.isPending}
                 submitError={mutation.error}

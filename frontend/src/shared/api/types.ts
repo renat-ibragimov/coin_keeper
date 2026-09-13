@@ -36,6 +36,7 @@ export type CollectionItemCreate = components['schemas']['CollectionItemCreate']
 export type CollectionItemUpdate = components['schemas']['CollectionItemUpdate'];
 export type CollectionPosition = components['schemas']['CollectionPositionOut'];
 export type CollectionPage = components['schemas']['Page_CollectionPositionOut_'];
+export type StorageLocation = components['schemas']['StorageLocationOut'];
 
 export type CatalogItemCreate = components['schemas']['CatalogItemCreate'];
 

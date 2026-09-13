@@ -33,6 +33,7 @@ describe('useStoredViewMode', () => {
       catalogViewMode: 'cards',
       collectionViewMode: 'cards',
       secondaryCurrency: 'USD',
+      defaultStorageLocation: null,
     });
   });
 

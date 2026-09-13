@@ -881,6 +881,8 @@ export interface components {
             totalUsd: string | null;
             /** Totaleur */
             totalEur: string | null;
+            /** Storagelocation */
+            storageLocation: string | null;
             /** Notes */
             notes: string | null;
         };
@@ -1177,6 +1179,8 @@ export interface components {
             notes?: string | null;
             /** Grade */
             grade?: string | null;
+            /** Storagelocation */
+            storageLocation?: string | null;
         };
         /** CollectionItemOut */
         CollectionItemOut: {
@@ -1214,6 +1218,8 @@ export interface components {
             rateUah: string | null;
             /** Totaluah */
             totalUah: string;
+            /** Storagelocation */
+            storageLocation: string | null;
             /** Notes */
             notes: string | null;
             /** Thumbnailurl */
@@ -1237,6 +1243,25 @@ export interface components {
             notes?: string | null;
             /** Grade */
             grade?: string | null;
+            /** Storagelocation */
+            storageLocation?: string | null;
+        };
+        /**
+         * StorageLocationOut
+         * @description A name, not an id: the client never tracks storage-location ids
+         *     (docs/04-business-rules.md). `custom` is true for the owner's own entry —
+         *     only those can be deleted; the four system presets cannot.
+         */
+        StorageLocationOut: {
+            /** Name */
+            name: string;
+            /** Custom */
+            custom: boolean;
+        };
+        /** StorageLocationCreate */
+        StorageLocationCreate: {
+            /** Name */
+            name: string;
         };
         /**
          * CollectionPositionOut
@@ -1775,6 +1800,8 @@ export interface components {
             collectionViewMode: string;
             /** Secondarycurrency */
             secondaryCurrency: string;
+            /** Defaultstoragelocation */
+            defaultStorageLocation: string | null;
         };
         /**
          * SettingsUpdate
@@ -1793,6 +1820,8 @@ export interface components {
             collectionViewMode?: ("cards" | "table") | null;
             /** Secondarycurrency */
             secondaryCurrency?: ("USD" | "EUR") | null;
+            /** Defaultstoragelocation */
+            defaultStorageLocation?: string | null;
         };
         /**
          * TokensOut

@@ -267,11 +267,11 @@ class CatalogService:
         row = await self._repo.get_row(item_id)
         if row is None:
             raise ItemNotFoundError
-        instances = await CollectionRepository(self._session, owner_id=self._user.id).list_for_item(
-            item_id
-        )
+        instances = await CollectionRepository(
+            self._session, owner_id=self._user.id, locale=self._locale
+        ).list_for_item(item_id)
         out = []
-        for instance in instances:
+        for instance, storage_location in instances:
             total_uah = (
                 (instance.purchase_price or Decimal(0))
                 * (instance.purchase_rate_uah or Decimal(1))
@@ -302,6 +302,7 @@ class CatalogService:
                     total_uah=total_uah,
                     total_usd=total_uah / usd_rate if usd_rate else None,
                     total_eur=total_uah / eur_rate if eur_rate else None,
+                    storage_location=storage_location,
                     notes=instance.notes,
                 )
             )
@@ -404,7 +405,7 @@ class CatalogService:
         """
         collection = CollectionRepository(self._session, owner_id=self._user.id)
         instances = await collection.list_for_item(item.id)
-        for instance in instances:
+        for instance, _storage_location in instances:
             expense = await collection.purchase_expense_for(instance.id)
             if expense is not None:
                 await self._session.delete(expense)

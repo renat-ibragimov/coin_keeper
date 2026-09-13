@@ -7,6 +7,7 @@ import type { CollectionItem, CurrencyOut } from '@/shared/api/types';
 import { currencySymbol, parseDecimal, todayIso } from '@/shared/lib/format';
 import {
   Button,
+  Combobox,
   FormActions,
   FormError,
   FormRow,
@@ -25,6 +26,7 @@ export interface PurchaseValues {
   purchaseDate: string;
   seller: string | null;
   grade: string | null;
+  storageLocation: string | null;
   notes: string | null;
 }
 
@@ -32,6 +34,8 @@ interface PurchaseFormProps {
   /** Existing instance when editing; absent for a new purchase. */
   initial?: CollectionItem;
   defaultGrade: string;
+  defaultStorageLocation: string | null;
+  storageLocations: string[];
   currencies: CurrencyOut[];
   busy: boolean;
   /** The last failed submission: rate and currency problems land on their fields. */
@@ -47,12 +51,17 @@ interface Fields {
   purchaseDate: string;
   seller: string;
   grade: string;
+  storageLocation: string;
   notes: string;
 }
 
 type FieldErrors = Partial<Record<keyof Fields, string>>;
 
-function initialFields(initial: CollectionItem | undefined, defaultGrade: string): Fields {
+function initialFields(
+  initial: CollectionItem | undefined,
+  defaultGrade: string,
+  defaultStorageLocation: string | null,
+): Fields {
   return {
     quantity: String(initial?.quantity ?? 1),
     price: initial?.price ?? '',
@@ -60,6 +69,7 @@ function initialFields(initial: CollectionItem | undefined, defaultGrade: string
     purchaseDate: initial?.purchaseDate ?? todayIso(),
     seller: initial?.seller ?? '',
     grade: initial?.grade ?? defaultGrade,
+    storageLocation: initial?.storageLocation ?? defaultStorageLocation ?? '',
     notes: initial?.notes ?? '',
   };
 }
@@ -77,6 +87,8 @@ function serverFieldErrors(error: unknown, currency: string): FieldErrors {
 export function PurchaseForm({
   initial,
   defaultGrade,
+  defaultStorageLocation,
+  storageLocations,
   currencies,
   busy,
   submitError,
@@ -84,7 +96,9 @@ export function PurchaseForm({
   onCancel,
 }: PurchaseFormProps) {
   const { t } = useTranslation();
-  const [fields, setFields] = useState<Fields>(() => initialFields(initial, defaultGrade));
+  const [fields, setFields] = useState<Fields>(() =>
+    initialFields(initial, defaultGrade, defaultStorageLocation),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const set = (key: keyof Fields) => (value: string) => {
@@ -137,6 +151,7 @@ export function PurchaseForm({
       purchaseDate: fields.purchaseDate,
       seller: fields.seller.trim() || null,
       grade: fields.grade.trim() || null,
+      storageLocation: fields.storageLocation.trim() || null,
       notes: fields.notes.trim() || null,
     });
   }
@@ -215,6 +230,14 @@ export function PurchaseForm({
             ))}
           </Select>
         </FormRow>
+        <Combobox
+          label={t('purchase.storageLocation')}
+          placeholder={t('purchase.storageLocationPlaceholder')}
+          options={storageLocations}
+          value={fields.storageLocation}
+          onChange={(event) => set('storageLocation')(event.target.value)}
+          maxLength={200}
+        />
         <Textarea
           label={t('purchase.notes')}
           placeholder={t('purchase.notesPlaceholder')}

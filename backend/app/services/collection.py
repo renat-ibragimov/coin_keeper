@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE, pick_name
@@ -41,11 +42,13 @@ from app.schemas.collection import (
     CollectionItemOut,
     CollectionItemUpdate,
     CollectionPositionOut,
+    StorageLocationOut,
 )
 from app.schemas.reference import CountryOut, DenominationOut
 from app.schemas.series import SeriesOut
 from app.services.catalog import display_title, material_out
 from app.services.media_urls import CatalogImages, MediaUrlBuilder
+from app.services.storage_locations import StorageLocationService
 
 
 def _country_out(
@@ -129,7 +132,13 @@ class MissingRateError(CollectionError):
 
 
 class CollectionService:
-    def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        user: User,
+        locale: str = DEFAULT_LOCALE,
+        background_tasks: BackgroundTasks | None = None,
+    ) -> None:
         self._session = session
         self._user = user
         self._locale = locale
@@ -140,6 +149,18 @@ class CollectionService:
         self._rates = RateRepository(session)
         self._media = MediaRepository(session, user_id=user.id)
         self._urls = MediaUrlBuilder()
+        self._storage_locations = StorageLocationService(
+            session, owner_id=user.id, locale=locale, background_tasks=background_tasks
+        )
+
+    async def list_storage_locations(self) -> list[StorageLocationOut]:
+        return await self._storage_locations.list_locations()
+
+    async def add_storage_location(self, name: str) -> StorageLocationOut:
+        return await self._storage_locations.add(name)
+
+    async def delete_storage_location(self, name: str) -> None:
+        await self._storage_locations.delete(name)
 
     async def list_positions(
         self, filters: CollectionFilters, *, limit: int, offset: int
@@ -181,6 +202,7 @@ class CollectionService:
         if item is None:
             raise CatalogItemNotFoundError
         rate = await self._resolve_rate(payload.currency, payload.purchase_date)
+        storage_location_id = await self._storage_locations.resolve(payload.storage_location)
 
         instance = CollectionItem(
             owner_id=self._user.id,
@@ -192,6 +214,7 @@ class CollectionService:
             purchase_price=payload.price,
             purchase_currency=payload.currency,
             purchase_rate_uah=rate,
+            storage_location_id=storage_location_id,
             notes=payload.notes,
         )
         await self._repo.add(instance)
@@ -206,6 +229,10 @@ class CollectionService:
         instance = row.instance
 
         changes = payload.model_dump(exclude_unset=True)
+        if "storage_location" in changes:
+            instance.storage_location_id = await self._storage_locations.resolve(
+                changes.pop("storage_location")
+            )
         field_map = {
             "quantity": "quantity",
             "price": "purchase_price",
@@ -355,6 +382,7 @@ class CollectionService:
             total_uah=(instance.purchase_price or Decimal(0))
             * (instance.purchase_rate_uah or Decimal(1))
             * instance.quantity,
+            storage_location=row.storage_location,
             notes=instance.notes,
             thumbnail_url=images.thumbnail_url,
             market_price_uah=row.market_price_uah,

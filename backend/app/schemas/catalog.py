@@ -232,4 +232,5 @@ class CatalogCollectionItemOut(CamelModel):
     total_uah: Money
     total_usd: Money | None
     total_eur: Money | None
+    storage_location: str | None
     notes: str | None

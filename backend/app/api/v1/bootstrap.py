@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 
 from app.api.deps import CurrentUser, DbSession, RequestLocale
 from app.schemas.bootstrap import BootstrapOut, SettingsOut, SettingsUpdate
@@ -18,8 +18,12 @@ async def bootstrap(session: DbSession, user: CurrentUser, locale: RequestLocale
 
 @router.patch("/bootstrap/settings")
 async def update_settings(
-    payload: SettingsUpdate, session: DbSession, user: CurrentUser, locale: RequestLocale
+    payload: SettingsUpdate,
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    background_tasks: BackgroundTasks,
 ) -> SettingsOut:
-    return await BootstrapService(session, user, locale).update_settings(
+    return await BootstrapService(session, user, locale, background_tasks).update_settings(
         **payload.model_dump(exclude_unset=True)
     )

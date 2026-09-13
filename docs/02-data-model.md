@@ -514,7 +514,7 @@ seller            text
 purchase_price    numeric(14,2)
 purchase_currency text FK currencies
 purchase_rate_uah numeric(14,6)      -- курс НБУ на дату покупки
-storage_location  text
+storage_location_id  bigint FK storage_locations ON DELETE SET NULL
 grading_company, grading_number, grading_grade  text
 is_for_swap       boolean NOT NULL DEFAULT false
 is_for_sale       boolean NOT NULL DEFAULT false
@@ -761,6 +761,7 @@ theme       text NOT NULL DEFAULT 'system'   -- 'light' | 'dark' | 'system'
 catalog_view_mode     text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
 collection_view_mode  text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
 secondary_currency    text NOT NULL DEFAULT 'USD'     -- 'USD' | 'EUR'
+default_storage_location_id  bigint FK storage_locations ON DELETE SET NULL
 updated_at  timestamptz
 ```
 
@@ -782,6 +783,40 @@ updated_at  timestamptz
 
 `display_currency` де-факто мёртвое поле: всегда `'UAH'`, ни UI, ни PATCH-параметра для
 его изменения нет.
+
+`default_storage_location_id` (миграция 0017) — то же самое "один дефолт, редактируемый
+в настройках, подставляется в форму покупки", что и `default_grade`, только резолвится
+через `storage_locations` по имени: клиенту всегда виден только текст, id внутренний.
+
+### storage_locations
+
+Свой словарь для «Хранение» (миграция 0017), тем же способом, что и три языковых слота
+выше, но с двумя, а не тремя слотами — эндонима тут нет, это не название монеты:
+
+```
+id             bigserial PK
+owner_id       bigint FK users ON DELETE CASCADE   -- NULL = системный пресет, виден всем
+name_original  text NOT NULL   -- как ввёл владелец
+name_uk        text NOT NULL
+name_uk_source translation_source NOT NULL
+name_en        text NOT NULL
+name_en_source translation_source NOT NULL
+created_at     timestamptz
+```
+
+Никогда не CRUD-ресурс по id для клиента: и в форме покупки, и в настройках запись видна
+и адресуется только по имени (`GET /collection/storage-locations` отдаёт `{name, custom}`),
+резолвится в id на сервере. Один системный пресет — «Вдома» (`owner_id IS NULL`), он же
+единственный, который нельзя удалить (`403`); всё остальное, включая «В дорозі», владелец
+заводит сам — первое использование текста заводит личную запись
+(`owner_id = <владелец>`), совпадение по имени (без учёта регистра, по любому из трёх
+слотов) переиспользует существующую. Свежесозданная запись хранит typed-текст в обоих
+языковых слотах и переводится в фоне (`BackgroundTasks`, не ARQ — see `10-infra.md`) через
+Haiku, чтобы сохранение покупки не ждало LLM.
+
+`collection_items.storage_location_id` и `user_settings.default_storage_location_id` —
+обе FK сюда, `ON DELETE SET NULL`: удаление личной записи владельцем просто снимает
+значение там, где она стояла, а не рвёт покупку.
 
 ### auth_tokens
 
@@ -833,9 +868,13 @@ users ──< collection_items >── catalog_items ──< market_price_snapsh
   │              └─< expenses
   ├──< catalog_items (личные позиции, created_by)
   ├──< market_price_snapshots (свои снимки цен, created_by)
+  ├──< storage_locations (свои, owner_id; пресет — owner_id NULL)
   └─< user_settings
   └─< ucoin_catalog_sources
   └─< refresh_tokens, auth_tokens
+
+storage_locations ──< collection_items (storage_location_id)
+storage_locations ──< user_settings (default_storage_location_id)
 
 countries ──< coin_series ──< catalog_items
     └─────< denominations ──< catalog_items
