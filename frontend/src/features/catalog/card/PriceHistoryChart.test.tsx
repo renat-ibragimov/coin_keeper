@@ -19,7 +19,10 @@ const mocks = vi.hoisted(() => {
   };
   return {
     createChart: vi.fn(() => chart),
-    createSeriesMarkers: vi.fn(() => ({ setMarkers: vi.fn() })),
+    createSeriesMarkers: vi.fn((_series: unknown, markers: { id?: string }[]) => {
+      void markers;
+      return { setMarkers: vi.fn() };
+    }),
     chart,
     series,
     timeScale,
@@ -86,7 +89,7 @@ describe('PriceHistoryChart', () => {
       { time: expect.any(Number), value: 650 },
       { time: expect.any(Number), value: 700 },
     ]);
-    const markers = mocks.createSeriesMarkers.mock.calls[0]![1] as { id?: string }[];
+    const markers = mocks.createSeriesMarkers.mock.calls[0]![1];
     expect(markers.map((marker) => marker.id).sort()).toEqual(['2', '4']);
     expect(mocks.timeScale.fitContent).toHaveBeenCalledTimes(1);
   });
