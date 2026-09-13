@@ -16,7 +16,7 @@ import {
 } from '@/shared/lib/format';
 import { Badge, Button, CoinImage, EmptyState, Skeleton } from '@/shared/ui';
 
-import { approxUsd, approxUsdSigned } from './usdApprox';
+import { formatUsd, formatUsdSigned, toUsd } from './usdApprox';
 import styles from './InstancesList.module.css';
 
 interface InstancePhoto {
@@ -37,8 +37,10 @@ interface InstancesListProps {
   photo: InstancePhoto;
   /** The catalog item's current market price, same for every instance. */
   currentPriceUah: string | null;
-  /** The live NBU USD/UAH rate (bootstrap's exchangeRates), for the ≈$
-   *  hints — null renders them as "no data" rather than a guess. */
+  /** The live NBU USD/UAH rate (bootstrap's exchangeRates) — only for a
+   *  row's current value, which has no purchase date of its own to convert
+   *  by. Its purchase total uses item.totalUsd instead, the backend's own
+   *  historical-rate conversion. null renders a ≈$ as "no data". */
   usdRate: number | null;
 }
 
@@ -131,6 +133,16 @@ export function InstancesList({
               const change = rowCurrentValue !== null ? rowCurrentValue - purchaseTotal : null;
               const changePercent =
                 change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
+              // The backend's own historical-rate conversion (item.totalUsd)
+              // for what was spent then; the live rate only for a value with
+              // no purchase date of its own (see the prop doc above).
+              const purchaseTotalUsd = item.totalUsd !== null ? Number(item.totalUsd) : null;
+              const rowCurrentValueUsd =
+                rowCurrentValue !== null ? toUsd(rowCurrentValue, usdRate) : null;
+              const changeUsd =
+                rowCurrentValueUsd !== null && purchaseTotalUsd !== null
+                  ? rowCurrentValueUsd - purchaseTotalUsd
+                  : null;
               const editHref = `/collection/coins/${item.id}/edit`;
 
               return (
@@ -158,7 +170,7 @@ export function InstancesList({
                   <td className="tabular">
                     <span className={styles.price}>{formatUah(purchaseTotal, locale) ?? '—'}</span>
                     <span className={styles.secondary}>
-                      {usdText(approxUsd(purchaseTotal, usdRate, locale))}
+                      {usdText(formatUsd(purchaseTotalUsd, locale))}
                     </span>
                     {rate ? (
                       <span className={styles.secondary}>
@@ -174,7 +186,7 @@ export function InstancesList({
                       <>
                         <span className={styles.price}>{formatUah(rowCurrentValue, locale)}</span>
                         <span className={styles.secondary}>
-                          {usdText(approxUsd(rowCurrentValue, usdRate, locale))}
+                          {usdText(formatUsd(rowCurrentValueUsd, locale))}
                         </span>
                       </>
                     ) : (
@@ -203,7 +215,7 @@ export function InstancesList({
                           </span>
                         ) : null}
                         <span className={styles.secondary}>
-                          {usdText(approxUsdSigned(change, usdRate, locale))}
+                          {usdText(changeUsd !== null ? formatUsdSigned(changeUsd, locale) : null)}
                         </span>
                       </>
                     ) : (

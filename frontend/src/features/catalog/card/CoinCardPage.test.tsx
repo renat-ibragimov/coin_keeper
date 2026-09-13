@@ -135,6 +135,7 @@ function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
     priceObservedAt: '2024-05-18T00:00:00Z',
     quantityOwned: 2,
     purchaseTotalUah: '640.00',
+    purchaseTotalUsd: '15.42',
     obverseImage: null,
     reverseImage: null,
     thumbnailUrl: null,
@@ -185,6 +186,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     purchaseCurrency: 'USD',
     purchaseRateUah: '35.0000',
     totalUah: '350.00',
+    totalUsd: '10.00',
     notes: 'Без капсули',
   },
   {
@@ -198,6 +200,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     purchaseCurrency: 'UAH',
     purchaseRateUah: null,
     totalUah: '290.00',
+    totalUsd: '7.25',
     notes: null,
   },
 ];

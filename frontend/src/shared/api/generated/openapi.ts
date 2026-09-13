@@ -757,6 +757,8 @@ export interface components {
             quantityOwned: number;
             /** Purchasetotaluah */
             purchaseTotalUah: string;
+            /** Purchasetotalusd */
+            purchaseTotalUsd: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
@@ -849,6 +851,8 @@ export interface components {
             purchaseRateUah: string | null;
             /** Totaluah */
             totalUah: string;
+            /** Totalusd */
+            totalUsd: string | null;
             /** Notes */
             notes: string | null;
         };
@@ -1021,6 +1025,8 @@ export interface components {
             quantityOwned: number;
             /** Purchasetotaluah */
             purchaseTotalUah: string;
+            /** Purchasetotalusd */
+            purchaseTotalUsd: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
@@ -1422,6 +1428,8 @@ export interface components {
             rateUah: string | null;
             /** Amountuah */
             amountUah: string;
+            /** Amountusd */
+            amountUsd: string | null;
             /**
              * Expensedate
              * Format: date

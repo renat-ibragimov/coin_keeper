@@ -370,11 +370,9 @@ export function ExpensesPage() {
                       className={column.className}
                     />
                   ))}
-                  {/* Reserved for the amount in dollars at the National Bank's
-                      rate of the day, so the spending can be read in a currency
-                      that does not move under your feet. The value comes in a
-                      later step (docs/BACKLOG.md), and nothing sorts by a column
-                      that carries none yet. */}
+                  {/* By the NBU rate on the expense's own date, so the spending
+                      reads in a currency that does not move under your feet
+                      (docs/BACKLOG.md). Nothing sorts by it yet. */}
                   <th className={styles.usdColumn}>{t('expenses.amountUsdHeader')}</th>
                   <th className={styles.actionsColumn}>{t('catalog.tableActions')}</th>
                 </tr>
@@ -407,9 +405,10 @@ export function ExpensesPage() {
                       <td className={`${cellAlign.center} tabular`}>
                         {formatMoney(expense.amount, expense.currencyCode, locale)}
                       </td>
-                      {/* In dollars at the rate of the day: the column is in
-                          place, the value comes from the API later. */}
-                      <td className={`${cellAlign.center} ${styles.muted} tabular`}>—</td>
+                      <td className={`${cellAlign.center} ${styles.secondary} tabular`}>
+                        {formatMoney(expense.amountUsd, 'USD', locale) ??
+                          t('dashboard.rateMissing')}
+                      </td>
                       <td className={styles.actions}>
                         {/* A purchase's expense is maintained by the purchase
                               itself, so there is nothing to press here — an

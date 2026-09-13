@@ -31,7 +31,7 @@ import { toChartPoints } from './chartData';
 import { InstancesList } from './InstancesList';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { catalogSpecRows, identitySpecRows, issueSpecRows, technicalSpecRows } from './specs';
-import { approxUsd, approxUsdSigned, usdRateFrom } from './usdApprox';
+import { formatUsd, formatUsdSigned, toUsd, usdRateFrom } from './usdApprox';
 import styles from './CoinCardPage.module.css';
 
 export function CoinCardPage() {
@@ -391,9 +391,15 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
 
 /**
  * The strip above "Мої екземпляри": the visitor's own purchase and valuation
- * numbers, aggregated across every instance of this coin they own. The ≈$
- * line is by the current NBU rate (bootstrap's exchangeRates) — a ballpark
- * for the aggregate, not the historical rate of any one purchase.
+ * numbers, aggregated across every instance of this coin they own.
+ *
+ * The two ≈$ figures are NOT the same kind of number: "purchased total" is
+ * card.purchaseTotalUsd, the backend's own conversion by the NBU rate on
+ * each instance's purchase date — what was actually spent, in dollars, back
+ * then. "Current value" has no purchase date of its own, so it converts by
+ * today's live rate instead (usdRate, bootstrap's exchangeRates). The change
+ * line is the difference of those two already-converted dollar figures, not
+ * a third conversion of its own.
  */
 function ValueSummary({
   card,
@@ -415,6 +421,13 @@ function ValueSummary({
   const usdText = (value: string | null) =>
     value !== null ? t('card.approxUsd', { value }) : t('dashboard.rateMissing');
 
+  const purchaseTotalUsd = card.purchaseTotalUsd !== null ? Number(card.purchaseTotalUsd) : null;
+  const currentValueUsd = currentValue !== null ? toUsd(currentValue, usdRate) : null;
+  const changeUsd =
+    currentValueUsd !== null && purchaseTotalUsd !== null
+      ? currentValueUsd - purchaseTotalUsd
+      : null;
+
   return (
     <Card className={styles.valueStrip}>
       <div className={styles.valueBox}>
@@ -422,9 +435,7 @@ function ValueSummary({
           {t('card.purchasedTotal')} ({t('card.pieces', { count: card.quantityOwned })})
         </span>
         <p className={`${styles.valueBoxValue} tabular`}>{formatUah(purchaseTotal, locale)}</p>
-        <span className={styles.valueBoxUsd}>
-          {usdText(approxUsd(purchaseTotal, usdRate, locale))}
-        </span>
+        <span className={styles.valueBoxUsd}>{usdText(formatUsd(purchaseTotalUsd, locale))}</span>
       </div>
 
       <div className={styles.valueBox}>
@@ -433,7 +444,7 @@ function ValueSummary({
           <>
             <p className={`${styles.valueBoxValue} tabular`}>{formatUah(currentValue, locale)}</p>
             <span className={styles.valueBoxUsd}>
-              {usdText(approxUsd(currentValue, usdRate, locale))}
+              {usdText(formatUsd(currentValueUsd, locale))}
             </span>
           </>
         ) : (
@@ -461,7 +472,7 @@ function ValueSummary({
               ) : null}
             </p>
             <span className={styles.valueBoxUsd}>
-              {usdText(approxUsdSigned(change, usdRate, locale))}
+              {usdText(changeUsd !== null ? formatUsdSigned(changeUsd, locale) : null)}
             </span>
           </>
         ) : (

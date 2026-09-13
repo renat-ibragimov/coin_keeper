@@ -176,6 +176,7 @@ function makeExpense(overrides: Partial<ExpenseOut>): ExpenseOut {
     currencyCode: 'UAH',
     rateUah: '1',
     amountUah: '100.00',
+    amountUsd: null,
     expenseDate: '2024-01-01',
     catalogItemId: null,
     collectionItemId: null,
@@ -340,6 +341,34 @@ describe('ExpensesPage', () => {
     expect(screen.getAllByText('з покупки монети')).toHaveLength(1);
     expect(screen.getByText('Редагувати')).toBeInTheDocument();
     expect(screen.getByText('Видалити')).toBeInTheDocument();
+  });
+
+  it('shows the dollar amount by the rate on the expense’s own date, or "no data" without one', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({ id: 1, amountUah: '55.00', amountUsd: '2.00' }),
+        makeExpense({ id: 2, amountUah: '50.00', amountUsd: null }),
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue({
+      categories: [{ category: 'album', count: 2, totalUah: '105.00' }],
+      totalUah: '105.00',
+      coinSpendUah: '0.00',
+      relatedSpendUah: '105.00',
+      byMonth: makeByMonth('0.00', '105.00'),
+      byCategory: [{ category: 'album', count: 2, totalUah: '105.00' }],
+      thisMonthUah: '0.00',
+      prevMonthUah: '105.00',
+    });
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByText('2 $')).toBeInTheDocument();
+    expect(screen.getByText('немає даних')).toBeInTheDocument();
   });
 
   it('renders the month and category charts once there is data', async () => {
