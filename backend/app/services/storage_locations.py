@@ -10,6 +10,8 @@ translate_in_background()) so saving a purchase never waits on an LLM call.
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +23,8 @@ from app.models.enums import TranslationSource
 from app.repositories.storage_locations import StorageLocationRepository
 from app.schemas.collection import StorageLocationOut
 from app.services.translation import TranslationResult, translate_short_phrase
+
+logger = logging.getLogger("app.services.storage_locations")
 
 
 class StorageLocationNotFoundError(Exception):
@@ -115,6 +119,14 @@ class StorageLocationService:
         )
         if self._background_tasks is not None and get_settings().anthropic_api_key:
             self._background_tasks.add_task(translate_in_background, location.id)
+        else:
+            logger.warning(
+                "storage_location %s created without a translation task "
+                "(background_tasks=%s, api_key configured=%s)",
+                location.id,
+                self._background_tasks is not None,
+                bool(get_settings().anthropic_api_key),
+            )
         return location
 
 
@@ -133,20 +145,32 @@ def apply_translation(location: StorageLocation, result: TranslationResult) -> N
 
 async def translate_in_background(location_id: int) -> None:
     """The BackgroundTasks entry point: opens its own session, since the
-    request's session is long gone by the time this runs."""
+    request's session is long gone by the time this runs.
+
+    Every early return is logged: a silent no-op here means the location
+    keeps showing the owner's typed text in both language slots forever,
+    with nothing in the UI to explain why -- the only way to notice is a
+    log line (docs/04-business-rules.md, п. 16, incident 2026-09-13).
+    """
     api_key = get_settings().anthropic_api_key
     if not api_key:
+        logger.warning("storage_location translation skipped: no ANTHROPIC_API_KEY configured")
         return
     async with get_session_factory()() as session:
         try:
             location = await session.get(StorageLocation, location_id)
             if location is None:
+                logger.warning("storage_location %s vanished before translation ran", location_id)
                 return
             result = await translate_short_phrase(location.name_original, api_key)
             if result is None:
+                logger.warning(
+                    "storage_location %s: translate_short_phrase returned None", location_id
+                )
                 return
             apply_translation(location, result)
             await session.commit()
         except Exception:
+            logger.exception("storage_location %s: translation failed", location_id)
             await session.rollback()
             raise

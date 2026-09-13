@@ -1,16 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
-import {
-  addStorageLocation,
-  deleteStorageLocation,
-  fetchStorageLocations,
-} from '@/features/collection/api';
+import { deleteStorageLocation, fetchStorageLocations } from '@/features/collection/api';
 import { GRADES } from '@/features/collection/grades';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { setLocale } from '@/shared/i18n';
@@ -54,7 +49,6 @@ export function SettingsPage() {
   });
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [storageLocationDraft, setStorageLocationDraft] = useState<string | null>(null);
-  const [newLocationName, setNewLocationName] = useState('');
   const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
 
   const catalogViewMode = useStoredViewMode('ck.viewMode.catalog', 'catalogViewMode');
@@ -75,6 +69,12 @@ export function SettingsPage() {
     onSuccess: (updated) => {
       updateUser(updated);
       setLocale(updated.locale === 'en' ? 'en' : 'uk');
+      // Every name the server sends (grades aside) is localized -- storage
+      // locations here, coin/series/country titles elsewhere. None of those
+      // query keys carry the locale, so nothing refetches on its own; without
+      // this, a page that doesn't fully remount (this one) keeps showing
+      // names in the language the user just left.
+      void queryClient.invalidateQueries();
     },
     onError: () => toast.show(t('errors.generic')),
   });
@@ -109,14 +109,6 @@ export function SettingsPage() {
       void queryClient.invalidateQueries({ queryKey: ['collection', 'storage-locations'] });
     },
   });
-  const addLocationMutation = useMutation({
-    mutationFn: (name: string) => addStorageLocation(name),
-    onSuccess: () => {
-      setNewLocationName('');
-      void queryClient.invalidateQueries({ queryKey: ['collection', 'storage-locations'] });
-    },
-    onError: () => toast.show(t('errors.generic')),
-  });
   const deleteLocationMutation = useMutation({
     mutationFn: (name: string) => deleteStorageLocation(name),
     onSuccess: () => {
@@ -143,21 +135,22 @@ export function SettingsPage() {
   const settings = bootstrapQuery.data?.settings;
   const storageLocationValue = storageLocationDraft ?? settings?.defaultStorageLocation ?? '';
 
-  function saveDefaultStorageLocation() {
-    if (
-      storageLocationDraft === null ||
-      storageLocationDraft === settings?.defaultStorageLocation
-    ) {
-      return;
-    }
-    storageLocationMutation.mutate(storageLocationDraft);
+  // Mirrors the filter-panel draft pattern (CatalogPage/CollectionPage): once
+  // the server value moves -- our own save lands, a locale switch relabels
+  // it, another tab changes it -- the local draft must let go, or it keeps
+  // shadowing the real value for the rest of the session.
+  useEffect(() => {
+    setStorageLocationDraft(null);
+  }, [settings?.defaultStorageLocation]);
+
+  function saveDefaultStorageLocationValue(value: string) {
+    if (value === (settings?.defaultStorageLocation ?? '')) return;
+    storageLocationMutation.mutate(value);
   }
 
-  function submitNewLocation(event: FormEvent) {
-    event.preventDefault();
-    const trimmed = newLocationName.trim();
-    if (!trimmed) return;
-    addLocationMutation.mutate(trimmed);
+  function saveDefaultStorageLocation() {
+    if (storageLocationDraft === null) return;
+    saveDefaultStorageLocationValue(storageLocationDraft);
   }
 
   return (
@@ -167,7 +160,12 @@ export function SettingsPage() {
       <div className={styles.columns}>
         <div className={styles.column}>
           <Card>
-            <h2 className={styles.sectionTitle}>{t('settings.profileTitle')}</h2>
+            <h2 className={styles.sectionTitle}>
+              {t('settings.profileTitle')}
+              <Badge tone={user?.role === 'admin' ? 'accent' : 'neutral'}>
+                {user?.role === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser')}
+              </Badge>
+            </h2>
             <form onSubmit={saveProfile} noValidate>
               <FormStack>
                 <FormError>{profileMutation.isError ? t('errors.generic') : null}</FormError>
@@ -197,6 +195,24 @@ export function SettingsPage() {
                 passwordMutation.mutateAsync({ current, next }).then(() => {})
               }
             />
+
+            {user?.role === 'admin' ? (
+              <div className={`${styles.adminBox} ${styles.spaced}`}>
+                <div className={styles.label}>{t('settings.adminTitle')}</div>
+                <p className={styles.note}>{t('settings.adminText')}</p>
+                <Link to="/admin">
+                  <Button variant="secondary" size="sm">
+                    {t('settings.adminLink')}
+                  </Button>
+                </Link>
+              </div>
+            ) : null}
+
+            <div className={`${styles.centerRow} ${styles.logoutRow}`}>
+              <Button variant="danger" onClick={() => void signOut()}>
+                {t('header.logout')}
+              </Button>
+            </div>
           </Card>
         </div>
 
@@ -302,7 +318,6 @@ export function SettingsPage() {
                 onChange={(checked) => packagingMutation.mutate(checked)}
                 label={t('settings.showPackagingVariants')}
               />
-              <p className={styles.note}>{t('settings.showPackagingVariantsNote')}</p>
             </FormStack>
 
             <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
@@ -316,74 +331,20 @@ export function SettingsPage() {
                 value={storageLocationValue}
                 disabled={!settings}
                 onChange={(event) => setStorageLocationDraft(event.target.value)}
+                // Fires on an explicit pick (click/Enter on a suggestion) or
+                // Enter on freshly typed text -- either way, later than
+                // onBlur, which stays as the fallback for clicking away
+                // without pressing Enter.
+                onCommitValue={saveDefaultStorageLocationValue}
                 onBlur={saveDefaultStorageLocation}
+                isOptionDeletable={(option) =>
+                  (storageLocationsQuery.data ?? []).some((l) => l.name === option && l.custom)
+                }
+                onDeleteOption={(option) => setLocationToDelete(option)}
+                deleteOptionLabel={t('common.delete')}
+                addNewLabel={t('settings.addStorageLocation')}
+                createHint={(typed) => t('settings.storageLocationCreateHint', { name: typed })}
               />
-            </FormStack>
-
-            <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
-              {t('settings.storageLocationsTitle')}
-            </h3>
-            <FormStack>
-              <ul className={styles.locationList}>
-                {(storageLocationsQuery.data ?? []).map((location) => (
-                  <li key={location.name} className={styles.locationItem}>
-                    <span>{location.name}</span>
-                    {location.custom ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={styles.iconButton}
-                        aria-label={t('common.delete')}
-                        onClick={() => setLocationToDelete(location.name)}
-                      >
-                        <Trash2 size={16} aria-hidden="true" />
-                      </Button>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-              <form onSubmit={submitNewLocation} className={styles.addLocationForm}>
-                <Input
-                  aria-label={t('settings.storageLocationsTitle')}
-                  placeholder={t('purchase.storageLocationPlaceholder')}
-                  value={newLocationName}
-                  onChange={(event) => setNewLocationName(event.target.value)}
-                  maxLength={200}
-                />
-                <Button type="submit" size="sm" loading={addLocationMutation.isPending}>
-                  {t('common.add')}
-                </Button>
-              </form>
-            </FormStack>
-          </Card>
-
-          <Card>
-            <h2 className={styles.sectionTitle}>{t('settings.accountTitle')}</h2>
-            <FormStack>
-              <FormRow>
-                <div>
-                  <div className={styles.label}>{t('settings.role')}</div>
-                  <Badge tone={user?.role === 'admin' ? 'accent' : 'neutral'}>
-                    {user?.role === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser')}
-                  </Badge>
-                </div>
-              </FormRow>
-              {user?.role === 'admin' ? (
-                <div className={styles.adminBox}>
-                  <div className={styles.label}>{t('settings.adminTitle')}</div>
-                  <p className={styles.note}>{t('settings.adminText')}</p>
-                  <Link to="/admin">
-                    <Button variant="secondary" size="sm">
-                      {t('settings.adminLink')}
-                    </Button>
-                  </Link>
-                </div>
-              ) : null}
-              <FormActions>
-                <Button variant="danger" onClick={() => void signOut()}>
-                  {t('header.logout')}
-                </Button>
-              </FormActions>
             </FormStack>
           </Card>
         </div>

@@ -36,3 +36,49 @@
 .input {
   padding-right: 32px;
 }
+
+.optionDelete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 4px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.optionDelete:hover {
+  color: var(--color-danger);
+  background: var(--color-surface-control);
+}
+
+/* Not part of the arrow-key/mouseenter active-index system the filtered
+ * options use (selectStyles.optionActive) -- it isn't a value that can be
+ * navigated to, just a permanent action row, so it gets a plain CSS hover
+ * instead. */
+.addNew {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.addNew:hover {
+  background: var(--color-surface-hover);
+}
+
+.addNewLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Below the option list, inside the same dropdown surface, so it reads as
+ * "what happens next" rather than a stray label under the field. */
+.createHint {
+  padding: var(--space-2) 10px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+}

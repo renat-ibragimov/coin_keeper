@@ -10,7 +10,15 @@ interface TextareaProps extends TextareaHTMLAttributes<HTMLTextAreaElement> {
   hint?: ReactNode;
 }
 
-export function Textarea({ label, error, hint, id, className, ...rest }: TextareaProps) {
+export function Textarea({
+  label,
+  error,
+  hint,
+  id,
+  className,
+  autoComplete = 'off',
+  ...rest
+}: TextareaProps) {
   const autoId = useId();
   const textareaId = id ?? autoId;
   return (
@@ -22,6 +30,7 @@ export function Textarea({ label, error, hint, id, className, ...rest }: Textare
       ) : null}
       <textarea
         {...rest}
+        autoComplete={autoComplete}
         id={textareaId}
         className={[
           inputStyles.input,

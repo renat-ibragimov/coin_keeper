@@ -24,12 +24,27 @@
 
 /* Settings headings name interface areas: body face, UI-panel size. */
 .sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   font-size: 18px;
   margin-bottom: var(--space-4);
 }
 
 .spaced {
   margin-top: var(--space-6);
+}
+
+.centerRow {
+  display: flex;
+  justify-content: center;
+}
+
+/* Extra breathing room, tuned to close the gap against the two shorter
+ * cards stacked on the right (owner's request, 2026-09-13) -- Профіль is
+ * the only card in its column, so nothing else can absorb the difference. */
+.logoutRow {
+  margin-top: 82px;
 }
 
 /* A heading for one control group inside a card that already has its own
@@ -68,41 +83,6 @@
 
 .adminBox .note {
   margin-bottom: var(--space-3);
-}
-
-.locationList {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.locationItem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-surface-control);
-  font-size: 14px;
-}
-
-.iconButton {
-  padding: 6px;
-  min-width: 32px;
-}
-
-.addLocationForm {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-}
-
-.addLocationForm > *:first-child {
-  flex: 1;
 }
 
 @media (max-width: 900px) {

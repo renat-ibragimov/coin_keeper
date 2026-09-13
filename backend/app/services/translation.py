@@ -10,8 +10,11 @@ untranslated placeholder in place rather than surfacing an error to the user.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Literal
+
+logger = logging.getLogger("app.services.translation")
 
 # A cheap, current model is enough for translating a couple of words —
 # the same convention app/ukraine_pipeline/translate_c.py uses.
@@ -82,8 +85,10 @@ async def translate_short_phrase(phrase: str, api_key: str) -> TranslationResult
             messages=[{"role": "user", "content": phrase}],
         )
     except anthropic.APIError:
+        logger.exception("Haiku translation call failed")
         return None
     for block in response.content:
         if block.type == "tool_use" and block.name == TOOL_NAME:
             return _parse(block.input)
+    logger.warning("Haiku reply had no %s tool_use block", TOOL_NAME)
     return None
