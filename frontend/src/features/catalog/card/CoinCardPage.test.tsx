@@ -6,9 +6,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
 import { ApiError } from '@/shared/api/client';
-import type { CatalogCard, CatalogCollectionItem, PriceHistoryItem } from '@/shared/api/types';
+import type {
+  BootstrapOut,
+  CatalogCard,
+  CatalogCollectionItem,
+  PriceHistoryItem,
+} from '@/shared/api/types';
 import type { CoinImageOut } from '@/shared/lib/coinImage';
 import { ThemeContext } from '@/shared/theme/themeContext';
+
+import { fetchBootstrap } from '@/features/dashboard/api';
 
 import { fetchCard, fetchOwnInstances, fetchPrices } from '../api';
 import { CoinCardPage } from './CoinCardPage';
@@ -18,6 +25,8 @@ vi.mock('../api', () => ({
   fetchPrices: vi.fn(),
   fetchOwnInstances: vi.fn(),
 }));
+
+vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
 
 const lwcMocks = vi.hoisted(() => {
   const timeScale = { fitContent: vi.fn(), setVisibleRange: vi.fn() };
@@ -46,6 +55,54 @@ vi.mock('lightweight-charts', () => ({
   CrosshairMode: { Magnet: 1 },
   LineStyle: { Dotted: 2, Solid: 0 },
 }));
+
+function makeBootstrap(usdRate: string | null = '41.5000'): BootstrapOut {
+  return {
+    user: {
+      id: 1,
+      email: 'owner@example.com',
+      displayName: 'Renat',
+      role: 'admin',
+      locale: 'uk',
+      emailVerified: true,
+    },
+    settings: {
+      locale: 'uk',
+      displayCurrency: 'UAH',
+      defaultGradeCommemorative: 'UNC',
+      defaultGradeCirculation: 'VF',
+      showPackagingVariants: false,
+    },
+    dashboard: {
+      catalogItems: 0,
+      collectionItems: 0,
+      countries: 0,
+      completedItems: 0,
+      missingItems: 0,
+      completionPercent: 0,
+      coinSpendUah: '0.00',
+      relatedSpendUah: '0.00',
+      totalSpendUah: '0.00',
+      marketValueUah: '0.00',
+      missingBudgetUah: '0.00',
+      unpricedMissingItems: 0,
+      countryBreakdown: [],
+      seriesBreakdown: [],
+      isEmpty: true,
+    },
+    exchangeRates: [
+      { code: 'USD', rate: usdRate, effectiveDate: usdRate ? '2026-09-13' : null },
+      { code: 'EUR', rate: null, effectiveDate: null },
+    ],
+    finance: {
+      coinSpendUah: '0.00',
+      coinSpendUsdAtPurchase: null,
+      coinSpendEurAtPurchase: null,
+      purchasesWithoutHistoricalUsdRate: 0,
+      purchasesWithoutHistoricalEurRate: 0,
+    },
+  };
+}
 
 function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
   return {
@@ -184,6 +241,7 @@ describe('CoinCardPage', () => {
     vi.mocked(fetchCard).mockReset();
     vi.mocked(fetchPrices).mockReset().mockResolvedValue([]);
     vi.mocked(fetchOwnInstances).mockReset().mockResolvedValue([]);
+    vi.mocked(fetchBootstrap).mockReset().mockResolvedValue(makeBootstrap());
   });
 
   it('shows the title and the identity fields in the specs table', async () => {

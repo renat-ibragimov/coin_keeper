@@ -39,6 +39,7 @@ function renderList(overrides: Partial<Parameters<typeof InstancesList>[0]> = {}
           coinTitle="Дельфін"
           photo={{ src: null }}
           currentPriceUah="460.00"
+          usdRate={41.5}
           {...overrides}
         />
       </MemoryRouter>
@@ -64,7 +65,7 @@ describe('InstancesList', () => {
     expect(row.textContent).toContain('—');
   });
 
-  it('shows the seller, the ownership duration, and a mocked ≈$ next to every UAH figure', () => {
+  it('shows the seller, the ownership duration, and a ≈$ by the live rate next to every UAH figure', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-13T00:00:00Z'));
     try {
@@ -74,13 +75,19 @@ describe('InstancesList', () => {
       // 529 days between the purchase and "today" — one full year.
       expect(screen.getByText('1 рік')).toBeInTheDocument();
 
-      // purchaseTotal 350, currentValue 460 (quantity 1), change +110.
+      // purchaseTotal 350, currentValue 460 (quantity 1), change +110, at usdRate=41.5.
       expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
       expect(screen.getByText('≈ 11,1 $')).toBeInTheDocument();
       expect(screen.getByText('≈ +2,7 $')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('shows "no data" instead of a ≈$ guess when NBU has no rate yet', () => {
+    renderList({ usdRate: null });
+    expect(screen.getAllByText('немає даних').length).toBeGreaterThan(0);
+    expect(screen.queryByText(/≈/)).not.toBeInTheDocument();
   });
 
   it('confirms and deletes a purchase, naming the coin in the confirmation', async () => {

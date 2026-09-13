@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
+import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
@@ -30,7 +31,7 @@ import { toChartPoints } from './chartData';
 import { InstancesList } from './InstancesList';
 import { PriceHistoryChart } from './PriceHistoryChart';
 import { catalogSpecRows, identitySpecRows, issueSpecRows, technicalSpecRows } from './specs';
-import { mockUsd, mockUsdSigned } from './mockUsd';
+import { approxUsd, approxUsdSigned, usdRateFrom } from './usdApprox';
 import styles from './CoinCardPage.module.css';
 
 export function CoinCardPage() {
@@ -91,6 +92,10 @@ function CardBody({ card }: { card: CatalogCard }) {
     queryKey: ['catalog', 'instances', card.id],
     queryFn: () => fetchOwnInstances(card.id),
   });
+  // Shares the 'bootstrap' cache key with the dashboard, so this is not a
+  // second network round trip once that page has already loaded it.
+  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const usdRate = usdRateFrom(bootstrapQuery.data?.exchangeRates);
 
   const title = coinTitle(card, locale);
   const addUrl = `/collection/coins/new?catalogItemId=${card.id}`;
@@ -194,7 +199,9 @@ function CardBody({ card }: { card: CatalogCard }) {
         <SidebarCard card={card} locale={locale} t={t} addUrl={addUrl} addState={addState} />
       </div>
 
-      {owned && hasInstances ? <ValueSummary card={card} locale={locale} t={t} /> : null}
+      {owned && hasInstances ? (
+        <ValueSummary card={card} locale={locale} t={t} usdRate={usdRate} />
+      ) : null}
 
       {owned ? (
         <Card className={styles.sectionCard}>
@@ -212,6 +219,7 @@ function CardBody({ card }: { card: CatalogCard }) {
               coinTitle={title}
               photo={sides[0]!.card}
               currentPriceUah={card.marketPriceUah}
+              usdRate={usdRate}
             />
           )}
         </Card>
@@ -384,15 +392,28 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
 /**
  * The strip above "Мої екземпляри": the visitor's own purchase and valuation
  * numbers, aggregated across every instance of this coin they own. The ≈$
- * line is a flat mocked rate for now (see MOCK_UAH_PER_USD).
+ * line is by the current NBU rate (bootstrap's exchangeRates) — a ballpark
+ * for the aggregate, not the historical rate of any one purchase.
  */
-function ValueSummary({ card, locale, t }: { card: CatalogCard; locale: string; t: TFunction }) {
+function ValueSummary({
+  card,
+  locale,
+  t,
+  usdRate,
+}: {
+  card: CatalogCard;
+  locale: string;
+  t: TFunction;
+  usdRate: number | null;
+}) {
   const currentValue =
     card.marketPriceUah !== null ? Number(card.marketPriceUah) * card.quantityOwned : null;
   const purchaseTotal = Number(card.purchaseTotalUah);
   const change = currentValue !== null ? currentValue - purchaseTotal : null;
   const changePercent =
     change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
+  const usdText = (value: string | null) =>
+    value !== null ? t('card.approxUsd', { value }) : t('dashboard.rateMissing');
 
   return (
     <Card className={styles.valueStrip}>
@@ -402,7 +423,7 @@ function ValueSummary({ card, locale, t }: { card: CatalogCard; locale: string; 
         </span>
         <p className={`${styles.valueBoxValue} tabular`}>{formatUah(purchaseTotal, locale)}</p>
         <span className={styles.valueBoxUsd}>
-          {t('card.approxUsd', { value: mockUsd(purchaseTotal, locale) })}
+          {usdText(approxUsd(purchaseTotal, usdRate, locale))}
         </span>
       </div>
 
@@ -412,7 +433,7 @@ function ValueSummary({ card, locale, t }: { card: CatalogCard; locale: string; 
           <>
             <p className={`${styles.valueBoxValue} tabular`}>{formatUah(currentValue, locale)}</p>
             <span className={styles.valueBoxUsd}>
-              {t('card.approxUsd', { value: mockUsd(currentValue, locale) })}
+              {usdText(approxUsd(currentValue, usdRate, locale))}
             </span>
           </>
         ) : (
@@ -440,7 +461,7 @@ function ValueSummary({ card, locale, t }: { card: CatalogCard; locale: string; 
               ) : null}
             </p>
             <span className={styles.valueBoxUsd}>
-              {t('card.approxUsd', { value: mockUsdSigned(change, locale) })}
+              {usdText(approxUsdSigned(change, usdRate, locale))}
             </span>
           </>
         ) : (

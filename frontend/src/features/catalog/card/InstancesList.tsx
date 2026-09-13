@@ -16,7 +16,7 @@ import {
 } from '@/shared/lib/format';
 import { Badge, Button, CoinImage, EmptyState, Skeleton } from '@/shared/ui';
 
-import { mockUsd, mockUsdSigned } from './mockUsd';
+import { approxUsd, approxUsdSigned } from './usdApprox';
 import styles from './InstancesList.module.css';
 
 interface InstancePhoto {
@@ -37,6 +37,9 @@ interface InstancesListProps {
   photo: InstancePhoto;
   /** The catalog item's current market price, same for every instance. */
   currentPriceUah: string | null;
+  /** The live NBU USD/UAH rate (bootstrap's exchangeRates), for the ≈$
+   *  hints — null renders them as "no data" rather than a guess. */
+  usdRate: number | null;
 }
 
 /** "Скільки часу монета вже в колекції" — the single largest whole unit, not
@@ -61,6 +64,7 @@ export function InstancesList({
   coinTitle,
   photo,
   currentPriceUah,
+  usdRate,
 }: InstancesListProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -89,6 +93,8 @@ export function InstancesList({
   }
 
   const currentPrice = currentPriceUah !== null ? Number(currentPriceUah) : null;
+  const usdText = (value: string | null) =>
+    value !== null ? t('card.approxUsd', { value }) : t('dashboard.rateMissing');
 
   return (
     <>
@@ -152,7 +158,7 @@ export function InstancesList({
                   <td className="tabular">
                     <span className={styles.price}>{formatUah(purchaseTotal, locale) ?? '—'}</span>
                     <span className={styles.secondary}>
-                      {t('card.approxUsd', { value: mockUsd(purchaseTotal, locale) })}
+                      {usdText(approxUsd(purchaseTotal, usdRate, locale))}
                     </span>
                     {rate ? (
                       <span className={styles.secondary}>
@@ -168,7 +174,7 @@ export function InstancesList({
                       <>
                         <span className={styles.price}>{formatUah(rowCurrentValue, locale)}</span>
                         <span className={styles.secondary}>
-                          {t('card.approxUsd', { value: mockUsd(rowCurrentValue, locale) })}
+                          {usdText(approxUsd(rowCurrentValue, usdRate, locale))}
                         </span>
                       </>
                     ) : (
@@ -197,7 +203,7 @@ export function InstancesList({
                           </span>
                         ) : null}
                         <span className={styles.secondary}>
-                          {t('card.approxUsd', { value: mockUsdSigned(change, locale) })}
+                          {usdText(approxUsdSigned(change, usdRate, locale))}
                         </span>
                       </>
                     ) : (
