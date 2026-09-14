@@ -41,10 +41,12 @@ describe('PurchaseForm', () => {
     );
   });
 
-  it('refuses an empty price and a zero quantity without calling the API', async () => {
+  it('refuses an emptied price and a zero quantity without calling the API', async () => {
     const onSubmit = renderForm();
     await userEvent.clear(screen.getByLabelText('Кількість'));
     await userEvent.type(screen.getByLabelText('Кількість'), '0');
+    // The price starts at 0 and is valid; emptying it is what the check is for.
+    await userEvent.clear(screen.getByLabelText(/Ціна за шт/));
     await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
@@ -111,5 +113,52 @@ describe('PurchaseForm', () => {
     expect(
       screen.getByText('На цю дату немає курсу НБУ для USD. Оберіть іншу дату або валюту.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('PurchaseForm price default', () => {
+  it('starts at zero so a found or gifted coin needs no correction', () => {
+    renderForm();
+    expect(screen.getByLabelText(/Ціна за шт/)).toHaveValue('0');
+  });
+
+  it('submits that zero without complaining', async () => {
+    const onSubmit = renderForm();
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ price: '0' }));
+  });
+
+  it('keeps an existing purchase price when editing', () => {
+    renderForm({
+      initial: {
+        id: 1,
+        catalogItemId: 1,
+        price: '150.50',
+        quantity: 1,
+      } as never,
+    });
+    expect(screen.getByLabelText(/Ціна за шт/)).toHaveValue('150.50');
+  });
+});
+
+describe('PurchaseForm price entry', () => {
+  it('replaces the default zero instead of letting a price land beside it', async () => {
+    const onSubmit = renderForm();
+    await userEvent.type(screen.getByLabelText(/Ціна за шт/), '250');
+
+    expect(screen.getByLabelText(/Ціна за шт/)).toHaveValue('250');
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ price: '250' }));
+  });
+
+  it('leaves a price that is already typed alone when the field is focused again', async () => {
+    renderForm();
+    const price = screen.getByLabelText(/Ціна за шт/);
+    await userEvent.type(price, '250');
+    await userEvent.click(screen.getByLabelText('Продавець'));
+    await userEvent.type(price, '0');
+
+    // Appending, not replacing: only the untouched zero gets selected.
+    expect(price).toHaveValue('2500');
   });
 });

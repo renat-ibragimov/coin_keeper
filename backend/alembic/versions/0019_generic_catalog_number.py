@@ -4,7 +4,7 @@
 numbering system, and the pipeline fills them from the source that uses it.
 A collector entering a coin by hand has one number and no reason to know
 whose it is — the "Додати" form asked which of the three it was and got three
-empty boxes for its trouble (owner, 2026-09-14, docs/current_ref/img.png).
+empty boxes for its trouble (owner's call, 2026-09-14).
 
 `catalog_number` is that number, unattributed. It is last in the chain the
 card and the listings already read (`catalog_km or catalog_uc or

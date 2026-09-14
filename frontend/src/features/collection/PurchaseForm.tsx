@@ -78,7 +78,13 @@ function initialFields(
 ): Fields {
   return {
     quantity: String(initial?.quantity ?? 1),
-    price: initial?.price ?? carried?.amount ?? '',
+    // Zero, not blank: a coin found in change or handed over by a friend
+    // cost nothing, and that is common enough that an empty field sends
+    // those people back to fix a validation error every time (owner,
+    // 2026-09-14). A real price is typed over it either way.
+    // `||` on the carried half, not `??`: it starts as an empty string,
+    // which `??` would happily keep.
+    price: initial?.price ?? (carried?.amount || '0'),
     currency: initial?.currency ?? carried?.currency ?? 'UAH',
     purchaseDate: initial?.purchaseDate ?? carried?.date ?? todayIso(),
     seller: initial?.seller ?? carried?.vendor ?? '',
@@ -225,6 +231,13 @@ export function PurchaseForm({
             required
             placeholder="0,00"
             value={fields.price}
+            // The default 0 is selected the moment the field is focused, so
+            // typing a real price replaces it instead of landing beside it
+            // ("0250"). Only the untouched zero: a price already typed is
+            // left alone, so a stray click does not wipe it.
+            onFocus={(event) => {
+              if (event.target.value === '0') event.target.select();
+            }}
             onChange={(event) => set('price')(event.target.value)}
             error={message('price')}
           />
