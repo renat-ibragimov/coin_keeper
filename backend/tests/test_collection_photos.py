@@ -180,6 +180,42 @@ async def test_upload_replace_and_remove_an_instance_photo(
     assert "catalog/1/obverse/official" in again.json()["obverse"]["medium"]
 
 
+def transparent_circle_png(*, size: int = 900) -> bytes:
+    """A round, browser-cropped coin photo: opaque circle, transparent corners
+    (docs/06-media-storage.md — the round crop's own alpha channel)."""
+    image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    ImageDraw.Draw(image).ellipse((0, 0, size - 1, size - 1), fill=(40, 90, 160, 255))
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+async def test_a_transparent_upload_keeps_its_alpha_channel_through_every_variant(
+    client: AsyncClient, storage: FakeStorage, ctx: SimpleNamespace
+) -> None:
+    """The round coin-photo crop uploads RGBA — process_image must neither
+    flatten it onto an opaque background nor run the white/black background
+    cut meant for a plain rectangular source (app/core/images.py)."""
+    photo_url = f"{COLLECTION_PATH}/{ctx.instance_id}/photos/obverse"
+
+    uploaded = await client.put(
+        photo_url,
+        content=transparent_circle_png(),
+        headers={**_auth(ctx.token_a), "Content-Type": "image/png"},
+    )
+    assert uploaded.status_code == 200, uploaded.text
+
+    obverse_keys = [
+        key for key in storage.objects if "/obverse/" in key and key.startswith("users/")
+    ]
+    assert obverse_keys
+    for key in obverse_keys:
+        variant = Image.open(io.BytesIO(storage.objects[key]))
+        assert variant.mode == "RGBA"
+        assert variant.getpixel((0, 0))[3] == 0
+        assert variant.getpixel((variant.width // 2, variant.height // 2))[3] == 255
+
+
 async def test_the_catalog_photo_is_never_touched(
     client: AsyncClient, db_session: AsyncSession, storage: FakeStorage, ctx: SimpleNamespace
 ) -> None:

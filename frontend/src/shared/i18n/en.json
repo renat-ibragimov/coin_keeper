@@ -473,7 +473,11 @@
     "invalid": "Pick a JPEG, PNG or WebP image up to 12 MB.",
     "saved": "Photo saved.",
     "removed": "Photo removed.",
-    "removePhoto": "Remove photo"
+    "removePhoto": "Remove photo",
+    "rotationLabel": "Rotation",
+    "resetRotation": "Reset rotation",
+    "blurWarning": "This photo may be blurry. Choose a sharper photo or save it anyway.",
+    "saveAnyway": "Save anyway"
   },
   "grades": {
     "UNC": "UNC — Uncirculated",

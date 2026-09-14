@@ -1,6 +1,10 @@
 import type { Area } from 'react-easy-crop';
 
-function encode(canvas: HTMLCanvasElement, type: string, quality: number): Promise<Blob | null> {
+export function encode(
+  canvas: HTMLCanvasElement,
+  type: string,
+  quality: number,
+): Promise<Blob | null> {
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
@@ -37,7 +41,7 @@ export async function cropToSquareBlob(
   return jpeg;
 }
 
-function loadImage(src: string): Promise<HTMLImageElement> {
+export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
     image.addEventListener('load', () => resolve(image));
