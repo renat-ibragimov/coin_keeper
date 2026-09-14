@@ -1,10 +1,11 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Coins, Receipt, Wallet } from 'lucide-react';
+import { CalendarDays, Coins, Pencil, Receipt, Trash2, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import { fetchCurrencies } from '@/features/catalog/api';
+import { DeleteInstanceDialog } from '@/features/collection/DeleteInstanceDialog';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { ExpenseCategory, ExpenseOut } from '@/shared/api/types';
@@ -89,6 +90,17 @@ export function ExpensesPage() {
   const order = params.get('order') === 'asc' ? 'asc' : 'desc';
   const [editor, setEditor] = useState<Editor>({ mode: 'closed' });
   const [deleting, setDeleting] = useState<ExpenseOut | null>(null);
+  // A purchase row deletes the coin, not the expense — the expense goes with
+  // it (docs/04-business-rules.md, rule 10), so it uses the collection's own
+  // dialog, which says exactly that.
+  const [deletingPurchase, setDeletingPurchase] = useState<{
+    id: number;
+    title: string;
+    totalUah: string;
+  } | null>(null);
+  const location = useLocation();
+  // Editing a purchase from here returns here, filters and page included.
+  const backHere = `${location.pathname}${location.search}`;
 
   const [preset, setPreset] = useState<ExpensesPeriodPreset | null>('1y');
   const [dateFrom, setDateFrom] = useState(() => presetRange('1y').dateFrom);
@@ -443,23 +455,66 @@ export function ExpensesPage() {
                         ) ?? t('dashboard.rateMissing')}
                       </td>
                       <td className={styles.actions}>
-                        {/* A purchase's expense is maintained by the purchase
-                              itself, so there is nothing to press here — an
-                              empty cell rather than a dash that reads as a
-                              missing value (owner, 2026-09-09). */}
-                        {fromPurchase ? null : (
-                          <>
+                        {/* Every row is editable and deletable, in the same
+                            icons «Мої екземпляри» uses (owner, 2026-09-14).
+                            What they act on differs: a purchase's expense is
+                            owned by the purchase, so its icons lead to the
+                            instance — editing opens the purchase form, and
+                            deleting removes the coin together with this very
+                            row (docs/04-business-rules.md, rule 4). Only a
+                            purchase whose instance is somehow gone has
+                            nothing to offer. */}
+                        {fromPurchase ? (
+                          expense.collectionItemId !== null ? (
+                            <div className={styles.rowActions}>
+                              <Link
+                                to={`/collection/coins/${expense.collectionItemId}/edit`}
+                                state={{ from: backHere }}
+                                aria-label={t('common.edit')}
+                                className={styles.iconLink}
+                              >
+                                <Button variant="ghost" size="sm" className={styles.iconButton}>
+                                  <Pencil size={16} aria-hidden="true" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={styles.iconButton}
+                                aria-label={t('common.delete')}
+                                onClick={() =>
+                                  setDeletingPurchase({
+                                    id: expense.collectionItemId!,
+                                    title: expense.coinTitle || t('expenses.fromPurchase'),
+                                    totalUah: expense.amountUah,
+                                  })
+                                }
+                              >
+                                <Trash2 size={16} aria-hidden="true" />
+                              </Button>
+                            </div>
+                          ) : null
+                        ) : (
+                          <div className={styles.rowActions}>
                             <Button
                               variant="ghost"
                               size="sm"
+                              className={styles.iconButton}
+                              aria-label={t('common.edit')}
                               onClick={() => setEditor({ mode: 'edit', expense })}
                             >
-                              {t('common.edit')}
+                              <Pencil size={16} aria-hidden="true" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setDeleting(expense)}>
-                              {t('common.delete')}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={styles.iconButton}
+                              aria-label={t('common.delete')}
+                              onClick={() => setDeleting(expense)}
+                            >
+                              <Trash2 size={16} aria-hidden="true" />
                             </Button>
-                          </>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -493,6 +548,8 @@ export function ExpensesPage() {
           />
         ) : null}
       </Modal>
+
+      <DeleteInstanceDialog item={deletingPurchase} onClose={() => setDeletingPurchase(null)} />
 
       <ConfirmDialog
         open={deleting !== null}

@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -292,6 +293,7 @@ describe('ExpensesPage', () => {
           id: 1,
           category: 'coin_purchase',
           catalogItemId: 5,
+          collectionItemId: 50,
           coinTitle: 'Дельфін',
           amountUah: '300.00',
         }),
@@ -299,6 +301,7 @@ describe('ExpensesPage', () => {
           id: 2,
           category: 'coin_purchase',
           catalogItemId: 7,
+          collectionItemId: 70,
           coinTitle: null,
           amountUah: '120.00',
         }),
@@ -344,8 +347,73 @@ describe('ExpensesPage', () => {
 
     // The right-hand actions column no longer repeats "з покупки монети" for these rows.
     expect(screen.getAllByText('з покупки монети')).toHaveLength(1);
-    expect(screen.getByText('Редагувати')).toBeInTheDocument();
-    expect(screen.getByText('Видалити')).toBeInTheDocument();
+    // Every row carries the same two icons now (owner, 2026-09-14): three
+    // rows, three delete buttons, and the two purchases edit through the
+    // purchase form rather than through the expense dialog.
+    expect(screen.getAllByRole('button', { name: 'Видалити' })).toHaveLength(3);
+    const editLinks = screen.getAllByRole('link', { name: 'Редагувати' });
+    expect(editLinks.map((link) => link.getAttribute('href'))).toEqual([
+      '/collection/coins/50/edit',
+      '/collection/coins/70/edit',
+    ]);
+    expect(screen.getAllByRole('button', { name: 'Редагувати' })).toHaveLength(1);
+  });
+
+  it('deleting a purchase row warns that the coin goes with it', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({
+          id: 1,
+          category: 'coin_purchase',
+          catalogItemId: 5,
+          collectionItemId: 50,
+          coinTitle: 'Дельфін',
+          amountUah: '300.00',
+        }),
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue(EMPTY_SUMMARY);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Видалити' }));
+
+    // The collection's own dialog, not the expense one: the row is a
+    // by-product of the purchase, and deleting it deletes the coin.
+    expect(screen.getByText('Видалити екземпляр?')).toBeInTheDocument();
+    expect(screen.getByTestId('delete-instance-text')).toHaveTextContent('Дельфін');
+    expect(screen.getByTestId('delete-instance-text')).toHaveTextContent(
+      /разом із витратою на покупку/,
+    );
+  });
+
+  it('leaves a purchase row without actions when its coin is already gone', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({
+          id: 1,
+          category: 'coin_purchase',
+          catalogItemId: 5,
+          collectionItemId: null,
+          coinTitle: 'Дельфін',
+        }),
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue(EMPTY_SUMMARY);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Дельфін' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Видалити' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Редагувати' })).toBeNull();
   });
 
   it('shows the dollar amount by the rate on the expense’s own date, or "no data" without one', async () => {
