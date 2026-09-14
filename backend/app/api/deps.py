@@ -46,9 +46,7 @@ def get_collection_photo_service(session: DbSession) -> CollectionPhotoService:
     return CollectionPhotoService(session)
 
 
-CollectionPhotoServiceDep = Annotated[
-    CollectionPhotoService, Depends(get_collection_photo_service)
-]
+CollectionPhotoServiceDep = Annotated[CollectionPhotoService, Depends(get_collection_photo_service)]
 
 
 def request_locale(

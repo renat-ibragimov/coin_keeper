@@ -78,8 +78,8 @@ async def ctx(
     client: AsyncClient, db_session: AsyncSession, mail_outbox: list[EmailMessage]
 ) -> SimpleNamespace:
     refs = await seed_reference(db_session)
-    email_a, token_a = await register_and_verify(client, mail_outbox)
-    email_b, token_b = await register_and_verify(client, mail_outbox)
+    _email_a, token_a = await register_and_verify(client, mail_outbox)
+    _email_b, token_b = await register_and_verify(client, mail_outbox)
     item = await make_catalog_item(
         db_session, country=refs.ukraine, title="Дельфін", year=2018, denomination=refs.uah_2
     )
@@ -146,7 +146,9 @@ async def test_upload_replace_and_remove_an_instance_photo(
     # The reverse side is untouched by an obverse upload: still the catalog photo.
     assert "catalog/1/reverse/official" in body["reverse"]["medium"]
 
-    obverse_keys = [key for key in storage.objects if "/obverse/" in key and key.startswith("users/")]
+    obverse_keys = [
+        key for key in storage.objects if "/obverse/" in key and key.startswith("users/")
+    ]
     assert obverse_keys
 
     instance = await client.get(f"{COLLECTION_PATH}/{ctx.instance_id}", headers=_auth(ctx.token_a))
