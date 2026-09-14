@@ -15,8 +15,13 @@ const MIN_QUERY = 2;
 const DEBOUNCE_MS = 300;
 
 interface CoinPickerProps {
-  countryId: number | null;
-  onCountryChange: (countryId: number | null) => void;
+  /**
+   * The country field, when the form needs one. Omitted — as the expense
+   * branch omits it — the select is not rendered and the search runs across
+   * every issuer (owner, 2026-09-14).
+   */
+  countryId?: number | null;
+  onCountryChange?: (countryId: number | null) => void;
   title: string;
   onTitleChange: (title: string) => void;
   onSelect: (item: CatalogListItem) => void;
@@ -30,15 +35,17 @@ interface CoinPickerProps {
 }
 
 /**
- * Country, then the coin's name with live suggestions inside that country.
+ * A coin's name with live suggestions, optionally narrowed to one country.
  *
- * The order is the point (docs/08-ui-map.md): a name means nothing on its own
- * — half the world has a coin called "10". Picking the country first turns
- * the search into something a person can read, and gives the catalog lookup
- * the one filter that makes it precise.
+ * The purchase branch asks for the country first, and the order is the point
+ * (docs/08-ui-map.md): a name means nothing on its own — half the world has
+ * a coin called "10" — and the country is also what the new personal item
+ * will be filed under. Pointing an expense at a coin needs none of that:
+ * there the collector types the name of a coin they already own, so the
+ * field stands alone and the search covers everything visible to them.
  */
 export function CoinPicker({
-  countryId,
+  countryId = null,
   onCountryChange,
   title,
   onTitleChange,
@@ -61,6 +68,7 @@ export function CoinPicker({
     queryKey: ['countries', 'all'],
     queryFn: () => fetchCountries('all'),
     staleTime: Infinity,
+    enabled: onCountryChange !== undefined,
   });
 
   useEffect(() => {
@@ -79,24 +87,26 @@ export function CoinPicker({
 
   return (
     <div className={styles.picker} ref={root}>
-      <Select
-        label={t('add.country')}
-        searchable
-        searchPlaceholder={t('add.countrySearch')}
-        value={countryId === null ? '' : String(countryId)}
-        error={countryError}
-        onChange={(event) => {
-          const next = event.target.value;
-          onCountryChange(next ? Number(next) : null);
-        }}
-      >
-        <option value="">{t('add.countryNone')}</option>
-        {(countriesQuery.data ?? []).map((country) => (
-          <option key={country.id} value={String(country.id)}>
-            {country.name}
-          </option>
-        ))}
-      </Select>
+      {onCountryChange ? (
+        <Select
+          label={t('add.country')}
+          searchable
+          searchPlaceholder={t('add.countrySearch')}
+          value={countryId === null ? '' : String(countryId)}
+          error={countryError}
+          onChange={(event) => {
+            const next = event.target.value;
+            onCountryChange(next ? Number(next) : null);
+          }}
+        >
+          <option value="">{t('add.countryNone')}</option>
+          {(countriesQuery.data ?? []).map((country) => (
+            <option key={country.id} value={String(country.id)}>
+              {country.name}
+            </option>
+          ))}
+        </Select>
+      ) : null}
 
       {/* A plain text field, not type="search": Chrome clears a search input
           on Escape, and here the value is the coin's name being typed, not a

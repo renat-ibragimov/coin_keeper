@@ -303,10 +303,16 @@ describe('AddPage', () => {
     expect(await screen.findByLabelText('Тип')).toHaveTextContent('Грейдинг');
     await userEvent.type(screen.getByLabelText(/Сума/), '900');
 
-    await userEvent.click(screen.getByLabelText('Країна'));
-    await userEvent.click(await screen.findByRole('option', { name: 'Україна' }));
+    // No country field on this branch: the coin is one the collector already
+    // owns, so the name alone is the question (owner, 2026-09-14).
+    expect(screen.queryByLabelText('Країна')).toBeNull();
     await userEvent.type(screen.getByLabelText('Назва монети'), 'Дельфін');
     await userEvent.click(await screen.findByRole('option', { name: /Дельфін/ }));
+
+    // The choice is repeated inside the block where it was made, not only in
+    // the header above the form.
+    expect(await screen.findByText('Дельфін', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Обрати іншу монету' }).length).toBeGreaterThan(0);
 
     await userEvent.click(screen.getByRole('button', { name: 'Додати витрату' }));
 
@@ -316,6 +322,27 @@ describe('AddPage', () => {
       amount: '900',
       catalogItemId: 7,
     });
+  });
+
+  it('searches every issuer for a linked coin, not one country', async () => {
+    vi.mocked(lookupCatalog).mockResolvedValue([SUGGESTION]);
+    renderPage('/collection/add?type=grading');
+
+    await userEvent.type(await screen.findByLabelText('Назва монети'), 'Дельфін');
+    await waitFor(() => expect(lookupCatalog).toHaveBeenCalled());
+    // countryId stays undefined, so the lookup is not narrowed.
+    expect(vi.mocked(lookupCatalog).mock.calls.at(-1)).toEqual(['Дельфін', undefined]);
+  });
+
+  it('lets the linked coin be swapped from inside the block', async () => {
+    vi.mocked(lookupCatalog).mockResolvedValue([SUGGESTION]);
+    renderPage('/collection/add?type=grading&catalogItemId=7');
+
+    const change = await screen.findAllByRole('button', { name: 'Обрати іншу монету' });
+    await userEvent.click(change[change.length - 1]!);
+
+    // Back to the search, and the expense keeps no coin.
+    expect(await screen.findByLabelText('Назва монети')).toBeInTheDocument();
   });
 });
 

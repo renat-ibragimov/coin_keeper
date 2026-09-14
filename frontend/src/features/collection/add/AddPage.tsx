@@ -20,6 +20,8 @@ import type {
   ExpenseCategory,
   NewCatalogItem,
 } from '@/shared/api/types';
+import { coinDenomination } from '@/shared/lib/coinDenomination';
+import { coinTitle } from '@/shared/lib/coinTitle';
 import { parseDecimal } from '@/shared/lib/format';
 import { Button, Card, ErrorState, PageHeader, Select, Skeleton, useToast } from '@/shared/ui';
 
@@ -96,7 +98,7 @@ function matchByName<T extends { id: number }>(
  * with it in a single request (docs/03-api-contract.md, `newCatalogItem`).
  */
 export function AddPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -379,16 +381,38 @@ export function AddPage() {
                     <h3 className={styles.linkedTitle}>{t('add.linkedCoin')}</h3>
                     <p className={styles.linkedLead}>{t('add.linkedCoinLead')}</p>
                     {catalogItemId === null ? (
+                      // No country field here: the collector is naming a coin
+                      // they already own, so the name alone is the whole
+                      // question and the search covers every issuer (owner,
+                      // 2026-09-14).
                       <CoinPicker
-                        countryId={countryId}
-                        onCountryChange={setCountryId}
                         title={title}
                         onTitleChange={setTitle}
                         onSelect={chooseCoin}
                         titleLabel={t('add.coinTitle')}
                         titleHint={t('add.linkedCoinHint')}
                       />
-                    ) : null}
+                    ) : (
+                      // The picked coin also appears above the form, big and
+                      // with both sides — and is easy to miss up there while
+                      // reading this block, so it is repeated where the
+                      // choice was made.
+                      <div className={styles.linkedChoice}>
+                        <span className={styles.linkedName}>
+                          {card ? coinTitle(card, i18n.language) : '…'}
+                        </span>
+                        {card ? (
+                          <span className={styles.linkedMeta}>
+                            {[card.country, String(card.year), coinDenomination(card)]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        ) : null}
+                        <button type="button" className={styles.linkedChange} onClick={clearCoin}>
+                          {t('purchase.changeItem')}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 }
                 currencies={currencies}
