@@ -1,0 +1,30 @@
+.stage {
+  position: relative;
+  height: 280px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-control);
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.zoomLabel {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.zoomSlider {
+  flex: 1;
+  accent-color: var(--color-accent);
+}
+
+.hint {
+  margin: var(--space-3) 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}

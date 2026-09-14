@@ -10,7 +10,7 @@ cannot hide behind a name that says nothing.
 
 from __future__ import annotations
 
-from app.core.images import LARGE_SIDE, PREVIEW_SIDE, VARIANT_SIDES
+from app.core.images import AVATAR_SIDE, LARGE_SIDE, PREVIEW_SIDE, VARIANT_SIDES
 
 EXTENSION = ".webp"
 
@@ -29,6 +29,16 @@ def catalog_base(catalog_item_id: int, role: str, name: str) -> str:
 
 def collection_base(owner_id: int, collection_item_id: int, role: str, name: str) -> str:
     return f"users/{owner_id}/{collection_item_id}/{role}/{name}"
+
+
+def avatar_key(user_id: int, name: str) -> str:
+    """One key per profile picture: `users/{id}/avatar/{sha}_256.webp`.
+
+    `name` is the digest of the source, so replacing the picture writes a new
+    key and every cached copy of the old URL is simply left behind rather than
+    serving the previous face until it expires.
+    """
+    return f"users/{user_id}/avatar/{name}_{AVATAR_SIDE}{EXTENSION}"
 
 
 def stored_variants(keys: dict[int, str]) -> dict[str, str]:

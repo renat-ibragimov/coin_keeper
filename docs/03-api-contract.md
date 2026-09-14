@@ -64,6 +64,8 @@ POST   /auth/forgot-password {email}                          → 202
 POST   /auth/reset-password  {token, newPassword}             → 204
 GET    /auth/me                                               → {user}
 PATCH  /auth/me              {displayName?, locale?}          → {user}
+PUT    /auth/me/avatar       <сырые байты изображения>        → {user}
+DELETE /auth/me/avatar       —                                → {user}
 POST   /auth/change-password {currentPassword, newPassword}   → 204
 ```
 
@@ -80,6 +82,16 @@ POST   /auth/change-password {currentPassword, newPassword}   → 204
 адрес или нет. Ограничения частоты по всем этим эндпоинтам — в `07-auth.md`.
 
 `locale` в `PATCH /auth/me` — `'uk' | 'en'`, по умолчанию `'uk'`.
+
+`user` везде содержит `avatarUrl` — подписанная ссылка на час или `null`, не ключ в
+бакете (`06-media-storage.md`). Она собирается в одном месте на бэкенде, поэтому приходит
+одинаково и здесь, и в `/bootstrap`.
+
+`PUT /auth/me/avatar` принимает **тело-изображение целиком, без multipart**: один файл без
+сопутствующих полей в конверте не нуждается. JPEG, PNG или WebP до 12 МБ и не шире 4000 px;
+всё остальное — `422 invalid-image`. Операция идемпотентна: те же байты дают тот же ключ.
+`DELETE` отвечает `200` с профилем, а не `204`, — вызывающему нужен уже пустой `avatarUrl`;
+удаление отсутствующей аватарки ошибкой не считается.
 
 ## Bootstrap
 

@@ -55,6 +55,10 @@ class UserOut(CamelModel):
     role: str
     locale: str
     email_verified: bool
+    # A signed, short-lived URL, never the storage key: the bucket is private
+    # and its host can change. Built by app.services.avatars.user_out, which
+    # is the only place this model should be assembled.
+    avatar_url: str | None = None
 
 
 class TokensOut(CamelModel):

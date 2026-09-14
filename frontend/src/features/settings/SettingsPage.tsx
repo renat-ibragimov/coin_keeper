@@ -31,6 +31,7 @@ import {
 } from '@/shared/ui';
 
 import { changePassword, updateProfile, updateSettings } from './api';
+import { AvatarSection } from './AvatarSection';
 import { PasswordForm } from './PasswordForm';
 import styles from './SettingsPage.module.css';
 
@@ -165,6 +166,7 @@ export function SettingsPage() {
                 {user?.role === 'admin' ? t('settings.roleAdmin') : t('settings.roleUser')}
               </Badge>
             </h2>
+            <AvatarSection />
             <form onSubmit={saveProfile} noValidate>
               <FormStack>
                 <FormError>{profileMutation.isError ? t('errors.generic') : null}</FormError>

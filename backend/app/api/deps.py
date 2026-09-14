@@ -18,6 +18,7 @@ from app.models import User
 from app.models.enums import UserRole
 from app.repositories.users import UserRepository
 from app.services.auth import AuthService
+from app.services.avatars import AvatarService
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -31,6 +32,13 @@ def get_auth_service(session: DbSession, settings: AppSettings, mail: Mail) -> A
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+
+
+def get_avatar_service(session: DbSession) -> AvatarService:
+    return AvatarService(session)
+
+
+AvatarServiceDep = Annotated[AvatarService, Depends(get_avatar_service)]
 
 
 def request_locale(

@@ -60,7 +60,8 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  /** A Blob is sent as raw bytes; anything else is serialised as JSON. */
   body?: unknown;
   /** Attach the Authorization header and refresh on 401. Default true. */
   auth?: boolean;
@@ -79,7 +80,12 @@ async function parseProblem(response: Response): Promise<ApiError> {
 
 async function rawRequest(path: string, options: RequestOptions, token: string | null) {
   const headers: Record<string, string> = { 'Accept-Language': apiLocale };
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json';
+  // An image goes up as itself. Wrapping bytes in JSON would base64 them for
+  // no gain — the avatar endpoint takes one file and no fields beside it.
+  const isBlob = options.body instanceof Blob;
+  if (options.body !== undefined) {
+    headers['Content-Type'] = isBlob ? (options.body as Blob).type : 'application/json';
+  }
   if (options.auth !== false && token) headers['Authorization'] = `Bearer ${token}`;
   const init: RequestInit = {
     method: options.method ?? 'GET',
@@ -87,7 +93,9 @@ async function rawRequest(path: string, options: RequestOptions, token: string |
     // The refresh cookie must travel with auth endpoints.
     credentials: 'include',
   };
-  if (options.body !== undefined) init.body = JSON.stringify(options.body);
+  if (options.body !== undefined) {
+    init.body = isBlob ? (options.body as Blob) : JSON.stringify(options.body);
+  }
   if (options.signal) init.signal = options.signal;
   return fetch(`${API_BASE}${path}`, init);
 }

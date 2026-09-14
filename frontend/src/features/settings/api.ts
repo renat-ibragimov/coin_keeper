@@ -20,6 +20,15 @@ export function updateSettings(body: {
   return api<SettingsOut>('/bootstrap/settings', { method: 'PATCH', body });
 }
 
+/** Raw bytes, not multipart: one file with no fields beside it. */
+export function uploadAvatar(image: Blob): Promise<UserOut> {
+  return api<UserOut>('/auth/me/avatar', { method: 'PUT', body: image });
+}
+
+export function deleteAvatar(): Promise<UserOut> {
+  return api<UserOut>('/auth/me/avatar', { method: 'DELETE' });
+}
+
 export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
   return api<void>('/auth/change-password', {
     method: 'POST',

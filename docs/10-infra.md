@@ -113,6 +113,9 @@ presigned-URL, подписанный на него, в браузере не о
 ```
 coins.renat-ibragimov.com {
     handle /api/* {
+        request_body {
+            max_size 13MB
+        }
         reverse_proxy <существующий апстрим api>
     }
     handle_path /media/* {
@@ -136,6 +139,14 @@ coins.renat-ibragimov.com {
 `index.html` вместо ответа API. `try_files {path} /index.html` — это и есть fallback для
 клиентского роутера: `/catalog?page=3` и `/reset-password?token=…` открываются по прямой
 ссылке.
+
+`request_body` на `/api/*` — мегабайтом выше 12 МБ, которые может нести загрузка
+изображения (`MAX_SOURCE_BYTES`): тело сверх лимита отсекается на границе, а не течёт в
+API, чтобы там быть измеренным. Остальные эндпоинты принимают JSON и близко к этой
+величине не подходят. Бэкенд ту же проверку делает сам по заголовку `Content-Length` — на
+случай, если запрос пришёл мимо Caddy. **Строчку нужно добавить руками в блок сайта в
+центральном Caddyfile на сервере** (см. выше: этот блок правится вручную, `Caddyfile` в
+репозитории — только эталон), иначе двенадцатимегабайтный мусор будет доезжать до Python.
 
 `/media/*` — именно `handle_path`, не `handle`: MinIO обслуживает объекты по path-style
 адресу `/<bucket>/<key>`, а `S3_PUBLIC_ENDPOINT=https://<домен>/media` подписывает ссылки

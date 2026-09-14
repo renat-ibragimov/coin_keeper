@@ -9,7 +9,6 @@ from app.core.locale import DEFAULT_LOCALE
 from app.models import User
 from app.repositories.dashboard import BreakdownRow, DashboardRepository
 from app.repositories.users import UserRepository
-from app.schemas.auth import UserOut
 from app.schemas.bootstrap import (
     BootstrapOut,
     BreakdownEntry,
@@ -19,6 +18,7 @@ from app.schemas.bootstrap import (
     SeriesBreakdownEntry,
     SettingsOut,
 )
+from app.services.avatars import user_out
 from app.services.storage_locations import StorageLocationService
 
 
@@ -83,7 +83,7 @@ class BootstrapService:
             is_empty=data.collection_items == 0 and data.personal_items == 0,
         )
         return BootstrapOut(
-            user=UserOut.model_validate(self._user),
+            user=user_out(self._user),
             settings=settings,
             dashboard=dashboard,
             exchange_rates=[

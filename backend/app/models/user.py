@@ -41,6 +41,12 @@ class User(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     locale: Mapped[str] = mapped_column(Text, nullable=False, default="uk", server_default="uk")
+    # The storage key of the profile picture, not a URL: the bucket's host can
+    # change, and the URL the API hands out is signed and short-lived anyway.
+    # A plain column rather than a media_files row — that table's CHECK ties
+    # every file to a catalog or collection item, and none of its
+    # provenance/role machinery means anything for a face.
+    avatar_key: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
