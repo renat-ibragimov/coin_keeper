@@ -336,3 +336,66 @@ async def test_a_coin_of_a_country_with_no_dictionaries_keeps_its_own_words(
     )
     assert position["denomination"] == "5 євро"
     assert position["seriesName"] == "Австрійські казки"
+
+
+async def test_a_hand_entered_coin_describes_itself_in_three_parts(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The form collects one catalogue number and three descriptions; the
+    descriptions land in `descriptions` in the shape docs/02-data-model.md
+    fixes — both locales, all three parts, null where there is no text."""
+    coin = coin_payload(
+        ctx.refs.ukraine.id,
+        catalogNumber="KM# 1",
+        description="Талер Марії Терезії",
+        descriptionObverse="Портрет праворуч",
+        descriptionReverse=None,
+    )
+    response = await client.post(
+        "/api/v1/collection", json=purchase(coin), headers=auth(ctx.token_a)
+    )
+    assert response.status_code == 201, response.text
+
+    item_id = response.json()["catalogItemId"]
+    item = (
+        await db_session.execute(select(CatalogItem).where(CatalogItem.id == item_id))
+    ).scalar_one()
+    assert item.catalog_number == "KM# 1"
+    assert item.catalog_km is None
+    assert item.descriptions == {
+        "uk": {
+            "general": "Талер Марії Терезії",
+            "obverse": "Портрет праворуч",
+            "reverse": None,
+        },
+        "en": {"general": None, "obverse": None, "reverse": None},
+    }
+
+    card = (await client.get(f"/api/v1/catalog/{item_id}", headers=auth(ctx.token_a))).json()
+    # The card's own "Каталожний номер" row reads the same chain the listings
+    # do, and an unattributed number is last in it.
+    assert card["catalogNumber"] == "KM# 1"
+    assert card["description"] == {
+        "general": "Талер Марії Терезії",
+        "obverse": "Портрет праворуч",
+        "reverse": None,
+    }
+
+
+async def test_a_coin_described_nowhere_leaves_the_column_untouched(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """NULL means "the parser has not been here", and a row of nulls does
+    not mean that (docs/02-data-model.md)."""
+    response = await client.post(
+        "/api/v1/collection",
+        json=purchase(coin_payload(ctx.refs.ukraine.id)),
+        headers=auth(ctx.token_a),
+    )
+    assert response.status_code == 201, response.text
+    item = (
+        await db_session.execute(
+            select(CatalogItem).where(CatalogItem.id == response.json()["catalogItemId"])
+        )
+    ).scalar_one()
+    assert item.descriptions is None

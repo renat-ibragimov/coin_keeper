@@ -38,10 +38,14 @@ export interface CoinFields {
   edgeTypeId: string;
   qualityTypeId: string;
   shape: string;
-  catalogKm: string;
-  catalogUc: string;
-  catalogNumista: string;
-  notes: string;
+  /** One number: the collector has it and no reason to know whose catalogue
+   *  it belongs to (owner, 2026-09-14). */
+  catalogNumber: string;
+  /** The coin in the collector's own words — three parts, as the catalogue's
+   *  own `descriptions` column is shaped (docs/02-data-model.md). */
+  description: string;
+  descriptionObverse: string;
+  descriptionReverse: string;
 }
 
 export type CoinFieldErrors = Partial<Record<keyof CoinFields, string>>;
@@ -61,9 +65,9 @@ export function emptyCoinFields(): CoinFields {
     edgeTypeId: '',
     qualityTypeId: '',
     shape: '',
-    catalogKm: '',
-    catalogUc: '',
-    catalogNumista: '',
-    notes: '',
+    catalogNumber: '',
+    description: '',
+    descriptionObverse: '',
+    descriptionReverse: '',
   };
 }

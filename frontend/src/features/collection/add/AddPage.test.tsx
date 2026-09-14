@@ -415,3 +415,54 @@ describe('AddPage — "Про монету" dictionaries', () => {
     expect(year).toHaveValue('1780');
   });
 });
+
+describe('AddPage — "Більше деталей"', () => {
+  it('sends one catalogue number and the coin described in three parts', async () => {
+    renderPage();
+    await chooseCountry();
+    await userEvent.type(screen.getByLabelText('Назва монети'), 'Мій талер');
+    await userEvent.type(await screen.findByLabelText('Рік випуску'), '1780');
+    await userEvent.type(screen.getByLabelText('Матеріал'), 'Срібло');
+    await userEvent.click(screen.getByRole('button', { name: 'Більше деталей' }));
+
+    await userEvent.type(screen.getByLabelText('Каталожний номер'), 'KM# 1');
+    await userEvent.type(screen.getByLabelText('Опис'), 'Талер Марії Терезії');
+    await userEvent.type(screen.getByLabelText('Опис аверса'), 'Портрет праворуч');
+    await userEvent.type(screen.getByLabelText('Опис реверса'), 'Двоглавий орел');
+    await userEvent.type(screen.getByLabelText(/Ціна за шт/), '500');
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+
+    await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
+    expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
+      newCatalogItem: {
+        catalogNumber: 'KM# 1',
+        description: 'Талер Марії Терезії',
+        descriptionObverse: 'Портрет праворуч',
+        descriptionReverse: 'Двоглавий орел',
+      },
+    });
+  });
+
+  it('no longer asks which of three catalogues the number belongs to', async () => {
+    renderPage();
+    await chooseCountry();
+    await userEvent.type(screen.getByLabelText('Назва монети'), 'Мій талер');
+    await userEvent.click(await screen.findByRole('button', { name: 'Більше деталей' }));
+
+    expect(screen.queryByLabelText('KM#')).toBeNull();
+    expect(screen.queryByLabelText('UC#')).toBeNull();
+    expect(screen.queryByLabelText('Numista')).toBeNull();
+    expect(screen.queryByLabelText('Нотатка про монету')).toBeNull();
+  });
+
+  it('promises a place in the collection, not a catalogue, and demands nothing up front', async () => {
+    renderPage();
+    await chooseCountry();
+    await userEvent.type(screen.getByLabelText('Назва монети'), 'Мій талер');
+
+    const lead = await screen.findByText(/Цієї монети ще немає/);
+    expect(lead).toHaveTextContent('у вашій колекції');
+    expect(lead).not.toHaveTextContent(/каталозі/);
+    expect(lead).not.toHaveTextContent(/Обов'язкові/);
+  });
+});

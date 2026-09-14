@@ -1073,6 +1073,8 @@ export interface components {
             catalogUc?: string | null;
             /** Catalognumista */
             catalogNumista?: string | null;
+            /** Catalognumber */
+            catalogNumber?: string | null;
             /** Notes */
             notes?: string | null;
             /**
@@ -1141,6 +1143,8 @@ export interface components {
             catalogUc?: string | null;
             /** Catalognumista */
             catalogNumista?: string | null;
+            /** Catalognumber */
+            catalogNumber?: string | null;
             /** Notes */
             notes?: string | null;
         };
@@ -1807,14 +1811,14 @@ export interface components {
             qualityTypeId?: number | null;
             /** Quality */
             quality?: string | null;
-            /** Catalogkm */
-            catalogKm?: string | null;
-            /** Cataloguc */
-            catalogUc?: string | null;
-            /** Catalognumista */
-            catalogNumista?: string | null;
-            /** Notes */
-            notes?: string | null;
+            /** Catalognumber */
+            catalogNumber?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Descriptionobverse */
+            descriptionObverse?: string | null;
+            /** Descriptionreverse */
+            descriptionReverse?: string | null;
         };
         /** Page[CatalogListItem] */
         Page_CatalogListItem_: {

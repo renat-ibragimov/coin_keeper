@@ -261,33 +261,37 @@ export function NewCoinFields({ countryId, values, errors, onChange }: NewCoinFi
             value={values.shape}
             onChange={(event) => set('shape')(event.target.value)}
           />
+          {/* One field, not the three named catalogues the pipeline fills:
+              a collector has a number, not a numbering system (owner,
+              2026-09-14). */}
           <Input
-            label={t('add.catalogKm')}
+            label={t('add.catalogNumber')}
+            hint={t('add.catalogNumberHint')}
             maxLength={100}
-            value={values.catalogKm}
-            onChange={(event) => set('catalogKm')(event.target.value)}
+            value={values.catalogNumber}
+            onChange={(event) => set('catalogNumber')(event.target.value)}
           />
         </FormRow>
-        <FormRow>
-          <Input
-            label={t('add.catalogUc')}
-            maxLength={100}
-            value={values.catalogUc}
-            onChange={(event) => set('catalogUc')(event.target.value)}
-          />
-          <Input
-            label={t('add.catalogNumista')}
-            maxLength={100}
-            value={values.catalogNumista}
-            onChange={(event) => set('catalogNumista')(event.target.value)}
-          />
-        </FormRow>
+        {/* The three parts the catalogue's own descriptions are split into
+            (docs/02-data-model.md) — the coin itself, then each side. */}
         <Textarea
-          label={t('add.coinNotes')}
-          hint={t('add.coinNotesHint')}
+          label={t('add.description')}
+          hint={t('add.descriptionHint')}
           maxLength={4000}
-          value={values.notes}
-          onChange={(event) => set('notes')(event.target.value)}
+          value={values.description}
+          onChange={(event) => set('description')(event.target.value)}
+        />
+        <Textarea
+          label={t('add.descriptionObverse')}
+          maxLength={4000}
+          value={values.descriptionObverse}
+          onChange={(event) => set('descriptionObverse')(event.target.value)}
+        />
+        <Textarea
+          label={t('add.descriptionReverse')}
+          maxLength={4000}
+          value={values.descriptionReverse}
+          onChange={(event) => set('descriptionReverse')(event.target.value)}
         />
       </div>
     </section>

@@ -159,6 +159,7 @@ class CatalogItemCreate(CamelModel):
     catalog_km: str | None = Field(default=None, max_length=100)
     catalog_uc: str | None = Field(default=None, max_length=100)
     catalog_numista: str | None = Field(default=None, max_length=100)
+    catalog_number: str | None = Field(default=None, max_length=100)
     notes: str | None = Field(default=None, max_length=4000)
     # Admin only: create the record in the shared catalog instead of a
     # personal item. Regular users get a 403 (docs/03-api-contract.md).
@@ -212,10 +213,17 @@ class NewCatalogItemIn(CamelModel):
     edge: str | None = Field(default=None, max_length=200)
     quality_type_id: int | None = None
     quality: str | None = Field(default=None, max_length=200)
-    catalog_km: str | None = Field(default=None, max_length=100)
-    catalog_uc: str | None = Field(default=None, max_length=100)
-    catalog_numista: str | None = Field(default=None, max_length=100)
-    notes: str | None = Field(default=None, max_length=4000)
+    # One number, not three: a collector has the number and no reason to know
+    # whose catalogue it belongs to (owner, 2026-09-14). The three named
+    # columns stay on CatalogItemCreate, where the pipeline fills them.
+    catalog_number: str | None = Field(default=None, max_length=100)
+    # The coin described in the collector's own words, in the language of the
+    # request. Stored in `descriptions` under that locale, in the shape
+    # docs/02-data-model.md fixes — not in `notes`, which is a note about the
+    # record rather than a description of the coin.
+    description: str | None = Field(default=None, max_length=4000)
+    description_obverse: str | None = Field(default=None, max_length=4000)
+    description_reverse: str | None = Field(default=None, max_length=4000)
 
     @model_validator(mode="after")
     def check_material(self) -> NewCatalogItemIn:
@@ -259,6 +267,7 @@ class CatalogItemUpdate(CamelModel):
     catalog_km: str | None = Field(default=None, max_length=100)
     catalog_uc: str | None = Field(default=None, max_length=100)
     catalog_numista: str | None = Field(default=None, max_length=100)
+    catalog_number: str | None = Field(default=None, max_length=100)
     notes: str | None = Field(default=None, max_length=4000)
 
 

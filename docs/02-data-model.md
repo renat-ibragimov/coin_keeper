@@ -322,9 +322,10 @@ diameter_mm        numeric(8,2)
 thickness_mm       numeric(8,2)
 shape, edge, orientation  text
 catalog_km, catalog_uc, catalog_numista  text
+catalog_number     text              -- номер без указания каталога: то, что вписали руками
 notes              text
 quality            text              -- качество чеканки каноническим кодом, словарь в coin-parser
-descriptions       jsonb             -- заполняется парсером coin-collector, руками не редактируется
+descriptions       jsonb             -- парсер coin-collector и форма «Додати» для личной позиции
 artists            jsonb             -- заполняется парсером coin-collector, руками не редактируется
 edited_fields      jsonb             -- имена полей, правленных руками; загрузчики их не трогают
 source_key         text              -- ключ дедупликации импорта, см. 04-business-rules
@@ -353,6 +354,12 @@ coin-collector ещё не коснулся. Но если колонка не `
   "en": {"general": null, "obverse": null, "reverse": null}
 }
 ```
+
+С 2026-09-14 `descriptions` пишет не только парсер: форма «Додати» собирает три поля —
+«Опис», «Опис аверса», «Опис реверса» — и кладёт их под локаль запроса, а вторую локаль
+заполняет `null`-ами. Форма JSON от этого не меняется: если колонка не `NULL`, обе локали и
+все три ключа на месте. Ничего не вписали — колонка остаётся `NULL` целиком, потому что
+строка из одних `null` означала бы «парсер приходил и ничего не нашёл», а это неправда.
 
 `artists` — авторы монеты. `designers` и `sculptors` — всегда массивы (в худшем случае
 пустые `[]`), никогда `null` и никогда не отсутствуют как ключи. Каждый автор — не голая

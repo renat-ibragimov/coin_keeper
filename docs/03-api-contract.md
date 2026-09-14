@@ -454,9 +454,9 @@ POST /collection
     "seriesId": null, "denominationId": null, "compositionId": null,
     "metalKind": "unknown", "issueDate": null, "mintageAnnounced": null,
     "weightGrams": null, "diameterMm": null, "thicknessMm": null,
-    "shape": null, "edgeTypeId": null, "edge": null,
-    "qualityTypeId": null, "quality": null,
-    "catalogKm": null, "catalogUc": null, "catalogNumista": null, "notes": null
+    "shape": null, "edgeTypeId": null, "qualityTypeId": null,
+    "catalogNumber": null,
+    "description": null, "descriptionObverse": null, "descriptionReverse": null
   },
   "quantity": 1, "price": "120.00", "currency": "UAH", "purchaseDate": "2026-09-14"
 }
@@ -478,6 +478,18 @@ POST /collection
   `denominationText`) и **серия** (`seriesId` или `seriesText`), только они необязательны;
   гурт и якість, наоборот, форма шлёт только словарными половинами (`edgeTypeId`,
   `qualityTypeId`). Подробности — `04-business-rules.md`, п. 14.
+
+Ещё три отличия от `CatalogItemCreate`, добавленные 2026-09-14 по скриншоту владельца:
+
+- **один `catalogNumber` вместо `catalogKm`/`catalogUc`/`catalogNumista`.** Те три колонки
+  никуда не делись — их заполняет конвейер из источника, который знает систему нумерации, —
+  но у человека номер один, и спрашивать, чей он, бессмысленно. Пишется в новую колонку
+  `catalog_items.catalog_number` (миграция `0019`) и стоит последним в цепочке, которую
+  `CatalogListItem.catalogNumber` и так читал;
+- **`description`, `descriptionObverse`, `descriptionReverse` вместо `notes`.** Складываются
+  в `descriptions` под локаль запроса, в форму, зафиксированную `02-data-model.md` (обе
+  локали, три ключа, `null` где текста нет); пусто во всех трёх — колонка остаётся `NULL`.
+  `notes` этот эндпоинт не пишет вовсе: это заметка о записи, а не описание монеты.
 
 Обязательны, кроме материала: `countryId`, `titleOriginal`, `issueYear`, `collectionGroup`.
 Год обязателен, потому что `catalog_items.issue_year` — `NOT NULL`, и на нём держатся

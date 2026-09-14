@@ -272,9 +272,15 @@ class CatalogItem(Base):
     catalog_km: Mapped[str | None] = mapped_column(Text)
     catalog_uc: Mapped[str | None] = mapped_column(Text)
     catalog_numista: Mapped[str | None] = mapped_column(Text)
+    # A number whose catalogue nobody recorded — what a collector entering a
+    # coin by hand has. Last in the chain the card reads, so a named number
+    # always wins (docs/02-data-model.md).
+    catalog_number: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
-    # Filled by the coin-collector parser, never edited by hand. NULL means
-    # untouched; once set, the inner shape is fixed (docs/02-data-model.md).
+    # Filled by the coin-collector parser, and by hand on a personal item
+    # entered through the "Додати" form. NULL means untouched; once set, the
+    # inner shape is fixed — both locales, all three parts, `null` where
+    # there is no text (docs/02-data-model.md).
     descriptions: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     artists: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     # Names of the fields a human has corrected. A catalogue loader leaves

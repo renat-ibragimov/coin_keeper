@@ -15,7 +15,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.core.locale import DEFAULT_LOCALE, pick_name
+from app.core.locale import DEFAULT_LOCALE, LOCALE_EN, LOCALE_UK, pick_name
 from app.db.session import get_session_factory
 from app.models import (
     AuditLog,
@@ -154,6 +154,27 @@ def quality_type_out(quality_type: QualityType | None, locale: str) -> CoinQuali
         code=quality_type.code,
         name=quality_type.name_uk if locale == "uk" else quality_type.name_en,
     )
+
+
+def _descriptions_json(
+    locale: str, *, general: str | None, obverse: str | None, reverse: str | None
+) -> dict[str, object] | None:
+    """The `descriptions` column as docs/02-data-model.md fixes its shape:
+    every locale key and every part key present, `null` where there is no
+    text. Nothing typed at all leaves the column NULL — an untouched row,
+    not a row full of nulls."""
+    texts = {
+        "general": (general or "").strip() or None,
+        "obverse": (obverse or "").strip() or None,
+        "reverse": (reverse or "").strip() or None,
+    }
+    if not any(texts.values()):
+        return None
+    empty = {"general": None, "obverse": None, "reverse": None}
+    return {
+        LOCALE_UK: texts if locale == LOCALE_UK else empty,
+        LOCALE_EN: texts if locale != LOCALE_UK else empty,
+    }
 
 
 def description_out(descriptions: dict[str, object] | None, locale: str) -> CoinDescriptions | None:
@@ -346,6 +367,12 @@ class CatalogService:
         """
         values = payload.model_dump()
         title = values["title_original"]
+        descriptions = _descriptions_json(
+            self._locale,
+            general=values.pop("description"),
+            obverse=values.pop("description_obverse"),
+            reverse=values.pop("description_reverse"),
+        )
         return await self._insert(
             {
                 **values,
@@ -353,6 +380,7 @@ class CatalogService:
                 "title_uk_source": TranslationSource.MANUAL,
                 "title_en": title,
                 "title_en_source": TranslationSource.MANUAL,
+                "descriptions": descriptions,
             },
             created_by=self._user.id,
         )
@@ -545,7 +573,11 @@ class CatalogService:
             "title_en": item.title_en,
             "title_en_source": item.title_en_source,
             "variety": item.subtype,
-            "catalog_number": item.catalog_km or item.catalog_uc or item.catalog_numista,
+            # A named number wins; the unattributed one is the fallback a
+            # hand-entered coin brings (docs/02-data-model.md).
+            "catalog_number": (
+                item.catalog_km or item.catalog_uc or item.catalog_numista or item.catalog_number
+            ),
             "collection_group": item.collection_group,
             "metal_kind": item.metal_kind,
             "composition": material_out(row.composition, self._locale),

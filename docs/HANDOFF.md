@@ -16,7 +16,8 @@
 - **Сервер:** Hetzner `2.28.42.171`, Ubuntu 24.04, 2 vCPU / 3.7 ГБ + своп; центральный
   Caddy в docker (`/srv/caddy`, сеть `web`). Стек — `/home/deploy/coinkeeper`
   (postgres 16, redis, minio, api). Статика фронта — `/srv/coinkeeper/frontend`.
-- **SSH:** порты 22 и 2222; `root` (общесерверное) и `deploy` (проект). Для долгих
+- **SSH:** порт **2222** (22 не отвечает — «No route to host», проверено 2026-09-14);
+  `root` (общесерверное) и `deploy` (проект). Для долгих
   команд — tmux (сессии рвутся, «Broken pipe»).
 - **CI:** пуш в `main` → check (тесты) → build → deploy (GHCR, тег = SHA) →
   deploy-frontend. Секреты в GitHub: `DEPLOY_*`, `SSH_KNOWN_HOSTS`, `SERVER_ENV`
