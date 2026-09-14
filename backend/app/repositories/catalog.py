@@ -53,7 +53,7 @@ from app.models import (
     QualityType,
 )
 from app.models.enums import CollectionGroup
-from app.repositories.localization import localized
+from app.repositories.localization import localized, series_display_name
 
 
 @dataclass
@@ -454,12 +454,8 @@ class CatalogRepository:
         return func.coalesce(name, CatalogItem.material)
 
     def _series_name(self) -> ColumnElement[str]:
-        return localized(
-            self._locale,
-            uk=CoinSeries.name_uk,
-            en=CoinSeries.name_en,
-            original=CoinSeries.name_original,
-        )
+        """Falls back to the typed-in series of a personal item (§14)."""
+        return series_display_name(self._locale)
 
     @staticmethod
     def _source_url_subquery() -> ColumnElement[str | None]:

@@ -207,6 +207,11 @@ class CatalogItem(Base):
     )
     country_id: Mapped[int] = mapped_column(ForeignKey("countries.id"), nullable=False)
     series_id: Mapped[int | None] = mapped_column(ForeignKey("coin_series.id", ondelete="SET NULL"))
+    # Display only, unlike series_id: completeness, the series screens and the
+    # series filter are all counted on the shared record an admin creates
+    # (docs/04-business-rules.md, rule 2). A typed-in name shows on the card
+    # and takes part in none of that.
+    series_text: Mapped[str | None] = mapped_column(Text)
     # The bare (non-packaged) catalog item this one is a souvenir-packaging
     # variant of, when coin-parser's weight/diameter match found one
     # (docs/04-business-rules.md). Not surfaced anywhere yet.
@@ -216,6 +221,10 @@ class CatalogItem(Base):
     denomination_id: Mapped[int | None] = mapped_column(
         ForeignKey("denominations.id", ondelete="SET NULL")
     )
+    # The same dictionary-or-own-words split as composition_id/material: a
+    # face value the denominations table has no row for (an Austrian 5 euro,
+    # say) is kept as the collector typed it (docs/04-business-rules.md, §14).
+    denomination_text: Mapped[str | None] = mapped_column(Text)
     collection_group: Mapped[CollectionGroup] = mapped_column(collection_group_enum, nullable=False)
     subtype: Mapped[str | None] = mapped_column(Text)
     # Three language slots. title_original is the issuer's own wording in

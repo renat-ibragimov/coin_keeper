@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE, pick_name
 from app.models import (
+    CatalogItem,
     CoinSeries,
     CollectionItem,
     Country,
@@ -88,6 +89,17 @@ def _series_out(series: CoinSeries, locale: str) -> SeriesOut:
         start_year=series.start_year,
         end_year=series.end_year,
     )
+
+
+def _denomination_label(
+    denomination: Denomination | None, item: CatalogItem, locale: str
+) -> str | None:
+    """The dictionary label, or what the owner typed on a personal item when
+    their country has no denominations at all (docs/04-business-rules.md, §14)."""
+    if denomination is not None:
+        return render_label(denomination.value, denomination.unit, locale)
+    text = (item.denomination_text or "").strip()
+    return text or None
 
 
 def _denomination_out(denomination: Denomination, locale: str) -> DenominationOut:
@@ -367,11 +379,7 @@ class CollectionService:
             country=row.country,
             series_name=row.series_name,
             collection_group=item.collection_group,
-            denomination=(
-                None
-                if row.denomination is None
-                else render_label(row.denomination.value, row.denomination.unit, self._locale)
-            ),
+            denomination=_denomination_label(row.denomination, item, self._locale),
             year=item.issue_year,
             is_archived=item.is_archived,
             archive_reason=item.archive_reason,
@@ -392,11 +400,7 @@ class CollectionService:
             title=display_title(item, self._locale),
             country=row.country,
             series_name=row.series_name,
-            denomination=(
-                None
-                if row.denomination is None
-                else render_label(row.denomination.value, row.denomination.unit, self._locale)
-            ),
+            denomination=_denomination_label(row.denomination, item, self._locale),
             year=item.issue_year,
             is_archived=item.is_archived,
             archive_reason=item.archive_reason,

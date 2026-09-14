@@ -111,6 +111,7 @@ const SUGGESTION = {
   country: 'Україна',
   seriesName: null,
   denomination: null,
+  denominationText: null,
   year: 2018,
   title: 'Дельфін',
   titleOriginal: 'Дельфін',
@@ -315,5 +316,102 @@ describe('AddPage', () => {
       amount: '900',
       catalogItemId: 7,
     });
+  });
+});
+
+describe('AddPage — "Про монету" dictionaries', () => {
+  it('keeps a denomination and a series its country has no dictionary for', async () => {
+    // Austria: nothing in either dictionary, which is the whole reason both
+    // fields take free text (owner, 2026-09-14).
+    renderPage();
+    await chooseCountry();
+    await userEvent.type(screen.getByLabelText('Назва монети'), '5 Євро');
+    await userEvent.type(await screen.findByLabelText('Рік випуску'), '2016');
+    await userEvent.type(screen.getByLabelText('Номінал'), '5 євро');
+    await userEvent.type(screen.getByLabelText('Серія'), 'Австрійські казки');
+    await userEvent.type(screen.getByLabelText('Матеріал'), 'Срібло 900');
+    await userEvent.type(screen.getByLabelText(/Ціна за шт/), '900');
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+
+    await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
+    expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
+      newCatalogItem: {
+        issueYear: 2016,
+        denominationId: null,
+        denominationText: '5 євро',
+        seriesId: null,
+        seriesText: 'Австрійські казки',
+        compositionId: null,
+        material: 'Срібло 900',
+      },
+    });
+  });
+
+  it('sends an id when what was typed is a row of the dictionary', async () => {
+    vi.mocked(fetchDenominations).mockResolvedValue([
+      {
+        id: 11,
+        countryId: 230,
+        currencyCode: 'UAH',
+        value: '2.000',
+        unit: 'hryvnia',
+        label: '2 гривні',
+        sortOrder: 200,
+      },
+    ]);
+    vi.mocked(fetchSeries).mockResolvedValue([
+      {
+        id: 22,
+        countryId: 230,
+        name: 'Флора і фауна України',
+        nameOriginal: 'Флора і фауна України',
+        originalLang: 'uk',
+        nameUk: 'Флора і фауна України',
+        nameUkSource: null,
+        nameEn: null,
+        nameEnSource: null,
+        description: null,
+        startYear: null,
+        endYear: null,
+      },
+    ]);
+    renderPage();
+    await chooseCountry();
+    await userEvent.type(screen.getByLabelText('Назва монети'), 'Моя монета');
+    await userEvent.type(await screen.findByLabelText('Рік випуску'), '2021');
+    // Typed by hand, matched case-insensitively — the same rule as material.
+    await userEvent.type(screen.getByLabelText('Номінал'), '2 ГРИВНІ');
+    await userEvent.type(screen.getByLabelText('Серія'), 'Флора і фауна України');
+    await userEvent.type(screen.getByLabelText('Матеріал'), 'Срібло');
+    await userEvent.type(screen.getByLabelText(/Ціна за шт/), '120');
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+
+    await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
+    expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
+      newCatalogItem: {
+        denominationId: 11,
+        denominationText: null,
+        seriesId: 22,
+        seriesText: null,
+        compositionId: 3,
+        material: null,
+      },
+    });
+  });
+
+  it('offers years to pick from and still takes one typed by hand', async () => {
+    renderPage();
+    await chooseCountry();
+    await userEvent.type(screen.getByLabelText('Назва монети'), 'Мій талер');
+
+    const year = await screen.findByLabelText('Рік випуску');
+    await userEvent.click(year);
+    const options = screen.getAllByRole('option').map((el) => el.textContent);
+    // Newest first: a coin just bought is likelier to be recent.
+    expect(options[0]).toBe(String(new Date().getFullYear()));
+
+    // A year older than any the list offers is still accepted.
+    await userEvent.type(year, '1780');
+    expect(year).toHaveValue('1780');
   });
 });

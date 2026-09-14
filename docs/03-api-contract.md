@@ -474,8 +474,10 @@ POST /collection
 - **материал обязателен** в одном из двух видов: `compositionId` из словаря `GET /materials`
   **или** свободный текст `material`. Ни того ни другого — `422`. Словарь заполнен тем, что
   реально есть в каталоге, и для большинства эмитентов пуст, поэтому свободный текст — не
-  запасной, а равноправный путь. Гурт и якість, в отличие от материала, форма шлёт только
-  словарными половинами (`edgeTypeId`, `qualityTypeId`).
+  запасной, а равноправный путь. Так же устроены **номинал** (`denominationId` или
+  `denominationText`) и **серия** (`seriesId` или `seriesText`), только они необязательны;
+  гурт и якість, наоборот, форма шлёт только словарными половинами (`edgeTypeId`,
+  `qualityTypeId`). Подробности — `04-business-rules.md`, п. 14.
 
 Обязательны, кроме материала: `countryId`, `titleOriginal`, `issueYear`, `collectionGroup`.
 Год обязателен, потому что `catalog_items.issue_year` — `NOT NULL`, и на нём держатся
@@ -591,6 +593,12 @@ GET    /expenses/chart-summary?dateFrom&dateTo
 `catalogItemId` в теле — необязательная привязка сопутствующей траты к монете (грейдинг,
 холдер для конкретного экземпляра). Ссылается на **существующую** позицию, видимую
 пользователю, — общую или свою личную; ничего не создаёт. Неизвестный id — `422`.
+
+`CatalogListItem.denominationText` и `CatalogCard.denominationText` — номинал словами у
+записи, для страны которой справочника нет; показывается вместо `denomination`, когда тот
+`null` (`02-data-model.md`). `seriesName` отдельного текстового поля не получил: он и так
+строка, и подставляет `series_text`, когда `series_id` пуст. В `CollectionPositionOut` /
+`CollectionItemOut` то же самое делает уже готовая строка `denomination`.
 
 `coinTitle` в `ExpenseOut` — локализованное (`?locale`/`Accept-Language`) название монеты,
 джойном через `catalogItemId`, для **любой** траты, у которой этот id задан, а не только

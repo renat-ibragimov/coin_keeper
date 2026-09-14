@@ -23,7 +23,13 @@ from app.core.mail.base import EmailMessage
 from app.models import CatalogItem, CollectionItem, Expense, Material
 from app.models.enums import ExpenseCategory, TranslationSource
 from tests.helpers import register_and_verify
-from tests.seed import add_rate, make_catalog_item, seed_reference, user_id_by_email
+from tests.seed import (
+    add_rate,
+    country_by_code,
+    make_catalog_item,
+    seed_reference,
+    user_id_by_email,
+)
 
 
 def auth(token: str) -> dict[str, str]:
@@ -285,3 +291,48 @@ async def test_a_purchase_of_a_known_coin_still_takes_the_plain_path(
     assert response.status_code == 201, response.text
     assert response.json()["catalogItemId"] == item.id
     assert await _catalog_count(db_session) == before
+
+
+async def test_a_coin_of_a_country_with_no_dictionaries_keeps_its_own_words(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """An Austrian 5 euro: the denominations table has nothing for that
+    country and neither does the series list, so both are typed in
+    (docs/04-business-rules.md, §14, owner 2026-09-14)."""
+    austria = await country_by_code(db_session, "AT")
+    coin = coin_payload(
+        austria.id,
+        titleOriginal="5 Євро",
+        denominationText="5 євро",
+        seriesText="Австрійські казки",
+    )
+    response = await client.post(
+        "/api/v1/collection", json=purchase(coin), headers=auth(ctx.token_a)
+    )
+    assert response.status_code == 201, response.text
+
+    item_id = response.json()["catalogItemId"]
+    item = (
+        await db_session.execute(select(CatalogItem).where(CatalogItem.id == item_id))
+    ).scalar_one()
+    assert item.denomination_id is None
+    assert item.denomination_text == "5 євро"
+    assert item.series_id is None
+    assert item.series_text == "Австрійські казки"
+
+    # Both show where the dictionary values would have: the card falls back
+    # to the text, and so does the collection row.
+    card = (await client.get(f"/api/v1/catalog/{item_id}", headers=auth(ctx.token_a))).json()
+    assert card["denomination"] is None
+    assert card["denominationText"] == "5 євро"
+    assert card["seriesName"] == "Австрійські казки"
+
+    position = next(
+        row
+        for row in (await client.get("/api/v1/collection", headers=auth(ctx.token_a))).json()[
+            "items"
+        ]
+        if row["catalogItemId"] == item_id
+    )
+    assert position["denomination"] == "5 євро"
+    assert position["seriesName"] == "Австрійські казки"

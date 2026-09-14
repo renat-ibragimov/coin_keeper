@@ -65,6 +65,7 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
       currencyCode: 'USD',
       label: '25 центів',
     },
+    denominationText: null,
     year: 1999,
     title: 'Delaware',
     titleOriginal: 'Delaware',

@@ -33,6 +33,7 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
       currencyCode: 'UAH',
       label: '5 гривень',
     },
+    denominationText: null,
     year: 2021,
     title: 'Sikorsky',
     titleOriginal: 'Ihor Sikorsky',

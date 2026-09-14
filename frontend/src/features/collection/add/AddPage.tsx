@@ -3,7 +3,13 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
-import { fetchAllMaterials, fetchCard, fetchCurrencies } from '@/features/catalog/api';
+import {
+  fetchAllMaterials,
+  fetchCard,
+  fetchCurrencies,
+  fetchDenominations,
+  fetchSeries,
+} from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { createExpense, MANUAL_CATEGORIES } from '@/features/expenses/api';
 import { ExpenseForm } from '@/features/expenses/ExpenseForm';
@@ -56,6 +62,24 @@ function decimalOrNull(value: string): string | null {
 }
 
 /**
+ * Resolves what was typed into a dictionary-or-own-words field: the id of the
+ * row whose name it matches, or the text itself when nothing matches. Never
+ * both, and an empty field is neither (docs/04-business-rules.md, §14).
+ */
+function matchByName<T extends { id: number }>(
+  rows: T[] | undefined,
+  typed: string,
+  nameOf: (row: T) => string,
+): { id: number | null; text: string | null } {
+  const value = typed.trim();
+  if (!value) return { id: null, text: null };
+  const found = (rows ?? []).find(
+    (row) => nameOf(row).toLocaleLowerCase() === value.toLocaleLowerCase(),
+  );
+  return found ? { id: found.id, text: null } : { id: null, text: value };
+}
+
+/**
  * `/collection/add` — one page for everything that costs money.
  *
  * The first field is the type, and it decides what the rest of the form is:
@@ -105,6 +129,18 @@ export function AddPage() {
     queryKey: ['materials', 'all'],
     queryFn: fetchAllMaterials,
     staleTime: Infinity,
+  });
+  // The same two queries "Про монету" renders from — resolving what was
+  // typed needs the rows, and the cache hands them over without a refetch.
+  const denominationsQuery = useQuery({
+    queryKey: ['denominations', countryId],
+    queryFn: () => fetchDenominations(countryId ?? undefined),
+    enabled: countryId !== null,
+  });
+  const seriesQuery = useQuery({
+    queryKey: ['series', countryId],
+    queryFn: () => fetchSeries(countryId ?? undefined),
+    enabled: countryId !== null,
   });
 
   const from = (location.state as { from?: string } | null)?.from;
@@ -161,22 +197,28 @@ export function AddPage() {
   }
 
   function newCatalogItem(): NewCatalogItem {
-    // A name typed into the material field is a dictionary row when it
-    // matches one, free text when it does not (docs/03-api-contract.md).
-    const typed = coinFields.material.trim();
-    const known = (materialsQuery.data ?? []).find(
-      (material) => material.name.toLocaleLowerCase() === typed.toLocaleLowerCase(),
+    // Material, denomination and series are each one field over "the
+    // dictionary, or your own words": a typed value that matches a row goes
+    // as that row's id, anything else goes as text (docs/03-api-contract.md).
+    const material = matchByName(materialsQuery.data, coinFields.material, (row) => row.name);
+    const denomination = matchByName(
+      denominationsQuery.data,
+      coinFields.denomination,
+      (row) => row.label,
     );
+    const series = matchByName(seriesQuery.data, coinFields.series, (row) => row.name);
     return {
       countryId: countryId!,
       titleOriginal: title.trim(),
       issueYear: Number.parseInt(coinFields.issueYear, 10),
       collectionGroup: coinFields.collectionGroup,
       metalKind: coinFields.metalKind,
-      seriesId: positiveInt(coinFields.seriesId),
-      denominationId: positiveInt(coinFields.denominationId),
-      compositionId: known ? known.id : null,
-      material: known ? null : typed,
+      seriesId: series.id,
+      seriesText: series.text,
+      denominationId: denomination.id,
+      denominationText: denomination.text,
+      compositionId: material.id,
+      material: material.text,
       mintageAnnounced: positiveInt(coinFields.mintageAnnounced),
       weightGrams: decimalOrNull(coinFields.weightGrams),
       diameterMm: decimalOrNull(coinFields.diameterMm),
@@ -299,8 +341,8 @@ export function AddPage() {
                       // choice made under another one is meaningless here.
                       setCoinFields((current) => ({
                         ...current,
-                        seriesId: '',
-                        denominationId: '',
+                        series: '',
+                        denomination: '',
                       }));
                     }}
                     title={title}

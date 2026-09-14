@@ -64,6 +64,9 @@ class CatalogListItem(CamelModel):
     country: str
     series_name: str | None
     denomination: CoinDenomination | None
+    # What the collector typed when the dictionary had nothing to offer for
+    # their country; shown in place of `denomination` (docs/04, §14).
+    denomination_text: str | None
     year: int
     # The name in the requested locale, and the slots it was chosen from.
     title: str
@@ -128,7 +131,9 @@ class CatalogCard(CatalogListItem):
 class CatalogItemCreate(CamelModel):
     country_id: int
     series_id: int | None = None
+    series_text: str | None = Field(default=None, max_length=200)
     denomination_id: int | None = None
+    denomination_text: str | None = Field(default=None, max_length=200)
     collection_group: CollectionGroup
     subtype: str | None = None
     title_original: str = Field(min_length=1, max_length=500)
@@ -182,7 +187,9 @@ class NewCatalogItemIn(CamelModel):
 
     country_id: int
     series_id: int | None = None
+    series_text: str | None = Field(default=None, max_length=200)
     denomination_id: int | None = None
+    denomination_text: str | None = Field(default=None, max_length=200)
     collection_group: CollectionGroup
     title_original: str = Field(min_length=1, max_length=500)
     # Required, unlike the rest of the coin's description: catalog_items.issue_year
@@ -221,7 +228,9 @@ class NewCatalogItemIn(CamelModel):
 class CatalogItemUpdate(CamelModel):
     country_id: int | None = None
     series_id: int | None = None
+    series_text: str | None = Field(default=None, max_length=200)
     denomination_id: int | None = None
+    denomination_text: str | None = Field(default=None, max_length=200)
     collection_group: CollectionGroup | None = None
     subtype: str | None = None
     title_original: str | None = Field(default=None, min_length=1, max_length=500)

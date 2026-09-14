@@ -387,10 +387,8 @@
     "yearInvalid": "Enter the year as a number between 1 and 2200.",
     "numberInvalid": "Enter a number.",
     "denomination": "Denomination",
-    "noDenominations": "The dictionary holds no denominations for this country.",
+    "noDenominations": "The dictionary holds no denominations for this country — type it as it is.",
     "series": "Series",
-    "seriesSearch": "Search series",
-    "noSeries": "There are no series for this country.",
     "notSpecified": "Not specified",
     "collectionGroup": "Coin type",
     "collectionGroups": {
@@ -426,7 +424,10 @@
     "linkedCoinHint": "Picks an existing coin only — nothing new is created here.",
     "asideTitle": "How this works",
     "asidePurchase": "Found the coin in the catalog? The purchase is recorded against it. Not there? We create an item in your personal catalog and attach the purchase to it at once.",
-    "asideExpense": "Supporting expenses do not change the collection: they go to the money journal and count towards the totals of the hobby."
+    "asideExpense": "Supporting expenses do not change the collection: they go to the money journal and count towards the totals of the hobby.",
+    "denominationPlaceholder": "Pick one or type your own",
+    "seriesPlaceholder": "Pick one or type your own",
+    "seriesHint": "A name of your own is kept as text: it shows on the card but does not count towards series completeness."
   },
   "purchase": {
     "subtitle": "The instance and its purchase expense are created together.",

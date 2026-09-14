@@ -14,6 +14,7 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
     country: 'Ukraine',
     seriesName: null,
     denomination: null,
+    denominationText: null,
     year: 2021,
     title: 'Sikorsky',
     titleOriginal: 'Ihor Sikorsky',

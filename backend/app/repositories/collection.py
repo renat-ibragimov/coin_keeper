@@ -28,7 +28,7 @@ from app.models import (
 )
 from app.models.enums import CollectionGroup, ExpenseCategory
 from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
-from app.repositories.localization import localized
+from app.repositories.localization import localized, series_display_name
 
 
 @dataclass
@@ -209,12 +209,7 @@ class CollectionRepository:
                     en=Country.name_en,
                     original=Country.name_original,
                 ).label("country"),
-                localized(
-                    self._locale,
-                    uk=CoinSeries.name_uk,
-                    en=CoinSeries.name_en,
-                    original=CoinSeries.name_original,
-                ).label("series_name"),
+                series_display_name(self._locale).label("series_name"),
                 Denomination,
                 agg.c.total_quantity,
                 agg.c.total_spend_uah,
@@ -357,12 +352,7 @@ class CollectionRepository:
                     en=Country.name_en,
                     original=Country.name_original,
                 ).label("country"),
-                localized(
-                    self._locale,
-                    uk=CoinSeries.name_uk,
-                    en=CoinSeries.name_en,
-                    original=CoinSeries.name_original,
-                ).label("series_name"),
+                series_display_name(self._locale).label("series_name"),
                 Denomination,
                 latest_price_uah_for(CatalogItem.id, self._owner_id).label("market_price_uah"),
                 localized(

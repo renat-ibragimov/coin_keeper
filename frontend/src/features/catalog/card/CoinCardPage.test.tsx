@@ -120,6 +120,7 @@ function makeCard(overrides: Partial<CatalogCard> = {}): CatalogCard {
       currencyCode: 'UAH',
       label: '2 гривні',
     },
+    denominationText: null,
     year: 2017,
     title: 'Дельфін',
     titleOriginal: 'Дельфін',

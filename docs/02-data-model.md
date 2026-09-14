@@ -301,7 +301,9 @@ id                 bigserial PK
 item_type          text NOT NULL DEFAULT 'coin'
 country_id         bigint NOT NULL FK countries
 series_id          bigint FK coin_series ON DELETE SET NULL
+series_text        text              -- своя серия личной позиции; только для показа
 denomination_id    bigint FK denominations ON DELETE SET NULL
+denomination_text  text              -- номинал словами, когда справочника по стране нет
 collection_group   collection_group NOT NULL
 subtype            text
 title_original     text NOT NULL
@@ -366,6 +368,24 @@ coin-collector ещё не коснулся. Но если колонка не `
 API отдаёт оба поля уже свёрнутыми до текущей локали интерфейса — `CatalogCard.description`
 (`general`/`obverse`/`reverse`) и списки имён `designers`/`sculptors` — с запасным вариантом
 на другую локаль там, где парсер не нашёл текста для запрошенной.
+
+### series_text и denomination_text (2026-09-14)
+
+Тот же приём, что `composition_id` + `material`: справочная строка, где она есть, и слова
+владельца, где справочника нет вовсе. Понадобилось форме «Додати»: справочники номиналов и
+серий засеяны тем, что реально лежит в каталоге, то есть Украиной, СССР и США, — и
+австрийская монета упиралась в два неактивных поля с извинением.
+
+**`denomination_text` показывается вместо номинала**, когда `denomination_id` пуст, — в
+карточке, в списках каталога и в «Мої монети». Сортировка и фильтр по номиналу его не
+видят, ровно как не видят свободный `material`.
+
+**`series_text` — только показ.** Комплектность, экран «Серії» и фильтр «Серія» считаются по
+`series_id`, а серии — общие записи, которые заводит администратор
+(`04-business-rules.md`, п. 2). Вписанное имя выводится рядом с монетой (общий
+`series_display_name()` в репозиториях каталога и коллекции) и не участвует ни в чём из
+перечисленного. Альтернатива — личные серии со своим фильтром видимости через весь серийный
+слой — отдельная задача, а не поле формы.
 
 ### status, quality и edited_fields
 

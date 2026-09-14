@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { CatalogCard, CollectionGroup } from '@/shared/api/types';
+import { coinDenomination } from '@/shared/lib/coinDenomination';
 import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatNumber } from '@/shared/lib/format';
@@ -64,7 +65,7 @@ export function identitySpecRows(card: CatalogCard, t: TFunction): PropertyRow[]
     {
       key: 'denomination',
       label: t('card.specDenomination'),
-      value: card.denomination?.label ?? null,
+      value: coinDenomination(card),
     },
   ];
 }

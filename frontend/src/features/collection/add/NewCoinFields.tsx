@@ -1,15 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
   fetchAllMaterials,
+  fetchCountries,
   fetchDenominations,
   fetchEdgeTypes,
   fetchQualityTypes,
   fetchSeries,
 } from '@/features/catalog/api';
+import { buildYearList, computeYearBounds } from '@/shared/lib/yearRange';
 import { Combobox, FormRow, Input, Select, Textarea } from '@/shared/ui';
 
 import { COLLECTION_GROUPS, METAL_KINDS } from './coinFields';
@@ -46,6 +48,12 @@ export function NewCoinFields({ countryId, values, errors, onChange }: NewCoinFi
     queryFn: () => fetchSeries(countryId ?? undefined),
     enabled: countryId !== null,
   });
+  // Already in the cache — the country picker above fetched it.
+  const countriesQuery = useQuery({
+    queryKey: ['countries', 'all'],
+    queryFn: () => fetchCountries('all'),
+    staleTime: Infinity,
+  });
   const materialsQuery = useQuery({
     queryKey: ['materials', 'all'],
     queryFn: fetchAllMaterials,
@@ -66,6 +74,15 @@ export function NewCoinFields({ countryId, values, errors, onChange }: NewCoinFi
 
   const denominations = denominationsQuery.data ?? [];
   const series = seriesQuery.data ?? [];
+  const yearOptions = useMemo(() => {
+    const country = (countriesQuery.data ?? []).find((row) => row.id === countryId);
+    const bounds = computeYearBounds(country ? [country] : [], country ? [country.id] : []);
+    // Down to this country's earliest coin, but never a list of one or two
+    // entries: a dictionary that thin is less useful than a plain field.
+    const min = Math.min(bounds.min, new Date().getFullYear() - 40);
+    const max = Math.max(bounds.max, new Date().getFullYear());
+    return buildYearList({ min, max }).reverse().map(String);
+  }, [countriesQuery.data, countryId]);
 
   const set = (key: keyof CoinFields) => (value: string) => onChange(key, value);
 
@@ -75,59 +92,49 @@ export function NewCoinFields({ countryId, values, errors, onChange }: NewCoinFi
       <p className={styles.lead}>{t('add.aboutCoinLead')}</p>
 
       <FormRow>
-        <Input
+        {/* The same field the catalog's "Рік від/до" filters use: a list to
+            pick from, free typing for anything older than it offers. Newest
+            first here, unlike the filters — a coin you just bought is far
+            likelier to be recent than to be from the bottom of the range. */}
+        <Combobox
           label={t('add.year')}
-          type="number"
-          inputMode="numeric"
           required
-          min={1}
-          max={2200}
+          inputMode="numeric"
           placeholder="2021"
+          options={yearOptions}
           value={values.issueYear}
           onChange={(event) => set('issueYear')(event.target.value)}
           error={errors.issueYear}
+          maxLength={4}
         />
         {/* The denominations dictionary is seeded from what the catalogue
-            holds, so for most issuers there is nothing to pick and the field
-            has nothing to say (docs/03-api-contract.md). */}
-        {denominations.length > 0 ? (
-          <Select
-            label={t('add.denomination')}
-            value={values.denominationId}
-            onChange={(event) => set('denominationId')(event.target.value)}
-          >
-            <option value="">{t('add.notSpecified')}</option>
-            {denominations.map((denomination) => (
-              <option key={denomination.id} value={String(denomination.id)}>
-                {denomination.label}
-              </option>
-            ))}
-          </Select>
-        ) : (
-          <Input label={t('add.denomination')} value="" disabled hint={t('add.noDenominations')} />
-        )}
+            holds, so for most issuers it offers nothing — which is why this
+            is a combobox and not a select (docs/04-business-rules.md, §14). */}
+        <Combobox
+          label={t('add.denomination')}
+          placeholder={t('add.denominationPlaceholder')}
+          hint={denominations.length > 0 ? undefined : t('add.noDenominations')}
+          options={denominations.map((denomination) => denomination.label)}
+          value={values.denomination}
+          onChange={(event) => set('denomination')(event.target.value)}
+          maxLength={200}
+        />
       </FormRow>
 
       <FormRow>
-        {/* Series belong to the shared catalog and only an admin creates them
-            (docs/04-business-rules.md, rule 2): a personal item may point at
-            one, never add one. */}
-        <Select
+        {/* Picking an existing series links to the shared record — only an
+            admin creates those (docs/04-business-rules.md, rule 2). A name
+            typed instead is kept as text: it shows on the card and counts
+            towards nothing, which is what the hint says. */}
+        <Combobox
           label={t('add.series')}
-          searchable={series.length > 8}
-          searchPlaceholder={t('add.seriesSearch')}
-          value={values.seriesId}
-          disabled={series.length === 0}
-          hint={series.length === 0 ? t('add.noSeries') : undefined}
-          onChange={(event) => set('seriesId')(event.target.value)}
-        >
-          <option value="">{t('add.notSpecified')}</option>
-          {series.map((item) => (
-            <option key={item.id} value={String(item.id)}>
-              {item.name}
-            </option>
-          ))}
-        </Select>
+          placeholder={t('add.seriesPlaceholder')}
+          hint={t('add.seriesHint')}
+          options={series.map((item) => item.name)}
+          value={values.series}
+          onChange={(event) => set('series')(event.target.value)}
+          maxLength={200}
+        />
         <Select
           label={t('add.collectionGroup')}
           value={values.collectionGroup}

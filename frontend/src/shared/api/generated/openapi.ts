@@ -869,6 +869,8 @@ export interface components {
             /** Seriesname */
             seriesName: string | null;
             denomination: components["schemas"]["CoinDenomination"] | null;
+            /** Denominationtext */
+            denominationText: string | null;
             /** Year */
             year: number;
             /** Title */
@@ -1013,8 +1015,12 @@ export interface components {
             countryId: number;
             /** Seriesid */
             seriesId?: number | null;
+            /** Seriestext */
+            seriesText?: string | null;
             /** Denominationid */
             denominationId?: number | null;
+            /** Denominationtext */
+            denominationText?: string | null;
             collectionGroup: components["schemas"]["CollectionGroup"];
             /** Subtype */
             subtype?: string | null;
@@ -1081,8 +1087,12 @@ export interface components {
             countryId?: number | null;
             /** Seriesid */
             seriesId?: number | null;
+            /** Seriestext */
+            seriesText?: string | null;
             /** Denominationid */
             denominationId?: number | null;
+            /** Denominationtext */
+            denominationText?: string | null;
             collectionGroup?: components["schemas"]["CollectionGroup"] | null;
             /** Subtype */
             subtype?: string | null;
@@ -1143,6 +1153,8 @@ export interface components {
             /** Seriesname */
             seriesName: string | null;
             denomination: components["schemas"]["CoinDenomination"] | null;
+            /** Denominationtext */
+            denominationText: string | null;
             /** Year */
             year: number;
             /** Title */
@@ -1758,8 +1770,12 @@ export interface components {
             countryId: number;
             /** Seriesid */
             seriesId?: number | null;
+            /** Seriestext */
+            seriesText?: string | null;
             /** Denominationid */
             denominationId?: number | null;
+            /** Denominationtext */
+            denominationText?: string | null;
             collectionGroup: components["schemas"]["CollectionGroup"];
             /** Titleoriginal */
             titleOriginal: string;

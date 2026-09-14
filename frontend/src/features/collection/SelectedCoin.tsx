@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import type { CatalogCard } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
+import { coinDenomination } from '@/shared/lib/coinDenomination';
 import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle } from '@/shared/lib/coinTitle';
 import { Badge, CoinImage } from '@/shared/ui';
@@ -44,7 +45,7 @@ export function SelectedCoin({ card, onChange }: SelectedCoinProps) {
             card.country,
             card.seriesName,
             String(card.year),
-            card.denomination?.label,
+            coinDenomination(card),
             coinMaterial(card),
           ]
             .filter(Boolean)

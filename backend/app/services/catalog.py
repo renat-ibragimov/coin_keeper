@@ -535,6 +535,7 @@ class CatalogService:
             "country": row.country,
             "series_name": row.series_name,
             "denomination": denomination_out(row.denomination, self._locale),
+            "denomination_text": item.denomination_text,
             "year": item.issue_year,
             "title": display_title(item, self._locale),
             "title_original": item.title_original,
