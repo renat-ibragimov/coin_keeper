@@ -1,0 +1,109 @@
+/* Set off by a rule, like "Про монету": these expenses belong to the purchase
+   above them, they are not a second thing on the page. */
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chevron {
+  width: 15px;
+  height: 15px;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* `display: flex` above outranks the user agent's own [hidden] rule, so the
+   collapsed block has to be hidden explicitly. */
+.rows[hidden] {
+  display: none;
+}
+
+.lead {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+/* Category, amount, currency and the button that drops the row. The button
+   sits on the baseline of the inputs, below their labels. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.8fr) auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The same box as the fields it sits beside (shared/ui/Input.module.css). */
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+.remove:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+@media (pointer: coarse) {
+  .remove {
+    width: 44px;
+    min-height: 44px;
+  }
+}
+
+.add {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+@media (max-width: 640px) {
+  /* Three fields side by side stop being readable well before the phone
+     width; the remove button keeps its place beside the amount. */
+  .row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}

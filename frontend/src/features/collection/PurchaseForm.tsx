@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '@/shared/api/client';
@@ -46,6 +46,12 @@ interface PurchaseFormProps {
    * purchase, and both sets of messages have to appear at once.
    */
   beforeSubmit?: () => boolean;
+  /**
+   * Rendered inside the form, last before the buttons: the "Додати" page puts
+   * the purchase's supporting expenses there. It has to live inside the
+   * <form> — those fields are submitted with the purchase, not beside it.
+   */
+  footer?: ReactNode;
   defaultGrade: string;
   defaultStorageLocation: string | null;
   storageLocations: string[];
@@ -119,6 +125,7 @@ export function PurchaseForm({
   carried,
   onCarriedChange,
   beforeSubmit,
+  footer,
   defaultGrade,
   defaultStorageLocation,
   storageLocations,
@@ -293,6 +300,7 @@ export function PurchaseForm({
           onChange={(event) => set('notes')(event.target.value)}
           maxLength={4000}
         />
+        {footer}
         <FormActions>
           <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
             {t('common.cancel')}

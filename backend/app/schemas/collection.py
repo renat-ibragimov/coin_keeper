@@ -7,7 +7,7 @@ from decimal import Decimal
 
 from pydantic import Field, model_validator
 
-from app.models.enums import CollectionGroup
+from app.models.enums import CollectionGroup, ExpenseCategory
 from app.schemas.base import CamelModel
 from app.schemas.catalog import NewCatalogItemIn
 from app.schemas.common import Money, Rate
@@ -77,6 +77,34 @@ class CollectionItemOut(CamelModel):
     market_price_uah: Money | None = None
 
 
+class ExtraExpenseIn(CamelModel):
+    """A supporting expense recorded together with the purchase it belongs to.
+
+    Delivery, a holder, a grading fee — money spent on this coin at the moment
+    it was bought, and having to reopen the money journal to write it down is
+    how it ends up never written down (owner's call, 2026-09-14). What comes
+    out is an ordinary manual expense linked to the coin: same category list,
+    same `catalogItemId` link, edited and deleted in «Гроші» like any other,
+    and deleting one leaves the coin alone.
+
+    Date and vendor are not fields here — they come from the purchase, which
+    is the point of recording the two together.
+    """
+
+    category: ExpenseCategory
+    # `gt=0`, exactly as POST /expenses: a free coin is a fact, a free
+    # delivery is a blank someone forgot to fill in.
+    amount: Decimal = Field(gt=0)
+    currency: str = Field(min_length=3, max_length=3)
+
+    @model_validator(mode="after")
+    def reject_coin_purchase(self) -> ExtraExpenseIn:
+        if self.category == ExpenseCategory.COIN_PURCHASE:
+            msg = "coin_purchase is written by the purchase itself, not listed beside it."
+            raise ValueError(msg)
+        return self
+
+
 class CollectionItemCreate(CamelModel):
     """A purchase of a coin the catalog already has, or of one it does not
     (docs/03-api-contract.md, `POST /collection`).
@@ -86,6 +114,9 @@ class CollectionItemCreate(CamelModel):
     and the coin_purchase expense are then created in one transaction, so a
     rejected purchase cannot leave an orphaned catalog record behind. Exactly
     one of the two fields is given — neither and both are 422.
+
+    `extraExpenses` rides along the same transaction: the delivery and the
+    coin are one act of spending, and either both are recorded or neither is.
     """
 
     catalog_item_id: int | None = None
@@ -98,6 +129,9 @@ class CollectionItemCreate(CamelModel):
     notes: str | None = Field(default=None, max_length=4000)
     grade: str | None = Field(default=None, max_length=50)
     storage_location: str | None = Field(default=None, max_length=200)
+    # Capped because nothing sane needs more: the form offers one row at a
+    # time and a purchase with a dozen side expenses is a data-entry accident.
+    extra_expenses: list[ExtraExpenseIn] = Field(default_factory=list, max_length=10)
 
     @model_validator(mode="after")
     def check_coin_reference(self) -> CollectionItemCreate:

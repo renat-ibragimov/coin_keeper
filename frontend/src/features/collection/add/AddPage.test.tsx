@@ -334,6 +334,54 @@ describe('AddPage', () => {
     expect(vi.mocked(lookupCatalog).mock.calls.at(-1)).toEqual(['Дельфін', undefined]);
   });
 
+  it('records the supporting expenses in the same request as the purchase', async () => {
+    renderPage('/collection/add?catalogItemId=7');
+
+    await userEvent.type(await screen.findByLabelText(/Ціна за шт/), '250');
+    await userEvent.click(screen.getByRole('button', { name: "Пов'язані витрати" }));
+    // Opening the block offers a row rather than an empty section.
+    await userEvent.type(await screen.findByLabelText(/Сума/), '60');
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+
+    await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
+    expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
+      catalogItemId: 7,
+      price: '250',
+      extraExpenses: [{ category: 'delivery', amount: '60', currency: 'UAH' }],
+    });
+  });
+
+  it('sends nothing extra while the block stays folded away', async () => {
+    renderPage('/collection/add?catalogItemId=7');
+
+    await userEvent.type(await screen.findByLabelText(/Ціна за шт/), '250');
+    expect(screen.queryByLabelText(/Сума/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+
+    await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
+    expect(vi.mocked(createCollectionItem).mock.calls[0]![0]!.extraExpenses).toEqual([]);
+  });
+
+  it('drops a row nobody filled in and refuses one that is filled in wrong', async () => {
+    renderPage('/collection/add?catalogItemId=7');
+
+    await userEvent.type(await screen.findByLabelText(/Ціна за шт/), '250');
+    await userEvent.click(screen.getByRole('button', { name: "Пов'язані витрати" }));
+    // Zero is a real answer for a coin and a mistake for a delivery.
+    await userEvent.type(await screen.findByLabelText(/Сума/), '0');
+    await userEvent.click(screen.getByRole('button', { name: 'Додати ще витрату' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+
+    expect(createCollectionItem).not.toHaveBeenCalled();
+    expect(screen.getByText('Вкажіть суму, більшу за 0')).toBeInTheDocument();
+
+    // With the bad row gone, the one left untouched is simply ignored.
+    await userEvent.clear(screen.getAllByLabelText(/Сума/)[0]!);
+    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
+    expect(vi.mocked(createCollectionItem).mock.calls[0]![0]!.extraExpenses).toEqual([]);
+  });
+
   it('lets the linked coin be swapped from inside the block', async () => {
     vi.mocked(lookupCatalog).mockResolvedValue([SUGGESTION]);
     renderPage('/collection/add?type=grading&catalogItemId=7');

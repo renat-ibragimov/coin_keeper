@@ -1302,6 +1302,9 @@ export interface components {
          *     and the coin_purchase expense are then created in one transaction, so a
          *     rejected purchase cannot leave an orphaned catalog record behind. Exactly
          *     one of the two fields is given — neither and both are 422.
+         *
+         *     `extraExpenses` rides along the same transaction: the delivery and the
+         *     coin are one act of spending, and either both are recorded or neither is.
          */
         CollectionItemCreate: {
             /** Catalogitemid */
@@ -1329,6 +1332,8 @@ export interface components {
             grade?: string | null;
             /** Storagelocation */
             storageLocation?: string | null;
+            /** Extraexpenses */
+            extraExpenses?: components["schemas"]["ExtraExpenseIn"][];
         };
         /** CollectionItemOut */
         CollectionItemOut: {
@@ -1704,6 +1709,27 @@ export interface components {
             thisMonthUah: string;
             /** Prevmonthuah */
             prevMonthUah: string;
+        };
+        /**
+         * ExtraExpenseIn
+         * @description A supporting expense recorded together with the purchase it belongs to.
+         *
+         *     Delivery, a holder, a grading fee — money spent on this coin at the moment
+         *     it was bought, and having to reopen the money journal to write it down is
+         *     how it ends up never written down (owner's call, 2026-09-14). What comes
+         *     out is an ordinary manual expense linked to the coin: same category list,
+         *     same `catalogItemId` link, edited and deleted in «Гроші» like any other,
+         *     and deleting one leaves the coin alone.
+         *
+         *     Date and vendor are not fields here — they come from the purchase, which
+         *     is the point of recording the two together.
+         */
+        ExtraExpenseIn: {
+            category: components["schemas"]["ExpenseCategory"];
+            /** Amount */
+            amount: number | string;
+            /** Currency */
+            currency: string;
         };
         /** FinanceOut */
         FinanceOut: {

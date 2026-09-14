@@ -43,6 +43,7 @@ from app.schemas.collection import (
     CollectionItemOut,
     CollectionItemUpdate,
     CollectionPositionOut,
+    ExtraExpenseIn,
     StorageLocationOut,
 )
 from app.schemas.reference import CountryOut, DenominationOut
@@ -213,12 +214,20 @@ class CollectionService:
         """The purchase transaction (docs/04-business-rules.md, rule 4).
 
         With `newCatalogItem` it grows a third write — the personal catalog
-        item itself — and the order below is the whole point: the rate is
-        resolved before anything is inserted, so a purchase rejected for a
-        missing rate cannot leave a coin nobody bought behind. The schema
-        guarantees exactly one of the two coin fields is set.
+        item itself — and with `extraExpenses` one more per supporting
+        expense. The order below is the whole point: every rate is resolved
+        before anything is inserted, so a purchase rejected for a missing rate
+        cannot leave a coin nobody bought behind. The schema guarantees
+        exactly one of the two coin fields is set.
         """
         rate = await self._resolve_rate(payload.currency, payload.purchase_date)
+        # Every currency in the request, the coin's and the delivery's alike,
+        # is resolved before the first insert. A supporting expense in a
+        # currency with no rate must not leave a coin and an instance behind.
+        extra_rates = [
+            await self._resolve_rate(extra.currency, payload.purchase_date)
+            for extra in payload.extra_expenses
+        ]
         # Resolved before the coin, not after: a storage location the owner
         # has not used before is created *and committed* on the spot
         # (app/repositories/storage_locations.py), and that commit must not
@@ -251,6 +260,8 @@ class CollectionService:
         )
         await self._repo.add(instance)
         self._session.add(self._build_expense(instance))
+        for extra, extra_rate in zip(payload.extra_expenses, extra_rates, strict=True):
+            self._session.add(self._build_extra_expense(extra, extra_rate, instance))
         await self._session.flush()
         if payload.new_catalog_item is not None:
             # All three rows at once, here rather than at the end of the
@@ -355,6 +366,28 @@ class CollectionService:
             expense_date=instance.acquisition_date,
             catalog_item_id=instance.catalog_item_id,
             collection_item_id=instance.id,
+            vendor=instance.seller,
+        )
+
+    def _build_extra_expense(
+        self, extra: ExtraExpenseIn, rate: Decimal, instance: CollectionItem
+    ) -> Expense:
+        """A supporting expense of the purchase — as a plain manual expense.
+
+        Linked to the coin, deliberately not to the instance: `collection_item_id`
+        means "this row *is* the purchase" everywhere else (it is what the money
+        journal's icons act on, and what deleting a coin takes with it, rule 4).
+        A delivery is money that was spent whether or not the coin later leaves
+        the collection, and deleting the delivery must never touch the coin.
+        """
+        return Expense(
+            owner_id=self._user.id,
+            category=extra.category,
+            amount=extra.amount,
+            currency_code=extra.currency,
+            rate_uah=rate,
+            expense_date=instance.acquisition_date,
+            catalog_item_id=instance.catalog_item_id,
             vendor=instance.seller,
         )
 

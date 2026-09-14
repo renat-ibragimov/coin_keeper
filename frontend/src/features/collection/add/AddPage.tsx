@@ -36,6 +36,9 @@ import type { CarriedValues } from './carried';
 import { emptyCoinFields } from './coinFields';
 import type { CoinFieldErrors, CoinFields } from './coinFields';
 import { CoinPicker } from './CoinPicker';
+import { collectExtraExpenses } from './extraExpenseRows';
+import type { ExtraExpenseErrors, ExtraExpenseRow } from './extraExpenseRows';
+import { ExtraExpenses } from './ExtraExpenses';
 import { NewCoinFields } from './NewCoinFields';
 
 /** "Покупка монети" plus every category a person records by hand. */
@@ -115,6 +118,8 @@ export function AddPage() {
   const [coinFields, setCoinFields] = useState<CoinFields>(emptyCoinFields);
   const [coinErrors, setCoinErrors] = useState<CoinFieldErrors>({});
   const [pickerErrors, setPickerErrors] = useState<{ country?: string; title?: string }>({});
+  const [extras, setExtras] = useState<ExtraExpenseRow[]>([]);
+  const [extraErrors, setExtraErrors] = useState<ExtraExpenseErrors>({});
 
   const cardQuery = useQuery({
     queryKey: ['catalog', 'card', catalogItemId],
@@ -194,8 +199,18 @@ export function AddPage() {
 
   /** Either a reference to a catalog item or the coin itself (docs/03-api-contract.md). */
   function purchaseBody(values: PurchaseValues): CollectionItemCreate {
-    if (catalogItemId !== null) return { ...values, catalogItemId };
-    return { ...values, newCatalogItem: newCatalogItem() };
+    // Already validated by `validateExtras` — the submission would not have
+    // got this far otherwise, so the rows can be read straight off.
+    const extraExpenses = collectExtraExpenses(extras).values;
+    if (catalogItemId !== null) return { ...values, catalogItemId, extraExpenses };
+    return { ...values, newCatalogItem: newCatalogItem(), extraExpenses };
+  }
+
+  /** The supporting expenses, checked whichever coin the purchase is about. */
+  function validateExtras(): boolean {
+    const { errors } = collectExtraExpenses(extras);
+    setExtraErrors(errors);
+    return Object.keys(errors).length === 0;
   }
 
   function newCatalogItem(): NewCatalogItem {
@@ -267,13 +282,29 @@ export function AddPage() {
   const storageLocations = (storageLocationsQuery.data ?? []).map((location) => location.name);
   const cancel = () => navigate(from ?? (isPurchase ? '/collection/coins' : '/collection/money'));
 
-  const purchaseForm = (key: string, beforeSubmit?: () => boolean) =>
+  const purchaseForm = (key: string, validateCoin?: () => boolean) =>
     settings ? (
       <PurchaseForm
         key={key}
         carried={carried}
         onCarriedChange={setCarried}
-        beforeSubmit={beforeSubmit}
+        // Both halves run, and neither short-circuits the other: someone
+        // fixing the form should see everything wrong with it at once.
+        beforeSubmit={() => {
+          const extrasOk = validateExtras();
+          return (validateCoin ? validateCoin() : true) && extrasOk;
+        }}
+        footer={
+          <ExtraExpenses
+            rows={extras}
+            onChange={setExtras}
+            errors={Object.fromEntries(
+              Object.entries(extraErrors).map(([rowKey, message]) => [rowKey, t(message)]),
+            )}
+            currencies={currencies}
+            defaultCurrency={carried.currency || 'UAH'}
+          />
+        }
         defaultGrade={settings.defaultGrade}
         defaultStorageLocation={settings.defaultStorageLocation}
         storageLocations={storageLocations}
