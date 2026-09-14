@@ -7,10 +7,16 @@
 /* Two independently stacking columns, not a strict grid: cards vary a lot in
  * height (a short password form next to a long appearance card), and a
  * two-row CSS grid would size every row to its tallest cell and leave dead
- * whitespace under the shorter one. */
+ * whitespace under the shorter one.
+ *
+ * The columns do end level, though: `stretch` gives both the height of the
+ * taller one, and the last card in each absorbs the slack (below). Whichever
+ * side is shorter grows by itself, so adding a section to either column no
+ * longer leaves a ragged bottom — the hand-tuned spacer that used to do this
+ * job broke the moment the avatar section was added above it. */
 .columns {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--space-5);
 }
 
@@ -20,6 +26,12 @@
   min-width: 0;
   flex-direction: column;
   gap: var(--space-5);
+}
+
+/* grow only — the card keeps its natural height and takes the leftover, if
+ * any, rather than being sized from zero. */
+.column > :last-child {
+  flex-grow: 1;
 }
 
 /* Settings headings name interface areas: body face, UI-panel size. */
@@ -33,18 +45,6 @@
 
 .spaced {
   margin-top: var(--space-6);
-}
-
-.centerRow {
-  display: flex;
-  justify-content: center;
-}
-
-/* Extra breathing room, tuned to close the gap against the two shorter
- * cards stacked on the right (owner's request, 2026-09-13) -- Профіль is
- * the only card in its column, so nothing else can absorb the difference. */
-.logoutRow {
-  margin-top: 82px;
 }
 
 /* A heading for one control group inside a card that already has its own
@@ -73,5 +73,11 @@
 
   .column {
     gap: var(--space-4);
+  }
+
+  /* One column below this width: there is nothing to line up with, and a
+   * stretched card would only be empty at the bottom. */
+  .column > :last-child {
+    flex-grow: 0;
   }
 }

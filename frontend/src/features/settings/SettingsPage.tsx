@@ -1,6 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useAuth } from '@/features/auth/useAuth';
@@ -14,12 +13,9 @@ import { useTheme } from '@/shared/theme/useTheme';
 import type { ThemePreference } from '@/shared/theme/themeContext';
 import {
   Badge,
-  Button,
   Card,
   Combobox,
   ConfirmDialog,
-  FormActions,
-  FormError,
   FormRow,
   FormStack,
   Input,
@@ -37,7 +33,7 @@ import styles from './SettingsPage.module.css';
 
 export function SettingsPage() {
   const { t } = useTranslation();
-  const { user, updateUser, signOut } = useAuth();
+  const { user, updateUser } = useAuth();
   const { preference, setPreference } = useTheme();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -55,11 +51,14 @@ export function SettingsPage() {
   const collectionViewMode = useStoredViewMode('ck.viewMode.collection', 'collectionViewMode');
 
   const profileMutation = useMutation({
-    mutationFn: () => updateProfile({ displayName: displayName.trim() || null }),
+    mutationFn: (name: string | null) => updateProfile({ displayName: name }),
     onSuccess: (updated) => {
       updateUser(updated);
       toast.show(t('settings.profileSaved'));
     },
+    // Every other control on this page reports failure the same way; without
+    // a form around the field there is no FormError slot to put it in.
+    onError: () => toast.show(t('errors.generic')),
   });
   // Interface language lives with the appearance settings, not the profile
   // form: it applies the moment it's picked, same as the theme, instead of
@@ -127,9 +126,14 @@ export function SettingsPage() {
     themeMutation.mutate(next);
   }
 
-  function saveProfile(event: FormEvent) {
-    event.preventDefault();
-    profileMutation.mutate();
+  // The same commit pair as «Місце зберігання» below: Enter saves, and so
+  // does clicking away — a name typed and then abandoned without pressing
+  // Enter must not disappear silently. An unchanged value sends nothing, or
+  // every stray click through the field would be a PATCH.
+  function saveDisplayName() {
+    const next = displayName.trim() || null;
+    if (next === (user?.displayName ?? null)) return;
+    profileMutation.mutate(next);
   }
 
   const settings = bootstrapQuery.data?.settings;
@@ -167,24 +171,23 @@ export function SettingsPage() {
               </Badge>
             </h2>
             <AvatarSection />
-            <form onSubmit={saveProfile} noValidate>
-              <FormStack>
-                <FormError>{profileMutation.isError ? t('errors.generic') : null}</FormError>
-                <Input label={t('settings.email')} value={user?.email ?? ''} readOnly disabled />
-                <Input
-                  label={t('settings.displayName')}
-                  hint={t('settings.displayNameHint')}
-                  value={displayName}
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  maxLength={100}
-                />
-                <FormActions>
-                  <Button type="submit" loading={profileMutation.isPending}>
-                    {t('common.save')}
-                  </Button>
-                </FormActions>
-              </FormStack>
-            </form>
+            <FormStack>
+              <Input label={t('settings.email')} value={user?.email ?? ''} readOnly disabled />
+              <Input
+                label={t('settings.displayName')}
+                hint={t('settings.displayNameHint')}
+                value={displayName}
+                onChange={(event) => setDisplayName(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    saveDisplayName();
+                  }
+                }}
+                onBlur={saveDisplayName}
+                maxLength={100}
+              />
+            </FormStack>
 
             <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
               {t('settings.passwordTitle')}
@@ -196,12 +199,6 @@ export function SettingsPage() {
                 passwordMutation.mutateAsync({ current, next }).then(() => {})
               }
             />
-
-            <div className={`${styles.centerRow} ${styles.logoutRow}`}>
-              <Button variant="danger" onClick={() => void signOut()}>
-                {t('header.logout')}
-              </Button>
-            </div>
           </Card>
         </div>
 
