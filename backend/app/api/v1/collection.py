@@ -4,16 +4,24 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, BackgroundTasks, Query, status
+from fastapi import APIRouter, BackgroundTasks, Query, Request, status
 
-from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
+from app.api.deps import (
+    CollectionPhotoServiceDep,
+    CurrentUser,
+    DbSession,
+    Pagination,
+    RequestLocale,
+)
 from app.api.errors import ProblemError
-from app.models.enums import CollectionGroup
+from app.core.images import MAX_SOURCE_BYTES, ImageRejectedError
+from app.models.enums import CollectionGroup, MediaRole
 from app.repositories.collection import CollectionFilters
 from app.schemas.catalog import CoinMaterial
 from app.schemas.collection import (
     CollectionItemCreate,
     CollectionItemOut,
+    CollectionItemPhotosOut,
     CollectionItemUpdate,
     CollectionPositionOut,
     StorageLocationCreate,
@@ -30,10 +38,14 @@ from app.services.collection import (
     MissingRateError,
     UnknownCurrencyError,
 )
+from app.services.collection_photos import CollectionItemNotFoundError as PhotoItemNotFoundError
+from app.services.media_urls import image_out
 from app.services.storage_locations import (
     StorageLocationForbiddenError,
     StorageLocationNotFoundError,
 )
+
+PhotoRole = Literal["obverse", "reverse"]
 
 router = APIRouter(prefix="/collection", tags=["collection"])
 
@@ -45,6 +57,15 @@ def _not_found(what: str) -> ProblemError:
 def _unprocessable(problem_type: str, detail: str) -> ProblemError:
     return ProblemError(
         status.HTTP_422_UNPROCESSABLE_CONTENT, problem_type, "Request rejected", detail
+    )
+
+
+def _invalid_image_problem() -> ProblemError:
+    return ProblemError(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "invalid-image",
+        "Image rejected",
+        "Upload a JPEG, PNG or WebP image up to 12 MB and no wider than 4000 px.",
     )
 
 
@@ -246,3 +267,56 @@ async def delete_item(
         await CollectionService(session, user, locale).delete(item_id)
     except CollectionItemNotFoundError as exc:
         raise _not_found("collection-item") from exc
+
+
+@router.put("/{item_id}/photos/{role}")
+async def set_photo(
+    request: Request,
+    user: CurrentUser,
+    service: CollectionPhotoServiceDep,
+    item_id: int,
+    role: PhotoRole,
+) -> CollectionItemPhotosOut:
+    """Raw image bytes, same shape as PUT /auth/me/avatar: one file, no
+    envelope, and a repeated upload of the same bytes lands on the same key.
+
+    Always a new `media_files` row bound to this collection item, never a
+    write to the catalog's own media (docs/06-media-storage.md) — the
+    invariant lives in CollectionPhotoService, not here.
+    """
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_SOURCE_BYTES:
+        raise _invalid_image_problem()
+
+    payload = await request.body()
+    if len(payload) > MAX_SOURCE_BYTES:
+        raise _invalid_image_problem()
+
+    try:
+        images = await service.set_photo(
+            owner=user, item_id=item_id, role=MediaRole(role), payload=payload
+        )
+    except PhotoItemNotFoundError as exc:
+        raise _not_found("collection-item") from exc
+    except ImageRejectedError as exc:
+        raise _invalid_image_problem() from exc
+    return CollectionItemPhotosOut(
+        obverse=image_out(images.obverse), reverse=image_out(images.reverse)
+    )
+
+
+@router.delete("/{item_id}/photos/{role}")
+async def delete_photo(
+    user: CurrentUser,
+    service: CollectionPhotoServiceDep,
+    item_id: int,
+    role: PhotoRole,
+) -> CollectionItemPhotosOut:
+    """200 with the fresh images, not 204: the page repaints from the answer."""
+    try:
+        images = await service.remove_photo(owner=user, item_id=item_id, role=MediaRole(role))
+    except PhotoItemNotFoundError as exc:
+        raise _not_found("collection-item") from exc
+    return CollectionItemPhotosOut(
+        obverse=image_out(images.obverse), reverse=image_out(images.reverse)
+    )

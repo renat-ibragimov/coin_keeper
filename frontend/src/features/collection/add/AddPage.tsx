@@ -25,11 +25,14 @@ import { coinTitle } from '@/shared/lib/coinTitle';
 import { parseDecimal } from '@/shared/lib/format';
 import { Button, Card, ErrorState, PageHeader, Select, Skeleton, useToast } from '@/shared/ui';
 
-import { createCollectionItem, fetchStorageLocations } from '../api';
+import { createCollectionItem, fetchStorageLocations, uploadCoinPhoto } from '../api';
+import { CoinPhotoCropDialog } from '../CoinPhotoCropDialog';
 import { COLLECTION_DEPENDENT_KEYS } from '../model';
 import { PurchaseForm } from '../PurchaseForm';
 import type { PurchaseValues } from '../PurchaseForm';
+import type { CoinSide } from '../SelectedCoin';
 import { SelectedCoin } from '../SelectedCoin';
+import { useCoinPhotoPicker } from '../useCoinPhotoPicker';
 import styles from './AddPage.module.css';
 import { emptyCarried } from './carried';
 import type { CarriedValues } from './carried';
@@ -121,6 +124,39 @@ export function AddPage() {
   const [extras, setExtras] = useState<ExtraExpenseRow[]>([]);
   const [extraErrors, setExtraErrors] = useState<ExtraExpenseErrors>({});
 
+  // Held in the form until the purchase itself is saved: there is no
+  // instance id to upload against yet (docs/06-media-storage.md — no server
+  // drafts). Keyed by side, not a fixed pair, so "no photo picked" needs no
+  // sentinel value.
+  const [pendingPhotos, setPendingPhotos] = useState<Partial<Record<CoinSide, Blob>>>({});
+  const [photoPreviews, setPhotoPreviews] = useState<Partial<Record<CoinSide, string>>>({});
+
+  function setPhoto(side: CoinSide, blob: Blob) {
+    setPhotoPreviews((current) => {
+      const previous = current[side];
+      if (previous) URL.revokeObjectURL(previous);
+      return { ...current, [side]: URL.createObjectURL(blob) };
+    });
+    setPendingPhotos((current) => ({ ...current, [side]: blob }));
+  }
+
+  function clearPhoto(side: CoinSide) {
+    setPhotoPreviews((current) => {
+      const previous = current[side];
+      if (previous) URL.revokeObjectURL(previous);
+      const next = { ...current };
+      delete next[side];
+      return next;
+    });
+    setPendingPhotos((current) => {
+      const next = { ...current };
+      delete next[side];
+      return next;
+    });
+  }
+
+  const photoPicker = useCoinPhotoPicker(setPhoto);
+
   const cardQuery = useQuery({
     queryKey: ['catalog', 'card', catalogItemId],
     queryFn: () => fetchCard(catalogItemId!),
@@ -178,10 +214,23 @@ export function AddPage() {
   const purchaseMutation = useMutation({
     mutationFn: (values: PurchaseValues) => createCollectionItem(purchaseBody(values)),
     onSuccess: async (created) => {
+      // The coin exists the moment this resolves; a failed photo upload from
+      // here on is not a failed purchase — it is a reason to say so and send
+      // the owner to the edit page to try again (owner, 2026-09-14).
+      let photoFailed = false;
+      for (const [side, blob] of Object.entries(pendingPhotos) as [CoinSide, Blob][]) {
+        try {
+          await uploadCoinPhoto(created.id, side, blob);
+        } catch {
+          photoFailed = true;
+        }
+      }
+      for (const url of Object.values(photoPreviews)) if (url) URL.revokeObjectURL(url);
+
       await Promise.all(
         COLLECTION_DEPENDENT_KEYS.map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
       );
-      toast.show(t('purchase.created'));
+      toast.show(t(photoFailed ? 'purchase.photoUploadFailed' : 'purchase.created'));
       navigate(from ?? `/catalog/${created.catalogItemId}`, { replace: true });
     },
   });
@@ -331,7 +380,15 @@ export function AddPage() {
       />
 
       <div className={styles.content}>
-        {catalogItemId !== null && card ? <SelectedCoin card={card} onChange={clearCoin} /> : null}
+        {catalogItemId !== null && card ? (
+          <SelectedCoin
+            card={card}
+            onChange={clearCoin}
+            photos={photoPreviews}
+            onPickPhoto={photoPicker.pick}
+            onRemovePhoto={clearPhoto}
+          />
+        ) : null}
 
         <Card className={styles.form}>
           <div className={styles.stack}>
@@ -394,6 +451,9 @@ export function AddPage() {
                       onChange={(key, value) =>
                         setCoinFields((current) => ({ ...current, [key]: value }))
                       }
+                      photos={photoPreviews}
+                      onPickPhoto={photoPicker.pick}
+                      onRemovePhoto={clearPhoto}
                     />
                   ) : null}
                   {purchaseForm('new-coin', validateNewCoin)}
@@ -456,6 +516,21 @@ export function AddPage() {
           </div>
         </Card>
       </div>
+
+      <input
+        ref={photoPicker.fileInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className={styles.fileInput}
+        onChange={photoPicker.onFileChange}
+      />
+      <CoinPhotoCropDialog
+        key={photoPicker.raw ?? 'none'}
+        image={photoPicker.raw}
+        busy={false}
+        onCancel={photoPicker.cancel}
+        onSave={photoPicker.onCropSave}
+      />
     </div>
   );
 }

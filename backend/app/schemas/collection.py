@@ -9,7 +9,7 @@ from pydantic import Field, model_validator
 
 from app.models.enums import CollectionGroup, ExpenseCategory
 from app.schemas.base import CamelModel
-from app.schemas.catalog import NewCatalogItemIn
+from app.schemas.catalog import CoinImageOut, NewCatalogItemIn
 from app.schemas.common import Money, Rate
 
 
@@ -75,6 +75,26 @@ class CollectionItemOut(CamelModel):
     # the visible thumbnail and the latest visible market price of the item.
     thumbnail_url: str | None = None
     market_price_uah: Money | None = None
+    # This instance's own photo where the owner uploaded one, the catalog's
+    # otherwise (docs/06-media-storage.md) — the edit page's SelectedCoin
+    # renders these, not the catalog card's, so a sibling purchase's photo
+    # never appears on the wrong instance.
+    obverse_image: CoinImageOut | None = None
+    reverse_image: CoinImageOut | None = None
+    # Whether the image above is this owner's own upload rather than the
+    # catalog's photo — the edit page's delete button only makes sense on a
+    # side that actually has something of the owner's to delete.
+    obverse_photo_is_own: bool = False
+    reverse_photo_is_own: bool = False
+
+
+class CollectionItemPhotosOut(CamelModel):
+    """What PUT/DELETE .../photos/{role} hands back: this instance's two
+    sides, already resolved to the owner's own photo or the catalog default,
+    so the page repaints without a second request."""
+
+    obverse: CoinImageOut | None = None
+    reverse: CoinImageOut | None = None
 
 
 class ExtraExpenseIn(CamelModel):

@@ -85,3 +85,7 @@
   cursor: pointer;
   text-decoration: underline;
 }
+
+.fileInput {
+  display: none;
+}

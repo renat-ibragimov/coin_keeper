@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Pencil, Plus, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -14,6 +14,8 @@ import {
 import { buildYearList, computeYearBounds } from '@/shared/lib/yearRange';
 import { Combobox, FormRow, Input, Select, Textarea } from '@/shared/ui';
 
+import type { CoinSide } from '../SelectedCoin';
+import photoStyles from '../SelectedCoin.module.css';
 import { COLLECTION_GROUPS, METAL_KINDS } from './coinFields';
 import type { CoinFieldErrors, CoinFields } from './coinFields';
 import styles from './NewCoinFields.module.css';
@@ -23,6 +25,12 @@ interface NewCoinFieldsProps {
   values: CoinFields;
   errors: CoinFieldErrors;
   onChange: (key: keyof CoinFields, value: string) => void;
+  /** Local preview URLs of the photos picked for the coin that is about to be
+   *  created — there is no server side yet to hold them (docs/06-media-storage.md:
+   *  the upload happens after the purchase itself is saved). */
+  photos?: Partial<Record<CoinSide, string | null>>;
+  onPickPhoto?: (side: CoinSide) => void;
+  onRemovePhoto?: (side: CoinSide) => void;
 }
 
 /**
@@ -34,7 +42,15 @@ interface NewCoinFieldsProps {
  * of it below the first four rows hides behind "Більше деталей": the common
  * case is a collector who knows what they bought and not much else.
  */
-export function NewCoinFields({ countryId, values, errors, onChange }: NewCoinFieldsProps) {
+export function NewCoinFields({
+  countryId,
+  values,
+  errors,
+  onChange,
+  photos,
+  onPickPhoto,
+  onRemovePhoto,
+}: NewCoinFieldsProps) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useState(false);
 
@@ -90,6 +106,63 @@ export function NewCoinFields({ countryId, values, errors, onChange }: NewCoinFi
     <section className={styles.block} aria-label={t('add.aboutCoin')}>
       <h3 className={styles.title}>{t('add.aboutCoin')}</h3>
       <p className={styles.lead}>{t('add.aboutCoinLead')}</p>
+
+      {onPickPhoto ? (
+        <div className={photoStyles.photos}>
+          {(['obverse', 'reverse'] as const).map((side) => {
+            const preview = photos?.[side];
+            return (
+              <figure key={side} className={photoStyles.photo}>
+                <div className={photoStyles.photoFrame}>
+                  {preview ? (
+                    <>
+                      <img src={preview} alt="" className={styles.photoPreview} />
+                      <button
+                        type="button"
+                        className={photoStyles.photoOverlay}
+                        onClick={() => onPickPhoto(side)}
+                      >
+                        <Pencil size={16} aria-hidden="true" />
+                        {t('card.changePhoto')}
+                      </button>
+                      <button
+                        type="button"
+                        className={photoStyles.photoEdit}
+                        aria-label={t('card.changePhoto')}
+                        onClick={() => onPickPhoto(side)}
+                      >
+                        <Pencil size={13} aria-hidden="true" />
+                      </button>
+                      {onRemovePhoto ? (
+                        <button
+                          type="button"
+                          className={photoStyles.photoRemove}
+                          aria-label={t('collectionPhoto.removePhoto')}
+                          onClick={() => onRemovePhoto(side)}
+                        >
+                          <X size={12} aria-hidden="true" />
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.photoPlaceholder}
+                      onClick={() => onPickPhoto(side)}
+                    >
+                      <Plus size={20} aria-hidden="true" />
+                      {t('add.addPhoto')}
+                    </button>
+                  )}
+                </div>
+                <figcaption className={photoStyles.photoLabel}>
+                  {t(side === 'obverse' ? 'card.obverse' : 'card.reverse')}
+                </figcaption>
+              </figure>
+            );
+          })}
+        </div>
+      ) : null}
 
       <FormRow>
         {/* The same field the catalog's "Рік від/до" filters use: a list to

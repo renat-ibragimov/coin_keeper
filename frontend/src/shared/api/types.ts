@@ -36,7 +36,18 @@ export type ExchangeRateOut = components['schemas']['ExchangeRateOut'];
 export type PriceHistoryItem = components['schemas']['PriceHistoryItem'];
 export type CatalogCollectionItem = components['schemas']['CatalogCollectionItemOut'];
 
-export type CollectionItem = components['schemas']['CollectionItemOut'];
+// obverseImage/reverseImage and the photos endpoints are on the server
+// already; the checked-in OpenAPI snapshot predates them. Drop the
+// intersection and add CollectionItemPhotosOut after `npm run gen:api` runs
+// against a backend carrying the collection-photos endpoints.
+type CoinImage = components['schemas']['CoinImageOut'];
+export type CollectionItem = components['schemas']['CollectionItemOut'] & {
+  obverseImage?: CoinImage | null;
+  reverseImage?: CoinImage | null;
+  obversePhotoIsOwn?: boolean;
+  reversePhotoIsOwn?: boolean;
+};
+export type CollectionItemPhotos = { obverse: CoinImage | null; reverse: CoinImage | null };
 export type CollectionItemCreate = components['schemas']['CollectionItemCreate'];
 export type CollectionItemUpdate = components['schemas']['CollectionItemUpdate'];
 export type CollectionPosition = components['schemas']['CollectionPositionOut'];

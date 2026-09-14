@@ -759,17 +759,22 @@ GET  /exports/{jobId}                 → {status, downloadUrl}
 ## Фото
 
 ```
-POST   /catalog/{id}/images       multipart: file, role  → {mediaId, url, thumbnailUrl, source}
-DELETE /catalog/{id}/images/{role}
-POST   /collection/{id}/images    multipart: file, role
-DELETE /collection/{id}/images/{role}
+PUT    /collection/{id}/photos/{role}     сырые байты (image/jpeg|png|webp) → CollectionItemPhotosOut
+DELETE /collection/{id}/photos/{role}                                      → CollectionItemPhotosOut
 ```
 
-`/catalog/{id}/images` работает только по **личным** позициям пользователя (403 на общую,
-404 на чужую); фото общего каталога загружает администратор или задача по каталогу НБУ.
-Загруженное пользователем получает `source = 'user_upload'`.
+`role` — `obverse` или `reverse`, в пути; что-то ещё — `422`. Как `PUT/DELETE /auth/me/avatar`
+(`08-ui-map.md`, часть 8): один файл без multipart-конверта, `Content-Length` сверх лимита
+отбивается `422` до чтения тела. Ответ — уже подписанные `CoinImageOut` на обе стороны этого
+**экземпляра** (`{obverse, reverse}`), чтобы страница перерисовалась без второго запроса.
+Всегда пишет новую строку `media_files` с `collectionItemId` (не `catalogItemId`) и
+`source = 'user_upload'`; своя позиция чужого пользователя — `404`.
 
-Ограничения, обработка и правила видимости по происхождению — `06-media-storage.md`.
+`GET /collection/{id}` и списки коллекции/каталога подмешивают этот же приоритет на чтение —
+подробности выбора и происхождения см. `06-media-storage.md`.
+
+Загрузка фото для **каталожных** записей (`/catalog/{id}/images`, редактирование общей
+позиции администратором) в MVP не реализована — отложено за пределы этого этапа.
 
 ## Фоновые задачи
 

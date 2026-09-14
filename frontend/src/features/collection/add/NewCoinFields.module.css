@@ -57,3 +57,36 @@
 .details[hidden] {
   display: none;
 }
+
+.photoPreview {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-surface-control);
+}
+
+/* Same footprint as a picked photo (photoStyles.photoFrame), so choosing one
+   does not shift anything else on the page. */
+.photoPlaceholder {
+  display: flex;
+  width: 132px;
+  height: 132px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border: 1px dashed var(--color-border);
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.photoPlaceholder:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}

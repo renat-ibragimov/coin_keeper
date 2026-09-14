@@ -3,6 +3,7 @@ import type {
   CoinMaterial,
   CollectionItem,
   CollectionItemCreate,
+  CollectionItemPhotos,
   CollectionItemUpdate,
   CollectionPage,
   CountryOut,
@@ -10,6 +11,8 @@ import type {
   SeriesOut,
   StorageLocation,
 } from '@/shared/api/types';
+
+export type PhotoRole = 'obverse' | 'reverse';
 
 import type { CollectionFilters } from './useCollectionFilters';
 
@@ -97,4 +100,22 @@ export function updateCollectionItem(
 /** Deletes the linked purchase expense as well (docs/04-business-rules.md, rule 10). */
 export function deleteCollectionItem(id: number): Promise<void> {
   return api<void>(`/collection/${id}`, { method: 'DELETE' });
+}
+
+/** Raw bytes, not multipart — same shape as PUT /auth/me/avatar. Answers with
+ *  both sides of the instance, already resolved, so the page repaints without
+ *  a second request. */
+export function uploadCoinPhoto(
+  itemId: number,
+  role: PhotoRole,
+  image: Blob,
+): Promise<CollectionItemPhotos> {
+  return api<CollectionItemPhotos>(`/collection/${itemId}/photos/${role}`, {
+    method: 'PUT',
+    body: image,
+  });
+}
+
+export function deleteCoinPhoto(itemId: number, role: PhotoRole): Promise<CollectionItemPhotos> {
+  return api<CollectionItemPhotos>(`/collection/${itemId}/photos/${role}`, { method: 'DELETE' });
 }

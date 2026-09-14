@@ -19,6 +19,7 @@ from app.models.enums import UserRole
 from app.repositories.users import UserRepository
 from app.services.auth import AuthService
 from app.services.avatars import AvatarService
+from app.services.collection_photos import CollectionPhotoService
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -39,6 +40,15 @@ def get_avatar_service(session: DbSession) -> AvatarService:
 
 
 AvatarServiceDep = Annotated[AvatarService, Depends(get_avatar_service)]
+
+
+def get_collection_photo_service(session: DbSession) -> CollectionPhotoService:
+    return CollectionPhotoService(session)
+
+
+CollectionPhotoServiceDep = Annotated[
+    CollectionPhotoService, Depends(get_collection_photo_service)
+]
 
 
 def request_locale(

@@ -5,6 +5,7 @@ export { Button } from './Button';
 export { Card } from './Card';
 export { CoinImage } from './CoinImage';
 export { Combobox } from './Combobox';
+export { CropDialog } from './CropDialog';
 export { DataTable, SortHeader } from './DataTable';
 export type { SortOrder } from './DataTable';
 export { cellAlign, clampTwoLines } from './dataTableCells';

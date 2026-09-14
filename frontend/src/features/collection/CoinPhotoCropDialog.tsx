@@ -2,9 +2,9 @@ import { useTranslation } from 'react-i18next';
 
 import { CropDialog } from '@/shared/ui';
 
-import { cropToBlob } from './cropAvatar';
+import { cropToBlob } from './cropCoinPhoto';
 
-interface AvatarCropDialogProps {
+interface CoinPhotoCropDialogProps {
   /** An object URL for the picked file; the caller owns and revokes it. */
   image: string | null;
   busy: boolean;
@@ -12,16 +12,16 @@ interface AvatarCropDialogProps {
   onSave: (cropped: Blob) => void;
 }
 
-/** Pick the visible circle out of a picture before it is uploaded. */
-export function AvatarCropDialog({ image, busy, onCancel, onSave }: AvatarCropDialogProps) {
+/** A viewfinder circle over the coin photo; the server gets the square behind it. */
+export function CoinPhotoCropDialog({ image, busy, onCancel, onSave }: CoinPhotoCropDialogProps) {
   const { t } = useTranslation();
   return (
     <CropDialog
       image={image}
-      title={t('settings.avatarCropTitle')}
-      hint={t('settings.avatarCropHint')}
+      title={t('collectionPhoto.cropTitle')}
+      hint={t('collectionPhoto.cropHint')}
       zoomLabel={t('settings.avatarZoom')}
-      invalidMessage={t('settings.avatarInvalid')}
+      invalidMessage={t('collectionPhoto.invalid')}
       busy={busy}
       cropShape="round"
       onCancel={onCancel}

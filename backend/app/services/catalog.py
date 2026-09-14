@@ -25,7 +25,6 @@ from app.models import (
     Denomination,
     EdgeType,
     Material,
-    MediaFile,
     QualityType,
     User,
 )
@@ -46,13 +45,17 @@ from app.schemas.catalog import (
     CoinDenomination,
     CoinDescriptions,
     CoinEdgeType,
-    CoinImageOut,
     CoinMaterial,
     CoinQualityType,
     NewCatalogItemIn,
     PriceHistoryItem,
 )
-from app.services.media_urls import CatalogImages, CoinImage, MediaUrlBuilder
+from app.services.media_urls import (
+    CatalogImages,
+    MediaUrlBuilder,
+    image_out,
+    images_by_catalog_item,
+)
 from app.services.translation import TranslationResult, translate_coin_title
 
 logger = logging.getLogger("app.services.catalog")
@@ -101,17 +104,6 @@ class BadReferenceError(CatalogError):
 def display_title(item: CatalogItem, locale: str = DEFAULT_LOCALE) -> str:
     """title_{locale} → title_original (docs/04-business-rules.md)."""
     return pick_name(locale, uk=item.title_uk, en=item.title_en, original=item.title_original)
-
-
-def _image_out(image: CoinImage | None) -> CoinImageOut | None:
-    if image is None:
-        return None
-    return CoinImageOut(
-        preview=image.preview,
-        medium=image.medium,
-        large=image.large,
-        attribution=image.attribution,
-    )
 
 
 def denomination_out(denomination: Denomination | None, locale: str) -> CoinDenomination | None:
@@ -547,14 +539,8 @@ class CatalogService:
         )
 
     async def _images_for(self, item_ids: list[int]) -> dict[int, CatalogImages]:
-        files = await self._media.visible_for_catalog_items(item_ids)
-        by_item: dict[int, list[MediaFile]] = {}
-        for media in files:
-            if media.catalog_item_id is not None:
-                by_item.setdefault(media.catalog_item_id, []).append(media)
-        return {
-            item_id: self._urls.pick_catalog_images(items) for item_id, items in by_item.items()
-        }
+        """The catalog photo, or the owner's own — see images_by_catalog_item."""
+        return await images_by_catalog_item(self._media, self._urls, item_ids)
 
     def _base_fields(self, row: CatalogRow, images: CatalogImages) -> dict[str, object]:
         item = row.item
@@ -589,8 +575,8 @@ class CatalogService:
             "purchase_total_uah": row.purchase_total_uah,
             "purchase_total_usd": row.purchase_total_usd,
             "purchase_total_eur": row.purchase_total_eur,
-            "obverse_image": _image_out(images.obverse),
-            "reverse_image": _image_out(images.reverse),
+            "obverse_image": image_out(images.obverse),
+            "reverse_image": image_out(images.reverse),
             "thumbnail_url": images.thumbnail_url,
             "is_own": item.created_by == self._user.id,
             "is_archived": item.is_archived,

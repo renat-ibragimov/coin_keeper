@@ -11,12 +11,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from app.core.config import get_settings
 from app.core.images import LARGE_SIDE, MEDIUM_SIDE, PREVIEW_SIDE
 from app.core.storage import ObjectStorage, build_s3_client
 from app.models import MediaFile
 from app.models.enums import MediaRole, MediaSource
+from app.schemas.catalog import CoinImageOut
+
+if TYPE_CHECKING:
+    from app.repositories.media import MediaRepository
 
 PRESIGN_TTL_SECONDS = 3600
 
@@ -126,3 +131,33 @@ class MediaUrlBuilder:
     def _ranking(media: MediaFile) -> tuple[int, int]:
         # Lower is better; among equals the newest row wins.
         return (_SOURCE_PRIORITY.get(media.source, 3), -media.id)
+
+
+async def images_by_catalog_item(
+    media: MediaRepository, urls: MediaUrlBuilder, catalog_item_ids: list[int]
+) -> dict[int, CatalogImages]:
+    """Public catalog media plus the viewer's own instance photos, per item.
+
+    Shared by the catalog listing/card and the collection listing: both show
+    "the viewer's own coin, with their own photo first" for the same set of
+    catalog items (docs/06-media-storage.md, "Выбор изображения для
+    карточки") — one query pair and one ranking, so the two screens cannot
+    quietly start disagreeing about which photo wins.
+    """
+    by_item: dict[int, list[MediaFile]] = {}
+    for catalog_media in await media.visible_for_catalog_items(catalog_item_ids):
+        if catalog_media.catalog_item_id is not None:
+            by_item.setdefault(catalog_media.catalog_item_id, []).append(catalog_media)
+    for catalog_item_id, own_media in await media.owned_instance_media_for_catalog_items(
+        catalog_item_ids
+    ):
+        by_item.setdefault(catalog_item_id, []).append(own_media)
+    return {item_id: urls.pick_catalog_images(files) for item_id, files in by_item.items()}
+
+
+def image_out(image: CoinImage | None) -> CoinImageOut | None:
+    if image is None:
+        return None
+    return CoinImageOut(
+        preview=image.preview, medium=image.medium, large=image.large, attribution=image.attribution
+    )

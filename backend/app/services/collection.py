@@ -23,10 +23,9 @@ from app.models import (
     Currency,
     Denomination,
     Expense,
-    MediaFile,
     User,
 )
-from app.models.enums import ExpenseCategory, UserRole
+from app.models.enums import ExpenseCategory, MediaRole, UserRole
 from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogRepository
 from app.repositories.collection import (
@@ -49,7 +48,12 @@ from app.schemas.collection import (
 from app.schemas.reference import CountryOut, DenominationOut
 from app.schemas.series import SeriesOut
 from app.services.catalog import CatalogService, display_title, material_out
-from app.services.media_urls import CatalogImages, MediaUrlBuilder
+from app.services.media_urls import (
+    CatalogImages,
+    MediaUrlBuilder,
+    image_out,
+    images_by_catalog_item,
+)
 from app.services.storage_locations import StorageLocationService
 
 
@@ -329,19 +333,26 @@ class CollectionService:
     async def _get_out(self, item_id: int) -> CollectionItemOut:
         row = await self._repo.get_row(item_id)
         assert row is not None
-        images = await self._images_for([row.catalog_item.id])
-        return self._row_out(row, images.get(row.catalog_item.id, CatalogImages()))
+        images, own_roles = await self._instance_images(row.instance.id, row.catalog_item.id)
+        return self._row_out(row, images, own_roles)
 
     async def _images_for(self, item_ids: list[int]) -> dict[int, CatalogImages]:
-        """Same visibility rules as the catalog listing (docs/06-media-storage.md)."""
-        files = await self._media.visible_for_catalog_items(item_ids)
-        by_item: dict[int, list[MediaFile]] = {}
-        for media in files:
-            if media.catalog_item_id is not None:
-                by_item.setdefault(media.catalog_item_id, []).append(media)
-        return {
-            item_id: self._urls.pick_catalog_images(items) for item_id, items in by_item.items()
-        }
+        """The listing's thumbnail: any of the owner's own purchases of the
+        item may carry the photo, since a position is not any one instance
+        (docs/06-media-storage.md)."""
+        return await images_by_catalog_item(self._media, self._urls, item_ids)
+
+    async def _instance_images(
+        self, item_id: int, catalog_item_id: int
+    ) -> tuple[CatalogImages, frozenset[MediaRole]]:
+        """This exact instance's own photo, or the catalog's — never a
+        sibling purchase's, unlike the position listing above. The role set
+        is which sides are actually this owner's own upload, for the edit
+        page's delete button."""
+        catalog_files = await self._media.visible_for_catalog_items([catalog_item_id])
+        own_files = await self._media.visible_for_collection_items([item_id])
+        images = self._urls.pick_catalog_images([*catalog_files, *own_files])
+        return images, frozenset(media.role for media in own_files)
 
     async def _resolve_rate(self, currency: str, on_date: date) -> Decimal:
         if await self._session.get(Currency, currency) is None:
@@ -424,7 +435,9 @@ class CollectionService:
             thumbnail_url=images.thumbnail_url,
         )
 
-    def _row_out(self, row: CollectionRow, images: CatalogImages) -> CollectionItemOut:
+    def _row_out(
+        self, row: CollectionRow, images: CatalogImages, own_roles: frozenset[MediaRole]
+    ) -> CollectionItemOut:
         instance = row.instance
         item = row.catalog_item
         return CollectionItemOut(
@@ -451,4 +464,8 @@ class CollectionService:
             notes=instance.notes,
             thumbnail_url=images.thumbnail_url,
             market_price_uah=row.market_price_uah,
+            obverse_image=image_out(images.obverse),
+            reverse_image=image_out(images.reverse),
+            obverse_photo_is_own=MediaRole.OBVERSE in own_roles,
+            reverse_photo_is_own=MediaRole.REVERSE in own_roles,
         )

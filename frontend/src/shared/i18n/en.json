@@ -230,6 +230,7 @@
     "photosLabel": "Photos",
     "obverse": "Obverse",
     "reverse": "Reverse",
+    "changePhoto": "Change photo",
     "enlarge": "Enlarge",
     "notFoundTitle": "Item not found",
     "notFoundText": "There is no such item, or it is not available to this account.",
@@ -433,7 +434,8 @@
     "description": "Description",
     "descriptionHint": "About the coin itself, not the purchase.",
     "descriptionObverse": "Obverse description",
-    "descriptionReverse": "Reverse description"
+    "descriptionReverse": "Reverse description",
+    "addPhoto": "+ Photo"
   },
   "purchase": {
     "subtitle": "The instance and its purchase expense are created together.",
@@ -462,7 +464,16 @@
     "submit": "Add the purchase",
     "created": "Purchase added: the instance and the expense are saved.",
     "updated": "Purchase updated.",
-    "instanceNotFound": "Instance not found"
+    "instanceNotFound": "Instance not found",
+    "photoUploadFailed": "The coin was saved, but the photo failed to upload — try again from the edit page."
+  },
+  "collectionPhoto": {
+    "cropTitle": "Choose the visible area",
+    "cropHint": "Centre the coin in the circle — a square is uploaded.",
+    "invalid": "Pick a JPEG, PNG or WebP image up to 12 MB.",
+    "saved": "Photo saved.",
+    "removed": "Photo removed.",
+    "removePhoto": "Remove photo"
   },
   "grades": {
     "UNC": "UNC — Uncirculated",
