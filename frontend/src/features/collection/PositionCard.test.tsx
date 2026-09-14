@@ -68,7 +68,7 @@ describe('PositionCard', () => {
     expect(screen.getByRole('link', { name: 'Дельфін' })).toHaveAttribute('href', '/catalog/7');
     expect(screen.getByRole('link', { name: /Додати ще екземпляр/ })).toHaveAttribute(
       'href',
-      '/collection/coins/new?catalogItemId=7',
+      '/collection/add?catalogItemId=7',
     );
   });
 });

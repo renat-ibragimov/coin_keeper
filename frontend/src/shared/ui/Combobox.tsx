@@ -18,6 +18,8 @@ interface ComboboxProps extends Omit<
    *  filters skip this and use their own group title plus aria-label instead. */
   label?: ReactNode;
   hint?: ReactNode;
+  /** Same slot as `Input`'s: a required field that was left empty says so here. */
+  error?: ReactNode;
   /** Which options may be deleted from the list itself (a preset, say,
    *  never should). Omit alongside onDeleteOption to skip this affordance
    *  entirely -- the year filters and most other callers do. */
@@ -53,6 +55,7 @@ export function Combobox({
   options,
   label,
   hint,
+  error,
   id,
   className,
   disabled,
@@ -86,9 +89,13 @@ export function Combobox({
   const inputRef = useRef<HTMLInputElement>(null);
 
   const filtered = useMemo(() => {
-    const needle = value.trim();
+    // A prefix match, not a substring one: the year filters live on this
+    // field too, and there "19" must offer the 1990s rather than every year
+    // with a 19 in it. Case-folded, because a dictionary of names does not
+    // deserve a capital letter to find itself.
+    const needle = value.trim().toLocaleLowerCase();
     if (!needle || value === openedWithValue) return options;
-    return options.filter((option) => option.startsWith(needle));
+    return options.filter((option) => option.toLocaleLowerCase().startsWith(needle));
   }, [options, value, openedWithValue]);
   // Same array reference only on the "show everything" branch above --
   // a cheap, reliable way to tell "browsing" from "typing something new"
@@ -299,7 +306,8 @@ export function Combobox({
           </div>
         ) : null}
       </div>
-      {hint ? <div className={inputStyles.hint}>{hint}</div> : null}
+      {error ? <div className={inputStyles.error}>{error}</div> : null}
+      {!error && hint ? <div className={inputStyles.hint}>{hint}</div> : null}
     </div>
   );
 }

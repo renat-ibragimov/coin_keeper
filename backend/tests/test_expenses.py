@@ -512,3 +512,69 @@ async def test_coin_title_in_listing(client: AsyncClient, ctx: SimpleNamespace) 
     by_category = {item["category"]: item for item in listing["items"]}
     assert by_category["coin_purchase"]["coinTitle"] == "Дельфін"
     assert by_category["album"]["coinTitle"] is None
+
+
+async def test_a_supporting_expense_of_zero_is_rejected(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    """Unlike a purchase price, which may honestly be zero (a gift), a
+    delivery or an album that cost nothing is a typo (docs/03-api-contract.md)."""
+    headers = auth(ctx.token_a)
+    body = {
+        "category": "delivery",
+        "amount": "0",
+        "currency": "UAH",
+        "expenseDate": "2024-02-01",
+    }
+    assert (await client.post("/api/v1/expenses", json=body, headers=headers)).status_code == 422
+
+    body["amount"] = "60.00"
+    created = await client.post("/api/v1/expenses", json=body, headers=headers)
+    assert created.status_code == 201, created.text
+
+    zeroed = await client.patch(
+        f"/api/v1/expenses/{created.json()['id']}", json={"amount": "0"}, headers=headers
+    )
+    assert zeroed.status_code == 422
+
+
+async def test_a_supporting_expense_can_name_a_coin(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    """Grading or a holder may be about one particular coin, and the journal
+    has to show the link (docs/08-ui-map.md, «Гроші»)."""
+    headers = auth(ctx.token_a)
+    created = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "grading",
+            "amount": "900.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-01",
+            "catalogItemId": ctx.item_id,
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["catalogItemId"] == ctx.item_id
+
+    row = next(
+        item
+        for item in (await client.get("/api/v1/expenses", headers=headers)).json()["items"]
+        if item["id"] == created.json()["id"]
+    )
+    assert row["coinTitle"] == "Дельфін"
+
+    # Someone else's personal item is not a coin this user may point at.
+    invisible = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "grading",
+            "amount": "900.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-01",
+            "catalogItemId": 10_000_000,
+        },
+        headers=headers,
+    )
+    assert invisible.status_code == 422

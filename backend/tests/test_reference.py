@@ -214,3 +214,32 @@ async def test_currencies(client: AsyncClient, db_session: AsyncSession, mail_ou
     assert codes == ["EUR", "SUR", "UAH", "UAK", "USD"]
     uah = next(row for row in response.json() if row["code"] == "UAH")
     assert uah == {"code": "UAH", "name": "Hryvnia", "symbol": "₴", "decimalPlaces": 2}
+
+
+async def test_coin_dictionaries_for_the_add_form(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list
+) -> None:
+    """What "Про монету" offers under Матеріал, Гурт and Якість карбування.
+
+    Wider than `GET /catalog/materials`, which narrows a filter to what a
+    confirmed coin actually uses: this form describes a coin that does not
+    exist yet (docs/03-api-contract.md)."""
+    await seed_reference(db_session)
+    _, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    materials = (await client.get("/api/v1/materials", headers=headers)).json()
+    by_code = {row["code"]: row["name"] for row in materials}
+    assert by_code["silver"] == "Срібло"
+    assert by_code["nickel_silver"] == "Нейзильбер"
+    assert [row["name"] for row in materials] == sorted(row["name"] for row in materials)
+
+    edges = (await client.get("/api/v1/edge-types", headers=headers)).json()
+    assert {row["code"] for row in edges} >= {"plain", "reeded"}
+    assert next(row for row in edges if row["code"] == "reeded")["name"] == "Рифлений"
+
+    qualities = (await client.get("/api/v1/quality-types", headers=headers)).json()
+    assert next(row for row in qualities if row["code"] == "proof")["name"] == "Пруф"
+
+    in_english = (await client.get("/api/v1/edge-types?locale=en", headers=headers)).json()
+    assert next(row for row in in_english if row["code"] == "reeded")["name"] == "Reeded"

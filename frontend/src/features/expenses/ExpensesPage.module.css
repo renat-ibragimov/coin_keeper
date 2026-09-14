@@ -128,3 +128,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* The coin a supporting expense is about, under its own description. */
+.linkedCoin {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}

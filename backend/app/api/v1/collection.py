@@ -22,6 +22,7 @@ from app.schemas.collection import (
 from app.schemas.common import Page
 from app.schemas.reference import CountryOut, DenominationOut
 from app.schemas.series import SeriesOut
+from app.services.catalog import BadReferenceError, translate_title_in_background
 from app.services.collection import (
     CatalogItemNotFoundError,
     CollectionItemNotFoundError,
@@ -102,13 +103,22 @@ async def create_item(
     background_tasks: BackgroundTasks,
 ) -> CollectionItemOut:
     try:
-        return await CollectionService(session, user, locale, background_tasks).create(payload)
+        created = await CollectionService(session, user, locale, background_tasks).create(payload)
     except CatalogItemNotFoundError as exc:
         raise _not_found("catalog-item") from exc
     except UnknownCurrencyError as exc:
         raise _unprocessable("unknown-currency", exc.detail) from exc
     except MissingRateError as exc:
         raise _unprocessable("exchange-rate-missing", exc.detail) from exc
+    except BadReferenceError as exc:
+        raise _unprocessable("invalid-reference", exc.detail) from exc
+    if payload.new_catalog_item is not None:
+        # The record is saved with the collector's own wording in both
+        # language slots; the translated one arrives afterwards, and the
+        # purchase is finished whether or not it ever does — the same
+        # arrangement a new storage location gets (app/services/catalog.py).
+        background_tasks.add_task(translate_title_in_background, created.catalog_item_id)
+    return created
 
 
 @router.get("/countries")

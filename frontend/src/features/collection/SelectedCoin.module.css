@@ -1,0 +1,98 @@
+.coinHeader {
+  max-width: 560px;
+  text-align: center;
+}
+
+.coinBadges {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.coinBadges:empty {
+  display: none;
+}
+
+.coinTitle {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.6vw, 28px);
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.coinTitle:hover {
+  color: var(--color-accent);
+}
+
+.coinMeta {
+  margin-top: var(--space-1);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.changeItem {
+  display: block;
+  margin: var(--space-2) auto 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.photos {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-5);
+}
+
+.photos {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-5);
+}
+
+.photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.photoImage {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: var(--color-surface-control);
+}
+
+.photoLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.photoImage {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: var(--color-surface-control);
+}
+
+.photoLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}

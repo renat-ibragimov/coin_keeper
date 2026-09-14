@@ -7,12 +7,16 @@ a 403.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.locale import DEFAULT_LOCALE, pick_name
+from app.db.session import get_session_factory
 from app.models import (
     AuditLog,
     CatalogItem,
@@ -45,9 +49,13 @@ from app.schemas.catalog import (
     CoinImageOut,
     CoinMaterial,
     CoinQualityType,
+    NewCatalogItemIn,
     PriceHistoryItem,
 )
 from app.services.media_urls import CatalogImages, CoinImage, MediaUrlBuilder
+from app.services.translation import TranslationResult, translate_coin_title
+
+logger = logging.getLogger("app.services.catalog")
 
 
 class CatalogError(Exception):
@@ -214,15 +222,22 @@ class CatalogService:
         limit: int,
         offset: int,
         require_confirmed: bool = True,
+        apply_storefront: bool = True,
     ) -> tuple[list[CatalogListItem], int]:
         """`require_confirmed=False` is for a caller about the user's own
         collection rather than the catalogue browse experience (a series
         screen) -- never from a request filter, see storefront_visible()
-        (app/repositories/catalog.py, docs/04-business-rules.md §13a)."""
+        (app/repositories/catalog.py, docs/04-business-rules.md §13a).
+        `apply_storefront=False` goes one further and is the typeahead's
+        alone: see the same function's docstring."""
         settings = await self._users.get_settings(self._user.id)
         filters.show_packaging_variants = settings is None or settings.show_packaging_variants
         page = await self._repo.list_items(
-            filters, limit=limit, offset=offset, require_confirmed=require_confirmed
+            filters,
+            limit=limit,
+            offset=offset,
+            require_confirmed=require_confirmed,
+            apply_storefront=apply_storefront,
         )
         images = await self._images_for([row.item.id for row in page.rows])
         items = [
@@ -313,19 +328,47 @@ class CatalogService:
     async def create_item(self, payload: CatalogItemCreate) -> CatalogCard:
         if payload.shared and not self._is_admin:
             raise SharedRecordForbiddenError
-        await self._check_references(
-            country_id=payload.country_id,
-            series_id=payload.series_id,
-            denomination_id=payload.denomination_id,
-            composition_id=payload.composition_id,
-        )
-        values = payload.model_dump(exclude={"shared"})
-        item = CatalogItem(
-            **values,
+        item = await self._insert(
+            payload.model_dump(exclude={"shared"}),
             created_by=None if payload.shared else self._user.id,
         )
-        await self._repo.add(item)
         return await self.get_card(item.id)
+
+    async def create_personal_item(self, payload: NewCatalogItemIn) -> CatalogItem:
+        """A personal item entered on the purchase form, in the caller's transaction.
+
+        Returns the row rather than a card on purpose: the caller is
+        CollectionService, which goes on to create the instance and the
+        purchase expense before anything is committed (docs/04-business-rules.md,
+        rule 4). Both language slots start out holding the typed text, exactly
+        as a new storage location does, and the background job replaces the
+        one that is a translation rather than a copy.
+        """
+        values = payload.model_dump()
+        title = values["title_original"]
+        return await self._insert(
+            {
+                **values,
+                "title_uk": title,
+                "title_uk_source": TranslationSource.MANUAL,
+                "title_en": title,
+                "title_en_source": TranslationSource.MANUAL,
+            },
+            created_by=self._user.id,
+        )
+
+    async def _insert(self, values: dict[str, Any], *, created_by: int | None) -> CatalogItem:
+        await self._check_references(
+            country_id=values["country_id"],
+            series_id=values.get("series_id"),
+            denomination_id=values.get("denomination_id"),
+            composition_id=values.get("composition_id"),
+            edge_type_id=values.get("edge_type_id"),
+            quality_type_id=values.get("quality_type_id"),
+        )
+        item = CatalogItem(**values, created_by=created_by)
+        await self._repo.add(item)
+        return item
 
     async def update_item(self, item_id: int, payload: CatalogItemUpdate) -> CatalogCard:
         item = await self._get_writable(item_id)
@@ -440,6 +483,8 @@ class CatalogService:
         series_id: int | None,
         denomination_id: int | None,
         composition_id: int | None = None,
+        edge_type_id: int | None = None,
+        quality_type_id: int | None = None,
     ) -> None:
         country = await self._session.get(Country, country_id)
         if country is None:
@@ -454,6 +499,13 @@ class CatalogService:
                 raise BadReferenceError("Unknown denominationId or it belongs to another country.")
         if composition_id is not None and await self._session.get(Material, composition_id) is None:
             raise BadReferenceError("Unknown compositionId.")
+        if edge_type_id is not None and await self._session.get(EdgeType, edge_type_id) is None:
+            raise BadReferenceError("Unknown edgeTypeId.")
+        if (
+            quality_type_id is not None
+            and await self._session.get(QualityType, quality_type_id) is None
+        ):
+            raise BadReferenceError("Unknown qualityTypeId.")
 
     def _audit(self, action: str, entity_id: int, details: dict[str, object] | None) -> None:
         self._session.add(
@@ -548,3 +600,55 @@ class CatalogService:
             created_at=item.created_at,
             updated_at=item.updated_at,
         )
+
+
+def apply_title_translation(item: CatalogItem, result: TranslationResult) -> None:
+    """The detected language's own slot stays exactly what the collector typed
+    -- only the other one is filled in by the model. Pure and DB-free on
+    purpose, the same way storage locations do it (app/services/storage_locations.py):
+    the one part with a real judgment call is testable without a database.
+    """
+    if result.language != "uk":
+        item.title_uk = result.name_uk
+        item.title_uk_source = TranslationSource.LLM
+    if result.language != "en":
+        item.title_en = result.name_en
+        item.title_en_source = TranslationSource.LLM
+
+
+async def translate_title_in_background(item_id: int) -> None:
+    """The BackgroundTasks entry point for a hand-entered coin: opens its own
+    session, since the request's is long gone by the time this runs.
+
+    Every early return is logged. A silent no-op leaves the record showing the
+    collector's own wording in both language slots forever, with nothing in
+    the interface to explain why -- the only way to notice is a log line (the
+    same lesson as storage locations, docs/04-business-rules.md, п. 16).
+    """
+    api_key = get_settings().anthropic_api_key
+    if not api_key:
+        logger.warning("catalog title translation skipped: no ANTHROPIC_API_KEY configured")
+        return
+    async with get_session_factory()() as session:
+        try:
+            item = await session.get(CatalogItem, item_id)
+            if item is None:
+                logger.warning("catalog item %s vanished before translation ran", item_id)
+                return
+            country = await session.get(Country, item.country_id)
+            result = await translate_coin_title(
+                item.title_original,
+                api_key,
+                country=(country.name_en or country.name_original) if country else None,
+                year=item.issue_year,
+            )
+            if result is None:
+                logger.warning("catalog item %s: translate_coin_title returned None", item_id)
+                return
+            apply_title_translation(item, result)
+            await session.commit()
+            logger.info(
+                "catalog item %s title translated (original language %s)", item_id, result.language
+            )
+        except Exception:
+            logger.exception("catalog title translation failed for %s", item_id)

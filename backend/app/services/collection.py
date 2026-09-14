@@ -46,7 +46,7 @@ from app.schemas.collection import (
 )
 from app.schemas.reference import CountryOut, DenominationOut
 from app.schemas.series import SeriesOut
-from app.services.catalog import display_title, material_out
+from app.services.catalog import CatalogService, display_title, material_out
 from app.services.media_urls import CatalogImages, MediaUrlBuilder
 from app.services.storage_locations import StorageLocationService
 
@@ -198,11 +198,31 @@ class CollectionService:
         return await self._get_out(item_id)
 
     async def create(self, payload: CollectionItemCreate) -> CollectionItemOut:
-        item = await self._catalog.get_visible(payload.catalog_item_id)
-        if item is None:
-            raise CatalogItemNotFoundError
+        """The purchase transaction (docs/04-business-rules.md, rule 4).
+
+        With `newCatalogItem` it grows a third write — the personal catalog
+        item itself — and the order below is the whole point: the rate is
+        resolved before anything is inserted, so a purchase rejected for a
+        missing rate cannot leave a coin nobody bought behind. The schema
+        guarantees exactly one of the two coin fields is set.
+        """
         rate = await self._resolve_rate(payload.currency, payload.purchase_date)
+        # Resolved before the coin, not after: a storage location the owner
+        # has not used before is created *and committed* on the spot
+        # (app/repositories/storage_locations.py), and that commit must not
+        # land in the middle of this transaction's own writes.
         storage_location_id = await self._storage_locations.resolve(payload.storage_location)
+
+        if payload.new_catalog_item is not None:
+            item = await CatalogService(
+                self._session, self._user, self._locale
+            ).create_personal_item(payload.new_catalog_item)
+        else:
+            assert payload.catalog_item_id is not None
+            found = await self._catalog.get_visible(payload.catalog_item_id)
+            if found is None:
+                raise CatalogItemNotFoundError
+            item = found
 
         instance = CollectionItem(
             owner_id=self._user.id,
@@ -220,6 +240,14 @@ class CollectionService:
         await self._repo.add(instance)
         self._session.add(self._build_expense(instance))
         await self._session.flush()
+        if payload.new_catalog_item is not None:
+            # All three rows at once, here rather than at the end of the
+            # request: FastAPI runs BackgroundTasks *before* the request's own
+            # commit (proved the hard way on storage locations, 2026-09-13),
+            # and the translation task opens a session of its own — it would
+            # find no such coin. Atomicity is untouched: this is still one
+            # commit for the item, the instance and the expense together.
+            await self._session.commit()
         return await self._get_out(instance.id)
 
     async def update(self, item_id: int, payload: CollectionItemUpdate) -> CollectionItemOut:

@@ -1,20 +1,35 @@
-"""Reference endpoints: countries, denominations, currencies (docs/03-api-contract.md)."""
+"""Reference endpoints: countries, denominations, coin dictionaries, currencies.
+
+Contract: docs/03-api-contract.md.
+"""
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Protocol
 
 from fastapi import APIRouter, Query
 
 from app.api.deps import CurrentUser, DbSession, RequestLocale
-from app.core.locale import pick_name
+from app.core.locale import LOCALE_UK, pick_name
 from app.models.enums import UserRole
 from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogRepository
 from app.repositories.reference import ReferenceRepository
+from app.schemas.catalog import CoinEdgeType, CoinMaterial, CoinQualityType
 from app.schemas.reference import CountryOut, CurrencyOut, DenominationOut
 
 router = APIRouter(tags=["reference"])
+
+
+class _Named(Protocol):
+    """The three coin dictionaries share a shape: id, code and two names."""
+
+    name_uk: str
+    name_en: str
+
+
+def _localised(row: _Named, locale: str) -> str:
+    return row.name_uk if locale == LOCALE_UK else row.name_en
 
 
 @router.get("/countries")
@@ -86,6 +101,39 @@ async def list_denominations(
         )
         for denomination in denominations
     ]
+
+
+@router.get("/materials")
+async def list_materials(
+    session: DbSession, _user: CurrentUser, locale: RequestLocale
+) -> list[CoinMaterial]:
+    """The whole composition dictionary behind `compositionId`.
+
+    Read by the "Додати" form, where a coin entered by hand needs a material:
+    a dictionary row when one fits, free text when none does. The catalogue's
+    own filter uses the narrower `GET /catalog/materials` instead."""
+    materials = await ReferenceRepository(session, locale).list_materials()
+    return [
+        CoinMaterial(id=row.id, code=row.code, name=_localised(row, locale)) for row in materials
+    ]
+
+
+@router.get("/edge-types")
+async def list_edge_types(
+    session: DbSession, _user: CurrentUser, locale: RequestLocale
+) -> list[CoinEdgeType]:
+    """The edge dictionary behind `edgeTypeId` (docs/04-business-rules.md, §14)."""
+    rows = await ReferenceRepository(session, locale).list_edge_types()
+    return [CoinEdgeType(id=row.id, code=row.code, name=_localised(row, locale)) for row in rows]
+
+
+@router.get("/quality-types")
+async def list_quality_types(
+    session: DbSession, _user: CurrentUser, locale: RequestLocale
+) -> list[CoinQualityType]:
+    """The strike-quality dictionary behind `qualityTypeId`."""
+    rows = await ReferenceRepository(session, locale).list_quality_types()
+    return [CoinQualityType(id=row.id, code=row.code, name=_localised(row, locale)) for row in rows]
 
 
 @router.get("/currencies")

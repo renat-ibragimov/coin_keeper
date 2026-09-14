@@ -144,6 +144,13 @@ def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> Colum
     of which countries the catalogue project has gotten around to confirming
     (owner's call, 2026-09-12).
 
+    Turned off altogether — `apply_storefront=False` on `list_items` — by
+    exactly one caller: the "Додати" form's typeahead (`GET /catalog/lookup`),
+    which searches inside one country the collector picked out of the full
+    list of issuers. There the storefront has nothing to say: not finding the
+    shared record means the collector enters a personal duplicate of a coin
+    the catalogue already holds (owner's call, 2026-09-14).
+
     Self-contained EXISTS checks so the caller need not join Country: reused
     verbatim by the series and dashboard repositories. Each subquery pins its
     correlation to CatalogItem alone — the dashboard's breakdown queries join
@@ -314,13 +321,20 @@ class CatalogRepository:
     # --------------------------------------------------------------- listing
 
     def _filter_conditions(
-        self, filters: CatalogFilters, *, require_confirmed: bool = True
+        self,
+        filters: CatalogFilters,
+        *,
+        require_confirmed: bool = True,
+        apply_storefront: bool = True,
     ) -> list[ColumnElement[bool]]:
         conditions: list[ColumnElement[bool]] = [
             self._visible(),
             self._archive_condition(filters.archived),
-            storefront_visible(self._user_id, require_confirmed=require_confirmed),
         ]
+        if apply_storefront:
+            conditions.append(
+                storefront_visible(self._user_id, require_confirmed=require_confirmed)
+            )
         if filters.scope == "shared":
             conditions.append(CatalogItem.created_by.is_(None))
         elif filters.scope == "own":
@@ -505,8 +519,11 @@ class CatalogRepository:
         limit: int,
         offset: int,
         require_confirmed: bool = True,
+        apply_storefront: bool = True,
     ) -> CatalogPage:
-        conditions = self._filter_conditions(filters, require_confirmed=require_confirmed)
+        conditions = self._filter_conditions(
+            filters, require_confirmed=require_confirmed, apply_storefront=apply_storefront
+        )
 
         count_query = (
             select(func.count(CatalogItem.id))

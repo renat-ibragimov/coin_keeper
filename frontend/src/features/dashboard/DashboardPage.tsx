@@ -83,7 +83,7 @@ export function DashboardPage() {
                 <Link to="/catalog">
                   <Button>{t('common.backToCatalog')}</Button>
                 </Link>
-                <Link to="/collection/coins/new">
+                <Link to="/collection/add">
                   <Button variant="secondary">{t('card.addPurchase')}</Button>
                 </Link>
               </>

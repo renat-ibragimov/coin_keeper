@@ -208,7 +208,7 @@ describe('ExpensesPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
       'href',
-      '/collection/coins/new',
+      '/collection/add',
     );
     expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
       'href',

@@ -349,7 +349,7 @@ describe('CoinCardPage', () => {
     expect(screen.getByText('460 ₴')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Додати ще екземпляр' })).toHaveAttribute(
       'href',
-      '/collection/coins/new?catalogItemId=7',
+      '/collection/add?catalogItemId=7',
     );
     // The visitor's own purchase price, valuation and profit live on "Мої екземпляри" instead.
     expect(screen.queryByText('Куплено загалом')).toBeNull();
@@ -366,7 +366,7 @@ describe('CoinCardPage', () => {
     expect(screen.queryByText(/Кількість/)).toBeNull();
     expect(screen.getByRole('link', { name: /Додати до колекції/ })).toHaveAttribute(
       'href',
-      '/collection/coins/new?catalogItemId=7',
+      '/collection/add?catalogItemId=7',
     );
     // Nothing to show on "Мої екземпляри" for a coin the visitor doesn't own.
     expect(screen.queryByRole('heading', { name: 'Мої екземпляри' })).toBeNull();
@@ -461,7 +461,7 @@ describe('CoinCardPage', () => {
     expect(await screen.findByText('У вас ще немає екземплярів цієї монети.')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Додати до колекції' })).toHaveAttribute(
       'href',
-      '/collection/coins/new?catalogItemId=7',
+      '/collection/add?catalogItemId=7',
     );
     // No purchase/valuation summary without any instances.
     expect(screen.queryByText('Куплено загалом')).toBeNull();

@@ -10,6 +10,8 @@ export type CatalogListItem = components['schemas']['CatalogListItem'];
 export type CatalogCard = components['schemas']['CatalogCard'];
 export type CatalogPage = components['schemas']['Page_CatalogListItem_'];
 export type CoinMaterial = components['schemas']['CoinMaterial'];
+export type CoinEdgeType = components['schemas']['CoinEdgeType'];
+export type CoinQualityType = components['schemas']['CoinQualityType'];
 export type CoinDescriptions = components['schemas']['CoinDescriptions'];
 
 export type CountryOut = components['schemas']['CountryOut'];
@@ -39,6 +41,7 @@ export type CollectionPage = components['schemas']['Page_CollectionPositionOut_'
 export type StorageLocation = components['schemas']['StorageLocationOut'];
 
 export type CatalogItemCreate = components['schemas']['CatalogItemCreate'];
+export type NewCatalogItem = components['schemas']['NewCatalogItemIn'];
 
 export type SeriesProgress = components['schemas']['SeriesProgressOut'];
 export type SeriesSummary = components['schemas']['SeriesSummaryOut'];

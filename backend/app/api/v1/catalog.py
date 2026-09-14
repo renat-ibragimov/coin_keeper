@@ -101,6 +101,39 @@ async def list_catalog(
 
 
 # Must stay registered before /{item_id} — otherwise FastAPI tries to parse
+# "lookup" as item_id and 422s instead of matching this route.
+@router.get("/lookup")
+async def lookup_catalog(
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    q: Annotated[str, Query(min_length=1, max_length=200)],
+    country_id: Annotated[int | None, Query(alias="countryId")] = None,
+    limit: Annotated[int, Query(ge=1, le=20)] = 8,
+) -> list[CatalogListItem]:
+    """The "Додати" form's typeahead: a handful of coins matching the text.
+
+    The same rows `GET /catalog` returns and the same layer visibility —
+    shared records plus the user's own personal items, active ones only —
+    with the storefront rule switched off entirely (docs/04-business-rules.md,
+    §13). The field sits under a country the collector just chose out of every
+    issuer there has ever been, so a coin of a country the catalogue project
+    has not confirmed still has to be findable by name; not finding it means a
+    personal duplicate of a coin the catalog already holds.
+    """
+    filters = CatalogFilters(
+        q=q,
+        country_ids=[country_id] if country_id is not None else None,
+        sort="year",
+        order="desc",
+    )
+    items, _ = await CatalogService(session, user, locale).list_catalog(
+        filters, limit=limit, offset=0, apply_storefront=False
+    )
+    return items
+
+
+# Must stay registered before /{item_id} — otherwise FastAPI tries to parse
 # "materials" as item_id and 422s instead of matching this route.
 @router.get("/materials")
 async def list_catalog_materials(

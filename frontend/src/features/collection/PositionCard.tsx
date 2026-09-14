@@ -17,7 +17,7 @@ export function PositionCard({ item }: PositionCardProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const cardUrl = `/catalog/${item.catalogItemId}`;
-  const addUrl = `/collection/coins/new?catalogItemId=${item.catalogItemId}`;
+  const addUrl = `/collection/add?catalogItemId=${item.catalogItemId}`;
   const meta = [String(item.year), item.denomination].filter(Boolean).join(' · ');
   const series = seriesLabel(item, t);
 

@@ -14,6 +14,7 @@ import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
 import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { parseFilters, serializeFilters } from '@/features/catalog/useCatalogFilters';
+import { AddPage } from '@/features/collection/add/AddPage';
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
@@ -159,7 +160,7 @@ export function App() {
                   <Route element={<AppLayout />}>
                     <Route path="/collection" element={<DashboardPage />} />
                     <Route path="/collection/coins" element={<CollectionPage />} />
-                    <Route path="/collection/coins/new" element={<PurchaseFormPage />} />
+                    <Route path="/collection/add" element={<AddPage />} />
                     <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
                     <Route path="/collection/series" element={<SeriesListPage />} />
                     <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
@@ -178,11 +179,12 @@ export function App() {
                     <Route path="/missing" element={<RedirectMissingToCatalog />} />
                     <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
                     <Route path="/expenses" element={<Navigate to="/collection/money" replace />} />
-                    <Route
-                      path="/collection/new"
-                      element={<RedirectTo to="/collection/coins/new" />}
-                    />
                     <Route path="/collection/:id/edit" element={<RedirectCollectionEdit />} />
+                    <Route path="/collection/new" element={<RedirectTo to="/collection/add" />} />
+                    <Route
+                      path="/collection/coins/new"
+                      element={<RedirectTo to="/collection/add" />}
+                    />
                   </Route>
                 </Route>
                 <Route path="*" element={<Navigate to="/collection" replace />} />

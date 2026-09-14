@@ -78,7 +78,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
         {items.map((item) => {
           const owned = item.quantityOwned > 0;
           const material = coinMaterial(item);
-          const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
+          const addUrl = `/collection/add?catalogItemId=${item.id}`;
           return (
             <tr
               key={item.id}

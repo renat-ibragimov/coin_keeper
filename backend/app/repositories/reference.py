@@ -11,8 +11,16 @@ from collections.abc import Sequence
 from sqlalchemy import exists, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.locale import DEFAULT_LOCALE
-from app.models import CatalogItem, Country, Currency, Denomination
+from app.core.locale import DEFAULT_LOCALE, LOCALE_UK
+from app.models import (
+    CatalogItem,
+    Country,
+    Currency,
+    Denomination,
+    EdgeType,
+    Material,
+    QualityType,
+)
 from app.repositories.catalog import storefront_visible
 from app.repositories.localization import localized
 
@@ -83,6 +91,27 @@ class ReferenceRepository:
         # separates units of equal worth (25 cents and a quarter dollar).
         query = query.order_by(Denomination.sort_order, Denomination.value, Denomination.unit)
         result = await self._session.execute(query)
+        return result.scalars().all()
+
+    async def list_materials(self) -> Sequence[Material]:
+        """The whole composition dictionary, by name in the requested locale.
+
+        Wider than `GET /catalog/materials`, which offers only what a
+        confirmed item actually uses: that one narrows a filter to what can
+        be found, this one fills a form where the coin does not exist yet
+        (docs/03-api-contract.md)."""
+        name = Material.name_uk if self._locale == LOCALE_UK else Material.name_en
+        result = await self._session.execute(select(Material).order_by(name))
+        return result.scalars().all()
+
+    async def list_edge_types(self) -> Sequence[EdgeType]:
+        name = EdgeType.name_uk if self._locale == LOCALE_UK else EdgeType.name_en
+        result = await self._session.execute(select(EdgeType).order_by(name))
+        return result.scalars().all()
+
+    async def list_quality_types(self) -> Sequence[QualityType]:
+        name = QualityType.name_uk if self._locale == LOCALE_UK else QualityType.name_en
+        result = await self._session.execute(select(QualityType).order_by(name))
         return result.scalars().all()
 
     async def list_currencies(self) -> Sequence[Currency]:

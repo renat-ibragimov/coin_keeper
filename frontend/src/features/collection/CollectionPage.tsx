@@ -288,7 +288,7 @@ export function CollectionPage() {
         actions={
           collectionEmpty ? undefined : (
             <>
-              <Link to="/collection/coins/new">
+              <Link to="/collection/add">
                 <Button>+ {t('card.addPurchase')}</Button>
               </Link>
               <Link to="/import">
@@ -310,7 +310,7 @@ export function CollectionPage() {
               <Link to="/catalog">
                 <Button>{t('common.backToCatalog')}</Button>
               </Link>
-              <Link to="/collection/coins/new">
+              <Link to="/collection/add">
                 <Button variant="secondary">{t('card.addPurchase')}</Button>
               </Link>
             </>

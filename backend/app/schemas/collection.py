@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.models.enums import CollectionGroup
 from app.schemas.base import CamelModel
+from app.schemas.catalog import NewCatalogItemIn
 from app.schemas.common import Money, Rate
 
 
@@ -77,7 +78,18 @@ class CollectionItemOut(CamelModel):
 
 
 class CollectionItemCreate(CamelModel):
-    catalog_item_id: int
+    """A purchase of a coin the catalog already has, or of one it does not
+    (docs/03-api-contract.md, `POST /collection`).
+
+    `newCatalogItem` is what the "Додати" form sends when the collector typed
+    a name the catalog search did not find: the personal item, the instance
+    and the coin_purchase expense are then created in one transaction, so a
+    rejected purchase cannot leave an orphaned catalog record behind. Exactly
+    one of the two fields is given — neither and both are 422.
+    """
+
+    catalog_item_id: int | None = None
+    new_catalog_item: NewCatalogItemIn | None = None
     quantity: int = Field(default=1, ge=1)
     price: Decimal = Field(ge=0)
     currency: str = Field(min_length=3, max_length=3)
@@ -86,6 +98,13 @@ class CollectionItemCreate(CamelModel):
     notes: str | None = Field(default=None, max_length=4000)
     grade: str | None = Field(default=None, max_length=50)
     storage_location: str | None = Field(default=None, max_length=200)
+
+    @model_validator(mode="after")
+    def check_coin_reference(self) -> CollectionItemCreate:
+        if (self.catalog_item_id is None) == (self.new_catalog_item is None):
+            msg = "Give exactly one of catalogItemId or newCatalogItem."
+            raise ValueError(msg)
+        return self
 
 
 class CollectionItemUpdate(CamelModel):

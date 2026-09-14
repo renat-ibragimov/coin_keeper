@@ -94,13 +94,12 @@ class ExpenseService:
         self, filters: ExpenseFilters, *, limit: int, offset: int
     ) -> tuple[list[ExpenseOut], int]:
         rows, total = await self._repo.list_page(filters, limit=limit, offset=offset)
+        # The coin's name for every expense that names one, not only for
+        # purchases: a supporting expense may be attached to a coin too
+        # (grading, a holder for one particular piece), and the journal has
+        # to show the link the person made.
         items = [
-            self._out(
-                expense,
-                coin_title=title if expense.category == ExpenseCategory.COIN_PURCHASE else None,
-                amount_usd=amount_usd,
-                amount_eur=amount_eur,
-            )
+            self._out(expense, coin_title=title, amount_usd=amount_usd, amount_eur=amount_eur)
             for expense, title, amount_usd, amount_eur in rows
         ]
         return items, total

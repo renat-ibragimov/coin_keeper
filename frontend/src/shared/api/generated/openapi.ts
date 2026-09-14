@@ -256,6 +256,34 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lookup Catalog
+         * @description The "Додати" form's typeahead: a handful of coins matching the text.
+         *
+         *     The same rows `GET /catalog` returns and the same layer visibility —
+         *     shared records plus the user's own personal items, active ones only —
+         *     with the storefront rule switched off entirely (docs/04-business-rules.md,
+         *     §13). The field sits under a country the collector just chose out of every
+         *     issuer there has ever been, so a coin of a country the catalogue project
+         *     has not confirmed still has to be findable by name; not finding it means a
+         *     personal duplicate of a coin the catalog already holds.
+         */
+        get: operations["lookup_catalog_api_v1_catalog_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/catalog/materials": {
         parameters: {
             query?: never;
@@ -449,6 +477,35 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/collection/storage-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Storage Locations
+         * @description The presets plus this owner's own, localized names only — a name here
+         *     is a free-form suggestion, not an id the client has to track. `custom`
+         *     marks the ones this owner can also delete.
+         */
+        get: operations["list_storage_locations_api_v1_collection_storage_locations_get"];
+        put?: never;
+        /**
+         * Add Storage Location
+         * @description Explicit "add to my list" from settings — the same find-or-create a
+         *     purchase's own storageLocation field uses, so typing a name that already
+         *     exists (a preset or one's own) just confirms it rather than duplicating.
+         */
+        post: operations["add_storage_location_api_v1_collection_storage_locations_post"];
+        /** Delete Storage Location */
+        delete: operations["delete_storage_location_api_v1_collection_storage_locations_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -666,6 +723,70 @@ export interface paths {
          *     visible to this user still uses (§13a).
          */
         get: operations["list_denominations_api_v1_denominations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Materials
+         * @description The whole composition dictionary behind `compositionId`.
+         *
+         *     Read by the "Додати" form, where a coin entered by hand needs a material:
+         *     a dictionary row when one fits, free text when none does. The catalogue's
+         *     own filter uses the narrower `GET /catalog/materials` instead.
+         */
+        get: operations["list_materials_api_v1_materials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/edge-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Edge Types
+         * @description The edge dictionary behind `edgeTypeId` (docs/04-business-rules.md, §14).
+         */
+        get: operations["list_edge_types_api_v1_edge_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quality-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Quality Types
+         * @description The strike-quality dictionary behind `qualityTypeId`.
+         */
+        get: operations["list_quality_types_api_v1_quality_types_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1155,10 +1276,21 @@ export interface components {
          * @enum {string}
          */
         CollectionGroup: "circulation" | "commemorative" | "collector" | "other";
-        /** CollectionItemCreate */
+        /**
+         * CollectionItemCreate
+         * @description A purchase of a coin the catalog already has, or of one it does not
+         *     (docs/03-api-contract.md, `POST /collection`).
+         *
+         *     `newCatalogItem` is what the "Додати" form sends when the collector typed
+         *     a name the catalog search did not find: the personal item, the instance
+         *     and the coin_purchase expense are then created in one transaction, so a
+         *     rejected purchase cannot leave an orphaned catalog record behind. Exactly
+         *     one of the two fields is given — neither and both are 422.
+         */
         CollectionItemCreate: {
             /** Catalogitemid */
-            catalogItemId: number;
+            catalogItemId?: number | null;
+            newCatalogItem?: components["schemas"]["NewCatalogItemIn"] | null;
             /**
              * Quantity
              * @default 1
@@ -1245,23 +1377,6 @@ export interface components {
             grade?: string | null;
             /** Storagelocation */
             storageLocation?: string | null;
-        };
-        /**
-         * StorageLocationOut
-         * @description A name, not an id: the client never tracks storage-location ids
-         *     (docs/04-business-rules.md). `custom` is true for the owner's own entry —
-         *     only those can be deleted; the four system presets cannot.
-         */
-        StorageLocationOut: {
-            /** Name */
-            name: string;
-            /** Custom */
-            custom: boolean;
-        };
-        /** StorageLocationCreate */
-        StorageLocationCreate: {
-            /** Name */
-            name: string;
         };
         /**
          * CollectionPositionOut
@@ -1618,6 +1733,73 @@ export interface components {
          * @enum {string}
          */
         MetalKind: "precious" | "base" | "unknown";
+        /**
+         * NewCatalogItemIn
+         * @description A personal catalog item entered by hand on the "Додати" form.
+         *
+         *     A subset of CatalogItemCreate, not that schema itself, and the three
+         *     differences are the point (docs/03-api-contract.md, `POST /collection`):
+         *
+         *     * no `shared` — this record is always personal. The shared catalog is
+         *       read-only for everyone but an admin editing it deliberately, and the
+         *       purchase form is not that place (CLAUDE.md).
+         *     * no `originalLang` and no title translations — the language is detected
+         *       and the two translated slots filled by the background translation job,
+         *       marked `llm`, exactly as a storage location's are. A client cannot
+         *       claim `official` or `manual` wording by the back door.
+         *     * `material` is mandatory in one of its two shapes (owner, 2026-09-14):
+         *       either a dictionary row (`compositionId`) or free text, because for
+         *       most issuers the dictionary holds nothing to pick. Edge and quality
+         *       keep the same two-shaped pair as the full schema, but the form only
+         *       ever sends their dictionary halves.
+         */
+        NewCatalogItemIn: {
+            /** Countryid */
+            countryId: number;
+            /** Seriesid */
+            seriesId?: number | null;
+            /** Denominationid */
+            denominationId?: number | null;
+            collectionGroup: components["schemas"]["CollectionGroup"];
+            /** Titleoriginal */
+            titleOriginal: string;
+            /** Issueyear */
+            issueYear: number;
+            /** Issuedate */
+            issueDate?: string | null;
+            /** Mintageannounced */
+            mintageAnnounced?: number | null;
+            /** Compositionid */
+            compositionId?: number | null;
+            /** Material */
+            material?: string | null;
+            /** @default unknown */
+            metalKind: components["schemas"]["MetalKind"];
+            /** Weightgrams */
+            weightGrams?: number | string | null;
+            /** Diametermm */
+            diameterMm?: number | string | null;
+            /** Thicknessmm */
+            thicknessMm?: number | string | null;
+            /** Shape */
+            shape?: string | null;
+            /** Edgetypeid */
+            edgeTypeId?: number | null;
+            /** Edge */
+            edge?: string | null;
+            /** Qualitytypeid */
+            qualityTypeId?: number | null;
+            /** Quality */
+            quality?: string | null;
+            /** Catalogkm */
+            catalogKm?: string | null;
+            /** Cataloguc */
+            catalogUc?: string | null;
+            /** Catalognumista */
+            catalogNumista?: string | null;
+            /** Notes */
+            notes?: string | null;
+        };
         /** Page[CatalogListItem] */
         Page_CatalogListItem_: {
             /** Items */
@@ -1818,10 +2000,27 @@ export interface components {
             catalogViewMode?: ("cards" | "table") | null;
             /** Collectionviewmode */
             collectionViewMode?: ("cards" | "table") | null;
-            /** Secondarycurrency */
-            secondaryCurrency?: ("USD" | "EUR") | null;
             /** Defaultstoragelocation */
             defaultStorageLocation?: string | null;
+            /** Secondarycurrency */
+            secondaryCurrency?: ("USD" | "EUR") | null;
+        };
+        /** StorageLocationCreate */
+        StorageLocationCreate: {
+            /** Name */
+            name: string;
+        };
+        /**
+         * StorageLocationOut
+         * @description A name, not an id: the client never tracks storage-location ids
+         *     (docs/04-business-rules.md). `custom` is true for the owner's own entry —
+         *     only those can be deleted; the four system presets cannot.
+         */
+        StorageLocationOut: {
+            /** Name */
+            name: string;
+            /** Custom */
+            custom: boolean;
         };
         /**
          * TokensOut
@@ -2377,6 +2576,40 @@ export interface operations {
             };
         };
     };
+    lookup_catalog_api_v1_catalog_lookup_get: {
+        parameters: {
+            query: {
+                q: string;
+                countryId?: number | null;
+                limit?: number;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_catalog_materials_api_v1_catalog_materials_get: {
         parameters: {
             query?: {
@@ -2841,6 +3074,102 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["CoinMaterial"][];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_storage_locations_api_v1_collection_storage_locations_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_storage_location_api_v1_collection_storage_locations_post: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageLocationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_storage_location_api_v1_collection_storage_locations_delete: {
+        parameters: {
+            query: {
+                name: string;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -3361,6 +3690,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DenominationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_materials_api_v1_materials_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinMaterial"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_edge_types_api_v1_edge_types_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinEdgeType"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_quality_types_api_v1_quality_types_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinQualityType"][];
                 };
             };
             /** @description Validation Error */

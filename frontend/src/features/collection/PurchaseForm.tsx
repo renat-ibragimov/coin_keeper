@@ -17,6 +17,7 @@ import {
   Textarea,
 } from '@/shared/ui';
 
+import type { CarriedValues } from './add/carried';
 import { GRADES } from './grades';
 
 export interface PurchaseValues {
@@ -33,6 +34,18 @@ export interface PurchaseValues {
 interface PurchaseFormProps {
   /** Existing instance when editing; absent for a new purchase. */
   initial?: CollectionItem;
+  /**
+   * What the "Додати" page carries over from the other branch of its type
+   * selector; ignored while editing, where the instance itself is the source.
+   */
+  carried?: CarriedValues;
+  onCarriedChange?: (values: CarriedValues) => void;
+  /**
+   * Checked after this form's own fields and before anything is sent: the
+   * "Додати" page validates the coin it is about to create alongside the
+   * purchase, and both sets of messages have to appear at once.
+   */
+  beforeSubmit?: () => boolean;
   defaultGrade: string;
   defaultStorageLocation: string | null;
   storageLocations: string[];
@@ -61,16 +74,27 @@ function initialFields(
   initial: CollectionItem | undefined,
   defaultGrade: string,
   defaultStorageLocation: string | null,
+  carried: CarriedValues | undefined,
 ): Fields {
   return {
     quantity: String(initial?.quantity ?? 1),
-    price: initial?.price ?? '',
-    currency: initial?.currency ?? 'UAH',
-    purchaseDate: initial?.purchaseDate ?? todayIso(),
-    seller: initial?.seller ?? '',
+    price: initial?.price ?? carried?.amount ?? '',
+    currency: initial?.currency ?? carried?.currency ?? 'UAH',
+    purchaseDate: initial?.purchaseDate ?? carried?.date ?? todayIso(),
+    seller: initial?.seller ?? carried?.vendor ?? '',
     grade: initial?.grade ?? defaultGrade,
     storageLocation: initial?.storageLocation ?? defaultStorageLocation ?? '',
-    notes: initial?.notes ?? '',
+    notes: initial?.notes ?? carried?.note ?? '',
+  };
+}
+
+function carriedFrom(fields: Fields): CarriedValues {
+  return {
+    amount: fields.price,
+    currency: fields.currency,
+    date: fields.purchaseDate,
+    vendor: fields.seller,
+    note: fields.notes,
   };
 }
 
@@ -86,6 +110,9 @@ function serverFieldErrors(error: unknown, currency: string): FieldErrors {
 
 export function PurchaseForm({
   initial,
+  carried,
+  onCarriedChange,
+  beforeSubmit,
   defaultGrade,
   defaultStorageLocation,
   storageLocations,
@@ -97,12 +124,17 @@ export function PurchaseForm({
 }: PurchaseFormProps) {
   const { t } = useTranslation();
   const [fields, setFields] = useState<Fields>(() =>
-    initialFields(initial, defaultGrade, defaultStorageLocation),
+    initialFields(initial, defaultGrade, defaultStorageLocation, carried),
   );
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const set = (key: keyof Fields) => (value: string) => {
-    setFields((current) => ({ ...current, [key]: value }));
+    const next = { ...fields, [key]: value };
+    setFields(next);
+    // Reported outward rather than folded into the state updater: the page
+    // above keeps this in its own state, and a parent must not be told to
+    // update from inside one.
+    onCarriedChange?.(carriedFrom(next));
     setErrors((current) => ({ ...current, [key]: undefined }));
   };
 
@@ -143,7 +175,10 @@ export function PurchaseForm({
     event.preventDefault();
     const next = validate();
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    // Both run, whatever the first one says: a person fixing the form should
+    // see everything that is wrong with it, not one message at a time.
+    const coinOk = beforeSubmit ? beforeSubmit() : true;
+    if (Object.keys(next).length > 0 || !coinOk) return;
     onSubmit({
       quantity: Number.parseInt(fields.quantity, 10),
       price: String(parseDecimal(fields.price)),

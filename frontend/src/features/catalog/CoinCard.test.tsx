@@ -96,7 +96,7 @@ describe('CoinCard collection state (same footer everywhere: catalog, series)', 
     render(<CoinCard item={makeItem({ quantityOwned: 0 })} />);
     expect(screen.queryByText(/Не вистачає/)).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: /Додати до колекції/ });
-    expect(link).toHaveAttribute('href', '/collection/coins/new?catalogItemId=1');
+    expect(link).toHaveAttribute('href', '/collection/add?catalogItemId=1');
   });
 
   it('shows a status row with a "+1" action when already owned, and no missing badge', () => {
@@ -106,7 +106,7 @@ describe('CoinCard collection state (same footer everywhere: catalog, series)', 
     expect(screen.queryByText(/Не вистачає/)).not.toBeInTheDocument();
     const link = screen.getByRole('link', { name: 'Додати ще один екземпляр' });
     expect(link).toHaveTextContent('+1');
-    expect(link).toHaveAttribute('href', '/collection/coins/new?catalogItemId=1');
+    expect(link).toHaveAttribute('href', '/collection/add?catalogItemId=1');
   });
 
   it('tints the card when the coin is owned, plain otherwise', () => {
@@ -131,7 +131,7 @@ describe('CoinCard collection state (same footer everywhere: catalog, series)', 
               <CoinCard item={makeItem({ quantityOwned: 0 })} backTo="/collection/missing" />
             }
           />
-          <Route path="/collection/coins/new" element={<LocationState />} />
+          <Route path="/collection/add" element={<LocationState />} />
         </Routes>
       </MemoryRouter>,
     );

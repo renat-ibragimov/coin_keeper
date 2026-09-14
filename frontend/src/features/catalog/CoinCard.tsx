@@ -65,7 +65,7 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
   const series = seriesLabel(item, t);
   const material = coinMaterial(item);
   const cardUrl = `/catalog/${item.id}`;
-  const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
+  const addUrl = `/collection/add?catalogItemId=${item.id}`;
   const addState = backTo ? { from: backTo } : undefined;
   const sourceLabel = priceSourceLabel(item.priceSource, t);
 

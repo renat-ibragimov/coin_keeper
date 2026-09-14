@@ -113,7 +113,7 @@ function CardBody({ card }: { card: CatalogCard }) {
   const secondaryRate = secondaryRateFrom(bootstrapQuery.data?.exchangeRates, secondaryCurrency);
 
   const title = coinTitle(card, locale);
-  const addUrl = `/collection/coins/new?catalogItemId=${card.id}`;
+  const addUrl = `/collection/add?catalogItemId=${card.id}`;
   const addState = { from: `/catalog/${card.id}` };
 
   const sides = [

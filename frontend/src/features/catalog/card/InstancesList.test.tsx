@@ -42,7 +42,7 @@ function renderList(overrides: Partial<Parameters<typeof InstancesList>[0]> = {}
         <InstancesList
           items={INSTANCES}
           loading={false}
-          addHref="/collection/coins/new?catalogItemId=7"
+          addHref="/collection/add?catalogItemId=7"
           coinTitle="Дельфін"
           photo={{ src: null }}
           currentPriceUah="460.00"

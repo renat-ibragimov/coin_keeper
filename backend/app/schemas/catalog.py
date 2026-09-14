@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from app.models.enums import CollectionGroup, MetalKind, TranslationSource
 from app.schemas.base import CamelModel
@@ -158,6 +158,64 @@ class CatalogItemCreate(CamelModel):
     # Admin only: create the record in the shared catalog instead of a
     # personal item. Regular users get a 403 (docs/03-api-contract.md).
     shared: bool = False
+
+
+class NewCatalogItemIn(CamelModel):
+    """A personal catalog item entered by hand on the "Додати" form.
+
+    A subset of CatalogItemCreate, not that schema itself, and the three
+    differences are the point (docs/03-api-contract.md, `POST /collection`):
+
+    * no `shared` — this record is always personal. The shared catalog is
+      read-only for everyone but an admin editing it deliberately, and the
+      purchase form is not that place (CLAUDE.md).
+    * no `originalLang` and no title translations — the language is detected
+      and the two translated slots filled by the background translation job,
+      marked `llm`, exactly as a storage location's are. A client cannot
+      claim `official` or `manual` wording by the back door.
+    * `material` is mandatory in one of its two shapes (owner, 2026-09-14):
+      either a dictionary row (`compositionId`) or free text, because for
+      most issuers the dictionary holds nothing to pick. Edge and quality
+      keep the same two-shaped pair as the full schema, but the form only
+      ever sends their dictionary halves.
+    """
+
+    country_id: int
+    series_id: int | None = None
+    denomination_id: int | None = None
+    collection_group: CollectionGroup
+    title_original: str = Field(min_length=1, max_length=500)
+    # Required, unlike the rest of the coin's description: catalog_items.issue_year
+    # is NOT NULL, and series completeness and every year filter are counted on
+    # it (owner's call 2026-09-14 — a nullable year is a migration of its own).
+    issue_year: int = Field(ge=1, le=2200)
+    issue_date: date | None = None
+    # One "Тираж" field on the form: what a catalogue publishes is the
+    # announced figure, and the actual one is a later correction nobody has
+    # at the moment of buying a coin.
+    mintage_announced: int | None = Field(default=None, ge=0)
+    composition_id: int | None = None
+    material: str | None = Field(default=None, max_length=200)
+    metal_kind: MetalKind = MetalKind.UNKNOWN
+    weight_grams: Decimal | None = Field(default=None, ge=0)
+    diameter_mm: Decimal | None = Field(default=None, ge=0)
+    thickness_mm: Decimal | None = Field(default=None, ge=0)
+    shape: str | None = Field(default=None, max_length=100)
+    edge_type_id: int | None = None
+    edge: str | None = Field(default=None, max_length=200)
+    quality_type_id: int | None = None
+    quality: str | None = Field(default=None, max_length=200)
+    catalog_km: str | None = Field(default=None, max_length=100)
+    catalog_uc: str | None = Field(default=None, max_length=100)
+    catalog_numista: str | None = Field(default=None, max_length=100)
+    notes: str | None = Field(default=None, max_length=4000)
+
+    @model_validator(mode="after")
+    def check_material(self) -> NewCatalogItemIn:
+        if self.composition_id is None and not (self.material or "").strip():
+            msg = "Either compositionId or material text is required."
+            raise ValueError(msg)
+        return self
 
 
 class CatalogItemUpdate(CamelModel):

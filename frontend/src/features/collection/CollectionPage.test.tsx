@@ -152,7 +152,7 @@ describe('CollectionPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
       'href',
-      '/collection/coins/new',
+      '/collection/add',
     );
     expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
       'href',
@@ -188,7 +188,7 @@ describe('CollectionPage', () => {
     expect(screen.queryByText('У колекції ще немає монет')).toBeNull();
     expect(screen.getByRole('link', { name: '+ Додати покупку' })).toHaveAttribute(
       'href',
-      '/collection/coins/new',
+      '/collection/add',
     );
   });
 

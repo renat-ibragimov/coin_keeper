@@ -2,8 +2,11 @@ import { api, toQuery } from '@/shared/api/client';
 import type {
   CatalogCard,
   CatalogCollectionItem,
+  CatalogListItem,
   CatalogPage,
+  CoinEdgeType,
   CoinMaterial,
+  CoinQualityType,
   CountryOut,
   CurrencyOut,
   DenominationOut,
@@ -98,7 +101,34 @@ export function fetchCurrencies(): Promise<CurrencyOut[]> {
   return api<CurrencyOut[]>('/currencies');
 }
 
-/** Quick lookup for pickers: a handful of active items matching the text. */
-export function searchCatalog(q: string, limit = 8): Promise<CatalogPage> {
-  return api<CatalogPage>(`/catalog${toQuery({ q, page: 1, pageSize: limit })}`);
+/**
+ * The "Додати" form's typeahead: a handful of coins matching the text, inside
+ * one country when the form has already asked for it.
+ *
+ * Not `GET /catalog`: this route drops the storefront rule, so a coin of a
+ * country the catalogue project has not confirmed is still findable by name —
+ * the country dropdown offers every issuer there has ever been
+ * (docs/03-api-contract.md).
+ */
+export function lookupCatalog(
+  q: string,
+  countryId?: number,
+  limit = 8,
+): Promise<CatalogListItem[]> {
+  return api<CatalogListItem[]>(`/catalog/lookup${toQuery({ q, countryId, limit })}`);
+}
+
+/** The whole composition dictionary, for the "Про монету" material field —
+ *  wider than `fetchCatalogMaterials`, which offers only what a confirmed
+ *  coin actually uses (docs/03-api-contract.md). */
+export function fetchAllMaterials(): Promise<CoinMaterial[]> {
+  return api<CoinMaterial[]>('/materials');
+}
+
+export function fetchEdgeTypes(): Promise<CoinEdgeType[]> {
+  return api<CoinEdgeType[]>('/edge-types');
+}
+
+export function fetchQualityTypes(): Promise<CoinQualityType[]> {
+  return api<CoinQualityType[]>('/quality-types');
 }

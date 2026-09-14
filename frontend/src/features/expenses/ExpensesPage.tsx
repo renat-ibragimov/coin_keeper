@@ -33,7 +33,6 @@ import {
 
 import {
   ALL_CATEGORIES,
-  createExpense,
   deleteExpense,
   EXPENSE_SORTS,
   fetchExpenses,
@@ -64,7 +63,12 @@ const SORTABLE_COLUMNS: { key: string; sort: ExpenseSort; className: string | un
   { key: 'expenses.amountHeader', sort: 'amount', className: styles.moneyColumn },
 ];
 
-type Editor = { mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; expense: ExpenseOut };
+/** Only editing opens here now: "+ Додати витрату" leads to `/collection/add`,
+ *  where the same form sits beside the purchase one (docs/08-ui-map.md). */
+type Editor = { mode: 'closed' } | { mode: 'edit'; expense: ExpenseOut };
+
+/** The type selector's default for an expense recorded from this page. */
+const ADD_EXPENSE_URL = '/collection/add?type=other';
 
 export function ExpensesPage() {
   const { t, i18n } = useTranslation();
@@ -116,11 +120,11 @@ export function ExpensesPage() {
     Promise.all(DEPENDENT_KEYS.map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
 
   const saveMutation = useMutation({
-    mutationFn: (values: ExpenseValues) =>
-      editor.mode === 'edit' ? updateExpense(editor.expense.id, values) : createExpense(values),
+    mutationFn: ({ id, values }: { id: number; values: ExpenseValues }) =>
+      updateExpense(id, values),
     onSuccess: async () => {
       await invalidate();
-      toast.show(editor.mode === 'edit' ? t('expenses.updated') : t('expenses.created'));
+      toast.show(t('expenses.updated'));
       setEditor({ mode: 'closed' });
     },
   });
@@ -196,7 +200,9 @@ export function ExpensesPage() {
         subtitle={t('expenses.subtitle')}
         actions={
           collectionEmpty ? undefined : (
-            <Button onClick={() => setEditor({ mode: 'create' })}>+ {t('expenses.add')}</Button>
+            <Link to={ADD_EXPENSE_URL}>
+              <Button>+ {t('expenses.add')}</Button>
+            </Link>
           )
         }
       />
@@ -212,7 +218,7 @@ export function ExpensesPage() {
               <Link to="/catalog">
                 <Button>{t('common.backToCatalog')}</Button>
               </Link>
-              <Link to="/collection/coins/new">
+              <Link to="/collection/add">
                 <Button variant="secondary">{t('card.addPurchase')}</Button>
               </Link>
             </>
@@ -351,9 +357,9 @@ export function ExpensesPage() {
               title={t('expenses.emptyTitle')}
               description={t('expenses.emptyText')}
               actions={
-                <Button variant="secondary" onClick={() => setEditor({ mode: 'create' })}>
-                  + {t('expenses.add')}
-                </Button>
+                <Link to={ADD_EXPENSE_URL}>
+                  <Button variant="secondary">+ {t('expenses.add')}</Button>
+                </Link>
               }
             />
           ) : null}
@@ -399,12 +405,28 @@ export function ExpensesPage() {
                         </Badge>
                       </td>
                       <td>
-                        {fromPurchase && expense.catalogItemId ? (
-                          <Link to={`/catalog/${expense.catalogItemId}`}>
-                            {expense.coinTitle || t('expenses.fromPurchase')}
-                          </Link>
+                        {fromPurchase ? (
+                          expense.catalogItemId ? (
+                            <Link to={`/catalog/${expense.catalogItemId}`}>
+                              {expense.coinTitle || t('expenses.fromPurchase')}
+                            </Link>
+                          ) : (
+                            t('expenses.fromPurchase')
+                          )
                         ) : (
-                          expense.description || '—'
+                          <>
+                            {expense.description || '—'}
+                            {/* A supporting expense may name a coin too
+                                (grading, a holder for one piece); the link
+                                the person made has to be visible. */}
+                            {expense.catalogItemId ? (
+                              <div className={styles.linkedCoin}>
+                                <Link to={`/catalog/${expense.catalogItemId}`}>
+                                  {expense.coinTitle || t('expenses.linkedCoinFallback')}
+                                </Link>
+                              </div>
+                            ) : null}
+                          </>
                         )}
                       </td>
                       <td className={`${cellAlign.center} ${styles.secondary}`}>
@@ -457,16 +479,16 @@ export function ExpensesPage() {
       <Modal
         open={editor.mode !== 'closed'}
         onClose={() => setEditor({ mode: 'closed' })}
-        title={editor.mode === 'edit' ? t('expenses.editTitle') : t('expenses.addTitle')}
+        title={t('expenses.editTitle')}
       >
-        {editor.mode !== 'closed' ? (
+        {editor.mode === 'edit' ? (
           <ExpenseForm
-            key={editor.mode === 'edit' ? editor.expense.id : 'new'}
-            initial={editor.mode === 'edit' ? editor.expense : undefined}
+            key={editor.expense.id}
+            initial={editor.expense}
             currencies={currenciesQuery.data ?? []}
             busy={saveMutation.isPending}
             submitError={saveMutation.error}
-            onSubmit={(values) => saveMutation.mutate(values)}
+            onSubmit={(values) => saveMutation.mutate({ id: editor.expense.id, values })}
             onCancel={() => setEditor({ mode: 'closed' })}
           />
         ) : null}
