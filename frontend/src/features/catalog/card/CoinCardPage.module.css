@@ -36,6 +36,20 @@
   justify-self: start;
 }
 
+@media (max-width: 900px) {
+  /* The phone browser already carries its own back affordance (a nav bar
+   * button or an edge-swipe gesture) — a second one here would just repeat
+   * it. Dropping to a single track lets the title cell centre on the full
+   * width instead of the empty space the button used to balance. */
+  .backButton {
+    display: none;
+  }
+
+  .titleBar {
+    grid-template-columns: 1fr;
+  }
+}
+
 .titleCell {
   display: flex;
   flex-wrap: wrap;
