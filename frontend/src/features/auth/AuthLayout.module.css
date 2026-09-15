@@ -20,7 +20,7 @@
 }
 
 .card {
-  margin: auto;
+  margin: auto auto var(--space-6);
   width: 100%;
   max-width: 1060px;
   display: grid;
@@ -32,6 +32,11 @@
     inset 0 1px 0 var(--highlight-inset),
     var(--shadow-card);
   overflow: hidden;
+}
+
+.page > footer {
+  margin-inline: calc(-1 * var(--space-5));
+  width: calc(100% + 2 * var(--space-5));
 }
 
 .welcome {
@@ -108,6 +113,12 @@
 @media (max-width: 860px) {
   .page {
     padding: var(--space-3) var(--space-4) var(--space-5);
+  }
+
+  .page > footer {
+    margin-inline: calc(-1 * var(--space-4));
+    margin-bottom: calc(-1 * var(--space-5));
+    width: calc(100% + 2 * var(--space-4));
   }
 
   .card {

@@ -392,8 +392,7 @@
   }
 
   .main {
-    /* Room for the fixed bar and the safe area, so the last card never hides. */
-    padding: var(--space-3) var(--space-4) calc(var(--space-6) + var(--bottom-nav-inset));
+    padding: var(--space-3) var(--space-4) var(--space-6);
   }
 
   .bottomNav {

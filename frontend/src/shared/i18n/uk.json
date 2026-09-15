@@ -2,6 +2,13 @@
   "brand": {
     "name": "Bakost Numismatics"
   },
+  "footer": {
+    "madeInUkraine": "З України з любов’ю",
+    "ukraineFlag": "Прапор України",
+    "linksLabel": "Допомога та підтримка",
+    "support": "Підтримка",
+    "donate": "Підтримати розвиток сайту"
+  },
   "nav": {
     "label": "Головна навігація",
     "collectionLabel": "Навігація колекції",

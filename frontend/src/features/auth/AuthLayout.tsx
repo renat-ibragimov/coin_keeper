@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 
 import { Brand } from '@/app/layout/Brand';
 import { LocaleSwitcher, ThemeSwitcher } from '@/app/layout/HeaderControls';
+import { SiteFooter } from '@/app/layout/SiteFooter';
 
 import styles from './AuthLayout.module.css';
 
@@ -48,6 +49,7 @@ export function AuthLayout() {
           <Outlet />
         </section>
       </div>
+      <SiteFooter />
     </div>
   );
 }

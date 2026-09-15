@@ -20,6 +20,7 @@ import { useDismissable } from '@/shared/lib/useDismissable';
 
 import { Brand } from './Brand';
 import { LocaleSwitcher, ThemeSwitcher } from './HeaderControls';
+import { SiteFooter } from './SiteFooter';
 import styles from './AppLayout.module.css';
 
 const COLLECTION_TABS = [
@@ -209,6 +210,7 @@ export function AppLayout() {
         <main className={styles.main}>
           <Outlet />
         </main>
+        <SiteFooter reserveMobileNav />
       </div>
 
       <nav className={styles.bottomNav} aria-label={t('nav.label')}>
