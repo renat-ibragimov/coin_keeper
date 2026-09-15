@@ -21,6 +21,7 @@ import { useAuth } from '@/features/auth/useAuth';
 import { useDismissable } from '@/shared/lib/useDismissable';
 
 import { Brand } from './Brand';
+import { useDonationDialog } from './donationDialogContext';
 import { LocaleSwitcher, ThemeSwitcher } from './HeaderControls';
 import { SiteFooter } from './SiteFooter';
 import { useSupportLink } from './useSupportLink';
@@ -63,6 +64,7 @@ export function AppLayout() {
     location.pathname === '/collection' || location.pathname.startsWith('/collection/');
   const mobileLinks = inCollection ? MOBILE_COLLECTION : MOBILE_PLAIN;
   const { openSupport, openingSupport } = useSupportLink();
+  const openDonation = useDonationDialog();
 
   const [accountOpen, setAccountOpen] = useState(false);
   const accountMenu = useRef<HTMLDivElement>(null);
@@ -187,7 +189,14 @@ export function AppLayout() {
                   <Headphones size={16} aria-hidden="true" />
                   {t('footer.support')}
                 </button>
-                <button type="button" className={styles.accountMenuLink} disabled>
+                <button
+                  type="button"
+                  className={styles.accountMenuLink}
+                  onClick={() => {
+                    closeAccount();
+                    openDonation();
+                  }}
+                >
                   <Coffee size={16} aria-hidden="true" />
                   {t('footer.donate')}
                 </button>

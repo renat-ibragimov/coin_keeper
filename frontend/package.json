@@ -26,6 +26,7 @@
     "i18next": "^24.2.0",
     "lightweight-charts": "^5.2.1",
     "lucide-react": "^1.41.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-easy-crop": "^6.2.3",

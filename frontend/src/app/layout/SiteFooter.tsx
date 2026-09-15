@@ -2,6 +2,7 @@ import { Coffee, Headphones } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import styles from './SiteFooter.module.css';
+import { useDonationDialog } from './donationDialogContext';
 import { useSupportLink } from './useSupportLink';
 
 interface SiteFooterProps {
@@ -11,6 +12,7 @@ interface SiteFooterProps {
 export function SiteFooter({ reserveMobileNav = false }: SiteFooterProps) {
   const { t } = useTranslation();
   const { openSupport, openingSupport } = useSupportLink();
+  const openDonation = useDonationDialog();
   const year = new Date().getFullYear();
 
   return (
@@ -36,10 +38,10 @@ export function SiteFooter({ reserveMobileNav = false }: SiteFooterProps) {
           <Headphones size={14} strokeWidth={1.8} aria-hidden="true" />
           {t('footer.support')}
         </button>
-        <a className={styles.link} aria-disabled="true">
+        <button type="button" className={styles.link} onClick={openDonation}>
           <Coffee size={14} strokeWidth={1.8} aria-hidden="true" />
           {t('footer.donate')}
-        </a>
+        </button>
       </nav>
     </footer>
   );

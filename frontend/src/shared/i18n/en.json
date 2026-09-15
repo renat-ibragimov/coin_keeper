@@ -10,6 +10,13 @@
     "donate": "Support the project",
     "supportUnavailable": "Support is temporarily unavailable. Please try again later."
   },
+  "donation": {
+    "title": "Support the project",
+    "description": "If you enjoy the service, you can support its development.",
+    "openJar": "Open monobank Jar",
+    "qrTitle": "monobank Jar QR code",
+    "scanQr": "Scan the QR code with another device"
+  },
   "nav": {
     "label": "Main navigation",
     "collectionLabel": "Collection navigation",

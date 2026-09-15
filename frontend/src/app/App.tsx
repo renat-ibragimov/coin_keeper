@@ -30,6 +30,7 @@ import { ToastProvider } from '@/shared/ui';
 
 import { ComingSoon } from './ComingSoon';
 import { AppLayout } from './layout/AppLayout';
+import { DonationDialogProvider } from './layout/DonationDialog';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ThemeSettingsSync } from './ThemeSettingsSync';
 
@@ -157,48 +158,59 @@ export function App() {
             <ThemeSettingsSync />
             <BrowserRouter>
               <ScrollToTop />
-              <Routes>
-                <Route element={<AuthLayout />}>
-                  <Route path="/login" element={<LoginPage />} />
-                  <Route path="/register" element={<RegisterPage />} />
-                  <Route path="/check-email" element={<CheckEmailPage />} />
-                  <Route path="/verify-email" element={<VerifyEmailPage />} />
-                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
-                </Route>
-                <Route element={<ProtectedRoute />}>
-                  <Route element={<AppLayout />}>
-                    <Route path="/collection" element={<DashboardPage />} />
-                    <Route path="/collection/coins" element={<CollectionPage />} />
-                    <Route path="/collection/add" element={<AddPage />} />
-                    <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
-                    <Route path="/collection/series" element={<SeriesListPage />} />
-                    <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
-                    <Route path="/collection/money" element={<ExpensesPage />} />
-                    <Route path="/catalog" element={<CatalogPage />} />
-                    <Route path="/catalog/:id" element={<CoinCardPage />} />
-                    <Route path="/import" element={<ComingSoon titleKey="catalog.importUcoin" />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="/admin" element={<AdminRoute />} />
-
-                    {/* Retired paths, kept as redirects for old bookmarks and links. */}
-                    <Route path="/" element={<Navigate to="/collection" replace />} />
-                    <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
-                    <Route path="/series" element={<Navigate to="/collection/series" replace />} />
-                    <Route path="/series/:id" element={<RedirectSeriesDetail />} />
-                    <Route path="/missing" element={<RedirectMissingToCatalog />} />
-                    <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
-                    <Route path="/expenses" element={<Navigate to="/collection/money" replace />} />
-                    <Route path="/collection/:id/edit" element={<RedirectCollectionEdit />} />
-                    <Route path="/collection/new" element={<RedirectTo to="/collection/add" />} />
-                    <Route
-                      path="/collection/coins/new"
-                      element={<RedirectTo to="/collection/add" />}
-                    />
+              <DonationDialogProvider>
+                <Routes>
+                  <Route element={<AuthLayout />}>
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/check-email" element={<CheckEmailPage />} />
+                    <Route path="/verify-email" element={<VerifyEmailPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
                   </Route>
-                </Route>
-                <Route path="*" element={<Navigate to="/collection" replace />} />
-              </Routes>
+                  <Route element={<ProtectedRoute />}>
+                    <Route element={<AppLayout />}>
+                      <Route path="/collection" element={<DashboardPage />} />
+                      <Route path="/collection/coins" element={<CollectionPage />} />
+                      <Route path="/collection/add" element={<AddPage />} />
+                      <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
+                      <Route path="/collection/series" element={<SeriesListPage />} />
+                      <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
+                      <Route path="/collection/money" element={<ExpensesPage />} />
+                      <Route path="/catalog" element={<CatalogPage />} />
+                      <Route path="/catalog/:id" element={<CoinCardPage />} />
+                      <Route
+                        path="/import"
+                        element={<ComingSoon titleKey="catalog.importUcoin" />}
+                      />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="/admin" element={<AdminRoute />} />
+
+                      {/* Retired paths, kept as redirects for old bookmarks and links. */}
+                      <Route path="/" element={<Navigate to="/collection" replace />} />
+                      <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
+                      <Route
+                        path="/series"
+                        element={<Navigate to="/collection/series" replace />}
+                      />
+                      <Route path="/series/:id" element={<RedirectSeriesDetail />} />
+                      <Route path="/missing" element={<RedirectMissingToCatalog />} />
+                      <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
+                      <Route
+                        path="/expenses"
+                        element={<Navigate to="/collection/money" replace />}
+                      />
+                      <Route path="/collection/:id/edit" element={<RedirectCollectionEdit />} />
+                      <Route path="/collection/new" element={<RedirectTo to="/collection/add" />} />
+                      <Route
+                        path="/collection/coins/new"
+                        element={<RedirectTo to="/collection/add" />}
+                      />
+                    </Route>
+                  </Route>
+                  <Route path="*" element={<Navigate to="/collection" replace />} />
+                </Routes>
+              </DonationDialogProvider>
             </BrowserRouter>
           </AuthProvider>
         </ToastProvider>
