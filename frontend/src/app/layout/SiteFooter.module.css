@@ -38,15 +38,28 @@
   align-items: center;
   gap: 6px;
   border: 0;
-  padding: 0;
+  border-bottom: 1px solid var(--color-border-strong);
+  padding: 0 0 2px;
   background: none;
   font: inherit;
   color: var(--color-text-muted);
-  text-decoration: underline;
-  text-decoration-color: var(--color-border-strong);
-  text-underline-offset: 3px;
+  text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
+  transition:
+    color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .link:not([aria-disabled='true']):not(:disabled):hover {
+    color: var(--color-accent-strong);
+    border-color: var(--color-accent);
+  }
+}
+
+:root[data-theme='dark'] .link:not([aria-disabled='true']):not(:disabled):hover {
+  color: var(--color-accent);
 }
 
 .link[aria-disabled='true'],

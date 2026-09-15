@@ -60,6 +60,15 @@ class SupportRepository:
         )
         return result.scalar_one_or_none()
 
+    async def latest_ticket_for_chat(
+        self, chat_id: int, *, linked_only: bool = False
+    ) -> SupportTicket | None:
+        query = select(SupportTicket).where(SupportTicket.telegram_chat_id == chat_id)
+        if linked_only:
+            query = query.where(SupportTicket.user_id.is_not(None))
+        result = await self.session.execute(query.order_by(SupportTicket.id.desc()).limit(1))
+        return result.scalar_one_or_none()
+
     async def ticket_by_topic(self, topic_id: int) -> SupportTicket | None:
         result = await self.session.execute(
             select(SupportTicket).where(SupportTicket.admin_topic_id == topic_id)

@@ -127,6 +127,18 @@ class SupportService:
         configured = await self.repo.settings()
         if configured is None:
             return None
+        # A site deep link proves the account once. Keep that association for
+        # later tickets opened directly in Telegram; otherwise Telegram's own
+        # language_code (often "en" even for a Ukrainian-speaking user) would
+        # also replace the locale after every closed conversation.
+        previous_linked = (
+            await self.repo.latest_ticket_for_chat(chat_id, linked_only=True)
+            if token is None
+            else None
+        )
+        previous = previous_linked or (
+            await self.repo.latest_ticket_for_chat(chat_id) if token is None else None
+        )
         full_name = (
             " ".join(
                 part
@@ -136,14 +148,18 @@ class SupportService:
             or None
         )
         ticket = await self.repo.create_ticket(
-            user_id=token.user_id if token else None,
+            user_id=token.user_id if token else (previous.user_id if previous else None),
             telegram_chat_id=chat_id,
             telegram_username=sender.get("username")
             if isinstance(sender.get("username"), str)
             else None,
             telegram_name=full_name,
             source_path=token.source_path if token else None,
-            locale=token.locale if token else (sender.get("language_code") or "uk")[:2],
+            locale=(
+                token.locale
+                if token
+                else (previous.locale if previous else (sender.get("language_code") or "uk")[:2])
+            ),
         )
         user = await self.session.get(User, ticket.user_id) if ticket.user_id else None
         label = (

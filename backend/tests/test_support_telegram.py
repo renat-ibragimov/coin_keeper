@@ -113,6 +113,40 @@ async def test_account_start_adds_identity_and_source_page(
     assert "User ID:" in header
 
 
+async def test_new_ticket_keeps_linked_account_locale_after_close(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mail_outbox: list[EmailMessage],
+    support_telegram: RecordingSupportTelegram,
+) -> None:
+    await setup_group(client)
+    _, access = await register_and_verify(client, mail_outbox)
+    linked = await client.post(
+        "/api/v1/support/telegram/link",
+        headers=auth(access),
+        json={"sourcePath": "/collection"},
+    )
+    code = linked.json()["url"].split("start=", 1)[1]
+    await client.post(WEBHOOK, headers=HEADERS, json=private_message(f"/start {code}"))
+    first = (await db_session.execute(select(SupportTicket))).scalar_one()
+    first.status = "closed"
+    await db_session.flush()
+
+    # The Telegram application language is English, but the linked site
+    # account is Ukrainian and remains authoritative for later tickets.
+    update = private_message("Ще одне питання", message_id=2)
+    update["message"]["from"]["language_code"] = "en"  # type: ignore[index]
+    await client.post(WEBHOOK, headers=HEADERS, json=update)
+
+    tickets = list(
+        (await db_session.execute(select(SupportTicket).order_by(SupportTicket.id))).scalars()
+    )
+    assert len(tickets) == 2
+    assert tickets[1].user_id == first.user_id
+    assert tickets[1].locale == "uk"
+    assert support_telegram.sent[-1][1] == "Отримали. Підтримка відповість у цьому чаті."
+
+
 async def test_admin_topic_reply_and_close_are_relayed(
     client: AsyncClient,
     db_session: AsyncSession,
