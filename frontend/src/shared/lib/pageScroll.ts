@@ -18,22 +18,10 @@ function scrollArea(): HTMLElement | null {
   return document.querySelector<HTMLElement>(SCROLL_AREA);
 }
 
-/**
- * Puts the page back at the top: a new route, a new page of results.
- *
- * Deferred a frame on purpose. Called straight from a route change, it lands
- * in the same tick as the outgoing page's unmount and the incoming one's
- * mount — on iOS Safari, moving the scroll offset while that much layout is
- * still settling (doubly so with a toast's fixed-position element newly in
- * the tree) can leave the page rendered at the wrong zoom in a corner of the
- * viewport until the next interaction. One frame is enough for layout to
- * settle first and is not perceptible as a delay.
- */
+/** Puts the page back at the top: a new route, a new page of results. */
 export function scrollPageToTop(): void {
-  requestAnimationFrame(() => {
-    scrollArea()?.scrollTo({ top: 0 });
-    window.scrollTo(0, 0);
-  });
+  scrollArea()?.scrollTo({ top: 0 });
+  window.scrollTo(0, 0);
 }
 
 /**

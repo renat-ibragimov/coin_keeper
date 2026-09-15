@@ -6,6 +6,15 @@
   display: grid;
   place-items: center;
   padding: var(--space-4);
+  /* Vertical scrolling inside .body still works — only pinch- and
+   * double-tap-zoom are excluded. Without this, a two-finger touch that
+   * starts a hair outside the crop dialog's own cropper (its container is
+   * the only thing that claims touch-action: none) reaches Safari as a
+   * native page pinch instead, and that zoom sticks to the tab through the
+   * dialog closing and the SPA navigation after it (owner-reported,
+   * 2026-09-15: the page rendered shrunk into a corner right after saving a
+   * purchase with a cropped coin photo). */
+  touch-action: pan-y;
 }
 
 .dialog {
