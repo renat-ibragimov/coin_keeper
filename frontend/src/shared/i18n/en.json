@@ -469,7 +469,7 @@
   },
   "collectionPhoto": {
     "cropTitle": "Choose the visible area",
-    "cropHint": "Centre the coin in the circle — a square is uploaded.",
+    "cropHint": "Centre the coin in the circle — everything outside it is cut away.",
     "invalid": "Pick a JPEG, PNG or WebP image up to 12 MB.",
     "saved": "Photo saved.",
     "removed": "Photo removed.",
