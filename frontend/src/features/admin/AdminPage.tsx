@@ -51,7 +51,7 @@ export function AdminPage() {
 
   return (
     <div className={styles.page}>
-      <PageHeader title={t('admin.title')} subtitle={t('admin.subtitle')} />
+      <PageHeader align="center" title={t('admin.title')} subtitle={t('admin.subtitle')} />
 
       <TelegramCard />
 
