@@ -5,7 +5,9 @@ from __future__ import annotations
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.enums import UserRole
 from app.models.telegram import TelegramRecipient
+from app.models.user import User
 
 
 class TelegramRecipientRepository:
@@ -40,9 +42,31 @@ class TelegramRecipientRepository:
         )
         return list(result.scalars().all())
 
+    async def get_authorized_chat(self, chat_id: int) -> TelegramRecipient | None:
+        result = await self._session.execute(
+            select(TelegramRecipient)
+            .join(User, User.id == TelegramRecipient.user_id)
+            .where(
+                TelegramRecipient.chat_id == chat_id,
+                User.role == UserRole.ADMIN,
+                User.is_active.is_(True),
+                User.email_verified.is_(True),
+                TelegramRecipient.chat_id > 0,
+            )
+        )
+        return result.scalar_one_or_none()
+
     async def all_chat_ids(self) -> list[int]:
         result = await self._session.execute(
-            select(TelegramRecipient.chat_id).order_by(TelegramRecipient.id)
+            select(TelegramRecipient.chat_id)
+            .join(User, User.id == TelegramRecipient.user_id)
+            .where(
+                User.role == UserRole.ADMIN,
+                User.is_active.is_(True),
+                User.email_verified.is_(True),
+                TelegramRecipient.chat_id > 0,
+            )
+            .order_by(TelegramRecipient.id)
         )
         return list(result.scalars().all())
 

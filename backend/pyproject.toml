@@ -89,6 +89,9 @@ ignore = ["S101"]
 # in. Only the message strings are exempt -- comments and docstrings in this
 # module stay plain English like everywhere else.
 "app/core/telegram/messages.py" = ["RUF001"]
+# The system prompt shows the model a real Ukrainian example phrase it needs
+# to recognise ("вдома") — an example of the data it translates, not prose.
+"app/services/translation.py" = ["RUF001"]
 
 [tool.mypy]
 python_version = "3.12"

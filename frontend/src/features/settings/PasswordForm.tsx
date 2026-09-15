@@ -56,14 +56,19 @@ export function PasswordForm({ busy, submitError, onSubmit }: PasswordFormProps)
         <FormError>{serverError}</FormError>
         <PasswordInput
           label={t('settings.currentPassword')}
-          autoComplete="current-password"
+          // "current-password" is the semantically correct value, but Chrome
+          // shows it a dropdown of unrelated remembered text (owner's report,
+          // 2026-09-13) rather than an actual saved-password prompt here --
+          // this form changes a password already known to be correct, not a
+          // login, so there is nothing worth autofilling anyway.
+          autoComplete="off"
           required
           value={current}
           onChange={(event) => setCurrent(event.target.value)}
         />
         <PasswordInput
           label={t('settings.newPassword')}
-          autoComplete="new-password"
+          autoComplete="off"
           required
           hint={t('auth.passwordHint')}
           value={next}
@@ -75,7 +80,7 @@ export function PasswordForm({ busy, submitError, onSubmit }: PasswordFormProps)
         />
         <PasswordInput
           label={t('auth.repeatPassword')}
-          autoComplete="new-password"
+          autoComplete="off"
           required
           value={repeat}
           onChange={(event) => {

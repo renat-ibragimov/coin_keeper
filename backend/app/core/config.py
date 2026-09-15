@@ -54,9 +54,6 @@ class Settings(BaseSettings):
     smtp_starttls: bool = Field(default=True, alias="SMTP_STARTTLS")
 
     # --- external sources, wired up in stages 5 and 6 ---
-    nbu_api_base: str = Field(
-        default="https://bank.gov.ua/NBUStatService/v1/statdirectory", alias="NBU_API_BASE"
-    )
     nbu_catalog_base: str = Field(
         default="https://bank.gov.ua/ua/numismatic-products", alias="NBU_CATALOG_BASE"
     )

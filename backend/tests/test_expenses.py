@@ -126,6 +126,57 @@ async def test_expense_in_foreign_currency(
     assert "exchange-rate-missing" in no_rate.json()["type"]
 
 
+async def test_amount_usd_uses_the_expense_own_date_not_a_later_rate(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The ~40 UAH/USD of 2026 must never leak into a 2020 purchase's
+    dollar figure (owner-reported bug, 2026-09-13)."""
+    await add_rate(db_session, "USD", "27.50", date(2020, 7, 20))
+    await add_rate(db_session, "USD", "44.55", date(2026, 9, 1))
+    await add_rate(db_session, "EUR", "25.00", date(2020, 7, 20))
+    await add_rate(db_session, "EUR", "48.00", date(2026, 9, 1))
+    headers = auth(ctx.token_a)
+
+    created = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "55.00",
+            "currency": "UAH",
+            "expenseDate": "2020-07-23",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    # 55 / 27.50 = 2.00 -- the 2020 rate, not 55 / 44.55 the 2026 one.
+    assert created.json()["amountUsd"] == "2.00"
+    # 55 / 25.00 = 2.20 -- same rule, the EUR side of it.
+    assert created.json()["amountEur"] == "2.20"
+
+    listing = await client.get("/api/v1/expenses", headers=headers)
+    assert listing.json()["items"][0]["amountUsd"] == "2.00"
+    assert listing.json()["items"][0]["amountEur"] == "2.20"
+
+
+async def test_amount_usd_is_null_without_a_rate_that_far_back(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    created = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "50.00",
+            "currency": "UAH",
+            "expenseDate": "1990-01-01",
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["amountUsd"] is None
+    assert created.json()["amountEur"] is None
+
+
 async def test_coin_purchase_guard(client: AsyncClient, ctx: SimpleNamespace) -> None:
     headers = auth(ctx.token_a)
 
@@ -326,6 +377,123 @@ async def test_summary_by_month_zero_filled(client: AsyncClient, ctx: SimpleName
     assert outside_window not in by_month
 
 
+async def test_chart_summary_daily_granularity_for_a_short_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "75.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-05",
+        },
+        headers=headers,
+    )
+
+    response = await client.get(
+        "/api/v1/expenses/chart-summary?dateFrom=2024-03-01&dateTo=2024-03-10",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["granularity"] == "day"
+    by_day = {row["period"]: row for row in body["byPeriod"]}
+    assert len(body["byPeriod"]) == 10
+    assert by_day["2024-03-05"]["supportingUah"] == "75.00"
+    # A day with no activity is a solid zero, not a missing key.
+    assert by_day["2024-03-01"]["supportingUah"] == "0.00"
+    assert by_day["2024-03-01"]["coinsUah"] == "0.00"
+
+
+async def test_chart_summary_monthly_granularity_for_a_longer_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    await _add_purchase(client, ctx.token_a, ctx.item_id, "300.00", purchase_date="2024-01-15")
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "40.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-20",
+        },
+        headers=headers,
+    )
+
+    response = await client.get(
+        "/api/v1/expenses/chart-summary?dateFrom=2024-01-01&dateTo=2024-04-30",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["granularity"] == "month"
+    by_month = {row["period"]: row for row in body["byPeriod"]}
+    assert list(by_month) == ["2024-01", "2024-02", "2024-03", "2024-04"]
+    assert by_month["2024-01"]["coinsUah"] == "300.00"
+    assert by_month["2024-02"]["coinsUah"] == "0.00"
+    assert by_month["2024-03"]["supportingUah"] == "40.00"
+
+
+async def test_chart_summary_scopes_categories_to_the_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    headers = auth(ctx.token_a)
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "album",
+            "amount": "10.00",
+            "currency": "UAH",
+            "expenseDate": "2023-01-01",
+        },
+        headers=headers,
+    )
+    await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "delivery",
+            "amount": "20.00",
+            "currency": "UAH",
+            "expenseDate": "2024-06-01",
+        },
+        headers=headers,
+    )
+
+    body = (
+        await client.get(
+            "/api/v1/expenses/chart-summary?dateFrom=2024-01-01&dateTo=2024-12-31",
+            headers=headers,
+        )
+    ).json()
+    categories = {row["category"] for row in body["byCategory"]}
+    assert categories == {"delivery"}
+
+    # Isolated from other users, same as the rest of the money screen.
+    empty = (
+        await client.get(
+            "/api/v1/expenses/chart-summary?dateFrom=2024-01-01&dateTo=2024-12-31",
+            headers=auth(ctx.token_b),
+        )
+    ).json()
+    assert empty["byCategory"] == []
+    assert all(
+        row["coinsUah"] == "0.00" and row["supportingUah"] == "0.00" for row in empty["byPeriod"]
+    )
+
+
+async def test_chart_summary_rejects_a_backwards_range(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    response = await client.get(
+        "/api/v1/expenses/chart-summary?dateFrom=2024-06-01&dateTo=2024-01-01",
+        headers=auth(ctx.token_a),
+    )
+    assert response.status_code == 422
+
+
 async def test_coin_title_in_listing(client: AsyncClient, ctx: SimpleNamespace) -> None:
     headers = auth(ctx.token_a)
     await _add_purchase(client, ctx.token_a, ctx.item_id, "120.00")
@@ -344,3 +512,69 @@ async def test_coin_title_in_listing(client: AsyncClient, ctx: SimpleNamespace) 
     by_category = {item["category"]: item for item in listing["items"]}
     assert by_category["coin_purchase"]["coinTitle"] == "Дельфін"
     assert by_category["album"]["coinTitle"] is None
+
+
+async def test_a_supporting_expense_of_zero_is_rejected(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    """Unlike a purchase price, which may honestly be zero (a gift), a
+    delivery or an album that cost nothing is a typo (docs/03-api-contract.md)."""
+    headers = auth(ctx.token_a)
+    body = {
+        "category": "delivery",
+        "amount": "0",
+        "currency": "UAH",
+        "expenseDate": "2024-02-01",
+    }
+    assert (await client.post("/api/v1/expenses", json=body, headers=headers)).status_code == 422
+
+    body["amount"] = "60.00"
+    created = await client.post("/api/v1/expenses", json=body, headers=headers)
+    assert created.status_code == 201, created.text
+
+    zeroed = await client.patch(
+        f"/api/v1/expenses/{created.json()['id']}", json={"amount": "0"}, headers=headers
+    )
+    assert zeroed.status_code == 422
+
+
+async def test_a_supporting_expense_can_name_a_coin(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    """Grading or a holder may be about one particular coin, and the journal
+    has to show the link (docs/08-ui-map.md, «Гроші»)."""
+    headers = auth(ctx.token_a)
+    created = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "grading",
+            "amount": "900.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-01",
+            "catalogItemId": ctx.item_id,
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["catalogItemId"] == ctx.item_id
+
+    row = next(
+        item
+        for item in (await client.get("/api/v1/expenses", headers=headers)).json()["items"]
+        if item["id"] == created.json()["id"]
+    )
+    assert row["coinTitle"] == "Дельфін"
+
+    # Someone else's personal item is not a coin this user may point at.
+    invisible = await client.post(
+        "/api/v1/expenses",
+        json={
+            "category": "grading",
+            "amount": "900.00",
+            "currency": "UAH",
+            "expenseDate": "2024-03-01",
+            "catalogItemId": 10_000_000,
+        },
+        headers=headers,
+    )
+    assert invisible.status_code == 422

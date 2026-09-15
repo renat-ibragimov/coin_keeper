@@ -16,6 +16,7 @@ docstring.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -43,32 +44,36 @@ from app.models import (
     CollectionItem,
     Country,
     Denomination,
+    EdgeType,
     ExchangeRate,
     Expense,
     MarketPriceSnapshot,
     Material,
     PriceSourceLink,
+    QualityType,
 )
-from app.models.enums import CollectionGroup, MetalKind
-from app.repositories.localization import localized
+from app.models.enums import CollectionGroup
+from app.repositories.localization import localized, series_display_name
 
 
 @dataclass
 class CatalogFilters:
     q: str | None = None
-    country_id: int | None = None
-    series_id: int | None = None
+    country_ids: list[int] | None = None
+    series_ids: list[int] | None = None
     year: int | None = None
     year_from: int | None = None
     year_to: int | None = None
-    denomination_id: int | None = None
-    group: CollectionGroup | None = None
-    metal_kind: MetalKind | None = None
+    denomination_ids: list[int] | None = None
+    groups: list[CollectionGroup] | None = None
+    material_ids: list[int] | None = None
     owned: bool | None = None
     scope: str = "all"  # all | shared | own
     archived: bool = False
-    sort: str = "country"
+    sort: str = "title"
     order: str = "asc"
+    # Set by CatalogService from the viewer's settings, not a client filter.
+    show_packaging_variants: bool = True
 
 
 @dataclass
@@ -80,10 +85,15 @@ class CatalogRow:
     composition: Material | None
     quantity_owned: int
     purchase_total_uah: Decimal
+    purchase_total_usd: Decimal | None
+    purchase_total_eur: Decimal | None
     market_price_uah: Decimal | None
     price_source: str | None
     price_observed_at: datetime | None
     source_url: str | None
+    # Card-only: the listing never selects these (docs/08-ui-map.md).
+    edge_type: EdgeType | None = None
+    quality_type: QualityType | None = None
 
 
 @dataclass
@@ -114,15 +124,32 @@ def _search_vector() -> ColumnElement[Any]:
     return func.to_tsvector("simple", joined)
 
 
-def storefront_visible(user_id: int) -> ColumnElement[bool]:
-    """Storefront visibility for a shared catalog record (docs/04-business-rules.md, §13).
+def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> ColumnElement[bool]:
+    """Storefront visibility for a shared catalog record (docs/04-business-rules.md, §13, §13a).
 
-    A record appears in listings and aggregates when its country is active,
-    when it is the user's own personal item, or when the user already holds
-    at least one instance of it — an owner keeps finding their coins from a
-    deactivated country in the catalog. Independent of `_visible()` (read
-    permission) and of the archive flag; never applied to the single-item
-    card or price/instance sub-resources, which stay reachable by id.
+    A record shows when its country is active, when it is the user's own
+    personal item, or when the user already holds at least one instance of
+    it — an owner keeps finding their coins from a deactivated country.
+    Independent of `_visible()` (read permission) and of the archive flag;
+    never applied to the single-item card or price/instance sub-resources,
+    which stay reachable by id.
+
+    `require_confirmed` (default on) adds the harder gate from §13a on top,
+    with no exception for a personal item or an owned instance: an
+    unconfirmed country never shows as *the catalogue*, however much of it a
+    user has collected. This is what makes `GET /catalog` Ukraine-only today.
+    Callers about the user's own collection rather than the catalogue browse
+    experience — the dashboard, the series screens — pass `False`: a
+    personal collection shows everything its owner actually has, regardless
+    of which countries the catalogue project has gotten around to confirming
+    (owner's call, 2026-09-12).
+
+    Turned off altogether — `apply_storefront=False` on `list_items` — by
+    exactly one caller: the "Додати" form's typeahead (`GET /catalog/lookup`),
+    which searches inside one country the collector picked out of the full
+    list of issuers. There the storefront has nothing to say: not finding the
+    shared record means the collector enters a personal duplicate of a coin
+    the catalogue already holds (owner's call, 2026-09-14).
 
     Self-contained EXISTS checks so the caller need not join Country: reused
     verbatim by the series and dashboard repositories. Each subquery pins its
@@ -130,7 +157,7 @@ def storefront_visible(user_id: int) -> ColumnElement[bool]:
     Country and CollectionItem directly, and without this SQLAlchemy
     auto-correlates those same tables out of these subqueries entirely.
     """
-    return or_(
+    visible = or_(
         exists(
             select(Country.id)
             .where(Country.id == CatalogItem.country_id, Country.is_active)
@@ -145,6 +172,16 @@ def storefront_visible(user_id: int) -> ColumnElement[bool]:
             )
             .correlate(CatalogItem)
         ),
+    )
+    if not require_confirmed:
+        return visible
+    return and_(
+        exists(
+            select(Country.id)
+            .where(Country.id == CatalogItem.country_id, Country.catalog_confirmed)
+            .correlate(CatalogItem)
+        ),
+        visible,
     )
 
 
@@ -283,52 +320,84 @@ class CatalogRepository:
 
     # --------------------------------------------------------------- listing
 
-    def _filter_conditions(self, filters: CatalogFilters) -> list[ColumnElement[bool]]:
+    def _filter_conditions(
+        self,
+        filters: CatalogFilters,
+        *,
+        require_confirmed: bool = True,
+        apply_storefront: bool = True,
+    ) -> list[ColumnElement[bool]]:
         conditions: list[ColumnElement[bool]] = [
             self._visible(),
             self._archive_condition(filters.archived),
-            storefront_visible(self._user_id),
         ]
+        if apply_storefront:
+            conditions.append(
+                storefront_visible(self._user_id, require_confirmed=require_confirmed)
+            )
         if filters.scope == "shared":
             conditions.append(CatalogItem.created_by.is_(None))
         elif filters.scope == "own":
             conditions.append(CatalogItem.created_by == self._user_id)
-        if filters.country_id is not None:
-            conditions.append(CatalogItem.country_id == filters.country_id)
-        if filters.series_id is not None:
-            conditions.append(CatalogItem.series_id == filters.series_id)
+        if filters.country_ids:
+            conditions.append(CatalogItem.country_id.in_(filters.country_ids))
+        if filters.series_ids:
+            conditions.append(CatalogItem.series_id.in_(filters.series_ids))
         if filters.year is not None:
             conditions.append(CatalogItem.issue_year == filters.year)
         if filters.year_from is not None:
             conditions.append(CatalogItem.issue_year >= filters.year_from)
         if filters.year_to is not None:
             conditions.append(CatalogItem.issue_year <= filters.year_to)
-        if filters.denomination_id is not None:
-            conditions.append(CatalogItem.denomination_id == filters.denomination_id)
-        if filters.group is not None:
-            conditions.append(CatalogItem.collection_group == filters.group)
-        if filters.metal_kind is not None:
-            conditions.append(CatalogItem.metal_kind == filters.metal_kind)
+        if filters.denomination_ids:
+            conditions.append(CatalogItem.denomination_id.in_(filters.denomination_ids))
+        if filters.groups:
+            conditions.append(CatalogItem.collection_group.in_(filters.groups))
+        if filters.material_ids:
+            conditions.append(CatalogItem.composition_id.in_(filters.material_ids))
         if filters.owned is True:
             conditions.append(self._own_instance_exists())
         elif filters.owned is False:
             conditions.append(not_(self._own_instance_exists()))
+        if not filters.show_packaging_variants:
+            conditions.append(CatalogItem.packaging_of_id.is_(None))
         if filters.q:
             conditions.append(catalog_search_condition(filters.q))
         return conditions
 
     def _owned_lateral(self) -> Any:
+        amount_uah = (
+            CollectionItem.quantity
+            * func.coalesce(CollectionItem.purchase_price, 0)
+            * func.coalesce(CollectionItem.purchase_rate_uah, 1)
+        )
+
+        # The rate on each instance's OWN acquisition date, not today's --
+        # this is what was spent then, not a mix of purchase cost and a
+        # live rate (docs/BACKLOG.md, NBU rates follow-up). Division by
+        # NULL (no rate that far back) yields NULL, which SUM simply skips
+        # rather than propagating -- a handful of missing rates cannot
+        # blank out an otherwise-known total.
+        def rate_on_purchase(code: str) -> Any:
+            return (
+                select(ExchangeRate.rate_uah)
+                .where(
+                    ExchangeRate.currency_code == code,
+                    ExchangeRate.effective_date <= CollectionItem.acquisition_date,
+                )
+                .order_by(ExchangeRate.effective_date.desc())
+                .limit(1)
+                .scalar_subquery()
+            )
+
+        usd_rate_on_purchase = rate_on_purchase("USD")
+        eur_rate_on_purchase = rate_on_purchase("EUR")
         return (
             select(
                 func.coalesce(func.sum(CollectionItem.quantity), 0).label("quantity_owned"),
-                func.coalesce(
-                    func.sum(
-                        CollectionItem.quantity
-                        * func.coalesce(CollectionItem.purchase_price, 0)
-                        * func.coalesce(CollectionItem.purchase_rate_uah, 1)
-                    ),
-                    0,
-                ).label("purchase_total_uah"),
+                func.coalesce(func.sum(amount_uah), 0).label("purchase_total_uah"),
+                func.sum(amount_uah / usd_rate_on_purchase).label("purchase_total_usd"),
+                func.sum(amount_uah / eur_rate_on_purchase).label("purchase_total_eur"),
             )
             .where(
                 CollectionItem.catalog_item_id == CatalogItem.id,
@@ -385,12 +454,8 @@ class CatalogRepository:
         return func.coalesce(name, CatalogItem.material)
 
     def _series_name(self) -> ColumnElement[str]:
-        return localized(
-            self._locale,
-            uk=CoinSeries.name_uk,
-            en=CoinSeries.name_en,
-            original=CoinSeries.name_original,
-        )
+        """Falls back to the typed-in series of a personal item (§14)."""
+        return series_display_name(self._locale)
 
     @staticmethod
     def _source_url_subquery() -> ColumnElement[str | None]:
@@ -435,7 +500,7 @@ class CatalogRepository:
             "purchase": [owned.c.purchase_total_uah],
             "price": [price.c.price_uah],
         }
-        columns = by_sort.get(filters.sort, by_sort["country"])
+        columns = by_sort.get(filters.sort, by_sort["title"])
         ordering: list[Any] = [direction(column) for column in columns]
         # Stable tiebreakers, mirroring the legacy default listing order.
         if filters.sort == "country":
@@ -443,8 +508,18 @@ class CatalogRepository:
         ordering.append(CatalogItem.id)
         return ordering
 
-    async def list_items(self, filters: CatalogFilters, *, limit: int, offset: int) -> CatalogPage:
-        conditions = self._filter_conditions(filters)
+    async def list_items(
+        self,
+        filters: CatalogFilters,
+        *,
+        limit: int,
+        offset: int,
+        require_confirmed: bool = True,
+        apply_storefront: bool = True,
+    ) -> CatalogPage:
+        conditions = self._filter_conditions(
+            filters, require_confirmed=require_confirmed, apply_storefront=apply_storefront
+        )
 
         count_query = (
             select(func.count(CatalogItem.id))
@@ -464,6 +539,8 @@ class CatalogRepository:
                 Material,
                 owned.c.quantity_owned,
                 owned.c.purchase_total_uah,
+                owned.c.purchase_total_usd,
+                owned.c.purchase_total_eur,
                 price.c.price_uah,
                 price.c.price_source,
                 price.c.price_observed_at,
@@ -490,6 +567,8 @@ class CatalogRepository:
                 composition=row.Material,
                 quantity_owned=int(row.quantity_owned or 0),
                 purchase_total_uah=Decimal(row.purchase_total_uah or 0),
+                purchase_total_usd=row.purchase_total_usd,
+                purchase_total_eur=row.purchase_total_eur,
                 market_price_uah=row.price_uah,
                 price_source=row.price_source,
                 price_observed_at=row.price_observed_at,
@@ -516,8 +595,12 @@ class CatalogRepository:
                 self._series_name().label("series_name"),
                 Denomination,
                 Material,
+                EdgeType,
+                QualityType,
                 owned.c.quantity_owned,
                 owned.c.purchase_total_uah,
+                owned.c.purchase_total_usd,
+                owned.c.purchase_total_eur,
                 price.c.price_uah,
                 price.c.price_source,
                 price.c.price_observed_at,
@@ -527,6 +610,8 @@ class CatalogRepository:
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
             .outerjoin(Material, Material.id == CatalogItem.composition_id)
+            .outerjoin(EdgeType, EdgeType.id == CatalogItem.edge_type_id)
+            .outerjoin(QualityType, QualityType.id == CatalogItem.quality_type_id)
             .outerjoin(owned, true())
             .outerjoin(price, true())
             .where(
@@ -547,8 +632,12 @@ class CatalogRepository:
             series_name=row.series_name,
             denomination=row.Denomination,
             composition=row.Material,
+            edge_type=row.EdgeType,
+            quality_type=row.QualityType,
             quantity_owned=int(row.quantity_owned or 0),
             purchase_total_uah=Decimal(row.purchase_total_uah or 0),
+            purchase_total_usd=row.purchase_total_usd,
+            purchase_total_eur=row.purchase_total_eur,
             market_price_uah=row.price_uah,
             price_source=row.price_source,
             price_observed_at=row.price_observed_at,
@@ -574,6 +663,30 @@ class CatalogRepository:
         )
         result = await self._session.execute(query)
         return {row[0]: (row[1], row[2]) for row in result}
+
+    async def list_confirmed_materials(self, country_id: int | None = None) -> Sequence[Material]:
+        """Materials actually used by a `catalog_confirmed` catalog item —
+        the catalog's material filter offers only what could possibly match,
+        not the whole shared dictionary (materials have no country_id of
+        their own, so this always goes through catalog_items)."""
+        condition: ColumnElement[bool] = CatalogItem.composition_id == Material.id
+        if country_id is not None:
+            condition = and_(condition, CatalogItem.country_id == country_id)
+        query = (
+            select(Material)
+            .where(
+                exists(
+                    select(CatalogItem.id).where(
+                        condition,
+                        self._visible(),
+                        self._archive_condition(archived=False),
+                        storefront_visible(self._user_id),
+                    )
+                )
+            )
+            .order_by(Material.name_uk if self._locale == LOCALE_UK else Material.name_en)
+        )
+        return (await self._session.execute(query)).scalars().all()
 
     async def get_visible(self, item_id: int) -> CatalogItem | None:
         """The bare item under the visibility filter, archive state ignored.

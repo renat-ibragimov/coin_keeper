@@ -54,19 +54,19 @@ PRECIOUS_CODES = ("silver", "gold", "platinum")
 
 # What the National Bank writes in "Матеріал". A closed list: the search form
 # of the site offers exactly these nine values, so they are mapped rather than
-# guessed at. Silver and gold carry no fineness on the card, which is why they
-# point at no dictionary row — the metal kind is known all the same, and that
-# is what the collection value depends on.
+# guessed at. Silver and gold carry no fineness on the card -- the dictionary
+# has no fineness-specific rows either (app/reference_data/materials.py), so
+# the plain metal is the whole answer, not a stand-in for one we cannot state.
 NBU_METALS: dict[str, tuple[str | None, MetalKind]] = {
-    "срібло": (None, MetalKind.PRECIOUS),
-    "золото": (None, MetalKind.PRECIOUS),
+    "срібло": ("silver", MetalKind.PRECIOUS),
+    "золото": ("gold", MetalKind.PRECIOUS),
     "біметалеві із дорогоцінних металів": ("bimetal", MetalKind.PRECIOUS),
     "біметалеві із недорогоцінних металів": ("bimetal", MetalKind.BASE),
     "нейзильбер": ("nickel_silver", MetalKind.BASE),
     "мельхіор": ("copper_nickel", MetalKind.BASE),
-    "сплав на основі цинку": (None, MetalKind.BASE),
-    "не вказується (набір)": (None, MetalKind.UNKNOWN),
-    "інший (банкнота)": (None, MetalKind.UNKNOWN),
+    "сплав на основі цинку": ("zinc_alloy", MetalKind.BASE),
+    "не вказується (набір)": ("not_specified", MetalKind.UNKNOWN),
+    "інший (банкнота)": ("other_banknote", MetalKind.UNKNOWN),
 }
 
 # "Ролик обігових пам'ятних монет [номіналом 10 гривень] «X» (у ролику 25 монет)"

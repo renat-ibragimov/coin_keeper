@@ -10,6 +10,17 @@
   max-width: 720px;
 }
 
+/* Explains the gap left by an unconfirmed country (docs/04-business-rules.md
+ * §13a) instead of a misleading "Open in the catalog" button and an empty
+ * grid that looks like the page is broken (owner-reported, 2026-09-13). */
+.notConfirmedNotice {
+  margin: 0 auto;
+  max-width: 560px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
 .tiles {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

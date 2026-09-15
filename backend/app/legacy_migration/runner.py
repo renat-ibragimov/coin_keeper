@@ -48,6 +48,7 @@ from app.models.enums import UserRole
 from app.reference_data import countries as country_seed
 from app.reference_data import materials as material_seed
 from app.reference_data.denominations import DenominationParseError, parse_label
+from app.services.storage_locations import StorageLocationService
 
 logger = logging.getLogger("app.legacy_migration")
 
@@ -182,6 +183,8 @@ class MigrationRunner:
         self._country_langs: dict[int, str] = {}
         self._country_codes: dict[int, str | None] = {}
         self._material_ids: dict[str, int] = {}
+        # Legacy free text, get-or-created into the dictionary (docs/04-business-rules.md).
+        self._storage_location_ids: dict[str, int] = {}
 
     # ------------------------------------------------------------------ entry
 
@@ -556,13 +559,30 @@ class MigrationRunner:
     # ------------------------------------------ steps 10-11: collection, expenses
 
     async def _step_collection(self, connection: sqlite3.Connection) -> None:
-        await self._copy(
-            connection,
-            "collection_items",
-            CollectionItem,
-            self._collection_row,
-        )
+        rows = reader.read_table(connection, "collection_items")
+        self._storage_location_ids = await self._resolve_storage_locations(rows)
+        await self._insert_rows("collection_items", CollectionItem, rows, self._collection_row)
         await self._copy(connection, "expenses", Expense, self._expense_row)
+
+    async def _resolve_storage_locations(self, rows: Sequence[Mapping[str, Any]]) -> dict[str, int]:
+        """Get-or-create the dictionary entry for each distinct legacy text.
+
+        Skipped in a dry run: nothing else about this preview writes to the
+        database, and there is no real owner id yet to attach a personal
+        entry to. No background translation here -- this is an offline,
+        one-shot script, not a request; a legacy location keeps its typed
+        text in both language slots until the owner touches it in the UI.
+        """
+        if self._options.dry_run:
+            return {}
+        service = StorageLocationService(self._session, owner_id=self._owner_id or 0)
+        texts = {str(row["storage_location"]) for row in rows if row.get("storage_location")}
+        resolved: dict[str, int] = {}
+        for value in texts:
+            location_id = await service.resolve(value)
+            if location_id is not None:
+                resolved[value] = location_id
+        return resolved
 
     def _collection_row(self, row: Mapping[str, Any]) -> dict[str, Any]:
         return {
@@ -579,7 +599,11 @@ class MigrationRunner:
             "purchase_price": convert.to_money(row.get("purchase_price")),
             "purchase_currency": row.get("purchase_currency"),
             "purchase_rate_uah": convert.to_rate(row.get("purchase_rate_uah")),
-            "storage_location": row.get("storage_location"),
+            "storage_location_id": (
+                self._storage_location_ids.get(str(row["storage_location"]))
+                if row.get("storage_location")
+                else None
+            ),
             "grading_company": row.get("grading_company"),
             "grading_number": row.get("grading_number"),
             "grading_grade": row.get("grading_grade"),
@@ -754,13 +778,14 @@ class MigrationRunner:
         display_currency = _unwrap_json(settings.get("display_currency"))
         if isinstance(display_currency, str) and display_currency:
             values["display_currency"] = display_currency
-        for legacy_key, column in (
-            ("default_grade_commemorative", "default_grade_commemorative"),
-            ("default_grade_circulation", "default_grade_circulation"),
-        ):
+        # The legacy split into per-group defaults is gone (migration 0014):
+        # one default now covers every new purchase. Prefer the commemorative
+        # value — historically the better of the two as a starting suggestion.
+        for legacy_key in ("default_grade_commemorative", "default_grade_circulation"):
             value = _unwrap_json(settings.get(legacy_key))
             if isinstance(value, str) and value:
-                values[column] = value
+                values["default_grade"] = value
+                break
 
         self._report.migrated["user_settings"] = 1
         if not values or self._options.dry_run or self._owner_id is None:

@@ -4,21 +4,58 @@
   gap: var(--space-5);
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+/* Two independently stacking columns, not a strict grid: cards vary a lot in
+ * height (a short password form next to a long appearance card), and a
+ * two-row CSS grid would size every row to its tallest cell and leave dead
+ * whitespace under the shorter one.
+ *
+ * The columns do end level, though: `stretch` gives both the height of the
+ * taller one, and the last card in each absorbs the slack (below). Whichever
+ * side is shorter grows by itself, so adding a section to either column no
+ * longer leaves a ragged bottom — the hand-tuned spacer that used to do this
+ * job broke the moment the avatar section was added above it. */
+.columns {
+  display: flex;
+  align-items: stretch;
   gap: var(--space-5);
-  align-items: start;
+}
+
+.column {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* grow only — the card keeps its natural height and takes the leftover, if
+ * any, rather than being sized from zero. */
+.column > :last-child {
+  flex-grow: 1;
 }
 
 /* Settings headings name interface areas: body face, UI-panel size. */
 .sectionTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
   font-size: 18px;
   margin-bottom: var(--space-4);
 }
 
 .spaced {
   margin-top: var(--space-6);
+}
+
+/* A heading for one control group inside a card that already has its own
+ * .sectionTitle — quieter than the card title so the hierarchy stays clear. */
+.subsectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
 }
 
 .label {
@@ -28,29 +65,19 @@
   margin-bottom: var(--space-2);
 }
 
-.note {
-  margin: var(--space-2) 0 0;
-  font-size: 13.5px;
-  color: var(--color-text-muted);
-}
-
-/* An inset block inside a raised card: below the card's own surface, with
- * an inset top shadow and a smaller radius. */
-.adminBox {
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-surface-control);
-  box-shadow: var(--shadow-inset);
-}
-
-.adminBox .note {
-  margin-bottom: var(--space-3);
-}
-
 @media (max-width: 900px) {
-  .grid {
-    grid-template-columns: 1fr;
+  .columns {
+    flex-direction: column;
     gap: var(--space-4);
+  }
+
+  .column {
+    gap: var(--space-4);
+  }
+
+  /* One column below this width: there is nothing to line up with, and a
+   * stretched card would only be empty at the bottom. */
+  .column > :last-child {
+    flex-grow: 0;
   }
 }

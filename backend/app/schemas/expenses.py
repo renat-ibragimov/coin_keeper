@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import Field
 
@@ -19,6 +20,8 @@ class ExpenseOut(CamelModel):
     currency_code: str
     rate_uah: Rate | None
     amount_uah: Money
+    amount_usd: Money | None
+    amount_eur: Money | None
     expense_date: date
     catalog_item_id: int | None
     collection_item_id: int | None
@@ -30,7 +33,11 @@ class ExpenseOut(CamelModel):
 
 class ExpenseCreate(CamelModel):
     category: ExpenseCategory
-    amount: Decimal = Field(ge=0)
+    # Strictly positive, unlike a purchase price: a coin can honestly cost
+    # nothing (a gift, an unknown price), a delivery or an album cannot
+    # (docs/03-api-contract.md). The column's own CHECK stays `>= 0` — it
+    # also guards the coin_purchase rows this endpoint never writes.
+    amount: Decimal = Field(gt=0)
     currency: str = Field(min_length=3, max_length=3)
     expense_date: date
     catalog_item_id: int | None = None
@@ -41,7 +48,7 @@ class ExpenseCreate(CamelModel):
 
 class ExpenseUpdate(CamelModel):
     category: ExpenseCategory | None = None
-    amount: Decimal | None = Field(default=None, ge=0)
+    amount: Decimal | None = Field(default=None, gt=0)
     currency: str | None = Field(default=None, min_length=3, max_length=3)
     expense_date: date | None = None
     catalog_item_id: int | None = None
@@ -73,3 +80,22 @@ class ExpensesSummaryOut(CamelModel):
     by_category: list[ExpenseCategorySummary]
     this_month_uah: Money
     prev_month_uah: Money
+
+
+class ExpensePeriodTotal(CamelModel):
+    """One point on the chart: `period` is "YYYY-MM-DD" for day granularity,
+    "YYYY-MM" for month granularity — zero-filled where there is no spending."""
+
+    period: str
+    coins_uah: Money
+    supporting_uah: Money
+
+
+class ExpensesChartOut(CamelModel):
+    """The two chart widgets on the money screen, scoped to a caller-picked
+    date range (`GET /expenses/chart-summary?dateFrom&dateTo`) — unlike
+    `ExpensesSummaryOut`, whose `byMonth`/`byCategory` are fixed windows."""
+
+    granularity: Literal["day", "month"]
+    by_period: list[ExpensePeriodTotal]
+    by_category: list[ExpenseCategorySummary]

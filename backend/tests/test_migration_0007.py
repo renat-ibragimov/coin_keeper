@@ -35,7 +35,7 @@ INSERT INTO catalog_items
 SELECT 902, country.id, 'commemorative', 'Code beside a composition', 2023, 'Nickel_Silver ',
        material.id
 FROM countries AS country, materials AS material
-WHERE country.code = 'UA' AND material.code = 'silver_925';
+WHERE country.code = 'UA' AND material.code = 'silver';
 
 INSERT INTO catalog_items
     (id, country_id, collection_group, title_original, issue_year, material, composition_id)
@@ -111,14 +111,16 @@ async def test_a_code_beside_a_composition_only_loses_the_text(
     migrated_connection: AsyncConnection,
 ) -> None:
     """Whatever filled the composition knew more than the leftover token."""
-    assert await row(migrated_connection, 902) == {"material": None, "composition": "silver_925"}
+    assert await row(migrated_connection, 902) == {"material": None, "composition": "silver"}
 
 
-async def test_a_bare_metal_keeps_its_place_and_gets_the_wording(
+async def test_a_bare_metal_is_now_a_code_too(
     migrated_connection: AsyncConnection,
 ) -> None:
-    """No fineness, so no dictionary row to point at — only the text changes."""
-    assert await row(migrated_connection, 903) == {"material": "срібло", "composition": None}
+    """ "silver"/"gold" are dictionary codes as of 2026-09-12 (no fineness in
+    the dictionary at all, docs/04-business-rules.md, §13a), so a bare metal
+    now resolves the same way "nickel_silver" always did."""
+    assert await row(migrated_connection, 903) == {"material": None, "composition": "silver"}
 
 
 async def test_an_alloy_name_is_left_alone(migrated_connection: AsyncConnection) -> None:

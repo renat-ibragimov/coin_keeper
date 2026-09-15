@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
+import { coinDenomination } from '@/shared/lib/coinDenomination';
 import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
@@ -78,7 +79,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
         {items.map((item) => {
           const owned = item.quantityOwned > 0;
           const material = coinMaterial(item);
-          const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
+          const addUrl = `/collection/add?catalogItemId=${item.id}`;
           return (
             <tr
               key={item.id}
@@ -123,7 +124,7 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                 <span className={clampTwoLines}>{seriesLabel(item, t) ?? '—'}</span>
               </td>
               <td className={`${cellAlign.center} tabular`}>{item.year}</td>
-              <td className={cellAlign.center}>{item.denomination?.label ?? '—'}</td>
+              <td className={cellAlign.center}>{coinDenomination(item) ?? '—'}</td>
               <td className={`${cellAlign.center} ${styles.secondary}`}>
                 {material ? (
                   <span className={clampTwoLines} title={material}>

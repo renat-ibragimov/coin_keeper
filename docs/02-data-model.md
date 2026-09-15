@@ -152,6 +152,7 @@ original_lang     text NOT NULL
 name_uk, name_en  text
 collect_variants  boolean NOT NULL DEFAULT false
 is_active         boolean NOT NULL DEFAULT true
+catalog_confirmed boolean NOT NULL DEFAULT false
 sort_order        int NOT NULL DEFAULT 100
 created_at, updated_at timestamptz
 UNIQUE (name_original)
@@ -168,6 +169,12 @@ UNIQUE (name_original)
 позиция может быть монетой какого угодно эмитента (`04-business-rules.md`, п. 2).
 Сид активирует только Украину; страна, которая уже была в базе, сохраняет своё состояние
 и, что важнее, свой `id`.
+
+`catalog_confirmed` — независимый и более жёсткий признак: страна, чей каталог реально
+собран и подтверждён, единственная ось, определяющая, показывается ли страна как «каталог»
+вообще, без исключений для личных позиций и уже купленных монет (`04-business-rules.md`,
+п. 13a). Заведена миграцией `0008`, сегодня `true` только у Украины — даже у США и СССР,
+попавших в общий каталог затравкой (`09-data-migration.md`), она `false`.
 
 **Факт из боевой диагностики 2026-09-05:** в базе владельца `is_active = true` у ТРЁХ
 стран (id 1, 2, 3), не только у Украины — легаси-миграция или ручная правка активировали
@@ -222,31 +229,47 @@ UNIQUE (country_id, currency_code, unit, value)
 монет. Неразбираемая подпись останавливает миграцию со списком: угадать номинал значит
 показать владельцу неверное число.
 
-### materials
+### materials, edge_types, quality_types
 
-Справочник составов, засеянный по факту встречающегося в каталоге, а не по общему списку
-сплавов: около тридцати значений покрывают все 3063 позиции.
+Три одинаковых по форме словаря — техническая лексика, а не что-то, что владеет своим
+названием на языке эмитента, поэтому у них нет `name_original`, только код и два локале
+(`04-business-rules.md`, п. 14):
 
 ```
 id       bigserial PK
-code     text NOT NULL UNIQUE   -- 'silver_925', 'nickel_silver', 'copper_plated_zinc'
+code     text NOT NULL UNIQUE   -- 'silver', 'nickel_silver', 'reeded', 'proof'
 name_uk  text NOT NULL
 name_en  text NOT NULL
 ```
 
-`catalog_items.material` был свободным текстом импортёра uCoin —
+`materials` — справочник составов, засеянный по факту встречающегося в каталоге. До
+2026-09-12 в нём была проба («Срібло 925», «Gold .999») — убрана: официальный фильтр
+Нацбанка («Матеріал» на bank.gov.ua, `NBU_METALS` в `app/ukraine_pipeline/sources.py`)
+пробу не указывает никогда, так что сохранённая проба была не тем, что говорит наш
+единственный источник истины, а догадкой легаси-коллекции либо текстом импорта uCoin.
+Семейства `silver_*`/`gold_*`/`silver_gilded_*` схлопнуты в `silver`/`gold`/
+`silver_gilded` миграцией `0010`.
+
+`edge_types`, `quality_types` — новые с `0010`. `catalog_items.edge_type_id` /
+`quality_type_id` — необязательные FK рядом с уже существующими текстовыми
+`edge`/`quality`, по тому же принципу, что и `composition_id`/`material`: словарное
+название, где оно известно, текст источника — где нет.
+
+`catalog_items.material` був свободным текстом импортёра uCoin —
 «Цинк с медным покрытием, 2.5g, ø 19mm», а в худшем случае с приклеенным впереди
 заголовком монеты. Миграция `0003` разобрала его на `composition_id`, `weight_grams` и
 `diameter_mm`; что разобрать не удалось, осталось текстом в `material` и попало в отчёт.
 
-Среди неразобранного оказались не только сплавы: в 24 записях легаси-база держала
-технический токен — наш же код справочника (`nickel_silver`) или голый металл без пробы
-(`silver`, `gold`). Пока поле никто не показывал, это было незаметно; в списках каталога
-(2026-09-09) `nickel_silver` вылез на карточку. Миграция `0007` разводит эти два случая:
-код разрешается в `composition_id`, текст обнуляется; голый металл строкой и остаётся —
-без пробы указывать не на что, — но в той же формулировке, что пишет загрузчик НБУ
-(«срібло», «золото»). `parse_material` теперь узнаёт код, а `plain_material` —
-голый металл, так что повторный прогон легаси-импорта их не вернёт.
+Среди неразобранного оказались не только сплавы: легаси-база и ранние прогоны конвейера
+НБУ иногда держали технический токен — наш же код справочника (`nickel_silver`) или
+голый металл (`silver`, `gold`), либо чужие английские слова (`bimetallic`, `cupronickel`,
+`banknote`), которых в словаре не было вовсе. Миграции `0007` и `0010` разрешают такие
+токены в `composition_id` и обнуляют текст; что не совпадает ни с одним известным алиасом,
+остаётся текстом как есть.
+
+`quality_types` заодно даёт применение данным, которые уже лежали в базе: какой-то
+разовый скрипт (его самого в репозитории уже нет) заполнил `catalog_items.quality` для
+1132 позиций, и до `0010` это никуда не читалось и не показывалось.
 
 ### coin_series
 
@@ -278,7 +301,9 @@ id                 bigserial PK
 item_type          text NOT NULL DEFAULT 'coin'
 country_id         bigint NOT NULL FK countries
 series_id          bigint FK coin_series ON DELETE SET NULL
+series_text        text              -- своя серия личной позиции; только для показа
 denomination_id    bigint FK denominations ON DELETE SET NULL
+denomination_text  text              -- номинал словами, когда справочника по стране нет
 collection_group   collection_group NOT NULL
 subtype            text
 title_original     text NOT NULL
@@ -297,9 +322,10 @@ diameter_mm        numeric(8,2)
 thickness_mm       numeric(8,2)
 shape, edge, orientation  text
 catalog_km, catalog_uc, catalog_numista  text
+catalog_number     text              -- номер без указания каталога: то, что вписали руками
 notes              text
 quality            text              -- качество чеканки каноническим кодом, словарь в coin-parser
-descriptions       jsonb             -- заполняется парсером coin-collector, руками не редактируется
+descriptions       jsonb             -- парсер coin-collector и форма «Додати» для личной позиции
 artists            jsonb             -- заполняется парсером coin-collector, руками не редактируется
 edited_fields      jsonb             -- имена полей, правленных руками; загрузчики их не трогают
 source_key         text              -- ключ дедупликации импорта, см. 04-business-rules
@@ -329,12 +355,44 @@ coin-collector ещё не коснулся. Но если колонка не `
 }
 ```
 
+С 2026-09-14 `descriptions` пишет не только парсер: форма «Додати» собирает три поля —
+«Опис», «Опис аверса», «Опис реверса» — и кладёт их под локаль запроса, а вторую локаль
+заполняет `null`-ами. Форма JSON от этого не меняется: если колонка не `NULL`, обе локали и
+все три ключа на месте. Ничего не вписали — колонка остаётся `NULL` целиком, потому что
+строка из одних `null` означала бы «парсер приходил и ничего не нашёл», а это неправда.
+
 `artists` — авторы монеты. `designers` и `sculptors` — всегда массивы (в худшем случае
-пустые `[]`), никогда `null` и никогда не отсутствуют как ключи:
+пустые `[]`), никогда `null` и никогда не отсутствуют как ключи. Каждый автор — не голая
+строка, а объект с теми же локалями `uk`/`en`, что и `descriptions`:
 
 ```json
-{"designers": ["Чайковський Роман"], "sculptors": ["Чайковський Роман"]}
+{
+  "designers": [{"uk": "Таран Володимир", "en": "Volodymyr Taran"}],
+  "sculptors": [{"uk": "Чайковський Роман", "en": "Roman Chaikovskyi"}]
+}
 ```
+
+API отдаёт оба поля уже свёрнутыми до текущей локали интерфейса — `CatalogCard.description`
+(`general`/`obverse`/`reverse`) и списки имён `designers`/`sculptors` — с запасным вариантом
+на другую локаль там, где парсер не нашёл текста для запрошенной.
+
+### series_text и denomination_text (2026-09-14)
+
+Тот же приём, что `composition_id` + `material`: справочная строка, где она есть, и слова
+владельца, где справочника нет вовсе. Понадобилось форме «Додати»: справочники номиналов и
+серий засеяны тем, что реально лежит в каталоге, то есть Украиной, СССР и США, — и
+австрийская монета упиралась в два неактивных поля с извинением.
+
+**`denomination_text` показывается вместо номинала**, когда `denomination_id` пуст, — в
+карточке, в списках каталога и в «Мої монети». Сортировка и фильтр по номиналу его не
+видят, ровно как не видят свободный `material`.
+
+**`series_text` — только показ.** Комплектность, экран «Серії» и фильтр «Серія» считаются по
+`series_id`, а серии — общие записи, которые заводит администратор
+(`04-business-rules.md`, п. 2). Вписанное имя выводится рядом с монетой (общий
+`series_display_name()` в репозиториях каталога и коллекции) и не участвует ни в чём из
+перечисленного. Альтернатива — личные серии со своим фильтром видимости через весь серийный
+слой — отдельная задача, а не поле формы.
 
 ### status, quality и edited_fields
 
@@ -483,7 +541,7 @@ seller            text
 purchase_price    numeric(14,2)
 purchase_currency text FK currencies
 purchase_rate_uah numeric(14,6)      -- курс НБУ на дату покупки
-storage_location  text
+storage_location_id  bigint FK storage_locations ON DELETE SET NULL
 grading_company, grading_number, grading_grade  text
 is_for_swap       boolean NOT NULL DEFAULT false
 is_for_sale       boolean NOT NULL DEFAULT false
@@ -724,13 +782,68 @@ UNIQUE (owner_id, url)
 user_id     bigint PK FK users ON DELETE CASCADE
 locale      text NOT NULL DEFAULT 'uk'   -- 'uk' | 'en'
 display_currency text NOT NULL DEFAULT 'UAH'
-default_grade_commemorative text NOT NULL DEFAULT 'UNC'
-default_grade_circulation   text NOT NULL DEFAULT 'VF'
+default_grade text NOT NULL DEFAULT 'UNC'
+show_packaging_variants boolean NOT NULL DEFAULT true
+theme       text NOT NULL DEFAULT 'system'   -- 'light' | 'dark' | 'system'
+catalog_view_mode     text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
+collection_view_mode  text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
+secondary_currency    text NOT NULL DEFAULT 'USD'     -- 'USD' | 'EUR'
+default_storage_location_id  bigint FK storage_locations ON DELETE SET NULL
 updated_at  timestamptz
 ```
 
-Значения по умолчанию — из ТЗ (раздел 6): памятные и коллекционные считаются в UNC,
-обиходные в VF.
+Один дефолт на все монеты, редактируемый в настройках (`PATCH /bootstrap/settings`),
+подставляется в форму покупки независимо от группы каталога. До миграции 0014 было два
+раздельных столбца по группе каталога (`default_grade_commemorative` = 'UNC' из ТЗ, раздел
+6, `default_grade_circulation` = 'VF') без интерфейса для правки; объединены в одно
+редактируемое поле — разделение по группе не оправдывало сложность.
+
+`theme`, `catalog_view_mode`, `collection_view_mode` (миграция 0015) — кросс-девайсные
+версии того, что раньше жило только в localStorage браузера. Клиент по-прежнему держит
+локальную копию для мгновенной отрисовки до ответа `GET /bootstrap` (и для экранов входа,
+где юзера ещё нет), но именно эта колонка переживает новый браузер или устройство.
+
+`secondary_currency` (миграция 0016) — какая валюта показывается вторым числом рядом с
+гривневой суммой («≈ …») в карточке монеты, в «Мої монети» и в «Гроші». Гривна остаётся
+основной осью расчётов всюду; вторичная валюта — только слой отображения. Только `USD`
+или `EUR`: история курсов НБУ (`exchange_rates`) покрывает лишь эти две.
+
+`display_currency` де-факто мёртвое поле: всегда `'UAH'`, ни UI, ни PATCH-параметра для
+его изменения нет.
+
+`default_storage_location_id` (миграция 0017) — то же самое "один дефолт, редактируемый
+в настройках, подставляется в форму покупки", что и `default_grade`, только резолвится
+через `storage_locations` по имени: клиенту всегда виден только текст, id внутренний.
+
+### storage_locations
+
+Свой словарь для «Хранение» (миграция 0017), тем же способом, что и три языковых слота
+выше, но с двумя, а не тремя слотами — эндонима тут нет, это не название монеты:
+
+```
+id             bigserial PK
+owner_id       bigint FK users ON DELETE CASCADE   -- NULL = системный пресет, виден всем
+name_original  text NOT NULL   -- как ввёл владелец
+name_uk        text NOT NULL
+name_uk_source translation_source NOT NULL
+name_en        text NOT NULL
+name_en_source translation_source NOT NULL
+created_at     timestamptz
+```
+
+Никогда не CRUD-ресурс по id для клиента: и в форме покупки, и в настройках запись видна
+и адресуется только по имени (`GET /collection/storage-locations` отдаёт `{name, custom}`),
+резолвится в id на сервере. Один системный пресет — «Вдома» (`owner_id IS NULL`), он же
+единственный, который нельзя удалить (`403`); всё остальное, включая «В дорозі», владелец
+заводит сам — первое использование текста заводит личную запись
+(`owner_id = <владелец>`), совпадение по имени (без учёта регистра, по любому из трёх
+слотов) переиспользует существующую. Свежесозданная запись хранит typed-текст в обоих
+языковых слотах и переводится в фоне (`BackgroundTasks`, не ARQ — see `10-infra.md`) через
+Haiku, чтобы сохранение покупки не ждало LLM.
+
+`collection_items.storage_location_id` и `user_settings.default_storage_location_id` —
+обе FK сюда, `ON DELETE SET NULL`: удаление личной записи владельцем просто снимает
+значение там, где она стояла, а не рвёт покупку.
 
 ### auth_tokens
 
@@ -810,9 +923,13 @@ users ──< collection_items >── catalog_items ──< market_price_snapsh
   │              └─< expenses
   ├──< catalog_items (личные позиции, created_by)
   ├──< market_price_snapshots (свои снимки цен, created_by)
+  ├──< storage_locations (свои, owner_id; пресет — owner_id NULL)
   └─< user_settings
   └─< ucoin_catalog_sources
   └─< refresh_tokens, auth_tokens
+
+storage_locations ──< collection_items (storage_location_id)
+storage_locations ──< user_settings (default_storage_location_id)
 
 countries ──< coin_series ──< catalog_items
     └─────< denominations ──< catalog_items

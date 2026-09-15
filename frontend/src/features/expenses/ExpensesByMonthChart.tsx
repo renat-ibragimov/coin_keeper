@@ -11,28 +11,49 @@ import {
 import type { TooltipContentProps } from 'recharts';
 import { useTranslation } from 'react-i18next';
 
-import type { ExpenseMonthTotal } from '@/shared/api/types';
-import { formatMonthShort, formatMonthYear, formatUah } from '@/shared/lib/format';
+import type { ExpensePeriodTotal } from '@/shared/api/types';
+import {
+  formatDate,
+  formatDayShort,
+  formatMonthShort,
+  formatMonthYear,
+  formatUah,
+} from '@/shared/lib/format';
 import type { ChartPalette } from '@/shared/theme/useChartPalette';
+import styles from '@/shared/ui/ChartTooltip.module.css';
 
-import styles from './ChartTooltip.module.css';
+type Granularity = 'day' | 'month';
 
 interface Props {
-  data: ExpenseMonthTotal[];
+  data: ExpensePeriodTotal[];
+  granularity: Granularity;
   locale: string;
   palette: ChartPalette;
 }
 
-function MonthTooltip({
+/** "5 січ" for a day, "січ. 2024" for a month — whichever the period holds. */
+function tickLabel(period: string, granularity: Granularity, locale: string): string {
+  return granularity === 'day' ? formatDayShort(period, locale) : formatMonthShort(period, locale);
+}
+
+function tooltipTitle(period: string, granularity: Granularity, locale: string): string {
+  return granularity === 'day'
+    ? (formatDate(period, locale) ?? period)
+    : formatMonthYear(`${period}-01`, locale);
+}
+
+function PeriodTooltip({
   active,
   payload,
   label,
+  granularity,
   locale,
   palette,
   coinsLabel,
   supportingLabel,
   totalLabel,
 }: TooltipContentProps & {
+  granularity: Granularity;
   locale: string;
   palette: ChartPalette;
   coinsLabel: string;
@@ -45,7 +66,7 @@ function MonthTooltip({
   return (
     <div className={styles.tooltip}>
       <div className={styles.title}>
-        {typeof label === 'string' ? formatMonthYear(`${label}-01`, locale) : label}
+        {typeof label === 'string' ? tooltipTitle(label, granularity, locale) : label}
       </div>
       <div className={styles.row}>
         <span className={styles.swatch} style={{ background: palette.series1 }} />
@@ -65,7 +86,7 @@ function MonthTooltip({
   );
 }
 
-export function ExpensesByMonthChart({ data, locale, palette }: Props) {
+export function ExpensesByMonthChart({ data, granularity, locale, palette }: Props) {
   const { t } = useTranslation();
   const coinsLabel = t('expenses.chartCoins');
   const supportingLabel = t('expenses.chartSupporting');
@@ -81,11 +102,16 @@ export function ExpensesByMonthChart({ data, locale, palette }: Props) {
       <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid stroke={palette.grid} strokeDasharray="3 3" vertical={false} />
         <XAxis
-          dataKey="month"
-          tickFormatter={(value: string) => formatMonthShort(value, locale)}
+          dataKey="period"
+          tickFormatter={(value: string) => tickLabel(value, granularity, locale)}
           tick={{ fill: palette.axis, fontSize: 12 }}
           axisLine={{ stroke: palette.grid }}
           tickLine={false}
+          // A daily view can carry up to 32 bars, and a wide custom range
+          // dozens of months — every label would overlap, so recharts skips
+          // as many as it needs to keep the rest legible, on any screen width.
+          interval="preserveStartEnd"
+          minTickGap={20}
         />
         <YAxis
           tick={{ fill: palette.axis, fontSize: 12 }}
@@ -109,8 +135,9 @@ export function ExpensesByMonthChart({ data, locale, palette }: Props) {
              wrapperStyle is merged last, over recharts' own positioning. */
           wrapperStyle={{ zIndex: 1 }}
           content={(props) => (
-            <MonthTooltip
+            <PeriodTooltip
               {...props}
+              granularity={granularity}
               locale={locale}
               palette={palette}
               coinsLabel={coinsLabel}
@@ -125,7 +152,7 @@ export function ExpensesByMonthChart({ data, locale, palette }: Props) {
         />
         <Bar
           dataKey="coinsUah"
-          stackId="month"
+          stackId="period"
           fill={palette.series1}
           radius={[0, 0, 4, 4]}
           stroke={palette.panel}
@@ -133,7 +160,7 @@ export function ExpensesByMonthChart({ data, locale, palette }: Props) {
         />
         <Bar
           dataKey="supportingUah"
-          stackId="month"
+          stackId="period"
           fill={palette.series2}
           radius={[4, 4, 0, 0]}
           stroke={palette.panel}

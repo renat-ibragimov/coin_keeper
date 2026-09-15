@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { CatalogCard, CollectionGroup } from '@/shared/api/types';
+import { coinDenomination } from '@/shared/lib/coinDenomination';
 import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatNumber } from '@/shared/lib/format';
@@ -34,6 +35,22 @@ function metalMaterial(card: CatalogCard, t: TFunction): string | null {
   return card.metalKind === 'unknown' ? null : t(METAL_LABELS[card.metalKind]);
 }
 
+/** The edge/quality dictionary name where known, the record's own text otherwise —
+ * same fallback `coinMaterial` uses for composition vs. free-text material. */
+function edgeName(card: CatalogCard): string | null {
+  return card.edgeType?.name ?? card.edge;
+}
+
+function qualityName(card: CatalogCard): string | null {
+  return card.qualityType?.name ?? card.quality;
+}
+
+/** Several names read as one comma-separated line, same as a denomination or
+ * a catalog number — there is no per-name UI on this page. */
+function joinNames(names: string[]): string | null {
+  return names.length > 0 ? names.join(', ') : null;
+}
+
 /** "Основна інформація": the coin's identity — country, series, category, year, denomination. */
 export function identitySpecRows(card: CatalogCard, t: TFunction): PropertyRow[] {
   return [
@@ -48,7 +65,7 @@ export function identitySpecRows(card: CatalogCard, t: TFunction): PropertyRow[]
     {
       key: 'denomination',
       label: t('card.specDenomination'),
-      value: card.denomination?.label ?? null,
+      value: coinDenomination(card),
     },
   ];
 }
@@ -73,6 +90,8 @@ export function issueSpecRows(card: CatalogCard, t: TFunction, locale: string): 
     },
     { key: 'variety', label: t('card.specVariety'), value: card.variety },
     { key: 'subtype', label: t('card.specSubtype'), value: card.subtype },
+    { key: 'designers', label: t('card.specDesigners'), value: joinNames(card.designers) },
+    { key: 'sculptors', label: t('card.specSculptors'), value: joinNames(card.sculptors) },
   ];
 }
 
@@ -91,9 +110,10 @@ export function technicalSpecRows(card: CatalogCard, t: TFunction, locale: strin
       label: t('card.specThickness'),
       value: unit(card.thicknessMm, t('units.mm')),
     },
-    { key: 'edge', label: t('card.specEdge'), value: card.edge },
+    { key: 'edge', label: t('card.specEdge'), value: edgeName(card) },
     { key: 'shape', label: t('card.specShape'), value: card.shape },
     { key: 'orientation', label: t('card.specOrientation'), value: card.orientation },
+    { key: 'quality', label: t('card.specQuality'), value: qualityName(card) },
   ];
 }
 

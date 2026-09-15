@@ -27,6 +27,25 @@
   gap: var(--space-3);
 }
 
+/* The 1fr/auto/1fr grid keeps the title centred on the page: the back
+ * button sits at the start of the first 1fr track without changing its
+ * width, so it stays as wide as the empty third track and the title lands
+ * exactly in the middle. */
+.titleBar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.backButton {
+  justify-self: start;
+}
+
+.titleCellCenter {
+  text-align: center;
+}
+
 /* The page's own name is content, so it keeps the display serif, and it
  * scales with the viewport instead of stepping at one breakpoint. */
 .title {
@@ -46,7 +65,8 @@
   flex-wrap: wrap;
 }
 
-.rowCenter .actions {
+.rowCenter .actions,
+.actionsCenter {
   justify-content: center;
 }
 

@@ -90,4 +90,12 @@ describe('toQuery', () => {
   it('returns an empty string with no values', () => {
     expect(toQuery({})).toBe('');
   });
+
+  it('repeats the key for each item of an array value', () => {
+    expect(toQuery({ countryId: [1, 2], q: 'x' })).toBe('?countryId=1&countryId=2&q=x');
+  });
+
+  it('omits an empty array entirely', () => {
+    expect(toQuery({ countryId: [], q: 'x' })).toBe('?q=x');
+  });
 });

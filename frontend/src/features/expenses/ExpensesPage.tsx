@@ -1,14 +1,17 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Coins, Receipt, Wallet } from 'lucide-react';
+import { CalendarDays, Coins, Pencil, Receipt, Trash2, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import { fetchCurrencies } from '@/features/catalog/api';
+import { DeleteInstanceDialog } from '@/features/collection/DeleteInstanceDialog';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { ExpenseCategory, ExpenseOut } from '@/shared/api/types';
 import { formatDate, formatMoney, formatSignedUah, formatUah } from '@/shared/lib/format';
+import type { SecondaryCurrency } from '@/shared/lib/secondaryAmount';
+import { pickSecondary } from '@/shared/lib/secondaryAmount';
 import { useChartPalette } from '@/shared/theme/useChartPalette';
 import type { SortOrder } from '@/shared/ui';
 import {
@@ -31,10 +34,10 @@ import {
 
 import {
   ALL_CATEGORIES,
-  createExpense,
   deleteExpense,
   EXPENSE_SORTS,
   fetchExpenses,
+  fetchExpensesChart,
   fetchExpensesSummary,
   PAGE_SIZE,
   updateExpense,
@@ -44,6 +47,9 @@ import { ExpensesByCategoryChart } from './ExpensesByCategoryChart';
 import { ExpensesByMonthChart } from './ExpensesByMonthChart';
 import { ExpenseForm } from './ExpenseForm';
 import type { ExpenseValues } from './ExpenseForm';
+import { ExpensesPeriodPicker } from './ExpensesPeriodPicker';
+import { presetRange } from './period';
+import type { ExpensesPeriodPreset } from './period';
 import styles from './ExpensesPage.module.css';
 
 const DEPENDENT_KEYS = ['expenses', 'bootstrap'];
@@ -58,7 +64,12 @@ const SORTABLE_COLUMNS: { key: string; sort: ExpenseSort; className: string | un
   { key: 'expenses.amountHeader', sort: 'amount', className: styles.moneyColumn },
 ];
 
-type Editor = { mode: 'closed' } | { mode: 'create' } | { mode: 'edit'; expense: ExpenseOut };
+/** Only editing opens here now: "+ Додати витрату" leads to `/collection/add`,
+ *  where the same form sits beside the purchase one (docs/08-ui-map.md). */
+type Editor = { mode: 'closed' } | { mode: 'edit'; expense: ExpenseOut };
+
+/** The type selector's default for an expense recorded from this page. */
+const ADD_EXPENSE_URL = '/collection/add?type=other';
 
 export function ExpensesPage() {
   const { t, i18n } = useTranslation();
@@ -79,6 +90,22 @@ export function ExpensesPage() {
   const order = params.get('order') === 'asc' ? 'asc' : 'desc';
   const [editor, setEditor] = useState<Editor>({ mode: 'closed' });
   const [deleting, setDeleting] = useState<ExpenseOut | null>(null);
+  // A purchase row deletes the coin, not the expense — the expense goes with
+  // it (docs/04-business-rules.md, rule 10), so it uses the collection's own
+  // dialog, which says exactly that.
+  const [deletingPurchase, setDeletingPurchase] = useState<{
+    id: number;
+    title: string;
+    totalUah: string;
+  } | null>(null);
+  const location = useLocation();
+  // Editing a purchase from here returns here, filters and page included.
+  const backHere = `${location.pathname}${location.search}`;
+
+  const [preset, setPreset] = useState<ExpensesPeriodPreset | null>('1y');
+  const [dateFrom, setDateFrom] = useState(() => presetRange('1y').dateFrom);
+  const [dateTo, setDateTo] = useState(() => presetRange('1y').dateTo);
+  const invalidRange = dateFrom > dateTo;
 
   const listQuery = useQuery({
     queryKey: ['expenses', 'list', category, page, sort, order],
@@ -89,19 +116,27 @@ export function ExpensesPage() {
     queryKey: ['expenses', 'summary'],
     queryFn: fetchExpensesSummary,
   });
+  const chartQuery = useQuery({
+    queryKey: ['expenses', 'chart', dateFrom, dateTo],
+    queryFn: () => fetchExpensesChart(dateFrom, dateTo),
+    enabled: !invalidRange,
+    placeholderData: keepPreviousData,
+  });
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const collectionEmpty = bootstrapQuery.data?.dashboard.isEmpty === true;
+  const secondaryCurrency: SecondaryCurrency =
+    bootstrapQuery.data?.settings.secondaryCurrency === 'EUR' ? 'EUR' : 'USD';
 
   const invalidate = () =>
     Promise.all(DEPENDENT_KEYS.map((key) => queryClient.invalidateQueries({ queryKey: [key] })));
 
   const saveMutation = useMutation({
-    mutationFn: (values: ExpenseValues) =>
-      editor.mode === 'edit' ? updateExpense(editor.expense.id, values) : createExpense(values),
+    mutationFn: ({ id, values }: { id: number; values: ExpenseValues }) =>
+      updateExpense(id, values),
     onSuccess: async () => {
       await invalidate();
-      toast.show(editor.mode === 'edit' ? t('expenses.updated') : t('expenses.created'));
+      toast.show(t('expenses.updated'));
       setEditor({ mode: 'closed' });
     },
   });
@@ -177,7 +212,9 @@ export function ExpensesPage() {
         subtitle={t('expenses.subtitle')}
         actions={
           collectionEmpty ? undefined : (
-            <Button onClick={() => setEditor({ mode: 'create' })}>+ {t('expenses.add')}</Button>
+            <Link to={ADD_EXPENSE_URL}>
+              <Button>+ {t('expenses.add')}</Button>
+            </Link>
           )
         }
       />
@@ -193,7 +230,7 @@ export function ExpensesPage() {
               <Link to="/catalog">
                 <Button>{t('common.backToCatalog')}</Button>
               </Link>
-              <Link to="/collection/coins/new">
+              <Link to="/collection/add">
                 <Button variant="secondary">{t('card.addPurchase')}</Button>
               </Link>
             </>
@@ -236,20 +273,56 @@ export function ExpensesPage() {
           </section>
 
           {summary && summary.categories.length > 0 ? (
-            <div className={styles.charts}>
-              <Card variant="panel" aria-label={t('expenses.chartByMonthTitle')}>
-                <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
-                <ExpensesByMonthChart data={summary.byMonth} locale={locale} palette={palette} />
-              </Card>
-              <Card variant="panel" aria-label={t('expenses.chartByCategoryTitle')}>
-                <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
-                <ExpensesByCategoryChart
-                  data={summary.byCategory}
-                  locale={locale}
-                  palette={palette}
-                />
-              </Card>
-            </div>
+            <>
+              <ExpensesPeriodPicker
+                preset={preset}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                invalidRange={invalidRange}
+                onPreset={(next) => {
+                  setPreset(next);
+                  const range = presetRange(next);
+                  setDateFrom(range.dateFrom);
+                  setDateTo(range.dateTo);
+                }}
+                onCustomRange={(from, to) => {
+                  setPreset(null);
+                  setDateFrom(from);
+                  setDateTo(to);
+                }}
+              />
+              <div className={styles.charts}>
+                <Card variant="panel" aria-label={t('expenses.chartByMonthTitle')}>
+                  <h3 className={styles.chartTitle}>{t('expenses.chartByMonthTitle')}</h3>
+                  {chartQuery.isError ? (
+                    <ErrorState onRetry={() => void chartQuery.refetch()} />
+                  ) : chartQuery.data ? (
+                    <ExpensesByMonthChart
+                      data={chartQuery.data.byPeriod}
+                      granularity={chartQuery.data.granularity}
+                      locale={locale}
+                      palette={palette}
+                    />
+                  ) : (
+                    <Skeleton height={260} />
+                  )}
+                </Card>
+                <Card variant="panel" aria-label={t('expenses.chartByCategoryTitle')}>
+                  <h3 className={styles.chartTitle}>{t('expenses.chartByCategoryTitle')}</h3>
+                  {chartQuery.isError ? (
+                    <ErrorState onRetry={() => void chartQuery.refetch()} />
+                  ) : chartQuery.data ? (
+                    <ExpensesByCategoryChart
+                      data={chartQuery.data.byCategory}
+                      locale={locale}
+                      palette={palette}
+                    />
+                  ) : (
+                    <Skeleton height={260} />
+                  )}
+                </Card>
+              </div>
+            </>
           ) : null}
 
           {summary && summary.categories.length > 0 ? (
@@ -296,9 +369,9 @@ export function ExpensesPage() {
               title={t('expenses.emptyTitle')}
               description={t('expenses.emptyText')}
               actions={
-                <Button variant="secondary" onClick={() => setEditor({ mode: 'create' })}>
-                  + {t('expenses.add')}
-                </Button>
+                <Link to={ADD_EXPENSE_URL}>
+                  <Button variant="secondary">+ {t('expenses.add')}</Button>
+                </Link>
               }
             />
           ) : null}
@@ -319,12 +392,14 @@ export function ExpensesPage() {
                       className={column.className}
                     />
                   ))}
-                  {/* Reserved for the amount in dollars at the National Bank's
-                      rate of the day, so the spending can be read in a currency
-                      that does not move under your feet. The value comes in a
-                      later step (docs/BACKLOG.md), and nothing sorts by a column
-                      that carries none yet. */}
-                  <th className={styles.usdColumn}>{t('expenses.amountUsdHeader')}</th>
+                  {/* By the NBU rate on the expense's own date, so the spending
+                      reads in a currency that does not move under your feet
+                      (docs/BACKLOG.md). Nothing sorts by it yet. */}
+                  <th className={styles.usdColumn}>
+                    {t('expenses.amountSecondaryHeader', {
+                      currency: t(`common.currencyNames.${secondaryCurrency}`),
+                    })}
+                  </th>
                   <th className={styles.actionsColumn}>{t('catalog.tableActions')}</th>
                 </tr>
               </thead>
@@ -342,12 +417,28 @@ export function ExpensesPage() {
                         </Badge>
                       </td>
                       <td>
-                        {fromPurchase && expense.catalogItemId ? (
-                          <Link to={`/catalog/${expense.catalogItemId}`}>
-                            {expense.coinTitle || t('expenses.fromPurchase')}
-                          </Link>
+                        {fromPurchase ? (
+                          expense.catalogItemId ? (
+                            <Link to={`/catalog/${expense.catalogItemId}`}>
+                              {expense.coinTitle || t('expenses.fromPurchase')}
+                            </Link>
+                          ) : (
+                            t('expenses.fromPurchase')
+                          )
                         ) : (
-                          expense.description || '—'
+                          <>
+                            {expense.description || '—'}
+                            {/* A supporting expense may name a coin too
+                                (grading, a holder for one piece); the link
+                                the person made has to be visible. */}
+                            {expense.catalogItemId ? (
+                              <div className={styles.linkedCoin}>
+                                <Link to={`/catalog/${expense.catalogItemId}`}>
+                                  {expense.coinTitle || t('expenses.linkedCoinFallback')}
+                                </Link>
+                              </div>
+                            ) : null}
+                          </>
                         )}
                       </td>
                       <td className={`${cellAlign.center} ${styles.secondary}`}>
@@ -356,27 +447,74 @@ export function ExpensesPage() {
                       <td className={`${cellAlign.center} tabular`}>
                         {formatMoney(expense.amount, expense.currencyCode, locale)}
                       </td>
-                      {/* In dollars at the rate of the day: the column is in
-                          place, the value comes from the API later. */}
-                      <td className={`${cellAlign.center} ${styles.muted} tabular`}>—</td>
+                      <td className={`${cellAlign.center} ${styles.secondary} tabular`}>
+                        {formatMoney(
+                          pickSecondary(expense.amountUsd, expense.amountEur, secondaryCurrency),
+                          secondaryCurrency,
+                          locale,
+                        ) ?? t('dashboard.rateMissing')}
+                      </td>
                       <td className={styles.actions}>
-                        {/* A purchase's expense is maintained by the purchase
-                              itself, so there is nothing to press here — an
-                              empty cell rather than a dash that reads as a
-                              missing value (owner, 2026-09-09). */}
-                        {fromPurchase ? null : (
-                          <>
+                        {/* Every row is editable and deletable, in the same
+                            icons «Мої екземпляри» uses (owner, 2026-09-14).
+                            What they act on differs: a purchase's expense is
+                            owned by the purchase, so its icons lead to the
+                            instance — editing opens the purchase form, and
+                            deleting removes the coin together with this very
+                            row (docs/04-business-rules.md, rule 4). Only a
+                            purchase whose instance is somehow gone has
+                            nothing to offer. */}
+                        {fromPurchase ? (
+                          expense.collectionItemId !== null ? (
+                            <div className={styles.rowActions}>
+                              <Link
+                                to={`/collection/coins/${expense.collectionItemId}/edit`}
+                                state={{ from: backHere }}
+                                aria-label={t('common.edit')}
+                                className={styles.iconLink}
+                              >
+                                <Button variant="ghost" size="sm" className={styles.iconButton}>
+                                  <Pencil size={16} aria-hidden="true" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className={styles.iconButton}
+                                aria-label={t('common.delete')}
+                                onClick={() =>
+                                  setDeletingPurchase({
+                                    id: expense.collectionItemId!,
+                                    title: expense.coinTitle || t('expenses.fromPurchase'),
+                                    totalUah: expense.amountUah,
+                                  })
+                                }
+                              >
+                                <Trash2 size={16} aria-hidden="true" />
+                              </Button>
+                            </div>
+                          ) : null
+                        ) : (
+                          <div className={styles.rowActions}>
                             <Button
                               variant="ghost"
                               size="sm"
+                              className={styles.iconButton}
+                              aria-label={t('common.edit')}
                               onClick={() => setEditor({ mode: 'edit', expense })}
                             >
-                              {t('common.edit')}
+                              <Pencil size={16} aria-hidden="true" />
                             </Button>
-                            <Button variant="ghost" size="sm" onClick={() => setDeleting(expense)}>
-                              {t('common.delete')}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={styles.iconButton}
+                              aria-label={t('common.delete')}
+                              onClick={() => setDeleting(expense)}
+                            >
+                              <Trash2 size={16} aria-hidden="true" />
                             </Button>
-                          </>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -396,20 +534,22 @@ export function ExpensesPage() {
       <Modal
         open={editor.mode !== 'closed'}
         onClose={() => setEditor({ mode: 'closed' })}
-        title={editor.mode === 'edit' ? t('expenses.editTitle') : t('expenses.addTitle')}
+        title={t('expenses.editTitle')}
       >
-        {editor.mode !== 'closed' ? (
+        {editor.mode === 'edit' ? (
           <ExpenseForm
-            key={editor.mode === 'edit' ? editor.expense.id : 'new'}
-            initial={editor.mode === 'edit' ? editor.expense : undefined}
+            key={editor.expense.id}
+            initial={editor.expense}
             currencies={currenciesQuery.data ?? []}
             busy={saveMutation.isPending}
             submitError={saveMutation.error}
-            onSubmit={(values) => saveMutation.mutate(values)}
+            onSubmit={(values) => saveMutation.mutate({ id: editor.expense.id, values })}
             onCancel={() => setEditor({ mode: 'closed' })}
           />
         ) : null}
       </Modal>
+
+      <DeleteInstanceDialog item={deletingPurchase} onClose={() => setDeletingPurchase(null)} />
 
       <ConfirmDialog
         open={deleting !== null}

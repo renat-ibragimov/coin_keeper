@@ -1,0 +1,84 @@
+.stage {
+  position: relative;
+  height: 280px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-surface-control);
+}
+
+.zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.zoomLabel {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.zoomSlider {
+  flex: 1;
+  accent-color: var(--color-accent);
+}
+
+.hint {
+  margin: var(--space-3) 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.rotation {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.rotationLabel {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.rotationSlider {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--color-accent);
+}
+
+.rotationValue {
+  min-width: 3.2em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.rotationReset {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.rotationReset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.warning {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+  font-size: 13px;
+}

@@ -1,7 +1,8 @@
 """Exchange rate lookups (docs/04-business-rules.md, rule 6).
 
-Only the table is read here. The NBU HTTP client that fills it arrives in
-stage 5; until then missing dates surface as a 422 at the API boundary.
+Only the table is read here. It is filled by a separate repository,
+coin-parser (collector/rates/), the same way UA-Coins prices are
+(docs/05-integrations.md) -- nothing here writes to exchange_rates.
 """
 
 from __future__ import annotations

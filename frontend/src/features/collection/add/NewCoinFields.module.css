@@ -1,0 +1,92 @@
+/* A block inside the form card, set off by a rule rather than a card of its
+   own: it belongs to the purchase, it is not a second thing on the page. */
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.lead {
+  margin: calc(-1 * var(--space-3)) 0 0;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+.toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.chevron {
+  width: 15px;
+  height: 15px;
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* `display: flex` above outranks the user agent's own [hidden] rule, so the
+   collapsed block has to be hidden explicitly. */
+.details[hidden] {
+  display: none;
+}
+
+.photoPreview {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--color-surface-control);
+}
+
+/* Same footprint as a picked photo (photoStyles.photoFrame), so choosing one
+   does not shift anything else on the page. */
+.photoPlaceholder {
+  display: flex;
+  width: 132px;
+  height: 132px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border: 1px dashed var(--color-border);
+  border-radius: 50%;
+  background: none;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.photoPlaceholder:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}

@@ -1,4 +1,11 @@
-"""DashboardRepository.series_breakdown: ordering and limit (docs/11-roadmap.md)."""
+"""DashboardRepository.series_breakdown: only started series, no cap.
+
+"Мої серії" on the overview shows every series the owner has started at
+least one coin of — the front end (`myCollectionSeries`) does its own sort
+over the whole set and drops anything with `owned == 0`, so this repository
+method restricts to `owned > 0` and does not otherwise rank or limit rows
+(owner's call, 2026-09-12).
+"""
 
 from __future__ import annotations
 
@@ -24,70 +31,39 @@ async def ctx(db_session: AsyncSession) -> SimpleNamespace:
     return SimpleNamespace(refs=refs, user_id=user.id)
 
 
-async def test_series_with_owned_coins_outranks_bigger_empty_series(
+async def test_a_series_with_no_owned_coins_is_left_out(
     db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """A user's own coins must reach the dashboard even when their series
-    are small next to the shared catalog's biggest ones."""
+    """A series the owner has not started at all never reaches the
+    overview — however big it is next to the one they actually collect."""
     refs = ctx.refs
-    small = await make_series(db_session, country=refs.ukraine, name="Мала серія")
+    started = await make_series(db_session, country=refs.ukraine, name="Почата серія")
     item = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Дельфін", year=2018, series=small
+        db_session, country=refs.ukraine, title="Дельфін", year=2018, series=started
     )
     await add_collection_item(db_session, owner_id=ctx.user_id, item=item, price="10")
 
-    for index in range(10):
-        big = await make_series(db_session, country=refs.ukraine, name=f"Велика серія {index}")
-        for year in range(2000, 2005):
-            await make_catalog_item(
-                db_session,
-                country=refs.ukraine,
-                title=f"Монета {index}-{year}",
-                year=year,
-                series=big,
-            )
+    untouched = await make_series(db_session, country=refs.ukraine, name="Незаймана серія")
+    for year in range(2000, 2010):
+        await make_catalog_item(
+            db_session, country=refs.ukraine, title=f"Монета {year}", year=year, series=untouched
+        )
 
     repo = DashboardRepository(db_session, user_id=ctx.user_id)
     rows = await repo.series_breakdown()
 
-    assert rows[0].name == "Мала серія"
-    assert rows[0].owned == 1
+    names = {row.name for row in rows}
+    assert names == {"Почата серія"}
 
 
-async def test_more_complete_owned_series_ranks_first(
+async def test_no_cap_on_how_many_started_series_are_returned(
     db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
+    """A cap here used to let several small, fully-completed series push a
+    still-open one out of the response entirely — there is no cap now, the
+    front end sorts the whole set itself."""
     refs = ctx.refs
-    mostly_done = await make_series(db_session, country=refs.ukraine, name="Майже готово")
-    half_done = await make_series(db_session, country=refs.ukraine, name="Наполовину")
-
-    for series, owned_count in ((mostly_done, 3), (half_done, 2)):
-        for i in range(4):
-            item = await make_catalog_item(
-                db_session,
-                country=refs.ukraine,
-                title=f"{series.name_original} {i}",
-                year=2010 + i,
-                series=series,
-            )
-            if i < owned_count:
-                await add_collection_item(db_session, owner_id=ctx.user_id, item=item, price="10")
-
-    repo = DashboardRepository(db_session, user_id=ctx.user_id)
-    rows = await repo.series_breakdown()
-    by_name = {row.name: row for row in rows}
-
-    assert by_name["Майже готово"].owned == 3
-    assert by_name["Наполовину"].owned == 2
-    names_in_order = [row.name for row in rows]
-    assert names_in_order.index("Майже готово") < names_in_order.index("Наполовину")
-
-
-async def test_a_completed_owned_series_does_not_push_out_an_unfinished_one(
-    db_session: AsyncSession, ctx: SimpleNamespace
-) -> None:
-    refs = ctx.refs
-    for index in range(11):
+    for index in range(20):
         series = await make_series(db_session, country=refs.ukraine, name=f"Завершена {index}")
         item = await make_catalog_item(
             db_session,
@@ -110,29 +86,46 @@ async def test_a_completed_owned_series_does_not_push_out_an_unfinished_one(
     repo = DashboardRepository(db_session, user_id=ctx.user_id)
     rows = await repo.series_breakdown()
 
-    assert len(rows) == 12
+    assert len(rows) == 21
     names = {row.name for row in rows}
     assert "Незавершена" in names
 
 
-async def test_user_without_coins_keeps_the_biggest_series_first(
+async def test_count_is_the_series_total_not_just_what_is_owned(
     db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """Regression guard for the empty-state dashboard (docs/11-roadmap.md)."""
+    """The outer join must not shrink the denominator to the owned rows —
+    `count` is every item in the series, `owned` is the owner's share of it."""
     refs = ctx.refs
-    small = await make_series(db_session, country=refs.ukraine, name="Мала")
-    big = await make_series(db_session, country=refs.ukraine, name="Велика")
-    await make_catalog_item(db_session, country=refs.ukraine, title="М1", year=2010, series=small)
-    for i in range(3):
+    series = await make_series(db_session, country=refs.ukraine, name="Серія")
+    owned_item = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Є", year=2020, series=series
+    )
+    for year in (2021, 2022):
         await make_catalog_item(
-            db_session, country=refs.ukraine, title=f"В{i}", year=2010 + i, series=big
+            db_session, country=refs.ukraine, title=f"Немає {year}", year=year, series=series
         )
+    await add_collection_item(db_session, owner_id=ctx.user_id, item=owned_item, price="10")
 
     repo = DashboardRepository(db_session, user_id=ctx.user_id)
     rows = await repo.series_breakdown()
-    by_name = {row.name: row for row in rows}
 
-    assert all(row.owned == 0 for row in rows)
-    names_in_order = [row.name for row in rows]
-    assert names_in_order.index("Велика") < names_in_order.index("Мала")
-    assert by_name["Велика"].count == 3
+    row = next(row for row in rows if row.name == "Серія")
+    assert (row.count, row.owned) == (3, 1)
+
+
+async def test_a_user_with_no_coins_gets_an_empty_breakdown(
+    db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The empty state ("Ще не почато жодної серії") is a front-end concern
+    over an empty list, not a fallback list of the biggest unowned series."""
+    refs = ctx.refs
+    series = await make_series(db_session, country=refs.ukraine, name="Серія")
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Монета", year=2018, series=series
+    )
+
+    repo = DashboardRepository(db_session, user_id=ctx.user_id)
+    rows = await repo.series_breakdown()
+
+    assert rows == []

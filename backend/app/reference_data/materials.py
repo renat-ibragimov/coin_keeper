@@ -28,19 +28,21 @@ class MaterialSeed:
 
 
 # The dictionary is seeded from what the catalogue actually contains, not from
-# an imagined list of alloys: about thirty values cover all 3063 items.
+# an imagined list of alloys.
+#
+# Fineness is deliberately not part of it: the National Bank never states a
+# fineness for silver or gold (its own "Матеріал" filter offers only the bare
+# metal, `NBU_METALS` in app/ukraine_pipeline/sources.py), so a specific
+# "Срібло 925" the legacy collection once carried was never something our
+# only source of truth actually said — dropped in favour of the plain metal
+# name rather than keep unverifiable precision (owner's call, 2026-09-12).
 MATERIALS: tuple[MaterialSeed, ...] = (
-    MaterialSeed("silver_350", "Срібло 350", "Silver .350"),
-    MaterialSeed("silver_400", "Срібло 400", "Silver .400"),
-    MaterialSeed("silver_500", "Срібло 500", "Silver .500"),
-    MaterialSeed("silver_900", "Срібло 900", "Silver .900"),
-    MaterialSeed("silver_925", "Срібло 925", "Silver .925"),
-    MaterialSeed("silver_999", "Срібло 999", "Silver .999"),
-    MaterialSeed("silver_gilded_925", "Срібло 925 із золотим покриттям", "Gilded silver .925"),
-    MaterialSeed("silver_gilded_999", "Срібло 999 із золотим покриттям", "Gilded silver .999"),
-    MaterialSeed("gold_900", "Золото 900", "Gold .900"),
-    MaterialSeed("gold_999", "Золото 999", "Gold .999"),
-    MaterialSeed("gold_1000", "Золото 1000", "Gold 1.000"),
+    MaterialSeed("silver", "Срібло", "Silver"),
+    MaterialSeed("silver_gilded", "Срібло із золотим покриттям", "Gilded silver"),
+    MaterialSeed("gold", "Золото", "Gold"),
+    MaterialSeed("zinc_alloy", "Сплав на основі цинку", "Zinc-based alloy"),
+    MaterialSeed("not_specified", "Не вказано", "Not specified"),
+    MaterialSeed("other_banknote", "Інший (банкнота)", "Other (banknote)"),
     MaterialSeed("bimetal", "Біметал", "Bimetal"),
     MaterialSeed("nickel_silver", "Нейзильбер", "Nickel silver"),
     MaterialSeed("aluminium_bronze", "Алюмінієва бронза", "Aluminium bronze"),
@@ -71,13 +73,25 @@ MATERIALS: tuple[MaterialSeed, ...] = (
 
 MATERIAL_CODES = frozenset(material.code for material in MATERIALS)
 
-# What the legacy base sometimes holds in the free-text material field instead
-# of an alloy name: one of our own dictionary codes ("nickel_silver"), or the
-# bare metal with no fineness ("silver", "gold"). A code names a dictionary
-# row and is resolved as one; a bare metal has no row to point at — without a
-# fineness there is nothing to name — so it stays text, in the wording the
-# National Bank uses and the rest of the catalogue already carries.
+# Kept for migration 0007, which imports this name to reword bare metals that
+# predate "silver"/"gold" becoming dictionary codes in their own right
+# (2026-09-12) — a fresh replay resolves them through `MATERIAL_CODES` before
+# this ever runs, so it is dead weight today, not a live translation path.
 BARE_METAL_WORDS: dict[str, str] = {"silver": "срібло", "gold": "золото"}
+
+# Stale English tokens the confirmed (Ukrainian) catalogue carries in the
+# free-text `material` column from before this dictionary covered every
+# category the National Bank's own "Матеріал" filter offers (`NBU_METALS` in
+# app/ukraine_pipeline/sources.py) -- an early run left them and nothing since
+# has revisited an already-filled column (docs/09-data-migration.md). Most
+# already spell a code exactly (`_composition_of` resolves those on its own);
+# these are the ones that do not.
+LEGACY_RAW_ALIASES: dict[str, str] = {
+    "bimetallic": "bimetal",
+    "bimetallic_precious": "bimetal",
+    "cupronickel": "copper_nickel",
+    "banknote": "other_banknote",
+}
 
 # Alloy names as the two sources write them. Matched as a suffix, longest
 # first, so "Copper-Nickel plated Copper" never resolves to plain "Copper".
@@ -157,27 +171,25 @@ def _composition_of(head: str) -> str | None:
     # writes "nickel_silver", so an exact match is our own token coming back.
     if normalised in MATERIAL_CODES:
         return normalised
+    if normalised in LEGACY_RAW_ALIASES:
+        return LEGACY_RAW_ALIASES[normalised]
     precious = _PRECIOUS_RE.search(normalised)
     if precious is not None:
+        # Fineness is not part of the dictionary (see MATERIALS above): a
+        # stated "0.925" still just means the plain metal, gilded or not.
         metal = _PRECIOUS_METAL[precious.group("metal")]
-        gilded = "_gilded" if precious.group("gilded") else ""
-        fineness = precious.group("fineness").replace(".", "").lstrip("0") or "0"
-        code = f"{metal}{gilded}_{fineness}"
-        return code if code in MATERIAL_CODES else None
+        return f"{metal}_gilded" if precious.group("gilded") else metal
     return next((code for phrase, code in _PHRASE_INDEX if normalised.endswith(phrase)), None)
 
 
 def plain_material(text: str | None) -> str | None:
     """Free-text material as it should be stored: nothing, or real wording.
 
-    Only for text the parser could not resolve to a dictionary row. A bare
-    metal word is translated to the National Bank's wording; anything else is
-    the source's own text and is kept as it stands.
+    Only for text the parser could not resolve to a dictionary row -- kept
+    exactly as the source wrote it.
     """
     stripped = (text or "").strip()
-    if not stripped:
-        return None
-    return BARE_METAL_WORDS.get(stripped.casefold(), stripped)
+    return stripped or None
 
 
 def strip_material(text: str) -> str:

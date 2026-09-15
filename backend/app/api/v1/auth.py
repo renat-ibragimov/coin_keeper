@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request, Response, status
 from app.api.deps import (
     AppSettings,
     AuthServiceDep,
+    AvatarServiceDep,
     ClientIp,
     CurrentUser,
     UserAgent,
@@ -14,6 +15,7 @@ from app.api.deps import (
 from app.api.errors import ProblemError
 from app.core import rate_limit
 from app.core.config import Settings
+from app.core.images import MAX_SOURCE_BYTES, ImageRejectedError
 from app.schemas.auth import (
     AcceptedOut,
     ChangePasswordRequest,
@@ -36,6 +38,7 @@ from app.services.auth import (
     RegistrationClosedError,
     WeakPasswordError,
 )
+from app.services.avatars import user_out
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -80,8 +83,17 @@ def _clear_refresh_cookie(response: Response, settings: Settings) -> None:
 
 def _session_payload(session: IssuedSession) -> SessionOut:
     return SessionOut(
-        user=UserOut.model_validate(session.user),
+        user=user_out(session.user),
         tokens=TokensOut(access_token=session.access_token, expires_in=session.expires_in),
+    )
+
+
+def _invalid_image_problem() -> ProblemError:
+    return ProblemError(
+        status.HTTP_422_UNPROCESSABLE_CONTENT,
+        "invalid-image",
+        "Image rejected",
+        "Upload a JPEG, PNG or WebP image up to 12 MB and no wider than 4000 px.",
     )
 
 
@@ -269,7 +281,7 @@ async def reset_password(
 
 @router.get("/me")
 async def read_me(user: CurrentUser) -> UserOut:
-    return UserOut.model_validate(user)
+    return user_out(user)
 
 
 @router.patch("/me")
@@ -279,7 +291,36 @@ async def update_me(
     updated = await service.update_profile(
         user=user, display_name=payload.display_name, locale=payload.locale
     )
-    return UserOut.model_validate(updated)
+    return user_out(updated)
+
+
+@router.put("/me/avatar")
+async def set_avatar(request: Request, user: CurrentUser, service: AvatarServiceDep) -> UserOut:
+    """Raw image bytes, not multipart: one file with no fields beside it does
+    not need the envelope, and the same bytes always land on the same key, so
+    a repeated upload is a no-op rather than a second stored file."""
+    # Answer an oversized upload from the header, before pulling the body into
+    # memory. Caddy caps the request ahead of us (Caddyfile, request_body), so
+    # this is the fallback for a declared length that got past it — and the
+    # length check below still stands for a chunked body that declares none.
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > MAX_SOURCE_BYTES:
+        raise _invalid_image_problem()
+
+    payload = await request.body()
+    if len(payload) > MAX_SOURCE_BYTES:
+        raise _invalid_image_problem()
+    try:
+        updated = await service.set_avatar(user=user, payload=payload)
+    except ImageRejectedError as exc:
+        raise _invalid_image_problem() from exc
+    return user_out(updated)
+
+
+@router.delete("/me/avatar")
+async def delete_avatar(user: CurrentUser, service: AvatarServiceDep) -> UserOut:
+    """200 with the profile, not 204: the caller needs the now-empty avatarUrl."""
+    return user_out(await service.remove_avatar(user=user))
 
 
 @router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)

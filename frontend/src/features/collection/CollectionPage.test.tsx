@@ -18,6 +18,7 @@ import {
   fetchCollection,
   fetchOwnedCountries,
   fetchOwnedDenominations,
+  fetchOwnedMaterials,
   fetchOwnedSeries,
 } from './api';
 import { CollectionPage } from './CollectionPage';
@@ -27,7 +28,7 @@ vi.mock('./api', () => ({
   fetchOwnedCountries: vi.fn(),
   fetchOwnedSeries: vi.fn(),
   fetchOwnedDenominations: vi.fn(),
-  PAGE_SIZE: 24,
+  fetchOwnedMaterials: vi.fn(),
 }));
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
 vi.mock('@/features/series/api', () => ({ fetchSeriesProgress: vi.fn() }));
@@ -45,8 +46,13 @@ function makeBootstrap(isEmpty: boolean): BootstrapOut {
     settings: {
       locale: 'uk',
       displayCurrency: 'UAH',
-      defaultGradeCommemorative: 'UNC',
-      defaultGradeCirculation: 'VF',
+      defaultGrade: 'UNC',
+      showPackagingVariants: false,
+      theme: 'system',
+      catalogViewMode: 'cards',
+      collectionViewMode: 'cards',
+      secondaryCurrency: 'USD',
+      defaultStorageLocation: null,
     },
     dashboard: {
       catalogItems: 0,
@@ -104,6 +110,7 @@ const OWNED_COUNTRY: CountryOut = {
   nameEn: 'Ukraine',
   collectVariants: false,
   isActive: true,
+  catalogConfirmed: true,
   sortOrder: 1,
   minYear: null,
   maxYear: null,
@@ -129,6 +136,7 @@ function mockCommonQueries(isEmpty: boolean) {
   vi.mocked(fetchOwnedCountries).mockResolvedValue([]);
   vi.mocked(fetchOwnedSeries).mockResolvedValue([]);
   vi.mocked(fetchOwnedDenominations).mockResolvedValue([]);
+  vi.mocked(fetchOwnedMaterials).mockResolvedValue([]);
 }
 
 describe('CollectionPage', () => {
@@ -144,7 +152,7 @@ describe('CollectionPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
       'href',
-      '/collection/coins/new',
+      '/collection/add',
     );
     expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
       'href',
@@ -159,6 +167,18 @@ describe('CollectionPage', () => {
     expect(screen.queryByText('Поточна оцінка')).toBeNull();
   });
 
+  it('fetches a page size that divides every grid column count evenly', async () => {
+    // 30: divisible by the fixed 1/2/3/5-column breakpoints
+    // (CollectionPage.module.css) — a mismatch strands a short last row
+    // before the pager even when later pages have more items.
+    vi.mocked(fetchCollection).mockResolvedValue(EMPTY_PAGE);
+    mockCommonQueries(false);
+    renderPage();
+
+    await screen.findByPlaceholderText('Пошук у колекції…');
+    expect(fetchCollection).toHaveBeenCalledWith(expect.anything(), 30);
+  });
+
   it('shows the filters panel and header actions once the collection has coins', async () => {
     vi.mocked(fetchCollection).mockResolvedValue(EMPTY_PAGE);
     mockCommonQueries(false);
@@ -168,7 +188,7 @@ describe('CollectionPage', () => {
     expect(screen.queryByText('У колекції ще немає монет')).toBeNull();
     expect(screen.getByRole('link', { name: '+ Додати покупку' })).toHaveAttribute(
       'href',
-      '/collection/coins/new',
+      '/collection/add',
     );
   });
 

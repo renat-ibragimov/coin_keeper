@@ -18,6 +18,8 @@ export interface ChartPalette {
   /** Axis ticks and labels: readable secondary contrast, not body contrast. */
   axis: string;
   grid: string;
+  /** A suspect/flagged data point — the price-history chart's suspect marker. */
+  danger: string;
   /** The raised card surface, used by shade() as the ramp's far end. */
   surface: string;
   /** The structural-panel surface the charts actually sit on: the colour a
@@ -50,6 +52,7 @@ export function useChartPalette(): ChartPalette {
       textMuted: readToken('--color-text-muted', '#786f62'),
       axis: readToken('--color-chart-axis', '#786f62'),
       grid: readToken('--color-chart-grid', '#b4a892'),
+      danger: readToken('--color-danger', '#8f3f30'),
       surface,
       panel: readToken('--color-surface', '#ddd5c8'),
       tooltipBg: readToken('--color-surface-raised', surface),

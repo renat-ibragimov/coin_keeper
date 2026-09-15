@@ -6,7 +6,12 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.helpers import register_and_verify
-from tests.seed import make_catalog_item, seed_reference, user_id_by_email
+from tests.seed import (
+    make_catalog_item,
+    seed_reference,
+    set_country_catalog_confirmed,
+    user_id_by_email,
+)
 
 
 async def test_reference_endpoints_require_auth(client: AsyncClient) -> None:
@@ -39,6 +44,7 @@ async def test_active_countries_lead_with_ukraine(
         "nameEn": "Ukraine",
         "collectVariants": False,
         "isActive": True,
+        "catalogConfirmed": True,
         "sortOrder": 0,
         "minYear": None,
         "maxYear": None,
@@ -145,6 +151,58 @@ async def test_denominations_filtered_by_country(
     assert len(everything.json()) == 3
 
 
+async def test_confirmed_scope_is_a_harder_gate_than_active(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list
+) -> None:
+    """docs/04-business-rules.md, §13a: `scope=confirmed` is the catalog's
+    own filter panel — active but unconfirmed is not enough."""
+    refs = await seed_reference(db_session)
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+    _, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    active = await client.get("/api/v1/countries?scope=active", headers=headers)
+    assert refs.usa.id in {row["id"] for row in active.json()}
+
+    confirmed = await client.get("/api/v1/countries?scope=confirmed", headers=headers)
+    confirmed_ids = {row["id"] for row in confirmed.json()}
+    assert refs.ukraine.id in confirmed_ids
+    assert refs.usa.id not in confirmed_ids
+
+    denominations = await client.get(
+        f"/api/v1/denominations?countryId={refs.usa.id}&scope=confirmed", headers=headers
+    )
+    assert denominations.json() == []
+
+
+async def test_confirmed_denominations_require_a_visible_catalog_item(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list
+) -> None:
+    """§13a's confirmed-scope gate applies per denomination, not just per
+    country: a denomination row can outlive every catalog item that used to
+    reference it (Ukraine pipeline merges/reassigns, docs/05-integrations.md),
+    and the catalog's filter panel must not offer it once nothing matches."""
+    refs = await seed_reference(db_session)
+    _, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Both denominations are active for a catalog_confirmed country, but
+    # neither has a catalog item yet.
+    empty = await client.get(
+        f"/api/v1/denominations?countryId={refs.ukraine.id}&scope=confirmed", headers=headers
+    )
+    assert empty.json() == []
+
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="2 гривні 2018", year=2018, denomination=refs.uah_2
+    )
+
+    confirmed = await client.get(
+        f"/api/v1/denominations?countryId={refs.ukraine.id}&scope=confirmed", headers=headers
+    )
+    assert [row["label"] for row in confirmed.json()] == ["2 гривні"]
+
+
 async def test_currencies(client: AsyncClient, db_session: AsyncSession, mail_outbox: list) -> None:
     await seed_reference(db_session)
     _, token = await register_and_verify(client, mail_outbox)
@@ -156,3 +214,32 @@ async def test_currencies(client: AsyncClient, db_session: AsyncSession, mail_ou
     assert codes == ["EUR", "SUR", "UAH", "UAK", "USD"]
     uah = next(row for row in response.json() if row["code"] == "UAH")
     assert uah == {"code": "UAH", "name": "Hryvnia", "symbol": "₴", "decimalPlaces": 2}
+
+
+async def test_coin_dictionaries_for_the_add_form(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list
+) -> None:
+    """What "Про монету" offers under Матеріал, Гурт and Якість карбування.
+
+    Wider than `GET /catalog/materials`, which narrows a filter to what a
+    confirmed coin actually uses: this form describes a coin that does not
+    exist yet (docs/03-api-contract.md)."""
+    await seed_reference(db_session)
+    _, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    materials = (await client.get("/api/v1/materials", headers=headers)).json()
+    by_code = {row["code"]: row["name"] for row in materials}
+    assert by_code["silver"] == "Срібло"
+    assert by_code["nickel_silver"] == "Нейзильбер"
+    assert [row["name"] for row in materials] == sorted(row["name"] for row in materials)
+
+    edges = (await client.get("/api/v1/edge-types", headers=headers)).json()
+    assert {row["code"] for row in edges} >= {"plain", "reeded"}
+    assert next(row for row in edges if row["code"] == "reeded")["name"] == "Рифлений"
+
+    qualities = (await client.get("/api/v1/quality-types", headers=headers)).json()
+    assert next(row for row in qualities if row["code"] == "proof")["name"] == "Пруф"
+
+    in_english = (await client.get("/api/v1/edge-types?locale=en", headers=headers)).json()
+    assert next(row for row in in_english if row["code"] == "reeded")["name"] == "Reeded"

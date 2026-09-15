@@ -19,6 +19,7 @@ from tests.seed import (
     make_series,
     seed_reference,
     set_country_active,
+    set_country_catalog_confirmed,
     user_id_by_email,
 )
 
@@ -62,6 +63,7 @@ async def test_empty_dashboard_for_new_user(
     assert body["user"]["email"] == ctx.email_a
     assert body["settings"]["locale"] == "uk"
     assert body["settings"]["displayCurrency"] == "UAH"
+    assert body["settings"]["showPackagingVariants"] is True
 
     finance = body["finance"]
     assert finance["coinSpendUah"] == "0.00"
@@ -149,6 +151,43 @@ async def test_dashboard_figures(
     assert series["Міста України"]["owned"] == 1
 
 
+async def test_series_breakdown_has_no_cap_and_keeps_the_true_total(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """ "Мої серії" on the overview used to cap at 12 rows ordered so that
+    several small, fully-completed series could push a large, still-open one
+    out of the response entirely — the front end is left to sort a complete
+    set now, not trim an already-truncated one (owner's call, 2026-09-12)."""
+    refs = ctx.refs
+    started_series = []
+    for i in range(15):
+        series = await make_series(db_session, country=refs.ukraine, name=f"Завершена {i}")
+        item = await make_catalog_item(
+            db_session, country=refs.ukraine, title=f"Готова {i}", year=2000 + i, series=series
+        )
+        await add_collection_item(db_session, owner_id=ctx.id_a, item=item, price="1")
+        started_series.append(series)
+
+    # A big series the owner has barely started: two items, one owned.
+    big_series = await make_series(db_session, country=refs.ukraine, name="Ще в процесі")
+    owned_item = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Перша", year=2020, series=big_series
+    )
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Друга", year=2021, series=big_series
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_item, price="1")
+
+    dashboard = (await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))).json()[
+        "dashboard"
+    ]
+    names = {row["name"] for row in dashboard["seriesBreakdown"]}
+    assert {series.name_original for series in started_series} <= names
+    assert "Ще в процесі" in names
+    in_progress = next(row for row in dashboard["seriesBreakdown"] if row["name"] == "Ще в процесі")
+    assert (in_progress["count"], in_progress["owned"]) == (2, 1)
+
+
 async def test_dashboard_hides_a_deactivated_country_from_aggregates(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
@@ -191,6 +230,39 @@ async def test_dashboard_hides_a_deactivated_country_from_aggregates(
     assert series["Standing Liberty"]["owned"] == 1
 
     _ = shared_usa
+
+
+async def test_dashboard_still_counts_an_unconfirmed_country(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13a: the `catalog_confirmed` gate is
+    `GET /catalog`-only. The dashboard is the user's own collection overview,
+    so it keeps counting an unconfirmed country's coins the user owns —
+    deliberately diverging from what `GET /catalog` itself would show
+    (owner's call, 2026-09-12)."""
+    refs = ctx.refs
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+
+    series_usa = await make_series(db_session, country=refs.usa, name="Standing Liberty")
+    await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
+    owned_usa = await make_catalog_item(
+        db_session, country=refs.usa, title="Quarter", year=1920, series=series_usa
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa, price="10")
+
+    dashboard = (await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))).json()[
+        "dashboard"
+    ]
+
+    assert dashboard["catalogItems"] == 2
+    assert dashboard["countries"] == 2
+    assert dashboard["completedItems"] == 1
+
+    countries = {row["name"] for row in dashboard["countryBreakdown"]}
+    assert "Сполучені Штати" in countries
+
+    series = {row["name"] for row in dashboard["seriesBreakdown"]}
+    assert "Standing Liberty" in series
 
 
 async def test_finance_at_purchase_rates(
@@ -258,3 +330,66 @@ async def test_bootstrap_isolation(
 
     body_a = (await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))).json()
     assert body_a["dashboard"]["marketValueUah"] == "1000.00"
+
+
+async def test_update_settings_persists_and_is_per_user(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    response = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"showPackagingVariants": False},
+    )
+    assert response.status_code == 200
+    assert response.json()["showPackagingVariants"] is False
+
+    refetched = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
+    assert refetched.json()["settings"]["showPackagingVariants"] is False
+
+    # Untouched for user B: still the default, on.
+    body_b = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_b))
+    assert body_b.json()["settings"]["showPackagingVariants"] is True
+
+
+async def test_update_settings_theme_and_view_mode_default_and_persist(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    fresh = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
+    settings = fresh.json()["settings"]
+    assert settings["theme"] == "system"
+    assert settings["catalogViewMode"] == "cards"
+    assert settings["collectionViewMode"] == "cards"
+
+    response = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"theme": "dark", "catalogViewMode": "table"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["theme"] == "dark"
+    assert body["catalogViewMode"] == "table"
+    # Untouched field keeps its previous value — a partial update.
+    assert body["collectionViewMode"] == "cards"
+
+
+async def test_update_settings_secondary_currency_default_and_persist(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    fresh = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
+    assert fresh.json()["settings"]["secondaryCurrency"] == "USD"
+
+    response = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"secondaryCurrency": "EUR"},
+    )
+    assert response.status_code == 200
+    assert response.json()["secondaryCurrency"] == "EUR"
+
+    rejected = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"secondaryCurrency": "GBP"},
+    )
+    assert rejected.status_code == 422

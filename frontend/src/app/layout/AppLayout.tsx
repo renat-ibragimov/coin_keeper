@@ -105,7 +105,11 @@ export function AppLayout() {
               aria-label={t('account.menuLabel')}
             >
               <span className={styles.avatar} aria-hidden="true">
-                <User size={16} />
+                {user?.avatarUrl ? (
+                  <img className={styles.avatarImage} src={user.avatarUrl} alt="" />
+                ) : (
+                  <User size={16} />
+                )}
               </span>
               <span className={styles.accountName}>{user?.displayName || user?.email}</span>
               <ChevronDown className={styles.accountChevron} size={15} aria-hidden="true" />
@@ -114,7 +118,11 @@ export function AppLayout() {
               <div ref={accountMenu} className={styles.accountMenu} role="menu">
                 <div className={styles.accountMenuProfile}>
                   <span className={`${styles.avatar} ${styles.avatarLarge}`} aria-hidden="true">
-                    <User size={20} />
+                    {user?.avatarUrl ? (
+                      <img className={styles.avatarImage} src={user.avatarUrl} alt="" />
+                    ) : (
+                      <User size={20} />
+                    )}
                   </span>
                   <span className={styles.accountMenuProfileText}>
                     <span className={styles.accountMenuProfileName}>

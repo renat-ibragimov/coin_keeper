@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { CarriedValues } from '@/features/collection/add/carried';
 import { ApiError } from '@/shared/api/client';
 import type { CurrencyOut, ExpenseCategory, ExpenseOut } from '@/shared/api/types';
 import { currencySymbol, parseDecimal, todayIso } from '@/shared/lib/format';
@@ -25,10 +26,29 @@ export interface ExpenseValues {
   expenseDate: string;
   vendor: string | null;
   description: string | null;
+  catalogItemId: number | null;
 }
 
 interface ExpenseFormProps {
   initial?: ExpenseOut;
+  /** Preselected category; the "Додати" page sets it from its type selector. */
+  category?: ExpenseCategory;
+  /** Hidden when the page above already shows the type as its first field. */
+  showCategory?: boolean;
+  /**
+   * The coin this expense is about — a whole picker, rendered by the page
+   * that has one. Optional: a delivery need not be about any single coin.
+   */
+  coinField?: ReactNode;
+  /**
+   * The coin `coinField` currently points at. Left out — as the edit dialog
+   * leaves it, having no picker — the expense keeps whatever link it already
+   * had rather than losing it to a form that never asked.
+   */
+  catalogItemId?: number | null;
+  /** Values shared with the purchase branch of the "Додати" page. */
+  carried?: CarriedValues;
+  onCarriedChange?: (values: CarriedValues) => void;
   currencies: CurrencyOut[];
   busy: boolean;
   submitError: unknown;
@@ -47,8 +67,24 @@ interface Fields {
 
 type FieldErrors = Partial<Record<keyof Fields, string>>;
 
+function carriedFrom(fields: Fields): CarriedValues {
+  return {
+    amount: fields.amount,
+    currency: fields.currency,
+    date: fields.expenseDate,
+    vendor: fields.vendor,
+    note: fields.description,
+  };
+}
+
 export function ExpenseForm({
   initial,
+  category,
+  showCategory = true,
+  coinField,
+  catalogItemId,
+  carried,
+  onCarriedChange,
   currencies,
   busy,
   submitError,
@@ -57,17 +93,21 @@ export function ExpenseForm({
 }: ExpenseFormProps) {
   const { t } = useTranslation();
   const [fields, setFields] = useState<Fields>({
-    category: initial?.category ?? 'other',
-    amount: initial?.amount ?? '',
-    currency: initial?.currencyCode ?? 'UAH',
-    expenseDate: initial?.expenseDate ?? todayIso(),
-    vendor: initial?.vendor ?? '',
-    description: initial?.description ?? '',
+    category: initial?.category ?? category ?? 'other',
+    amount: initial?.amount ?? carried?.amount ?? '',
+    currency: initial?.currencyCode ?? carried?.currency ?? 'UAH',
+    expenseDate: initial?.expenseDate ?? carried?.date ?? todayIso(),
+    vendor: initial?.vendor ?? carried?.vendor ?? '',
+    description: initial?.description ?? carried?.note ?? '',
   });
   const [errors, setErrors] = useState<FieldErrors>({});
+  const linkedCoinId =
+    catalogItemId === undefined ? (initial?.catalogItemId ?? null) : catalogItemId;
 
   const set = (key: keyof Fields) => (value: string) => {
-    setFields((current) => ({ ...current, [key]: value }));
+    const next = { ...fields, [key]: value };
+    setFields(next);
+    onCarriedChange?.(carriedFrom(next));
     setErrors((current) => ({ ...current, [key]: undefined }));
   };
 
@@ -89,12 +129,13 @@ export function ExpenseForm({
     setErrors(next);
     if (Object.keys(next).length > 0) return;
     onSubmit({
-      category: fields.category,
+      category: category ?? fields.category,
       amount: String(amount),
       currency: fields.currency,
       expenseDate: fields.expenseDate,
       vendor: fields.vendor.trim() || null,
       description: fields.description.trim() || null,
+      catalogItemId: linkedCoinId,
     });
   }
 
@@ -102,17 +143,19 @@ export function ExpenseForm({
     <form onSubmit={submit} noValidate data-testid="expense-form">
       <FormStack>
         <FormError>{genericError}</FormError>
-        <Select
-          label={t('expenses.category')}
-          value={fields.category}
-          onChange={(event) => set('category')(event.target.value)}
-        >
-          {MANUAL_CATEGORIES.map((category) => (
-            <option key={category} value={category}>
-              {t(`expenses.categories.${category}`)}
-            </option>
-          ))}
-        </Select>
+        {showCategory ? (
+          <Select
+            label={t('expenses.category')}
+            value={fields.category}
+            onChange={(event) => set('category')(event.target.value)}
+          >
+            {MANUAL_CATEGORIES.map((option) => (
+              <option key={option} value={option}>
+                {t(`expenses.categories.${option}`)}
+              </option>
+            ))}
+          </Select>
+        ) : null}
         <FormRow>
           <Input
             label={t('expenses.amount', { symbol: currencySymbol(fields.currency) })}
@@ -166,6 +209,7 @@ export function ExpenseForm({
           onChange={(event) => set('description')(event.target.value)}
           maxLength={4000}
         />
+        {coinField}
         <FormActions>
           <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
             {t('common.cancel')}

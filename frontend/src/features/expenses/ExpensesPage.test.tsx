@@ -1,15 +1,22 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
 import { fetchCurrencies } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
-import type { BootstrapOut, ExpenseOut, ExpensePage, ExpensesSummary } from '@/shared/api/types';
+import type {
+  BootstrapOut,
+  ExpenseOut,
+  ExpensePage,
+  ExpensesChart,
+  ExpensesSummary,
+} from '@/shared/api/types';
 import { ThemeContext } from '@/shared/theme/themeContext';
 
-import { fetchExpenses, fetchExpensesSummary } from './api';
+import { fetchExpenses, fetchExpensesChart, fetchExpensesSummary } from './api';
 import { ExpensesPage } from './ExpensesPage';
 
 // recharts measures its container through ResizeObserver + getBoundingClientRect,
@@ -36,6 +43,10 @@ beforeEach(() => {
       return {};
     },
   });
+  // The period picker's own chart query fires on every mount regardless of
+  // what the test cares about; give it a harmless default and let the one
+  // test that actually checks the charts override it.
+  vi.mocked(fetchExpensesChart).mockResolvedValue(EMPTY_CHART);
 });
 
 afterEach(() => {
@@ -46,6 +57,7 @@ afterEach(() => {
 vi.mock('./api', () => ({
   fetchExpenses: vi.fn(),
   fetchExpensesSummary: vi.fn(),
+  fetchExpensesChart: vi.fn(),
   createExpense: vi.fn(),
   updateExpense: vi.fn(),
   deleteExpense: vi.fn(),
@@ -69,8 +81,13 @@ function makeBootstrap(isEmpty: boolean): BootstrapOut {
     settings: {
       locale: 'uk',
       displayCurrency: 'UAH',
-      defaultGradeCommemorative: 'UNC',
-      defaultGradeCirculation: 'VF',
+      defaultGrade: 'UNC',
+      showPackagingVariants: false,
+      theme: 'system',
+      catalogViewMode: 'cards',
+      collectionViewMode: 'cards',
+      secondaryCurrency: 'USD',
+      defaultStorageLocation: null,
     },
     dashboard: {
       catalogItems: 0,
@@ -111,6 +128,7 @@ const EMPTY_SUMMARY: ExpensesSummary = {
   thisMonthUah: '0.00',
   prevMonthUah: '0.00',
 };
+const EMPTY_CHART: ExpensesChart = { granularity: 'month', byPeriod: [], byCategory: [] };
 
 function renderPage() {
   return render(
@@ -147,6 +165,14 @@ function makeByMonth(thisMonthCoins: string, prevMonthSupporting: string) {
   });
 }
 
+/** Same shape as `makeByMonth`, but keyed `period` — what `/expenses/chart-summary` sends. */
+function makeByPeriod(thisMonthCoins: string, prevMonthSupporting: string) {
+  return makeByMonth(thisMonthCoins, prevMonthSupporting).map(({ month, ...rest }) => ({
+    period: month,
+    ...rest,
+  }));
+}
+
 function makeExpense(overrides: Partial<ExpenseOut>): ExpenseOut {
   return {
     id: 1,
@@ -155,6 +181,8 @@ function makeExpense(overrides: Partial<ExpenseOut>): ExpenseOut {
     currencyCode: 'UAH',
     rateUah: '1',
     amountUah: '100.00',
+    amountUsd: null,
+    amountEur: null,
     expenseDate: '2024-01-01',
     catalogItemId: null,
     collectionItemId: null,
@@ -181,7 +209,7 @@ describe('ExpensesPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
       'href',
-      '/collection/coins/new',
+      '/collection/add',
     );
     expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
       'href',
@@ -190,7 +218,7 @@ describe('ExpensesPage', () => {
     // No header action, zero-value KPI tiles, charts or category chips above the empty state.
     expect(screen.queryByRole('button', { name: /Додати витрату/ })).toBeNull();
     expect(screen.queryByText('Разом на хобі')).toBeNull();
-    expect(screen.queryByText('Витрати за місяцями')).toBeNull();
+    expect(screen.queryByText('Витрати за період')).toBeNull();
     expect(screen.queryByText('Усі категорії')).toBeNull();
   });
 
@@ -265,6 +293,7 @@ describe('ExpensesPage', () => {
           id: 1,
           category: 'coin_purchase',
           catalogItemId: 5,
+          collectionItemId: 50,
           coinTitle: 'Дельфін',
           amountUah: '300.00',
         }),
@@ -272,6 +301,7 @@ describe('ExpensesPage', () => {
           id: 2,
           category: 'coin_purchase',
           catalogItemId: 7,
+          collectionItemId: 70,
           coinTitle: null,
           amountUah: '120.00',
         }),
@@ -317,8 +347,101 @@ describe('ExpensesPage', () => {
 
     // The right-hand actions column no longer repeats "з покупки монети" for these rows.
     expect(screen.getAllByText('з покупки монети')).toHaveLength(1);
-    expect(screen.getByText('Редагувати')).toBeInTheDocument();
-    expect(screen.getByText('Видалити')).toBeInTheDocument();
+    // Every row carries the same two icons now (owner, 2026-09-14): three
+    // rows, three delete buttons, and the two purchases edit through the
+    // purchase form rather than through the expense dialog.
+    expect(screen.getAllByRole('button', { name: 'Видалити' })).toHaveLength(3);
+    const editLinks = screen.getAllByRole('link', { name: 'Редагувати' });
+    expect(editLinks.map((link) => link.getAttribute('href'))).toEqual([
+      '/collection/coins/50/edit',
+      '/collection/coins/70/edit',
+    ]);
+    expect(screen.getAllByRole('button', { name: 'Редагувати' })).toHaveLength(1);
+  });
+
+  it('deleting a purchase row warns that the coin goes with it', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({
+          id: 1,
+          category: 'coin_purchase',
+          catalogItemId: 5,
+          collectionItemId: 50,
+          coinTitle: 'Дельфін',
+          amountUah: '300.00',
+        }),
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue(EMPTY_SUMMARY);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Видалити' }));
+
+    // The collection's own dialog, not the expense one: the row is a
+    // by-product of the purchase, and deleting it deletes the coin.
+    expect(screen.getByText('Видалити екземпляр?')).toBeInTheDocument();
+    expect(screen.getByTestId('delete-instance-text')).toHaveTextContent('Дельфін');
+    expect(screen.getByTestId('delete-instance-text')).toHaveTextContent(
+      /разом із витратою на покупку/,
+    );
+  });
+
+  it('leaves a purchase row without actions when its coin is already gone', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({
+          id: 1,
+          category: 'coin_purchase',
+          catalogItemId: 5,
+          collectionItemId: null,
+          coinTitle: 'Дельфін',
+        }),
+      ],
+      total: 1,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue(EMPTY_SUMMARY);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'Дельфін' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Видалити' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Редагувати' })).toBeNull();
+  });
+
+  it('shows the dollar amount by the rate on the expense’s own date, or "no data" without one', async () => {
+    vi.mocked(fetchExpenses).mockResolvedValue({
+      items: [
+        makeExpense({ id: 1, amountUah: '55.00', amountUsd: '2.00' }),
+        makeExpense({ id: 2, amountUah: '50.00', amountUsd: null }),
+      ],
+      total: 2,
+      page: 1,
+      pageSize: 24,
+    });
+    vi.mocked(fetchExpensesSummary).mockResolvedValue({
+      categories: [{ category: 'album', count: 2, totalUah: '105.00' }],
+      totalUah: '105.00',
+      coinSpendUah: '0.00',
+      relatedSpendUah: '105.00',
+      byMonth: makeByMonth('0.00', '105.00'),
+      byCategory: [{ category: 'album', count: 2, totalUah: '105.00' }],
+      thisMonthUah: '0.00',
+      prevMonthUah: '105.00',
+    });
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCurrencies).mockResolvedValue([]);
+    renderPage();
+
+    expect(await screen.findByText('2 $')).toBeInTheDocument();
+    expect(screen.getByText('немає даних')).toBeInTheDocument();
   });
 
   it('renders the month and category charts once there is data', async () => {
@@ -353,11 +476,19 @@ describe('ExpensesPage', () => {
       thisMonthUah: '300.00',
       prevMonthUah: '50.00',
     });
+    vi.mocked(fetchExpensesChart).mockResolvedValue({
+      granularity: 'month',
+      byPeriod: makeByPeriod('300.00', '50.00'),
+      byCategory: [
+        { category: 'coin_purchase', count: 1, totalUah: '300.00' },
+        { category: 'album', count: 1, totalUah: '100.00' },
+      ],
+    });
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
     vi.mocked(fetchCurrencies).mockResolvedValue([]);
     const { container } = renderPage();
 
-    expect(await screen.findByText('Витрати за місяцями')).toBeInTheDocument();
+    expect(await screen.findByText('Витрати за період')).toBeInTheDocument();
     expect(screen.getByText('За категоріями')).toBeInTheDocument();
     await waitFor(() => {
       expect(container.querySelectorAll('.recharts-surface').length).toBeGreaterThanOrEqual(2);

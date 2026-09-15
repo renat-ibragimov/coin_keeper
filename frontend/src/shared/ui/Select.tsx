@@ -245,6 +245,7 @@ export function Select({
                 <input
                   ref={searchInputRef}
                   type="text"
+                  autoComplete="off"
                   className={styles.searchInput}
                   placeholder={searchPlaceholder}
                   value={query}

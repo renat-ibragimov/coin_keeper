@@ -24,8 +24,13 @@ function makeBootstrap(overrides: Partial<BootstrapOut['dashboard']> = {}): Boot
     settings: {
       locale: 'uk',
       displayCurrency: 'UAH',
-      defaultGradeCommemorative: 'UNC',
-      defaultGradeCirculation: 'VF',
+      defaultGrade: 'UNC',
+      showPackagingVariants: false,
+      theme: 'system',
+      catalogViewMode: 'cards',
+      collectionViewMode: 'cards',
+      secondaryCurrency: 'USD',
+      defaultStorageLocation: null,
     },
     dashboard: {
       catalogItems: 3063,
@@ -89,7 +94,7 @@ describe('DashboardPage', () => {
     );
     expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
       'href',
-      '/collection/coins/new',
+      '/collection/add',
     );
     expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
       'href',

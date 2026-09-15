@@ -1,0 +1,91 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* Centred like the purchase page it grew out of: the coin, then the form
+   under it, both in one column (docs/08-ui-map.md). */
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.form {
+  width: 100%;
+  max-width: 640px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.formSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* The linked coin sits inside the expense form, set off the same way
+   "Про монету" is set off inside the purchase form. */
+.linkedCoin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.linkedTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.linkedLead {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  font-size: 13.5px;
+  color: var(--color-text-muted);
+}
+
+/* The coin this expense points at, repeated where it was chosen: the big
+   header above the form is easy to miss while reading this block. */
+.linkedChoice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+
+.linkedName {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.linkedMeta {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.linkedChange {
+  margin-top: var(--space-1);
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.fileInput {
+  display: none;
+}

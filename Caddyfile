@@ -1,6 +1,13 @@
 # HTTPS with automatic certificates (docs/10-infra.md).
 {$DOMAIN} {
 	handle /api/* {
+		# One megabyte over the 12 MB an image upload may carry
+		# (MAX_SOURCE_BYTES), so an oversized body is refused at the edge
+		# rather than streamed into the API to be measured there. Every other
+		# endpoint takes JSON and is nowhere near this.
+		request_body {
+			max_size 13MB
+		}
 		reverse_proxy api:8000
 	}
 

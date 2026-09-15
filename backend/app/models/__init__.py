@@ -12,8 +12,10 @@ from app.models.catalog import (
     CoinSeries,
     Country,
     Denomination,
+    EdgeType,
     ExchangeRate,
     Material,
+    QualityType,
 )
 from app.models.collection import (
     CollectionGoal,
@@ -21,6 +23,7 @@ from app.models.collection import (
     Expense,
     PurchaseOffer,
     Sale,
+    StorageLocation,
 )
 from app.models.jobs import JobRun
 from app.models.media import MediaFile
@@ -48,6 +51,7 @@ __all__ = [
     "Country",
     "Currency",
     "Denomination",
+    "EdgeType",
     "ExchangeRate",
     "Expense",
     "JobRun",
@@ -56,8 +60,10 @@ __all__ = [
     "MediaFile",
     "PriceSourceLink",
     "PurchaseOffer",
+    "QualityType",
     "RefreshToken",
     "Sale",
+    "StorageLocation",
     "TelegramRecipient",
     "UcoinCatalogSource",
     "User",

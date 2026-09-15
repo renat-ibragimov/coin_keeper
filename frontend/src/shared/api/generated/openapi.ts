@@ -260,6 +260,32 @@ export interface paths {
         patch: operations["update_me_api_v1_auth_me_patch"];
         trace?: never;
     };
+    "/api/v1/auth/me/avatar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Avatar
+         * @description Raw image bytes, not multipart: one file with no fields beside it does
+         *     not need the envelope, and the same bytes always land on the same key, so
+         *     a repeated upload is a no-op rather than a second stored file.
+         */
+        put: operations["set_avatar_api_v1_auth_me_avatar_put"];
+        post?: never;
+        /**
+         * Delete Avatar
+         * @description 200 with the profile, not 204: the caller needs the now-empty avatarUrl.
+         */
+        delete: operations["delete_avatar_api_v1_auth_me_avatar_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/change-password": {
         parameters: {
             query?: never;
@@ -294,6 +320,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bootstrap/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Settings */
+        patch: operations["update_settings_api_v1_bootstrap_settings_patch"];
+        trace?: never;
+    };
     "/api/v1/catalog": {
         parameters: {
             query?: never;
@@ -306,6 +349,55 @@ export interface paths {
         put?: never;
         /** Create Item */
         post: operations["create_item_api_v1_catalog_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Lookup Catalog
+         * @description The "Додати" form's typeahead: a handful of coins matching the text.
+         *
+         *     The same rows `GET /catalog` returns and the same layer visibility —
+         *     shared records plus the user's own personal items, active ones only —
+         *     with the storefront rule switched off entirely (docs/04-business-rules.md,
+         *     §13). The field sits under a country the collector just chose out of every
+         *     issuer there has ever been, so a coin of a country the catalogue project
+         *     has not confirmed still has to be findable by name; not finding it means a
+         *     personal duplicate of a coin the catalog already holds.
+         */
+        get: operations["lookup_catalog_api_v1_catalog_lookup_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/catalog/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Catalog Materials
+         * @description Materials the material filter offers on `GET /catalog` — only what a
+         *     `catalog_confirmed` item actually uses (docs/04-business-rules.md, §14).
+         */
+        get: operations["list_catalog_materials_api_v1_catalog_materials_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -472,6 +564,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/collection/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Owned Materials */
+        get: operations["list_owned_materials_api_v1_collection_materials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/collection/storage-locations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Storage Locations
+         * @description The presets plus this owner's own, localized names only — a name here
+         *     is a free-form suggestion, not an id the client has to track. `custom`
+         *     marks the ones this owner can also delete.
+         */
+        get: operations["list_storage_locations_api_v1_collection_storage_locations_get"];
+        put?: never;
+        /**
+         * Add Storage Location
+         * @description Explicit "add to my list" from settings — the same find-or-create a
+         *     purchase's own storageLocation field uses, so typing a name that already
+         *     exists (a preset or one's own) just confirms it rather than duplicating.
+         */
+        post: operations["add_storage_location_api_v1_collection_storage_locations_post"];
+        /** Delete Storage Location */
+        delete: operations["delete_storage_location_api_v1_collection_storage_locations_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/collection/{item_id}": {
         parameters: {
             query?: never;
@@ -489,6 +627,35 @@ export interface paths {
         head?: never;
         /** Update Item */
         patch: operations["update_item_api_v1_collection__item_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/collection/{item_id}/photos/{role}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Photo
+         * @description Raw image bytes, same shape as PUT /auth/me/avatar: one file, no
+         *     envelope, and a repeated upload of the same bytes lands on the same key.
+         *
+         *     Always a new `media_files` row bound to this collection item, never a
+         *     write to the catalog's own media (docs/06-media-storage.md) — the
+         *     invariant lives in CollectionPhotoService, not here.
+         */
+        put: operations["set_photo_api_v1_collection__item_id__photos__role__put"];
+        post?: never;
+        /**
+         * Delete Photo
+         * @description 200 with the fresh images, not 204: the page repaints from the answer.
+         */
+        delete: operations["delete_photo_api_v1_collection__item_id__photos__role__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/expenses": {
@@ -526,6 +693,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/expenses/chart-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Expenses Chart Summary */
+        get: operations["expenses_chart_summary_api_v1_expenses_chart_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/expenses/{expense_id}": {
         parameters: {
             query?: never;
@@ -551,7 +735,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Series */
+        /**
+         * List Series
+         * @description `scope=mine` (default) is the user's own collection — the "Серії"
+         *     screen and the dashboard, unrestricted by which countries the catalogue
+         *     project has confirmed. `scope=catalog` is `GET /catalog`'s own series
+         *     filter: a harder, separate gate (§13a), only a `catalog_confirmed`
+         *     country's series.
+         */
         get: operations["list_series_api_v1_series_get"];
         put?: never;
         /** Create Series */
@@ -596,6 +787,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/series/{series_id}/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Series Items
+         * @description The series detail screen's own tiles -- shared or personal, regardless
+         *     of catalog_confirmed. Deliberately not `GET /catalog?seriesId=`: that
+         *     endpoint is the catalogue browse experience and its harder gate (§13a)
+         *     would hide a user's own coins of a country the catalogue project has not
+         *     confirmed yet, same bug as summary() below would have if it used it.
+         */
+        get: operations["series_items_api_v1_series__series_id__items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/countries": {
         parameters: {
             query?: never;
@@ -606,7 +821,8 @@ export interface paths {
         /**
          * List Countries
          * @description `scope=active` is the storefront; `scope=all` is the personal-item form,
-         *     where the user may enter a coin of any issuer ever.
+         *     where the user may enter a coin of any issuer ever; `scope=confirmed` is
+         *     the catalog's own filter panel — a harder, separate gate (§13a).
          *
          *     `minYear`/`maxYear` are the issue-year bounds of the catalog items
          *     actually visible to this user in that country (docs/03-api-contract.md) —
@@ -628,8 +844,77 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Denominations */
+        /**
+         * List Denominations
+         * @description `scope=confirmed` is the catalog's own filter panel: only a
+         *     `catalog_confirmed` country's denominations that a catalog item actually
+         *     visible to this user still uses (§13a).
+         */
         get: operations["list_denominations_api_v1_denominations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Materials
+         * @description The whole composition dictionary behind `compositionId`.
+         *
+         *     Read by the "Додати" form, where a coin entered by hand needs a material:
+         *     a dictionary row when one fits, free text when none does. The catalogue's
+         *     own filter uses the narrower `GET /catalog/materials` instead.
+         */
+        get: operations["list_materials_api_v1_materials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/edge-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Edge Types
+         * @description The edge dictionary behind `edgeTypeId` (docs/04-business-rules.md, §14).
+         */
+        get: operations["list_edge_types_api_v1_edge_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/quality-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Quality Types
+         * @description The strike-quality dictionary behind `qualityTypeId`.
+         */
+        get: operations["list_quality_types_api_v1_quality_types_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -763,6 +1048,8 @@ export interface components {
             /** Seriesname */
             seriesName: string | null;
             denomination: components["schemas"]["CoinDenomination"] | null;
+            /** Denominationtext */
+            denominationText: string | null;
             /** Year */
             year: number;
             /** Title */
@@ -796,6 +1083,10 @@ export interface components {
             quantityOwned: number;
             /** Purchasetotaluah */
             purchaseTotalUah: string;
+            /** Purchasetotalusd */
+            purchaseTotalUsd: string | null;
+            /** Purchasetotaleur */
+            purchaseTotalEur: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
@@ -832,10 +1123,14 @@ export interface components {
             thicknessMm: string | null;
             /** Shape */
             shape: string | null;
+            edgeType: components["schemas"]["CoinEdgeType"] | null;
             /** Edge */
             edge: string | null;
             /** Orientation */
             orientation: string | null;
+            qualityType: components["schemas"]["CoinQualityType"] | null;
+            /** Quality */
+            quality: string | null;
             /** Catalogkm */
             catalogKm: string | null;
             /** Cataloguc */
@@ -844,6 +1139,11 @@ export interface components {
             catalogNumista: string | null;
             /** Notes */
             notes: string | null;
+            description: components["schemas"]["CoinDescriptions"] | null;
+            /** Designers */
+            designers: string[];
+            /** Sculptors */
+            sculptors: string[];
             /** Archivedat */
             archivedAt: string | null;
             /**
@@ -879,6 +1179,12 @@ export interface components {
             purchaseRateUah: string | null;
             /** Totaluah */
             totalUah: string;
+            /** Totalusd */
+            totalUsd: string | null;
+            /** Totaleur */
+            totalEur: string | null;
+            /** Storagelocation */
+            storageLocation: string | null;
             /** Notes */
             notes: string | null;
         };
@@ -888,8 +1194,12 @@ export interface components {
             countryId: number;
             /** Seriesid */
             seriesId?: number | null;
+            /** Seriestext */
+            seriesText?: string | null;
             /** Denominationid */
             denominationId?: number | null;
+            /** Denominationtext */
+            denominationText?: string | null;
             collectionGroup: components["schemas"]["CollectionGroup"];
             /** Subtype */
             subtype?: string | null;
@@ -926,16 +1236,24 @@ export interface components {
             thicknessMm?: number | string | null;
             /** Shape */
             shape?: string | null;
+            /** Edgetypeid */
+            edgeTypeId?: number | null;
             /** Edge */
             edge?: string | null;
             /** Orientation */
             orientation?: string | null;
+            /** Qualitytypeid */
+            qualityTypeId?: number | null;
+            /** Quality */
+            quality?: string | null;
             /** Catalogkm */
             catalogKm?: string | null;
             /** Cataloguc */
             catalogUc?: string | null;
             /** Catalognumista */
             catalogNumista?: string | null;
+            /** Catalognumber */
+            catalogNumber?: string | null;
             /** Notes */
             notes?: string | null;
             /**
@@ -950,8 +1268,12 @@ export interface components {
             countryId?: number | null;
             /** Seriesid */
             seriesId?: number | null;
+            /** Seriestext */
+            seriesText?: string | null;
             /** Denominationid */
             denominationId?: number | null;
+            /** Denominationtext */
+            denominationText?: string | null;
             collectionGroup?: components["schemas"]["CollectionGroup"] | null;
             /** Subtype */
             subtype?: string | null;
@@ -984,16 +1306,24 @@ export interface components {
             thicknessMm?: number | string | null;
             /** Shape */
             shape?: string | null;
+            /** Edgetypeid */
+            edgeTypeId?: number | null;
             /** Edge */
             edge?: string | null;
             /** Orientation */
             orientation?: string | null;
+            /** Qualitytypeid */
+            qualityTypeId?: number | null;
+            /** Quality */
+            quality?: string | null;
             /** Catalogkm */
             catalogKm?: string | null;
             /** Cataloguc */
             catalogUc?: string | null;
             /** Catalognumista */
             catalogNumista?: string | null;
+            /** Catalognumber */
+            catalogNumber?: string | null;
             /** Notes */
             notes?: string | null;
         };
@@ -1006,6 +1336,8 @@ export interface components {
             /** Seriesname */
             seriesName: string | null;
             denomination: components["schemas"]["CoinDenomination"] | null;
+            /** Denominationtext */
+            denominationText: string | null;
             /** Year */
             year: number;
             /** Title */
@@ -1039,6 +1371,10 @@ export interface components {
             quantityOwned: number;
             /** Purchasetotaluah */
             purchaseTotalUah: string;
+            /** Purchasetotalusd */
+            purchaseTotalUsd: string | null;
+            /** Purchasetotaleur */
+            purchaseTotalEur: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
@@ -1076,6 +1412,29 @@ export interface components {
             label: string;
         };
         /**
+         * CoinDescriptions
+         * @description The coin-collector parser's text for the requested locale
+         *     (docs/02-data-model.md). Any of the three may still be null — the parser
+         *     writes the key regardless of whether it found text for it.
+         */
+        CoinDescriptions: {
+            /** General */
+            general: string | null;
+            /** Obverse */
+            obverse: string | null;
+            /** Reverse */
+            reverse: string | null;
+        };
+        /** CoinEdgeType */
+        CoinEdgeType: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+        };
+        /**
          * CoinImageOut
          * @description One side of a coin at the sizes stored for it, plus who to credit.
          */
@@ -1098,15 +1457,38 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** CoinQualityType */
+        CoinQualityType: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+        };
         /**
          * CollectionGroup
          * @enum {string}
          */
         CollectionGroup: "circulation" | "commemorative" | "collector" | "other";
-        /** CollectionItemCreate */
+        /**
+         * CollectionItemCreate
+         * @description A purchase of a coin the catalog already has, or of one it does not
+         *     (docs/03-api-contract.md, `POST /collection`).
+         *
+         *     `newCatalogItem` is what the "Додати" form sends when the collector typed
+         *     a name the catalog search did not find: the personal item, the instance
+         *     and the coin_purchase expense are then created in one transaction, so a
+         *     rejected purchase cannot leave an orphaned catalog record behind. Exactly
+         *     one of the two fields is given — neither and both are 422.
+         *
+         *     `extraExpenses` rides along the same transaction: the delivery and the
+         *     coin are one act of spending, and either both are recorded or neither is.
+         */
         CollectionItemCreate: {
             /** Catalogitemid */
-            catalogItemId: number;
+            catalogItemId?: number | null;
+            newCatalogItem?: components["schemas"]["NewCatalogItemIn"] | null;
             /**
              * Quantity
              * @default 1
@@ -1127,6 +1509,10 @@ export interface components {
             notes?: string | null;
             /** Grade */
             grade?: string | null;
+            /** Storagelocation */
+            storageLocation?: string | null;
+            /** Extraexpenses */
+            extraExpenses?: components["schemas"]["ExtraExpenseIn"][];
         };
         /** CollectionItemOut */
         CollectionItemOut: {
@@ -1164,12 +1550,36 @@ export interface components {
             rateUah: string | null;
             /** Totaluah */
             totalUah: string;
+            /** Storagelocation */
+            storageLocation: string | null;
             /** Notes */
             notes: string | null;
             /** Thumbnailurl */
             thumbnailUrl?: string | null;
             /** Marketpriceuah */
             marketPriceUah?: string | null;
+            obverseImage?: components["schemas"]["CoinImageOut"] | null;
+            reverseImage?: components["schemas"]["CoinImageOut"] | null;
+            /**
+             * Obversephotoisown
+             * @default false
+             */
+            obversePhotoIsOwn: boolean;
+            /**
+             * Reversephotoisown
+             * @default false
+             */
+            reversePhotoIsOwn: boolean;
+        };
+        /**
+         * CollectionItemPhotosOut
+         * @description What PUT/DELETE .../photos/{role} hands back: this instance's two
+         *     sides, already resolved to the owner's own photo or the catalog default,
+         *     so the page repaints without a second request.
+         */
+        CollectionItemPhotosOut: {
+            obverse?: components["schemas"]["CoinImageOut"] | null;
+            reverse?: components["schemas"]["CoinImageOut"] | null;
         };
         /** CollectionItemUpdate */
         CollectionItemUpdate: {
@@ -1187,6 +1597,8 @@ export interface components {
             notes?: string | null;
             /** Grade */
             grade?: string | null;
+            /** Storagelocation */
+            storageLocation?: string | null;
         };
         /**
          * CollectionPositionOut
@@ -1261,6 +1673,8 @@ export interface components {
             collectVariants: boolean;
             /** Isactive */
             isActive: boolean;
+            /** Catalogconfirmed */
+            catalogConfirmed: boolean;
             /** Sortorder */
             sortOrder: number;
             /** Minyear */
@@ -1408,6 +1822,10 @@ export interface components {
             rateUah: string | null;
             /** Amountuah */
             amountUah: string;
+            /** Amountusd */
+            amountUsd: string | null;
+            /** Amounteur */
+            amountEur: string | null;
             /**
              * Expensedate
              * Format: date
@@ -1425,6 +1843,19 @@ export interface components {
             description: string | null;
             /** Cointitle */
             coinTitle: string | null;
+        };
+        /**
+         * ExpensePeriodTotal
+         * @description One point on the chart: `period` is "YYYY-MM-DD" for day granularity,
+         *     "YYYY-MM" for month granularity — zero-filled where there is no spending.
+         */
+        ExpensePeriodTotal: {
+            /** Period */
+            period: string;
+            /** Coinsuah */
+            coinsUah: string;
+            /** Supportinguah */
+            supportingUah: string;
         };
         /** ExpenseUpdate */
         ExpenseUpdate: {
@@ -1444,6 +1875,23 @@ export interface components {
             /** Description */
             description?: string | null;
         };
+        /**
+         * ExpensesChartOut
+         * @description The two chart widgets on the money screen, scoped to a caller-picked
+         *     date range (`GET /expenses/chart-summary?dateFrom&dateTo`) — unlike
+         *     `ExpensesSummaryOut`, whose `byMonth`/`byCategory` are fixed windows.
+         */
+        ExpensesChartOut: {
+            /**
+             * Granularity
+             * @enum {string}
+             */
+            granularity: "day" | "month";
+            /** Byperiod */
+            byPeriod: components["schemas"]["ExpensePeriodTotal"][];
+            /** Bycategory */
+            byCategory: components["schemas"]["ExpenseCategorySummary"][];
+        };
         /** ExpensesSummaryOut */
         ExpensesSummaryOut: {
             /** Categories */
@@ -1462,6 +1910,27 @@ export interface components {
             thisMonthUah: string;
             /** Prevmonthuah */
             prevMonthUah: string;
+        };
+        /**
+         * ExtraExpenseIn
+         * @description A supporting expense recorded together with the purchase it belongs to.
+         *
+         *     Delivery, a holder, a grading fee — money spent on this coin at the moment
+         *     it was bought, and having to reopen the money journal to write it down is
+         *     how it ends up never written down (owner's call, 2026-09-14). What comes
+         *     out is an ordinary manual expense linked to the coin: same category list,
+         *     same `catalogItemId` link, edited and deleted in «Гроші» like any other,
+         *     and deleting one leaves the coin alone.
+         *
+         *     Date and vendor are not fields here — they come from the purchase, which
+         *     is the point of recording the two together.
+         */
+        ExtraExpenseIn: {
+            category: components["schemas"]["ExpenseCategory"];
+            /** Amount */
+            amount: number | string;
+            /** Currency */
+            currency: string;
         };
         /** FinanceOut */
         FinanceOut: {
@@ -1607,6 +2076,77 @@ export interface components {
          * @enum {string}
          */
         MetalKind: "precious" | "base" | "unknown";
+        /**
+         * NewCatalogItemIn
+         * @description A personal catalog item entered by hand on the "Додати" form.
+         *
+         *     A subset of CatalogItemCreate, not that schema itself, and the three
+         *     differences are the point (docs/03-api-contract.md, `POST /collection`):
+         *
+         *     * no `shared` — this record is always personal. The shared catalog is
+         *       read-only for everyone but an admin editing it deliberately, and the
+         *       purchase form is not that place (CLAUDE.md).
+         *     * no `originalLang` and no title translations — the language is detected
+         *       and the two translated slots filled by the background translation job,
+         *       marked `llm`, exactly as a storage location's are. A client cannot
+         *       claim `official` or `manual` wording by the back door.
+         *     * `material` is mandatory in one of its two shapes (owner, 2026-09-14):
+         *       either a dictionary row (`compositionId`) or free text, because for
+         *       most issuers the dictionary holds nothing to pick. Edge and quality
+         *       keep the same two-shaped pair as the full schema, but the form only
+         *       ever sends their dictionary halves.
+         */
+        NewCatalogItemIn: {
+            /** Countryid */
+            countryId: number;
+            /** Seriesid */
+            seriesId?: number | null;
+            /** Seriestext */
+            seriesText?: string | null;
+            /** Denominationid */
+            denominationId?: number | null;
+            /** Denominationtext */
+            denominationText?: string | null;
+            collectionGroup: components["schemas"]["CollectionGroup"];
+            /** Titleoriginal */
+            titleOriginal: string;
+            /** Issueyear */
+            issueYear: number;
+            /** Issuedate */
+            issueDate?: string | null;
+            /** Mintageannounced */
+            mintageAnnounced?: number | null;
+            /** Compositionid */
+            compositionId?: number | null;
+            /** Material */
+            material?: string | null;
+            /** @default unknown */
+            metalKind: components["schemas"]["MetalKind"];
+            /** Weightgrams */
+            weightGrams?: number | string | null;
+            /** Diametermm */
+            diameterMm?: number | string | null;
+            /** Thicknessmm */
+            thicknessMm?: number | string | null;
+            /** Shape */
+            shape?: string | null;
+            /** Edgetypeid */
+            edgeTypeId?: number | null;
+            /** Edge */
+            edge?: string | null;
+            /** Qualitytypeid */
+            qualityTypeId?: number | null;
+            /** Quality */
+            quality?: string | null;
+            /** Catalognumber */
+            catalogNumber?: string | null;
+            /** Description */
+            description?: string | null;
+            /** Descriptionobverse */
+            descriptionObverse?: string | null;
+            /** Descriptionreverse */
+            descriptionReverse?: string | null;
+        };
         /** Page[CatalogListItem] */
         Page_CatalogListItem_: {
             /** Items */
@@ -1777,10 +2317,57 @@ export interface components {
             locale: string;
             /** Displaycurrency */
             displayCurrency: string;
-            /** Defaultgradecommemorative */
-            defaultGradeCommemorative: string;
-            /** Defaultgradecirculation */
-            defaultGradeCirculation: string;
+            /** Defaultgrade */
+            defaultGrade: string;
+            /** Showpackagingvariants */
+            showPackagingVariants: boolean;
+            /** Theme */
+            theme: string;
+            /** Catalogviewmode */
+            catalogViewMode: string;
+            /** Collectionviewmode */
+            collectionViewMode: string;
+            /** Secondarycurrency */
+            secondaryCurrency: string;
+            /** Defaultstoragelocation */
+            defaultStorageLocation: string | null;
+        };
+        /**
+         * SettingsUpdate
+         * @description Partial update: only the fields the caller sends are changed.
+         */
+        SettingsUpdate: {
+            /** Showpackagingvariants */
+            showPackagingVariants?: boolean | null;
+            /** Defaultgrade */
+            defaultGrade?: string | null;
+            /** Theme */
+            theme?: ("light" | "dark" | "system") | null;
+            /** Catalogviewmode */
+            catalogViewMode?: ("cards" | "table") | null;
+            /** Collectionviewmode */
+            collectionViewMode?: ("cards" | "table") | null;
+            /** Defaultstoragelocation */
+            defaultStorageLocation?: string | null;
+            /** Secondarycurrency */
+            secondaryCurrency?: ("USD" | "EUR") | null;
+        };
+        /** StorageLocationCreate */
+        StorageLocationCreate: {
+            /** Name */
+            name: string;
+        };
+        /**
+         * StorageLocationOut
+         * @description A name, not an id: the client never tracks storage-location ids
+         *     (docs/04-business-rules.md). `custom` is true for the owner's own entry —
+         *     only those can be deleted; the four system presets cannot.
+         */
+        StorageLocationOut: {
+            /** Name */
+            name: string;
+            /** Custom */
+            custom: boolean;
         };
         /**
          * TelegramLinkOut
@@ -1846,6 +2433,8 @@ export interface components {
             locale: string;
             /** Emailverified */
             emailVerified: boolean;
+            /** Avatarurl */
+            avatarUrl?: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -2303,6 +2892,46 @@ export interface operations {
             };
         };
     };
+    set_avatar_api_v1_auth_me_avatar_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
+    delete_avatar_api_v1_auth_me_avatar_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserOut"];
+                };
+            };
+        };
+    };
     change_password_api_v1_auth_change_password_post: {
         parameters: {
             query?: never;
@@ -2365,18 +2994,53 @@ export interface operations {
             };
         };
     };
+    update_settings_api_v1_bootstrap_settings_patch: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_catalog_api_v1_catalog_get: {
         parameters: {
             query?: {
                 q?: string | null;
-                countryId?: number | null;
-                seriesId?: number | null;
+                countryId?: number[] | null;
+                seriesId?: number[] | null;
                 year?: number | null;
                 yearFrom?: number | null;
                 yearTo?: number | null;
-                denominationId?: number | null;
-                group?: components["schemas"]["CollectionGroup"] | null;
-                metalKind?: components["schemas"]["MetalKind"] | null;
+                denominationId?: number[] | null;
+                group?: components["schemas"]["CollectionGroup"][] | null;
+                materialId?: number[] | null;
                 owned?: boolean | null;
                 scope?: "all" | "shared" | "own";
                 archived?: boolean;
@@ -2434,6 +3098,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CatalogCard"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    lookup_catalog_api_v1_catalog_lookup_get: {
+        parameters: {
+            query: {
+                q: string;
+                countryId?: number | null;
+                limit?: number;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_catalog_materials_api_v1_catalog_materials_get: {
+        parameters: {
+            query?: {
+                countryId?: number | null;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinMaterial"][];
                 };
             };
             /** @description Validation Error */
@@ -2688,14 +3418,14 @@ export interface operations {
         parameters: {
             query?: {
                 q?: string | null;
-                countryId?: number | null;
-                seriesId?: number | null;
+                countryId?: number[] | null;
+                seriesId?: number[] | null;
                 year?: number | null;
                 yearFrom?: number | null;
                 yearTo?: number | null;
-                denominationId?: number | null;
-                group?: components["schemas"]["CollectionGroup"] | null;
-                metalKind?: components["schemas"]["MetalKind"] | null;
+                denominationId?: number[] | null;
+                group?: components["schemas"]["CollectionGroup"][] | null;
+                materialId?: number[] | null;
                 grade?: string | null;
                 sort?: "date" | "title" | "country" | "series" | "quantity" | "total" | "valuation" | "grade";
                 order?: "asc" | "desc";
@@ -2859,6 +3589,134 @@ export interface operations {
             };
         };
     };
+    list_owned_materials_api_v1_collection_materials_get: {
+        parameters: {
+            query?: {
+                countryId?: number | null;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinMaterial"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_storage_locations_api_v1_collection_storage_locations_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_storage_location_api_v1_collection_storage_locations_post: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StorageLocationCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StorageLocationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_storage_location_api_v1_collection_storage_locations_delete: {
+        parameters: {
+            query: {
+                name: string;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_item_api_v1_collection__item_id__get: {
         parameters: {
             query?: {
@@ -2947,6 +3805,70 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CollectionItemOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_photo_api_v1_collection__item_id__photos__role__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+                role: "obverse" | "reverse";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionItemPhotosOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_photo_api_v1_collection__item_id__photos__role__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+                role: "obverse" | "reverse";
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionItemPhotosOut"];
                 };
             };
             /** @description Validation Error */
@@ -3051,6 +3973,38 @@ export interface operations {
             };
         };
     };
+    expenses_chart_summary_api_v1_expenses_chart_summary_get: {
+        parameters: {
+            query: {
+                dateFrom: string;
+                dateTo: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpensesChartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     delete_expense_api_v1_expenses__expense_id__delete: {
         parameters: {
             query?: never;
@@ -3119,6 +4073,7 @@ export interface operations {
         parameters: {
             query?: {
                 countryId?: number | null;
+                scope?: "mine" | "catalog";
                 locale?: string | null;
             };
             header?: never;
@@ -3247,10 +4202,45 @@ export interface operations {
             };
         };
     };
+    series_items_api_v1_series__series_id__items_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                series_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page_CatalogListItem_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_countries_api_v1_countries_get: {
         parameters: {
             query?: {
-                scope?: "active" | "all";
+                scope?: "active" | "all" | "confirmed";
                 locale?: string | null;
             };
             header?: never;
@@ -3283,6 +4273,7 @@ export interface operations {
         parameters: {
             query?: {
                 countryId?: number | null;
+                scope?: "all" | "confirmed";
                 locale?: string | null;
             };
             header?: never;
@@ -3298,6 +4289,99 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DenominationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_materials_api_v1_materials_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinMaterial"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_edge_types_api_v1_edge_types_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinEdgeType"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_quality_types_api_v1_quality_types_get: {
+        parameters: {
+            query?: {
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoinQualityType"][];
                 };
             };
             /** @description Validation Error */

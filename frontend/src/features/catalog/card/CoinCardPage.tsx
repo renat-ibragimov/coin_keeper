@@ -1,15 +1,22 @@
 import { useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { ArrowLeft, CircleCheck, CircleMinus, Maximize2 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
+import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
 import { coinTitle, showsOriginal } from '@/shared/lib/coinTitle';
-import { formatDate, formatSignedPercent, formatSignedUah, formatUah } from '@/shared/lib/format';
+import {
+  currencySymbol,
+  formatDate,
+  formatSignedPercent,
+  formatSignedUah,
+  formatUah,
+} from '@/shared/lib/format';
 import { languageName } from '@/shared/lib/languageName';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
 import {
@@ -21,19 +28,24 @@ import {
   Lightbox,
   PropertyList,
   Skeleton,
-  Tabs,
 } from '@/shared/ui';
-import type { PropertyRow, TabOption } from '@/shared/ui';
+import type { PropertyRow } from '@/shared/ui';
 
 import { fetchCard, fetchOwnInstances, fetchPrices } from '../api';
 import type { ChartPoint } from './chartData';
 import { toChartPoints } from './chartData';
 import { InstancesList } from './InstancesList';
 import { PriceHistoryChart } from './PriceHistoryChart';
+import type { SecondaryCurrency } from '@/shared/lib/secondaryAmount';
+import {
+  formatSecondary,
+  formatSecondarySigned,
+  pickSecondary,
+  secondaryRateFrom,
+  toSecondary,
+} from '@/shared/lib/secondaryAmount';
 import { catalogSpecRows, identitySpecRows, issueSpecRows, technicalSpecRows } from './specs';
 import styles from './CoinCardPage.module.css';
-
-type PanelTab = 'specs' | 'instances' | 'prices';
 
 export function CoinCardPage() {
   const { t } = useTranslation();
@@ -84,8 +96,6 @@ function CardBody({ card }: { card: CatalogCard }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [enlarged, setEnlarged] = useState<'obverse' | 'reverse' | null>(null);
-  const [tab, setTab] = useState<PanelTab>('specs');
-  const instancesDisclosureRef = useRef<HTMLDetailsElement>(null);
 
   const pricesQuery = useQuery({
     queryKey: ['catalog', 'prices', card.id],
@@ -95,9 +105,15 @@ function CardBody({ card }: { card: CatalogCard }) {
     queryKey: ['catalog', 'instances', card.id],
     queryFn: () => fetchOwnInstances(card.id),
   });
+  // Shares the 'bootstrap' cache key with the dashboard, so this is not a
+  // second network round trip once that page has already loaded it.
+  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const secondaryCurrency: SecondaryCurrency =
+    bootstrapQuery.data?.settings.secondaryCurrency === 'EUR' ? 'EUR' : 'USD';
+  const secondaryRate = secondaryRateFrom(bootstrapQuery.data?.exchangeRates, secondaryCurrency);
 
   const title = coinTitle(card, locale);
-  const addUrl = `/collection/coins/new?catalogItemId=${card.id}`;
+  const addUrl = `/collection/add?catalogItemId=${card.id}`;
   const addState = { from: `/catalog/${card.id}` };
 
   const sides = [
@@ -122,12 +138,10 @@ function CardBody({ card }: { card: CatalogCard }) {
   const chartPoints = toChartPoints(priceItems);
   const hasInstances = (instancesQuery.data?.length ?? 0) > 0;
   const owned = card.quantityOwned > 0;
-  // No instances of a coin the visitor doesn't have — the tab has nothing to show.
-  const panelTabs: TabOption<PanelTab>[] = [
-    { value: 'specs', label: t('card.specs') },
-    { value: 'prices', label: t('card.priceHistory') },
-    ...(owned ? [{ value: 'instances' as const, label: t('card.instances') }] : []),
-  ];
+  const description = card.description;
+  const hasDescription = Boolean(
+    description && (description.general || description.obverse || description.reverse),
+  );
 
   return (
     <div className={styles.page}>
@@ -197,96 +211,100 @@ function CardBody({ card }: { card: CatalogCard }) {
           ))}
         </div>
 
-        <SidebarCard card={card} locale={locale} t={t} addUrl={addUrl} addState={addState} />
+        <SidebarCard
+          card={card}
+          locale={locale}
+          t={t}
+          addUrl={addUrl}
+          addState={addState}
+          secondaryCurrency={secondaryCurrency}
+          secondaryRate={secondaryRate}
+        />
       </div>
 
-      <Card className={styles.bottomCard} padded={false}>
-        {/* Restyled locally via role/aria selectors (CoinCardPage.module.css)
-            instead of touching the shared Tabs component used elsewhere. */}
-        <div className={styles.tabsWrapper}>
-          <Tabs
-            aria-label={t('card.detailsTabs')}
-            value={tab}
-            onChange={setTab}
-            options={panelTabs}
-          />
-        </div>
-        <div className={styles.bottomPanel}>
-          {tab === 'specs' ? (
-            <>
-              <div className={styles.specGrid}>
-                <SpecGroup title={t('card.specGroupIdentity')} rows={identitySpecRows(card, t)} />
-                <SpecGroup title={t('card.specGroupIssue')} rows={issueSpecRows(card, t, locale)} />
-                <SpecGroup
-                  title={t('card.specGroupTechnical')}
-                  rows={technicalSpecRows(card, t, locale)}
-                />
-                <SpecGroup title={t('card.specGroupCatalog')} rows={catalogSpecRows(card, t)} />
+      {owned && hasInstances ? (
+        <ValueSummary
+          card={card}
+          locale={locale}
+          t={t}
+          secondaryCurrency={secondaryCurrency}
+          secondaryRate={secondaryRate}
+        />
+      ) : null}
+
+      {owned ? (
+        <Card className={styles.sectionCard}>
+          <h2 className={`${styles.sectionTitle} ${styles.instancesHeading}`}>
+            {t('card.instances')}
+            {hasInstances ? <Badge>{instancesQuery.data?.length ?? 0}</Badge> : null}
+          </h2>
+          {instancesQuery.isError ? (
+            <ErrorState onRetry={() => void instancesQuery.refetch()} />
+          ) : (
+            <InstancesList
+              items={instancesQuery.data}
+              loading={instancesQuery.isPending}
+              addHref={addUrl}
+              coinTitle={title}
+              photo={sides[0]!.card}
+              currentPriceUah={card.marketPriceUah}
+              secondaryCurrency={secondaryCurrency}
+              secondaryRate={secondaryRate}
+            />
+          )}
+        </Card>
+      ) : null}
+
+      {hasDescription ? (
+        <Card className={styles.sectionCard}>
+          <h2 className={styles.sectionTitle}>{t('card.description')}</h2>
+          <div className={styles.descriptionSides}>
+            {description?.general ? (
+              <div className={styles.descriptionSide}>
+                <p className={styles.descriptionText}>{description.general}</p>
               </div>
-              {card.notes ? <p className={styles.notes}>{card.notes}</p> : null}
-            </>
-          ) : null}
-          {tab === 'instances' ? (
-            <>
-              {instancesQuery.isError ? (
-                <ErrorState onRetry={() => void instancesQuery.refetch()} />
-              ) : hasInstances ? (
-                <>
-                  <InstancesSummary card={card} locale={locale} t={t} />
-                  <details
-                    ref={instancesDisclosureRef}
-                    className={styles.instancesDisclosure}
-                    onToggle={(event) => {
-                      // Wait a frame so the revealed list has already been
-                      // laid out — scrolling before that targets the old,
-                      // collapsed height and undershoots.
-                      if (event.currentTarget.open) {
-                        requestAnimationFrame(() => {
-                          instancesDisclosureRef.current?.scrollIntoView?.({
-                            behavior: 'smooth',
-                            block: 'end',
-                          });
-                        });
-                      }
-                    }}
-                  >
-                    <summary>
-                      {t('card.showAllInstances', { count: instancesQuery.data?.length ?? 0 })}
-                    </summary>
-                    <InstancesList
-                      items={instancesQuery.data}
-                      loading={instancesQuery.isPending}
-                      addHref={addUrl}
-                      coinTitle={title}
-                    />
-                  </details>
-                </>
-              ) : (
-                <InstancesList
-                  items={instancesQuery.data}
-                  loading={instancesQuery.isPending}
-                  addHref={addUrl}
-                  coinTitle={title}
-                />
-              )}
-            </>
-          ) : null}
-          {tab === 'prices' ? (
-            <>
-              {pricesQuery.isPending ? <Skeleton height={180} /> : null}
-              {pricesQuery.isError ? (
-                <ErrorState onRetry={() => void pricesQuery.refetch()} />
-              ) : null}
-              {pricesQuery.data && chartPoints.length === 0 ? (
-                <p className={styles.muted}>{t('card.pricesEmpty')}</p>
-              ) : null}
-              {chartPoints.length === 1 ? (
-                <SinglePricePoint point={chartPoints[0]!} locale={locale} t={t} />
-              ) : null}
-              {chartPoints.length >= 2 ? <PriceHistoryChart items={priceItems} /> : null}
-            </>
-          ) : null}
+            ) : null}
+            {description?.obverse ? (
+              <div className={styles.descriptionSide}>
+                <h3 className={styles.descriptionSideTitle}>{t('card.obverse')}</h3>
+                <p className={styles.descriptionText}>{description.obverse}</p>
+              </div>
+            ) : null}
+            {description?.reverse ? (
+              <div className={styles.descriptionSide}>
+                <h3 className={styles.descriptionSideTitle}>{t('card.reverse')}</h3>
+                <p className={styles.descriptionText}>{description.reverse}</p>
+              </div>
+            ) : null}
+          </div>
+        </Card>
+      ) : null}
+
+      <Card className={styles.sectionCard}>
+        <h2 className={styles.sectionTitle}>{t('card.specs')}</h2>
+        <div className={styles.specGrid}>
+          <SpecGroup title={t('card.specGroupIdentity')} rows={identitySpecRows(card, t)} />
+          <SpecGroup title={t('card.specGroupIssue')} rows={issueSpecRows(card, t, locale)} />
+          <SpecGroup
+            title={t('card.specGroupTechnical')}
+            rows={technicalSpecRows(card, t, locale)}
+          />
+          <SpecGroup title={t('card.specGroupCatalog')} rows={catalogSpecRows(card, t)} />
         </div>
+        {card.notes ? <p className={styles.notes}>{card.notes}</p> : null}
+      </Card>
+
+      <Card className={styles.sectionCard}>
+        <h2 className={styles.sectionTitle}>{t('card.priceHistory')}</h2>
+        {pricesQuery.isPending ? <Skeleton height={180} /> : null}
+        {pricesQuery.isError ? <ErrorState onRetry={() => void pricesQuery.refetch()} /> : null}
+        {pricesQuery.data && chartPoints.length === 0 ? (
+          <p className={styles.muted}>{t('card.pricesEmpty')}</p>
+        ) : null}
+        {chartPoints.length === 1 ? (
+          <SinglePricePoint point={chartPoints[0]!} locale={locale} t={t} />
+        ) : null}
+        {chartPoints.length >= 2 ? <PriceHistoryChart items={priceItems} /> : null}
       </Card>
 
       <Lightbox
@@ -323,21 +341,39 @@ interface SidebarCardProps {
   t: TFunction;
   addUrl: string;
   addState: { from: string };
+  secondaryCurrency: SecondaryCurrency;
+  secondaryRate: number | null;
 }
 
 /**
  * The sidebar answers one question only — "do I have it, and what does it
  * cost right now?". Purchase price, valuation and profit are the visitor's
- * own numbers, not the coin's, so they live on the "Мої екземпляри" tab
+ * own numbers, not the coin's, so they live in the "Мої екземпляри" section
  * instead (InstancesSummary below).
  */
-function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
+function SidebarCard({
+  card,
+  locale,
+  t,
+  addUrl,
+  addState,
+  secondaryCurrency,
+  secondaryRate,
+}: SidebarCardProps) {
   const owned = card.quantityOwned > 0;
   const sourceLabel = priceSourceLabel(card.priceSource, t);
   const observedDate = formatDate(card.priceObservedAt, locale);
   const openLabel = sourceLabel
     ? t('card.openOnSource', { source: sourceLabel })
     : t('catalog.sourceLink');
+  const priceApprox =
+    card.marketPriceUah !== null
+      ? formatSecondary(toSecondary(Number(card.marketPriceUah), secondaryRate), locale)
+      : null;
+  const priceApproxText =
+    priceApprox !== null
+      ? t('card.approxSecondary', { value: priceApprox, symbol: currencySymbol(secondaryCurrency) })
+      : t('dashboard.rateMissing');
 
   return (
     <Card className={styles.sidebarCard} padded={false}>
@@ -371,6 +407,7 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
         {card.marketPriceUah !== null ? (
           <>
             <p className={styles.priceValue}>{formatUah(card.marketPriceUah, locale)}</p>
+            <span className={styles.priceApprox}>{priceApproxText}</span>
             {sourceLabel || observedDate ? (
               <p className={styles.priceMeta}>
                 {sourceLabel ? t('card.priceSource', { source: sourceLabel }) : null}
@@ -402,17 +439,30 @@ function SidebarCard({ card, locale, t, addUrl, addState }: SidebarCardProps) {
 }
 
 /**
- * Summary at the top of "Мої екземпляри": the visitor's own purchase and
- * valuation numbers, aggregated across every instance of this coin they own.
+ * The strip above "Мої екземпляри": the visitor's own purchase and valuation
+ * numbers, aggregated across every instance of this coin they own.
+ *
+ * The two ≈ figures are NOT the same kind of number: "purchased total" is
+ * card.purchaseTotalUsd/Eur, the backend's own conversion by the NBU rate on
+ * each instance's purchase date — what was actually spent, back then, in
+ * whichever secondary currency the viewer picked. "Current value" has no
+ * purchase date of its own, so it converts by today's live rate instead
+ * (secondaryRate, bootstrap's exchangeRates). The change line is the
+ * difference of those two already-converted figures, not a third conversion
+ * of its own.
  */
-function InstancesSummary({
+function ValueSummary({
   card,
   locale,
   t,
+  secondaryCurrency,
+  secondaryRate,
 }: {
   card: CatalogCard;
   locale: string;
   t: TFunction;
+  secondaryCurrency: SecondaryCurrency;
+  secondaryRate: number | null;
 }) {
   const currentValue =
     card.marketPriceUah !== null ? Number(card.marketPriceUah) * card.quantityOwned : null;
@@ -420,35 +470,57 @@ function InstancesSummary({
   const change = currentValue !== null ? currentValue - purchaseTotal : null;
   const changePercent =
     change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
+  const symbol = currencySymbol(secondaryCurrency);
+  const approxText = (value: string | null) =>
+    value !== null ? t('card.approxSecondary', { value, symbol }) : t('dashboard.rateMissing');
 
-  const rows: (PropertyRow | null)[] = [
-    {
-      key: 'quantity',
-      label: t('card.quantity'),
-      value: <span className="tabular">{t('card.pieces', { count: card.quantityOwned })}</span>,
-    },
-    {
-      key: 'purchaseTotal',
-      label: t('card.purchasedTotal'),
-      value: <span className="tabular">{formatUah(card.purchaseTotalUah, locale)}</span>,
-    },
-    {
-      key: 'currentValue',
-      label: t('card.currentValue'),
-      value:
-        currentValue !== null ? (
-          <span className="tabular">{formatUah(currentValue, locale)}</span>
+  const purchaseTotalSecondary = pickSecondary(
+    card.purchaseTotalUsd,
+    card.purchaseTotalEur,
+    secondaryCurrency,
+  );
+  const purchaseTotalApprox =
+    purchaseTotalSecondary !== null ? Number(purchaseTotalSecondary) : null;
+  const currentValueApprox =
+    currentValue !== null ? toSecondary(currentValue, secondaryRate) : null;
+  const changeApprox =
+    currentValueApprox !== null && purchaseTotalApprox !== null
+      ? currentValueApprox - purchaseTotalApprox
+      : null;
+
+  return (
+    <Card className={styles.valueStrip}>
+      <div className={styles.valueBox}>
+        <span className={styles.valueBoxLabel}>
+          {t('card.purchasedTotal')} ({t('card.pieces', { count: card.quantityOwned })})
+        </span>
+        <p className={`${styles.valueBoxValue} tabular`}>{formatUah(purchaseTotal, locale)}</p>
+        <span className={styles.valueBoxUsd}>
+          {approxText(formatSecondary(purchaseTotalApprox, locale))}
+        </span>
+      </div>
+
+      <div className={styles.valueBox}>
+        <span className={styles.valueBoxLabel}>{t('card.currentValue')}</span>
+        {currentValue !== null ? (
+          <>
+            <p className={`${styles.valueBoxValue} tabular`}>{formatUah(currentValue, locale)}</p>
+            <span className={styles.valueBoxUsd}>
+              {approxText(formatSecondary(currentValueApprox, locale))}
+            </span>
+          </>
         ) : (
-          <span className={styles.muted}>{t('catalog.noPrice')}</span>
-        ),
-    },
-    change !== null
-      ? {
-          key: 'change',
-          label: t('card.valueChange'),
-          value: (
-            <span
+          <p className={styles.muted}>{t('catalog.noPrice')}</p>
+        )}
+      </div>
+
+      <div className={styles.valueBox}>
+        <span className={styles.valueBoxLabel}>{t('card.valueChange')}</span>
+        {change !== null ? (
+          <>
+            <p
               className={[
+                styles.valueBoxValue,
                 'tabular',
                 change > 0 ? styles.positive : change < 0 ? styles.negative : '',
               ].join(' ')}
@@ -460,17 +532,18 @@ function InstancesSummary({
                   ({formatSignedPercent(changePercent, locale)})
                 </span>
               ) : null}
+            </p>
+            <span className={styles.valueBoxUsd}>
+              {approxText(
+                changeApprox !== null ? formatSecondarySigned(changeApprox, locale) : null,
+              )}
             </span>
-          ),
-        }
-      : null,
-  ];
-
-  return (
-    <PropertyList
-      className={styles.instancesSummary}
-      rows={rows.filter((row): row is PropertyRow => row !== null)}
-    />
+          </>
+        ) : (
+          <p className={styles.muted}>{t('catalog.noPrice')}</p>
+        )}
+      </div>
+    </Card>
   );
 }
 

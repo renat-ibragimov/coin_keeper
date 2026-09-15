@@ -15,28 +15,37 @@ from typing import Any
 from sqlalchemy import ColumnElement, and_, exists, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.locale import DEFAULT_LOCALE
-from app.models import CatalogItem, CoinSeries, CollectionItem, Country, Denomination, Expense
-from app.models.enums import CollectionGroup, ExpenseCategory, MetalKind
+from app.core.locale import DEFAULT_LOCALE, LOCALE_UK
+from app.models import (
+    CatalogItem,
+    CoinSeries,
+    CollectionItem,
+    Country,
+    Denomination,
+    Expense,
+    Material,
+    StorageLocation,
+)
+from app.models.enums import CollectionGroup, ExpenseCategory
 from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
-from app.repositories.localization import localized
+from app.repositories.localization import localized, series_display_name
 
 
 @dataclass
 class CollectionFilters:
     q: str | None = None
-    country_id: int | None = None
-    series_id: int | None = None
+    country_ids: list[int] | None = None
+    series_ids: list[int] | None = None
     year: int | None = None
     year_from: int | None = None
     year_to: int | None = None
-    denomination_id: int | None = None
-    group: CollectionGroup | None = None
-    metal_kind: MetalKind | None = None
+    denomination_ids: list[int] | None = None
+    groups: list[CollectionGroup] | None = None
+    material_ids: list[int] | None = None
     grade: str | None = None
     # Every column of the "Мої монети" table sorts (docs/08-ui-map.md).
-    sort: str = "date"  # date | title | country | series | quantity | total | valuation | grade
-    order: str = "desc"
+    sort: str = "title"  # date | title | country | series | quantity | total | valuation | grade
+    order: str = "asc"
 
 
 @dataclass
@@ -62,6 +71,7 @@ class CollectionRow:
     series_name: str | None
     denomination: Denomination | None
     market_price_uah: Decimal | None = None
+    storage_location: str | None = None
 
 
 def _total_uah() -> ColumnElement[Any]:
@@ -99,22 +109,22 @@ class CollectionRepository:
         conditions: list[ColumnElement[bool]] = [self._owns_catalog_item()]
         if filters.grade is not None:
             conditions.append(self._owns_catalog_item(grade=filters.grade))
-        if filters.country_id is not None:
-            conditions.append(CatalogItem.country_id == filters.country_id)
-        if filters.series_id is not None:
-            conditions.append(CatalogItem.series_id == filters.series_id)
+        if filters.country_ids:
+            conditions.append(CatalogItem.country_id.in_(filters.country_ids))
+        if filters.series_ids:
+            conditions.append(CatalogItem.series_id.in_(filters.series_ids))
         if filters.year is not None:
             conditions.append(CatalogItem.issue_year == filters.year)
         if filters.year_from is not None:
             conditions.append(CatalogItem.issue_year >= filters.year_from)
         if filters.year_to is not None:
             conditions.append(CatalogItem.issue_year <= filters.year_to)
-        if filters.denomination_id is not None:
-            conditions.append(CatalogItem.denomination_id == filters.denomination_id)
-        if filters.group is not None:
-            conditions.append(CatalogItem.collection_group == filters.group)
-        if filters.metal_kind is not None:
-            conditions.append(CatalogItem.metal_kind == filters.metal_kind)
+        if filters.denomination_ids:
+            conditions.append(CatalogItem.denomination_id.in_(filters.denomination_ids))
+        if filters.groups:
+            conditions.append(CatalogItem.collection_group.in_(filters.groups))
+        if filters.material_ids:
+            conditions.append(CatalogItem.composition_id.in_(filters.material_ids))
         if filters.q:
             conditions.append(catalog_search_condition(filters.q))
         return conditions
@@ -187,7 +197,7 @@ class CollectionRepository:
             # what a column of "AU · XF" chips reads as.
             "grade": agg.c.grades,
         }
-        column = sort_columns.get(filters.sort, sort_columns["date"])
+        column = sort_columns.get(filters.sort, sort_columns["title"])
         ordering = column.desc().nulls_last() if descending else column.asc().nulls_last()
 
         query = (
@@ -199,12 +209,7 @@ class CollectionRepository:
                     en=Country.name_en,
                     original=Country.name_original,
                 ).label("country"),
-                localized(
-                    self._locale,
-                    uk=CoinSeries.name_uk,
-                    en=CoinSeries.name_en,
-                    original=CoinSeries.name_original,
-                ).label("series_name"),
+                series_display_name(self._locale).label("series_name"),
                 Denomination,
                 agg.c.total_quantity,
                 agg.c.total_spend_uah,
@@ -320,6 +325,20 @@ class CollectionRepository:
         )
         return (await self._session.execute(query)).scalars().all()
 
+    async def list_owned_materials(self, country_id: int | None = None) -> Sequence[Material]:
+        """Materials the material filter offers on "Мої монети" — only what
+        the owner actually has, regardless of which countries the catalogue
+        project has confirmed (docs/04-business-rules.md, §13a, §14)."""
+        catalog_condition = CatalogItem.composition_id == Material.id
+        if country_id is not None:
+            catalog_condition = and_(catalog_condition, CatalogItem.country_id == country_id)
+        query = (
+            select(Material)
+            .where(self._owns_via(catalog_condition))
+            .order_by(Material.name_uk if self._locale == LOCALE_UK else Material.name_en)
+        )
+        return (await self._session.execute(query)).scalars().all()
+
     # ------------------------------------------------------- single items
 
     def _row_query(self) -> Any:
@@ -333,19 +352,21 @@ class CollectionRepository:
                     en=Country.name_en,
                     original=Country.name_original,
                 ).label("country"),
-                localized(
-                    self._locale,
-                    uk=CoinSeries.name_uk,
-                    en=CoinSeries.name_en,
-                    original=CoinSeries.name_original,
-                ).label("series_name"),
+                series_display_name(self._locale).label("series_name"),
                 Denomination,
                 latest_price_uah_for(CatalogItem.id, self._owner_id).label("market_price_uah"),
+                localized(
+                    self._locale,
+                    uk=StorageLocation.name_uk,
+                    en=StorageLocation.name_en,
+                    original=StorageLocation.name_original,
+                ).label("storage_location"),
             )
             .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
             .join(Country, Country.id == CatalogItem.country_id)
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
+            .outerjoin(StorageLocation, StorageLocation.id == CollectionItem.storage_location_id)
         )
 
     @staticmethod
@@ -357,6 +378,7 @@ class CollectionRepository:
             series_name=row.series_name,
             denomination=row.Denomination,
             market_price_uah=row.market_price_uah,
+            storage_location=row.storage_location,
         )
 
     async def get_row(self, item_id: int) -> CollectionRow | None:
@@ -366,16 +388,27 @@ class CollectionRepository:
         row = (await self._session.execute(query)).first()
         return None if row is None else self._to_row(row)
 
-    async def list_for_item(self, catalog_item_id: int) -> Sequence[CollectionItem]:
+    async def list_for_item(
+        self, catalog_item_id: int
+    ) -> Sequence[tuple[CollectionItem, str | None]]:
         result = await self._session.execute(
-            select(CollectionItem)
+            select(
+                CollectionItem,
+                localized(
+                    self._locale,
+                    uk=StorageLocation.name_uk,
+                    en=StorageLocation.name_en,
+                    original=StorageLocation.name_original,
+                ).label("storage_location"),
+            )
+            .outerjoin(StorageLocation, StorageLocation.id == CollectionItem.storage_location_id)
             .where(
                 CollectionItem.owner_id == self._owner_id,
                 CollectionItem.catalog_item_id == catalog_item_id,
             )
             .order_by(CollectionItem.acquisition_date.desc().nulls_last(), CollectionItem.id)
         )
-        return result.scalars().all()
+        return [(row.CollectionItem, row.storage_location) for row in result]
 
     async def get(self, item_id: int) -> CollectionItem | None:
         result = await self._session.execute(

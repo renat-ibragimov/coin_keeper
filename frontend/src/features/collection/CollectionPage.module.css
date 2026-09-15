@@ -10,10 +10,31 @@
   gap: var(--space-4);
 }
 
+/* Fixed column counts (1/2/3/5) rather than an auto-fill fluid grid: each one
+   divides GRID_PAGE_SIZE (30, see CollectionPage.tsx) evenly, so every page
+   fills complete rows instead of stranding a short one before the pager. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(1, 1fr);
   gap: var(--space-4);
+}
+
+@media (min-width: 560px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(5, 1fr);
+  }
 }
 
 @media (max-width: 900px) {

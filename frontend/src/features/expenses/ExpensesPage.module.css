@@ -101,13 +101,31 @@
   width: 10%;
 }
 
+/* Two icon buttons wide, not two labelled ones — the labels used to eat the
+   width the description column needed (the same trade «Мої екземпляри» made). */
 .actionsColumn {
-  width: 170px;
+  width: 92px;
 }
 
 .actions {
   white-space: nowrap;
   text-align: center;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.iconLink {
+  display: inline-flex;
+}
+
+.iconButton {
+  padding: 6px;
+  min-width: 32px;
 }
 
 .secondary {
@@ -127,4 +145,10 @@
   .charts {
     grid-template-columns: 1fr;
   }
+}
+
+/* The coin a supporting expense is about, under its own description. */
+.linkedCoin {
+  font-size: 13px;
+  color: var(--color-text-muted);
 }

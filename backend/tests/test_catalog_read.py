@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -11,15 +11,18 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
-from app.models import Material
+from app.models import EdgeType, Material, QualityType
+from app.models.enums import CollectionGroup
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
+    add_rate,
     add_snapshot,
     make_catalog_item,
     promote_to_admin,
     seed_reference,
     set_country_active,
+    set_country_catalog_confirmed,
     user_id_by_email,
 )
 
@@ -115,6 +118,42 @@ async def test_scope_filter(
 
     only_own = await client.get("/api/v1/catalog?scope=own", headers=auth(ctx.token_a))
     assert {i["id"] for i in only_own.json()["items"]} == {own.id}
+
+
+async def test_packaging_variant_hidden_after_the_viewer_opts_out(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    refs = ctx.refs
+    bare = await make_catalog_item(db_session, country=refs.ukraine, title="Голуб", year=2020)
+    packaged = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Голуб у сувенірній упаковці",
+        year=2020,
+        packaging_of_id=bare.id,
+    )
+
+    default = await client.get("/api/v1/catalog", headers=auth(ctx.token_a))
+    assert {i["id"] for i in default.json()["items"]} == {bare.id, packaged.id}
+
+    settings = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"showPackagingVariants": False},
+    )
+    assert settings.status_code == 200
+    assert settings.json()["showPackagingVariants"] is False
+
+    opted_out = await client.get("/api/v1/catalog", headers=auth(ctx.token_a))
+    ids = {i["id"] for i in opted_out.json()["items"]}
+    assert bare.id in ids
+    assert packaged.id not in ids
+
+    # Per-user: user B never toggled the setting and still sees both cards.
+    other_user = await client.get("/api/v1/catalog", headers=auth(ctx.token_b))
+    other_ids = {i["id"] for i in other_user.json()["items"]}
+    assert bare.id in other_ids
+    assert packaged.id in other_ids
 
 
 async def test_filters(client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace) -> None:
@@ -343,8 +382,8 @@ async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
     nickel_silver = (
         await db_session.execute(select(Material).where(Material.code == "nickel_silver"))
     ).scalar_one()
-    silver_925 = (
-        await db_session.execute(select(Material).where(Material.code == "silver_925"))
+    silver = (
+        await db_session.execute(select(Material).where(Material.code == "silver"))
     ).scalar_one()
 
     dictionary_late = await make_catalog_item(
@@ -358,7 +397,7 @@ async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
         db_session, country=refs.ukraine, title="Вільний текст", year=2002, material="Алюміній"
     )
     dictionary_early = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Срібло", year=2003, composition_id=silver_925.id
+        db_session, country=refs.ukraine, title="Срібло", year=2003, composition_id=silver.id
     )
     nothing = await make_catalog_item(
         db_session, country=refs.ukraine, title="Без матеріалу", year=2004
@@ -384,6 +423,170 @@ async def test_sorting_by_material_reads_the_dictionary_then_the_free_text(
         dictionary_late.id,
         free_text.id,
     ]
+
+
+async def test_multi_select_filters_union_within_a_facet(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """countryId=A,B (etc.) is an OR within the facet: either matches."""
+    refs = ctx.refs
+    silver = (
+        await db_session.execute(select(Material).where(Material.code == "silver"))
+    ).scalar_one()
+    gold = (await db_session.execute(select(Material).where(Material.code == "gold"))).scalar_one()
+
+    dolphin = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Дельфін",
+        year=2018,
+        series=refs.fauna,
+        denomination=refs.uah_2,
+        group=CollectionGroup.COMMEMORATIVE,
+        composition_id=silver.id,
+    )
+    kyiv = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Київ",
+        year=2020,
+        series=refs.cities,
+        denomination=refs.uah_5,
+        group=CollectionGroup.OTHER,
+        composition_id=gold.id,
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Third",
+        year=2021,
+        group=CollectionGroup.CIRCULATION,
+    )
+
+    headers = auth(ctx.token_a)
+
+    by_series = await client.get(
+        f"/api/v1/catalog?seriesId={refs.fauna.id}&seriesId={refs.cities.id}", headers=headers
+    )
+    assert {i["id"] for i in by_series.json()["items"]} == {dolphin.id, kyiv.id}
+
+    by_denomination = await client.get(
+        f"/api/v1/catalog?denominationId={refs.uah_2.id}&denominationId={refs.uah_5.id}",
+        headers=headers,
+    )
+    assert {i["id"] for i in by_denomination.json()["items"]} == {dolphin.id, kyiv.id}
+
+    by_group = await client.get("/api/v1/catalog?group=commemorative&group=other", headers=headers)
+    assert {i["id"] for i in by_group.json()["items"]} == {dolphin.id, kyiv.id}
+
+    by_material = await client.get(
+        f"/api/v1/catalog?materialId={silver.id}&materialId={gold.id}", headers=headers
+    )
+    assert {i["id"] for i in by_material.json()["items"]} == {dolphin.id, kyiv.id}
+
+
+async def test_catalog_materials_only_offers_what_the_confirmed_catalog_uses(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §14: the material filter offers only
+    materials a `catalog_confirmed` item actually uses — the whole shared
+    dictionary is much bigger than what Ukraine's catalog uses today."""
+    refs = ctx.refs
+    silver = (
+        await db_session.execute(select(Material).where(Material.code == "silver"))
+    ).scalar_one()
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018, composition_id=silver.id
+    )
+
+    headers = auth(ctx.token_a)
+    response = await client.get("/api/v1/catalog/materials", headers=headers)
+    codes = {row["code"] for row in response.json()}
+    assert codes == {"silver"}
+
+    scoped = await client.get(f"/api/v1/catalog/materials?countryId={refs.usa.id}", headers=headers)
+    assert scoped.json() == []
+
+
+async def test_card_resolves_edge_and_quality_dictionaries(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md §13a: edge and quality behave like material —
+    a dictionary row where one is known, the record's own text where not."""
+    refs = ctx.refs
+    reeded = (
+        await db_session.execute(select(EdgeType).where(EdgeType.code == "reeded"))
+    ).scalar_one()
+    proof = (
+        await db_session.execute(select(QualityType).where(QualityType.code == "proof"))
+    ).scalar_one()
+
+    dictionary_linked = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Довідник",
+        year=2010,
+        edge_type_id=reeded.id,
+        quality_type_id=proof.id,
+    )
+    raw_text_only = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Вільний текст",
+        year=2011,
+        edge="Незвичайний гурт",
+        quality="Незвичайна якість",
+    )
+
+    headers = auth(ctx.token_a)
+    linked = (await client.get(f"/api/v1/catalog/{dictionary_linked.id}", headers=headers)).json()
+    assert linked["edgeType"] == {"id": reeded.id, "code": "reeded", "name": "Рифлений"}
+    assert linked["edge"] is None
+    assert linked["qualityType"] == {"id": proof.id, "code": "proof", "name": "Пруф"}
+    assert linked["quality"] is None
+
+    raw = (await client.get(f"/api/v1/catalog/{raw_text_only.id}", headers=headers)).json()
+    assert raw["edgeType"] is None
+    assert raw["edge"] == "Незвичайний гурт"
+    assert raw["qualityType"] is None
+    assert raw["quality"] == "Незвичайна якість"
+
+
+async def test_card_resolves_description_and_artists_to_the_requested_locale(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/02-data-model.md: coin-collector's descriptions/artists JSON is
+    fixed-shape and locale-keyed; the card resolves it to the caller's locale,
+    with a fallback to the other one when that slot has no text."""
+    refs = ctx.refs
+    item = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Архістратиг Михаїл",
+        year=2017,
+        descriptions={
+            "uk": {"general": "Опис", "obverse": "Аверс", "reverse": None},
+            "en": {"general": "Description", "obverse": None, "reverse": "Reverse"},
+        },
+        artists={
+            "designers": [{"uk": "Таран Володимир", "en": "Volodymyr Taran"}],
+            "sculptors": [],
+        },
+    )
+    untouched = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Не оброблена", year=2022
+    )
+
+    headers = auth(ctx.token_a)
+    card = (await client.get(f"/api/v1/catalog/{item.id}", headers=headers)).json()
+    assert card["description"] == {"general": "Опис", "obverse": "Аверс", "reverse": "Reverse"}
+    assert card["designers"] == ["Таран Володимир"]
+    assert card["sculptors"] == []
+
+    bare = (await client.get(f"/api/v1/catalog/{untouched.id}", headers=headers)).json()
+    assert bare["description"] is None
+    assert bare["designers"] == []
+    assert bare["sculptors"] == []
 
 
 async def test_card_and_own_instances(
@@ -429,13 +632,70 @@ async def test_card_and_own_instances(
     assert instances_b == []
 
 
+async def test_purchase_total_usd_uses_the_purchase_own_date_not_a_later_rate(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The ~40 UAH/USD of 2026 must never leak into a 2020 purchase's
+    dollar figure (owner-reported bug, 2026-09-13) -- neither on the
+    card's aggregate nor on the instance row."""
+    refs = ctx.refs
+    item = await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
+    await add_rate(db_session, "USD", "27.50", date(2020, 7, 20))
+    await add_rate(db_session, "USD", "44.55", date(2026, 9, 1))
+    await add_rate(db_session, "EUR", "25.00", date(2020, 7, 20))
+    await add_rate(db_session, "EUR", "48.00", date(2026, 9, 1))
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="55",
+        rate_uah="1",
+        acquisition_date=date(2020, 7, 23),
+    )
+
+    card = (await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))).json()
+    # 55 / 27.50 = 2.00 -- the 2020 rate, not 55 / 44.55 the 2026 one.
+    assert card["purchaseTotalUsd"] == "2.00"
+    # 55 / 25.00 = 2.20 -- same rule, the EUR side of it.
+    assert card["purchaseTotalEur"] == "2.20"
+
+    instances = (
+        await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a))
+    ).json()
+    assert instances[0]["totalUsd"] == "2.00"
+    assert instances[0]["totalEur"] == "2.20"
+
+
+async def test_purchase_total_usd_null_without_a_rate_that_far_back(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    refs = ctx.refs
+    item = await make_catalog_item(db_session, country=refs.ukraine, title="Дельфін", year=2018)
+    await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="50",
+        rate_uah="1",
+        acquisition_date=date(1990, 1, 1),
+    )
+
+    card = (await client.get(f"/api/v1/catalog/{item.id}", headers=auth(ctx.token_a))).json()
+    assert card["purchaseTotalUsd"] is None
+    assert card["purchaseTotalEur"] is None
+
+    instances = (
+        await client.get(f"/api/v1/catalog/{item.id}/collection-items", headers=auth(ctx.token_a))
+    ).json()
+    assert instances[0]["totalUsd"] is None
+    assert instances[0]["totalEur"] is None
+
+
 async def test_snapshot_in_foreign_currency_converted(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    from datetime import date
-
-    from tests.seed import add_rate
-
     refs = ctx.refs
     item = await make_catalog_item(db_session, country=refs.usa, title="Morgan dollar", year=1921)
     await add_rate(db_session, "USD", "41.50", date(2026, 8, 1))
@@ -549,6 +809,42 @@ async def test_storefront_hides_records_of_a_deactivated_country(
     assert card_b.status_code == 200
 
     _ = shared_usa  # never owned or authored by A or B: visible to neither.
+
+
+async def test_catalog_hides_records_of_an_unconfirmed_country(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """docs/04-business-rules.md, §13a: an unconfirmed country's records never
+    show as "catalogue", even ones the user authored or already owns — unlike
+    a merely deactivated country, there is no escape hatch."""
+    refs = ctx.refs
+    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
+
+    shared_ua = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Дельфін", year=2018
+    )
+    owned_usa = await make_catalog_item(
+        db_session, country=refs.usa, title="Lincoln cent", year=1970
+    )
+    personal_usa_a = await make_catalog_item(
+        db_session, country=refs.usa, title="Особиста А", year=1980, created_by=ctx.id_a
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa, price="10")
+
+    headers_a = auth(ctx.token_a)
+
+    listing_a = (await client.get("/api/v1/catalog", headers=headers_a)).json()
+    assert {i["id"] for i in listing_a["items"]} == {shared_ua.id}
+    assert listing_a["total"] == 1
+
+    # The direct card and the collection stay reachable — only the catalogue
+    # listing is gated, not the user's own coins.
+    card = await client.get(f"/api/v1/catalog/{owned_usa.id}", headers=headers_a)
+    assert card.status_code == 200
+    personal_card = await client.get(f"/api/v1/catalog/{personal_usa_a.id}", headers=headers_a)
+    assert personal_card.status_code == 200
+    collection = (await client.get("/api/v1/collection", headers=headers_a)).json()
+    assert owned_usa.id in {i["catalogItemId"] for i in collection["items"]}
 
 
 async def test_storefront_for_a_user_with_no_coins_at_all(

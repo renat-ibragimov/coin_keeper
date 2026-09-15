@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ApiError } from '@/shared/api/client';
@@ -7,6 +7,7 @@ import type { CollectionItem, CurrencyOut } from '@/shared/api/types';
 import { currencySymbol, parseDecimal, todayIso } from '@/shared/lib/format';
 import {
   Button,
+  Combobox,
   FormActions,
   FormError,
   FormRow,
@@ -16,6 +17,7 @@ import {
   Textarea,
 } from '@/shared/ui';
 
+import type { CarriedValues } from './add/carried';
 import { GRADES } from './grades';
 
 export interface PurchaseValues {
@@ -25,13 +27,34 @@ export interface PurchaseValues {
   purchaseDate: string;
   seller: string | null;
   grade: string | null;
+  storageLocation: string | null;
   notes: string | null;
 }
 
 interface PurchaseFormProps {
   /** Existing instance when editing; absent for a new purchase. */
   initial?: CollectionItem;
+  /**
+   * What the "Додати" page carries over from the other branch of its type
+   * selector; ignored while editing, where the instance itself is the source.
+   */
+  carried?: CarriedValues;
+  onCarriedChange?: (values: CarriedValues) => void;
+  /**
+   * Checked after this form's own fields and before anything is sent: the
+   * "Додати" page validates the coin it is about to create alongside the
+   * purchase, and both sets of messages have to appear at once.
+   */
+  beforeSubmit?: () => boolean;
+  /**
+   * Rendered inside the form, last before the buttons: the "Додати" page puts
+   * the purchase's supporting expenses there. It has to live inside the
+   * <form> — those fields are submitted with the purchase, not beside it.
+   */
+  footer?: ReactNode;
   defaultGrade: string;
+  defaultStorageLocation: string | null;
+  storageLocations: string[];
   currencies: CurrencyOut[];
   busy: boolean;
   /** The last failed submission: rate and currency problems land on their fields. */
@@ -47,20 +70,43 @@ interface Fields {
   purchaseDate: string;
   seller: string;
   grade: string;
+  storageLocation: string;
   notes: string;
 }
 
 type FieldErrors = Partial<Record<keyof Fields, string>>;
 
-function initialFields(initial: CollectionItem | undefined, defaultGrade: string): Fields {
+function initialFields(
+  initial: CollectionItem | undefined,
+  defaultGrade: string,
+  defaultStorageLocation: string | null,
+  carried: CarriedValues | undefined,
+): Fields {
   return {
     quantity: String(initial?.quantity ?? 1),
-    price: initial?.price ?? '',
-    currency: initial?.currency ?? 'UAH',
-    purchaseDate: initial?.purchaseDate ?? todayIso(),
-    seller: initial?.seller ?? '',
+    // Zero, not blank: a coin found in change or handed over by a friend
+    // cost nothing, and that is common enough that an empty field sends
+    // those people back to fix a validation error every time (owner,
+    // 2026-09-14). A real price is typed over it either way.
+    // `||` on the carried half, not `??`: it starts as an empty string,
+    // which `??` would happily keep.
+    price: initial?.price ?? (carried?.amount || '0'),
+    currency: initial?.currency ?? carried?.currency ?? 'UAH',
+    purchaseDate: initial?.purchaseDate ?? carried?.date ?? todayIso(),
+    seller: initial?.seller ?? carried?.vendor ?? '',
     grade: initial?.grade ?? defaultGrade,
-    notes: initial?.notes ?? '',
+    storageLocation: initial?.storageLocation ?? defaultStorageLocation ?? '',
+    notes: initial?.notes ?? carried?.note ?? '',
+  };
+}
+
+function carriedFrom(fields: Fields): CarriedValues {
+  return {
+    amount: fields.price,
+    currency: fields.currency,
+    date: fields.purchaseDate,
+    vendor: fields.seller,
+    note: fields.notes,
   };
 }
 
@@ -76,7 +122,13 @@ function serverFieldErrors(error: unknown, currency: string): FieldErrors {
 
 export function PurchaseForm({
   initial,
+  carried,
+  onCarriedChange,
+  beforeSubmit,
+  footer,
   defaultGrade,
+  defaultStorageLocation,
+  storageLocations,
   currencies,
   busy,
   submitError,
@@ -84,11 +136,18 @@ export function PurchaseForm({
   onCancel,
 }: PurchaseFormProps) {
   const { t } = useTranslation();
-  const [fields, setFields] = useState<Fields>(() => initialFields(initial, defaultGrade));
+  const [fields, setFields] = useState<Fields>(() =>
+    initialFields(initial, defaultGrade, defaultStorageLocation, carried),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
 
   const set = (key: keyof Fields) => (value: string) => {
-    setFields((current) => ({ ...current, [key]: value }));
+    const next = { ...fields, [key]: value };
+    setFields(next);
+    // Reported outward rather than folded into the state updater: the page
+    // above keeps this in its own state, and a parent must not be told to
+    // update from inside one.
+    onCarriedChange?.(carriedFrom(next));
     setErrors((current) => ({ ...current, [key]: undefined }));
   };
 
@@ -129,7 +188,10 @@ export function PurchaseForm({
     event.preventDefault();
     const next = validate();
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    // Both run, whatever the first one says: a person fixing the form should
+    // see everything that is wrong with it, not one message at a time.
+    const coinOk = beforeSubmit ? beforeSubmit() : true;
+    if (Object.keys(next).length > 0 || !coinOk) return;
     onSubmit({
       quantity: Number.parseInt(fields.quantity, 10),
       price: String(parseDecimal(fields.price)),
@@ -137,6 +199,7 @@ export function PurchaseForm({
       purchaseDate: fields.purchaseDate,
       seller: fields.seller.trim() || null,
       grade: fields.grade.trim() || null,
+      storageLocation: fields.storageLocation.trim() || null,
       notes: fields.notes.trim() || null,
     });
   }
@@ -175,6 +238,13 @@ export function PurchaseForm({
             required
             placeholder="0,00"
             value={fields.price}
+            // The default 0 is selected the moment the field is focused, so
+            // typing a real price replaces it instead of landing beside it
+            // ("0250"). Only the untouched zero: a price already typed is
+            // left alone, so a stray click does not wipe it.
+            onFocus={(event) => {
+              if (event.target.value === '0') event.target.select();
+            }}
             onChange={(event) => set('price')(event.target.value)}
             error={message('price')}
           />
@@ -215,6 +285,14 @@ export function PurchaseForm({
             ))}
           </Select>
         </FormRow>
+        <Combobox
+          label={t('purchase.storageLocation')}
+          placeholder={t('purchase.storageLocationPlaceholder')}
+          options={storageLocations}
+          value={fields.storageLocation}
+          onChange={(event) => set('storageLocation')(event.target.value)}
+          maxLength={200}
+        />
         <Textarea
           label={t('purchase.notes')}
           placeholder={t('purchase.notesPlaceholder')}
@@ -222,6 +300,7 @@ export function PurchaseForm({
           onChange={(event) => set('notes')(event.target.value)}
           maxLength={4000}
         />
+        {footer}
         <FormActions>
           <Button type="button" variant="secondary" onClick={onCancel} disabled={busy}>
             {t('common.cancel')}

@@ -40,6 +40,24 @@ class UserRepository:
         )
         await self._session.flush()
 
+    async def update_settings(self, user_id: int, **fields: object) -> None:
+        """Generic partial update: pass only the `user_settings` columns that
+        changed. Keeps adding a new setting (currency, storage locations, …)
+        a one-line change in the schema rather than a new repository method
+        each time."""
+        if not fields:
+            return
+        await self._session.execute(
+            update(UserSettings).where(UserSettings.user_id == user_id).values(**fields)
+        )
+        await self._session.flush()
+
+    async def get_settings(self, user_id: int) -> UserSettings | None:
+        result = await self._session.execute(
+            select(UserSettings).where(UserSettings.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
 
 class RefreshTokenRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -107,15 +125,18 @@ class AuthTokenRepository:
         await self._session.flush()
         return token
 
-    async def get_usable(self, *, token_hash: str, kind: AuthTokenKind) -> AuthToken | None:
-        result = await self._session.execute(
-            select(AuthToken).where(
-                AuthToken.token_hash == token_hash,
-                AuthToken.kind == kind,
-                AuthToken.used_at.is_(None),
-                AuthToken.expires_at > datetime.now(UTC),
-            )
+    async def get_usable(
+        self, *, token_hash: str, kind: AuthTokenKind, for_update: bool = False
+    ) -> AuthToken | None:
+        statement = select(AuthToken).where(
+            AuthToken.token_hash == token_hash,
+            AuthToken.kind == kind,
+            AuthToken.used_at.is_(None),
+            AuthToken.expires_at > datetime.now(UTC),
         )
+        if for_update:
+            statement = statement.with_for_update()
+        result = await self._session.execute(statement)
         return result.scalar_one_or_none()
 
     async def mark_used(self, token: AuthToken) -> None:

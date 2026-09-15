@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy import text
+from sqlalchemy import text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
+from app.models import User
 from tests.conftest import JOB_TOKEN, WEBHOOK_SECRET, RecordingTelegramSender
 from tests.helpers import register_and_verify
 from tests.seed import promote_to_admin
@@ -31,7 +32,17 @@ def auth(token: str) -> dict[str, str]:
 
 
 def start_update(code: str, chat_id: int = CHAT_ID) -> dict[str, object]:
-    return {"message": {"chat": {"id": chat_id}, "text": f"/start {code}"}}
+    return message_update(f"/start {code}", chat_id)
+
+
+def message_update(command: str, chat_id: int = CHAT_ID) -> dict[str, object]:
+    return {
+        "message": {
+            "chat": {"id": chat_id, "type": "private"},
+            "from": {"id": chat_id, "is_bot": False},
+            "text": command,
+        }
+    }
 
 
 @pytest.fixture
@@ -70,7 +81,7 @@ async def test_start_without_a_code_does_nothing(
     an answer would confirm the bot is listening."""
     response = await client.post(
         WEBHOOK,
-        json={"message": {"chat": {"id": 777}, "text": "/start"}},
+        json=message_update("/start", 777),
         headers=SECRET_HEADERS,
     )
     assert response.status_code == 200
@@ -216,7 +227,7 @@ async def test_last_answers_a_linked_chat_only(
 
     stranger = await client.post(
         WEBHOOK,
-        json={"message": {"chat": {"id": 4242}, "text": "/last"}},
+        json=message_update("/last", 4242),
         headers=SECRET_HEADERS,
     )
     assert stranger.status_code == 200
@@ -224,8 +235,129 @@ async def test_last_answers_a_linked_chat_only(
 
     await client.post(
         WEBHOOK,
-        json={"message": {"chat": {"id": CHAT_ID}, "text": "/last"}},
+        json=message_update("/last"),
         headers=SECRET_HEADERS,
     )
     assert len(telegram_sender.sent) == 1
     assert "Оновлення цін" in telegram_sender.sent[0].text
+
+
+@pytest.mark.parametrize(
+    "change", [{"role": "user"}, {"is_active": False}, {"email_verified": False}]
+)
+async def test_revoked_admin_cannot_link_read_or_receive(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_token: str,
+    telegram_sender: RecordingTelegramSender,
+    change: dict[str, str | bool],
+) -> None:
+    code = await link_code(client, admin_token)
+    await client.post(WEBHOOK, json=start_update(code), headers=SECRET_HEADERS)
+    pending_code = await link_code(client, admin_token)
+    await db_session.execute(update(User).values(**change))
+    await db_session.commit()
+    telegram_sender.sent.clear()
+
+    await client.post(WEBHOOK, json=message_update("/last"), headers=SECRET_HEADERS)
+    await client.post(WEBHOOK, json=start_update(pending_code, 999), headers=SECRET_HEADERS)
+    await client.post(REPORT, json={"job": "update-prices", "status": "ok"}, headers=JOB_HEADERS)
+    assert telegram_sender.sent == []
+
+
+@pytest.mark.parametrize(
+    "command", ["/start", "/last", "/help", "/status", "hello", "/last@admin_bot"]
+)
+async def test_stranger_commands_never_disclose_information(
+    client: AsyncClient, telegram_sender: RecordingTelegramSender, command: str
+) -> None:
+    response = await client.post(WEBHOOK, json=message_update(command, 777), headers=SECRET_HEADERS)
+    assert response.status_code == 200
+    assert telegram_sender.sent == []
+
+
+@pytest.mark.parametrize("chat_type", ["group", "supergroup", "channel"])
+async def test_group_cannot_consume_link_code(
+    client: AsyncClient,
+    admin_token: str,
+    telegram_sender: RecordingTelegramSender,
+    chat_type: str,
+) -> None:
+    code = await link_code(client, admin_token)
+    await client.post(
+        WEBHOOK,
+        json={
+            "message": {
+                "chat": {"id": -100500, "type": chat_type},
+                "from": {"id": CHAT_ID, "is_bot": False},
+                "text": f"/start {code}",
+            }
+        },
+        headers=SECRET_HEADERS,
+    )
+    assert telegram_sender.sent == []
+    await client.post(WEBHOOK, json=start_update(code), headers=SECRET_HEADERS)
+    assert len(telegram_sender.sent) == 1
+
+
+async def test_unlink_revokes_pending_codes_and_last(
+    client: AsyncClient,
+    admin_token: str,
+    telegram_sender: RecordingTelegramSender,
+) -> None:
+    code = await link_code(client, admin_token)
+    await client.post(WEBHOOK, json=start_update(code), headers=SECRET_HEADERS)
+    pending_code = await link_code(client, admin_token)
+    await client.delete("/api/v1/admin/telegram", headers=auth(admin_token))
+    telegram_sender.sent.clear()
+    await client.post(WEBHOOK, json=message_update("/last"), headers=SECRET_HEADERS)
+    await client.post(WEBHOOK, json=start_update(pending_code), headers=SECRET_HEADERS)
+    await client.post(REPORT, json={"job": "update-prices", "status": "ok"}, headers=JOB_HEADERS)
+    assert telegram_sender.sent == []
+
+
+@pytest.mark.parametrize("mode", ["expired", "replaced"])
+async def test_old_link_codes_are_silent(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_token: str,
+    telegram_sender: RecordingTelegramSender,
+    mode: str,
+) -> None:
+    code = await link_code(client, admin_token)
+    if mode == "expired":
+        await db_session.execute(
+            text("UPDATE auth_tokens SET expires_at = now() - interval '1 minute'")
+        )
+        await db_session.commit()
+    else:
+        await link_code(client, admin_token)
+    await client.post(WEBHOOK, json=start_update(code), headers=SECRET_HEADERS)
+    assert telegram_sender.sent == []
+
+
+@pytest.mark.parametrize(
+    "sender",
+    [None, {"id": 999, "is_bot": False}, {"id": CHAT_ID, "is_bot": True}],
+)
+async def test_invalid_sender_cannot_read_a_linked_chat(
+    client: AsyncClient,
+    admin_token: str,
+    telegram_sender: RecordingTelegramSender,
+    sender: dict[str, object] | None,
+) -> None:
+    code = await link_code(client, admin_token)
+    await client.post(WEBHOOK, json=start_update(code), headers=SECRET_HEADERS)
+    telegram_sender.sent.clear()
+    await client.post(
+        WEBHOOK,
+        json={
+            "message": {
+                "chat": {"id": CHAT_ID, "type": "private"},
+                "from": sender,
+                "text": "/last",
+            }
+        },
+        headers=SECRET_HEADERS,
+    )
+    assert telegram_sender.sent == []

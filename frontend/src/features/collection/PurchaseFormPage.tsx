@@ -1,62 +1,53 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { fetchCard, fetchCurrencies } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
-import type { CatalogListItem } from '@/shared/api/types';
-import { coinTitle } from '@/shared/lib/coinTitle';
-import {
-  Badge,
-  Breadcrumbs,
-  Button,
-  Card,
-  CoinImage,
-  ErrorState,
-  PageHeader,
-  Skeleton,
-  useToast,
-} from '@/shared/ui';
+import type { CollectionItemPhotos } from '@/shared/api/types';
+import { Button, Card, ErrorState, PageHeader, Skeleton, useToast } from '@/shared/ui';
 
-import { createCollectionItem, fetchCollectionItem, updateCollectionItem } from './api';
-import { CatalogItemPicker } from './CatalogItemPicker';
-import { defaultGradeFor } from './grades';
+import {
+  deleteCoinPhoto,
+  fetchCollectionItem,
+  fetchStorageLocations,
+  updateCollectionItem,
+  uploadCoinPhoto,
+} from './api';
+import { CoinPhotoCropDialog } from './CoinPhotoCropDialog';
 import { COLLECTION_DEPENDENT_KEYS } from './model';
 import { PurchaseForm } from './PurchaseForm';
 import type { PurchaseValues } from './PurchaseForm';
 import styles from './PurchaseFormPage.module.css';
+import type { CoinSide } from './SelectedCoin';
+import { SelectedCoin } from './SelectedCoin';
+import { useCoinPhotoPicker } from './useCoinPhotoPicker';
 
 /**
- * /collection/coins/new?catalogItemId=  — a new purchase of a catalog item
- * /collection/coins/new                 — pick the item first
- * /collection/coins/:id/edit            — change an existing purchase
+ * `/collection/coins/:id/edit` — change an existing purchase.
+ *
+ * Recording a new one lives on `/collection/add` instead, where the coin may
+ * also be one the catalog has never heard of; here the coin is settled and
+ * only the purchase itself is editable.
  */
 export function PurchaseFormPage() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { id } = useParams();
-  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  const editId = id ? Number.parseInt(id, 10) : null;
-  const editing = editId !== null && Number.isFinite(editId);
-  const [picked, setPicked] = useState<CatalogListItem | null>(null);
+  const editId = Number.parseInt(id ?? '', 10);
 
   const instanceQuery = useQuery({
     queryKey: ['collection', 'item', editId],
-    queryFn: () => fetchCollectionItem(editId!),
-    enabled: editing,
+    queryFn: () => fetchCollectionItem(editId),
+    enabled: Number.isFinite(editId),
   });
-  const queryItemId = Number.parseInt(searchParams.get('catalogItemId') ?? '', 10);
-  const catalogItemId = editing
-    ? (instanceQuery.data?.catalogItemId ?? null)
-    : Number.isFinite(queryItemId) && queryItemId > 0
-      ? queryItemId
-      : (picked?.id ?? null);
+  const catalogItemId = instanceQuery.data?.catalogItemId ?? null;
 
   const cardQuery = useQuery({
     queryKey: ['catalog', 'card', catalogItemId],
@@ -66,29 +57,88 @@ export function PurchaseFormPage() {
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
 
+  // What PUT/DELETE last answered, so both sides repaint without a refetch
+  // of the whole coin (docs/06-media-storage.md) — every response already
+  // carries the fresh truth for both, so one slot supersedes the instance
+  // query's own image fields entirely once anything has been uploaded or
+  // removed. `ownership` tracks which side is the owner's own photo, since
+  // the crop dialog's answer does not say that on its own.
+  const [photos, setPhotos] = useState<CollectionItemPhotos | null>(null);
+  const [ownership, setOwnership] = useState<Partial<Record<CoinSide, boolean>>>({});
+  const [savingSide, setSavingSide] = useState<CoinSide | null>(null);
+
+  const uploadMutation = useMutation({
+    mutationFn: ({ side, blob }: { side: CoinSide; blob: Blob }) =>
+      uploadCoinPhoto(editId, side, blob),
+    onMutate: ({ side }) => setSavingSide(side),
+    onSuccess: (result, { side }) => {
+      setPhotos(result);
+      setOwnership((current) => ({ ...current, [side]: true }));
+      toast.show(t('collectionPhoto.saved'));
+    },
+    onError: (error) => {
+      const rejected = error instanceof ApiError && error.problemType === 'invalid-image';
+      toast.show(rejected ? t('collectionPhoto.invalid') : t('errors.generic'));
+    },
+    onSettled: () => setSavingSide(null),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (side: CoinSide) => deleteCoinPhoto(editId, side),
+    onMutate: (side: CoinSide) => setSavingSide(side),
+    onSuccess: (result, side) => {
+      setPhotos(result);
+      setOwnership((current) => ({ ...current, [side]: false }));
+      toast.show(t('collectionPhoto.removed'));
+    },
+    onError: () => toast.show(t('errors.generic')),
+    onSettled: () => setSavingSide(null),
+  });
+
+  const photoPicker = useCoinPhotoPicker((side, blob) => uploadMutation.mutate({ side, blob }));
+
+  function isOwnPhoto(side: CoinSide): boolean {
+    if (side in ownership) return Boolean(ownership[side]);
+    return Boolean(
+      side === 'obverse'
+        ? instanceQuery.data?.obversePhotoIsOwn
+        : instanceQuery.data?.reversePhotoIsOwn,
+    );
+  }
+
+  const photoOverrides: Partial<Record<CoinSide, string | null>> = {
+    obverse: photos
+      ? (photos.obverse?.medium ?? null)
+      : (instanceQuery.data?.obverseImage?.medium ?? undefined),
+    reverse: photos
+      ? (photos.reverse?.medium ?? null)
+      : (instanceQuery.data?.reverseImage?.medium ?? undefined),
+  };
+
+  const storageLocationsQuery = useQuery({
+    queryKey: ['collection', 'storage-locations'],
+    queryFn: fetchStorageLocations,
+  });
+
   const from = (location.state as { from?: string } | null)?.from;
-  const destination = from ?? (editing ? '/collection/coins' : `/catalog/${catalogItemId}`);
+  // The only entry point into editing is a coin's own page, so both the back
+  // button and the cancel button return there rather than to the full list.
+  const destination =
+    from ?? (catalogItemId !== null ? `/catalog/${catalogItemId}` : '/collection/coins');
+  const goBack = () => navigate(destination);
 
   const mutation = useMutation({
-    mutationFn: (values: PurchaseValues) =>
-      editing
-        ? updateCollectionItem(editId!, values)
-        : createCollectionItem({ ...values, catalogItemId: catalogItemId! }),
+    mutationFn: (values: PurchaseValues) => updateCollectionItem(editId, values),
     onSuccess: async () => {
       await Promise.all(
         COLLECTION_DEPENDENT_KEYS.map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
       );
-      toast.show(editing ? t('purchase.updated') : t('purchase.created'));
+      toast.show(t('purchase.updated'));
       navigate(destination, { replace: true });
     },
   });
 
-  const crumbs = [
-    { label: t('nav.coins'), to: '/collection/coins' },
-    { label: editing ? t('purchase.editTitle') : t('card.addPurchase') },
-  ];
-
-  if (editing && instanceQuery.isError) {
+  if (instanceQuery.isError) {
     const notFound = instanceQuery.error instanceof ApiError && instanceQuery.error.status === 404;
     return (
       <ErrorState
@@ -106,108 +156,73 @@ export function PurchaseFormPage() {
   return (
     <div className={styles.page}>
       <PageHeader
-        above={<Breadcrumbs items={crumbs} />}
-        title={editing ? t('purchase.editTitle') : t('card.addPurchase')}
-        subtitle={editing ? t('purchase.editSubtitle') : t('purchase.subtitle')}
+        align="center"
+        onBack={goBack}
+        title={t('purchase.editTitle')}
+        subtitle={t('purchase.editSubtitle')}
       />
 
-      {catalogItemId === null ? (
-        <Card>
-          <CatalogItemPicker
-            onSelect={(item) => {
-              setPicked(item);
-              setSearchParams({ catalogItemId: String(item.id) }, { replace: true });
-            }}
+      <div className={styles.content}>
+        {cardQuery.data ? (
+          <SelectedCoin
+            card={cardQuery.data}
+            photos={photoOverrides}
+            ownPhoto={{ obverse: isOwnPhoto('obverse'), reverse: isOwnPhoto('reverse') }}
+            onPickPhoto={photoPicker.pick}
+            onRemovePhoto={(side) => deleteMutation.mutate(side)}
           />
-        </Card>
-      ) : (
-        <div className={styles.layout}>
-          <Card className={styles.item}>
-            {cardQuery.data ? (
-              <div className={styles.itemBody}>
-                <CoinImage
-                  src={cardQuery.data.thumbnailUrl ?? cardQuery.data.obverseImage?.preview ?? null}
-                  alt=""
-                  className={styles.itemImage}
-                />
-                <div>
-                  <div className={styles.itemBadges}>
-                    {cardQuery.data.isOwn ? (
-                      <Badge tone="accent">{t('catalog.badgeOwn')}</Badge>
-                    ) : null}
-                    {cardQuery.data.isArchived ? (
-                      <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
-                    ) : null}
-                  </div>
-                  <Link to={`/catalog/${cardQuery.data.id}`} className={styles.itemTitle}>
-                    {coinTitle(cardQuery.data, i18n.language)}
-                  </Link>
-                  <div className={styles.itemMeta}>
-                    {[
-                      cardQuery.data.denomination?.label,
-                      cardQuery.data.country,
-                      String(cardQuery.data.year),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </div>
-                  {cardQuery.data.seriesName ? (
-                    <div className={styles.itemSeries}>{cardQuery.data.seriesName}</div>
-                  ) : null}
-                  {!editing ? (
-                    <button
-                      type="button"
-                      className={styles.changeItem}
-                      onClick={() => {
-                        setPicked(null);
-                        setSearchParams({}, { replace: true });
-                      }}
-                    >
-                      {t('purchase.changeItem')}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : cardQuery.isError ? (
-              <ErrorState
-                title={t('card.notFoundTitle')}
-                actions={
-                  <Link to="/catalog">
-                    <Button variant="secondary">{t('common.backToCatalog')}</Button>
-                  </Link>
-                }
-              />
-            ) : (
-              <Skeleton height={96} />
-            )}
-          </Card>
+        ) : cardQuery.isError ? (
+          <ErrorState
+            title={t('card.notFoundTitle')}
+            actions={
+              <Link to="/catalog">
+                <Button variant="secondary">{t('common.backToCatalog')}</Button>
+              </Link>
+            }
+          />
+        ) : (
+          <Skeleton width={280} height={32} style={{ margin: '0 auto' }} />
+        )}
 
-          <Card className={styles.form}>
-            {cardQuery.data && bootstrapQuery.data && (!editing || instanceQuery.data) ? (
-              <PurchaseForm
-                key={editing ? `edit-${editId}` : `new-${catalogItemId}`}
-                initial={editing ? instanceQuery.data : undefined}
-                defaultGrade={defaultGradeFor(
-                  cardQuery.data.collectionGroup,
-                  bootstrapQuery.data.settings,
-                )}
-                currencies={currenciesQuery.data ?? []}
-                busy={mutation.isPending}
-                submitError={mutation.error}
-                onSubmit={(values) => mutation.mutate(values)}
-                onCancel={() => navigate(destination)}
-              />
-            ) : cardQuery.isError ? null : (
-              <div className={styles.formSkeleton}>
-                <Skeleton height={42} />
-                <Skeleton height={42} />
-                <Skeleton height={42} />
-                <Skeleton height={96} />
-              </div>
-            )}
-          </Card>
-        </div>
-      )}
+        <Card className={styles.form}>
+          {cardQuery.data && bootstrapQuery.data && instanceQuery.data ? (
+            <PurchaseForm
+              key={`edit-${editId}`}
+              initial={instanceQuery.data}
+              defaultGrade={bootstrapQuery.data.settings.defaultGrade}
+              defaultStorageLocation={bootstrapQuery.data.settings.defaultStorageLocation}
+              storageLocations={(storageLocationsQuery.data ?? []).map((l) => l.name)}
+              currencies={currenciesQuery.data ?? []}
+              busy={mutation.isPending}
+              submitError={mutation.error}
+              onSubmit={(values) => mutation.mutate(values)}
+              onCancel={goBack}
+            />
+          ) : cardQuery.isError ? null : (
+            <div className={styles.formSkeleton}>
+              <Skeleton height={42} />
+              <Skeleton height={42} />
+              <Skeleton height={42} />
+              <Skeleton height={96} />
+            </div>
+          )}
+        </Card>
+      </div>
+
+      <input
+        ref={photoPicker.fileInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className={styles.fileInput}
+        onChange={photoPicker.onFileChange}
+      />
+      <CoinPhotoCropDialog
+        key={photoPicker.raw ?? 'none'}
+        image={photoPicker.raw}
+        busy={savingSide !== null}
+        onCancel={photoPicker.cancel}
+        onSave={photoPicker.onCropSave}
+      />
     </div>
   );
 }

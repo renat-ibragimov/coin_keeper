@@ -34,3 +34,26 @@ def localized(
     translated = uk if locale == LOCALE_UK else en
     expr = func.coalesce(func.nullif(func.btrim(translated), ""), original)
     return expr.collate(_ICU_COLLATION.get(locale, "und-x-icu"))
+
+
+def series_display_name(locale: str) -> ColumnElement[str]:
+    """The series shown beside a coin: the shared record's localized name,
+    falling back to whatever the owner typed on a personal item.
+
+    Requires `CoinSeries` outer-joined and `CatalogItem` in the query. The
+    fallback is display only — completeness, the series screens and the
+    series filter all count on `series_id`, so the dashboard's own
+    `_series_name` (which groups by real series) deliberately does not use
+    this (docs/04-business-rules.md, rule 2).
+    """
+    from app.models import CatalogItem, CoinSeries
+
+    return func.coalesce(
+        localized(
+            locale,
+            uk=CoinSeries.name_uk,
+            en=CoinSeries.name_en,
+            original=CoinSeries.name_original,
+        ),
+        func.nullif(func.btrim(CatalogItem.series_text), ""),
+    )

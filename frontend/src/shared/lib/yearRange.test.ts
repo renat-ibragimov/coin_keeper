@@ -15,6 +15,7 @@ function country(overrides: Partial<CountryOut>): CountryOut {
     nameEn: 'Test',
     collectVariants: false,
     isActive: true,
+    catalogConfirmed: true,
     sortOrder: 0,
     minYear: null,
     maxYear: null,
@@ -28,7 +29,16 @@ describe('computeYearBounds', () => {
       country({ id: 1, minYear: 1995, maxYear: 2024 }),
       country({ id: 2, minYear: 1900, maxYear: 2020 }),
     ];
-    expect(computeYearBounds(countries, 1)).toEqual({ min: 1995, max: 2024 });
+    expect(computeYearBounds(countries, [1])).toEqual({ min: 1995, max: 2024 });
+  });
+
+  it('unions the bounds of every selected country', () => {
+    const countries = [
+      country({ id: 1, minYear: 1995, maxYear: 2010 }),
+      country({ id: 2, minYear: 1980, maxYear: 2005 }),
+      country({ id: 3, minYear: 2050, maxYear: 2060 }),
+    ];
+    expect(computeYearBounds(countries, [1, 2])).toEqual({ min: 1980, max: 2010 });
   });
 
   it('spans every country in the list when none is selected', () => {
@@ -36,7 +46,7 @@ describe('computeYearBounds', () => {
       country({ id: 1, minYear: 1995, maxYear: 2010 }),
       country({ id: 2, minYear: 1980, maxYear: 2024 }),
     ];
-    expect(computeYearBounds(countries, undefined)).toEqual({ min: 1980, max: 2024 });
+    expect(computeYearBounds(countries, [])).toEqual({ min: 1980, max: 2024 });
   });
 
   it('skips countries with no coins when spanning the whole list', () => {
@@ -44,7 +54,7 @@ describe('computeYearBounds', () => {
       country({ id: 1, minYear: null, maxYear: null }),
       country({ id: 2, minYear: 2000, maxYear: 2005 }),
     ];
-    expect(computeYearBounds(countries, undefined)).toEqual({ min: 2000, max: 2005 });
+    expect(computeYearBounds(countries, [])).toEqual({ min: 2000, max: 2005 });
   });
 
   it('falls back to the selected country having no coins at all by using the whole list', () => {
@@ -52,12 +62,12 @@ describe('computeYearBounds', () => {
       country({ id: 1, minYear: null, maxYear: null }),
       country({ id: 2, minYear: 2000, maxYear: 2005 }),
     ];
-    expect(computeYearBounds(countries, 1)).toEqual({ min: 2000, max: 2005 });
+    expect(computeYearBounds(countries, [1])).toEqual({ min: 2000, max: 2005 });
   });
 
   it('falls back to 1900..this year when the directory has no bounds at all', () => {
-    expect(computeYearBounds([], undefined)).toEqual({ min: 1900, max: new Date().getFullYear() });
-    expect(computeYearBounds([country({ minYear: null, maxYear: null })], undefined)).toEqual({
+    expect(computeYearBounds([], [])).toEqual({ min: 1900, max: new Date().getFullYear() });
+    expect(computeYearBounds([country({ minYear: null, maxYear: null })], [])).toEqual({
       min: 1900,
       max: new Date().getFullYear(),
     });

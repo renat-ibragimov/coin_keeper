@@ -8,8 +8,9 @@ purchase expenses would silently break (docs/04-business-rules.md, rule 4).
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
+from typing import Literal
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,16 +18,22 @@ from app.core.locale import DEFAULT_LOCALE
 from app.models import CoinSeries, Currency, Expense, User
 from app.models.enums import ExpenseCategory, UserRole
 from app.repositories.catalog import CatalogRepository
-from app.repositories.expenses import ExpenseFilters, ExpenseRepository, MonthlyTotal
+from app.repositories.expenses import DailyTotal, ExpenseFilters, ExpenseRepository, MonthlyTotal
 from app.repositories.rates import RateRepository
 from app.schemas.expenses import (
     ExpenseCategorySummary,
     ExpenseCreate,
     ExpenseMonthTotal,
     ExpenseOut,
+    ExpensePeriodTotal,
+    ExpensesChartOut,
     ExpensesSummaryOut,
     ExpenseUpdate,
 )
+
+# A day-by-day chart beyond this span would draw hundreds of bars with
+# nothing to read; past it the chart switches to one bar per month.
+DAILY_GRANULARITY_MAX_DAYS = 31
 
 
 def _shift_month(day: date, months: int) -> date:
@@ -87,12 +94,13 @@ class ExpenseService:
         self, filters: ExpenseFilters, *, limit: int, offset: int
     ) -> tuple[list[ExpenseOut], int]:
         rows, total = await self._repo.list_page(filters, limit=limit, offset=offset)
+        # The coin's name for every expense that names one, not only for
+        # purchases: a supporting expense may be attached to a coin too
+        # (grading, a holder for one particular piece), and the journal has
+        # to show the link the person made.
         items = [
-            self._out(
-                expense,
-                coin_title=title if expense.category == ExpenseCategory.COIN_PURCHASE else None,
-            )
-            for expense, title in rows
+            self._out(expense, coin_title=title, amount_usd=amount_usd, amount_eur=amount_eur)
+            for expense, title, amount_usd, amount_eur in rows
         ]
         return items, total
 
@@ -114,7 +122,11 @@ class ExpenseService:
             description=payload.description,
         )
         await self._repo.add(expense)
-        return self._out(expense)
+        return self._out(
+            expense,
+            amount_usd=await self._amount_usd_for(expense),
+            amount_eur=await self._amount_eur_for(expense),
+        )
 
     async def update(self, expense_id: int, payload: ExpenseUpdate) -> ExpenseOut:
         expense = await self._get_editable(expense_id)
@@ -134,7 +146,11 @@ class ExpenseService:
         if rate_needed:
             expense.rate_uah = await self._resolve_rate(expense.currency_code, expense.expense_date)
         await self._session.flush()
-        return self._out(expense)
+        return self._out(
+            expense,
+            amount_usd=await self._amount_usd_for(expense),
+            amount_eur=await self._amount_eur_for(expense),
+        )
 
     async def delete(self, expense_id: int) -> None:
         expense = await self._get_editable(expense_id)
@@ -171,7 +187,69 @@ class ExpenseService:
             prev_month_uah=prev_month,
         )
 
+    async def chart_summary(self, date_from: date, date_to: date) -> ExpensesChartOut:
+        span_days = (date_to - date_from).days
+        granularity: Literal["day", "month"]
+        if span_days <= DAILY_GRANULARITY_MAX_DAYS:
+            by_period = await self._daily_series(date_from, date_to)
+            granularity = "day"
+        else:
+            by_period = await self._monthly_range_series(date_from, date_to)
+            granularity = "month"
+
+        totals = await self._repo.summary(date_from=date_from, date_to=date_to)
+        by_category = [
+            ExpenseCategorySummary(category=row.category, count=row.count, total_uah=row.total_uah)
+            for row in sorted(totals, key=lambda row: row.total_uah, reverse=True)
+        ]
+        return ExpensesChartOut(
+            granularity=granularity, by_period=by_period, by_category=by_category
+        )
+
     # ------------------------------------------------------------- internals
+
+    async def _daily_series(self, date_from: date, date_to: date) -> list[ExpensePeriodTotal]:
+        """Every day in the range, oldest first, zero-filled where empty."""
+        totals = {
+            row.day: row for row in await self._repo.daily_totals(start=date_from, end=date_to)
+        }
+        empty = DailyTotal(day=date_from, coins_uah=Decimal(0), supporting_uah=Decimal(0))
+        days = [
+            date_from + timedelta(days=offset) for offset in range((date_to - date_from).days + 1)
+        ]
+        return [
+            ExpensePeriodTotal(
+                period=day.isoformat(),
+                coins_uah=totals.get(day, empty).coins_uah,
+                supporting_uah=totals.get(day, empty).supporting_uah,
+            )
+            for day in days
+        ]
+
+    async def _monthly_range_series(
+        self, date_from: date, date_to: date
+    ) -> list[ExpensePeriodTotal]:
+        """Every calendar month touching the range, oldest first, zero-filled where empty."""
+        start_month = date_from.replace(day=1)
+        end_month = date_to.replace(day=1)
+        totals = {
+            row.month: row
+            for row in await self._repo.monthly_totals(start=start_month, end=date_to)
+        }
+        months = []
+        cursor = start_month
+        while cursor <= end_month:
+            months.append(cursor)
+            cursor = _shift_month(cursor, 1)
+        empty = MonthlyTotal(month=start_month, coins_uah=Decimal(0), supporting_uah=Decimal(0))
+        return [
+            ExpensePeriodTotal(
+                period=month.strftime("%Y-%m"),
+                coins_uah=totals.get(month, empty).coins_uah,
+                supporting_uah=totals.get(month, empty).supporting_uah,
+            )
+            for month in months
+        ]
 
     async def _monthly_series(self) -> list[ExpenseMonthTotal]:
         """Last 12 calendar months, oldest first, zero-filled where empty."""
@@ -215,8 +293,32 @@ class ExpenseService:
         if series_id is not None and await self._session.get(CoinSeries, series_id) is None:
             raise BadReferenceError("Unknown seriesId.")
 
+    async def _amount_usd_for(self, expense: Expense) -> Decimal | None:
+        """The rate on the expense's OWN date, not today's -- what it cost
+        then (docs/BACKLOG.md, NBU rates follow-up). None if NBU has no
+        rate that far back, rather than a live-rate guess."""
+        usd_rate = await self._rates.rate_on("USD", expense.expense_date)
+        if usd_rate is None:
+            return None
+        amount_uah = expense.amount * (expense.rate_uah or Decimal(1))
+        return amount_uah / usd_rate
+
+    async def _amount_eur_for(self, expense: Expense) -> Decimal | None:
+        """Same as _amount_usd_for(), converted by the EUR rate instead."""
+        eur_rate = await self._rates.rate_on("EUR", expense.expense_date)
+        if eur_rate is None:
+            return None
+        amount_uah = expense.amount * (expense.rate_uah or Decimal(1))
+        return amount_uah / eur_rate
+
     @staticmethod
-    def _out(expense: Expense, *, coin_title: str | None = None) -> ExpenseOut:
+    def _out(
+        expense: Expense,
+        *,
+        coin_title: str | None = None,
+        amount_usd: Decimal | None = None,
+        amount_eur: Decimal | None = None,
+    ) -> ExpenseOut:
         return ExpenseOut(
             id=expense.id,
             category=expense.category,
@@ -224,6 +326,8 @@ class ExpenseService:
             currency_code=expense.currency_code,
             rate_uah=expense.rate_uah,
             amount_uah=expense.amount * (expense.rate_uah or Decimal(1)),
+            amount_usd=amount_usd,
+            amount_eur=amount_eur,
             expense_date=expense.expense_date,
             catalog_item_id=expense.catalog_item_id,
             collection_item_id=expense.collection_item_id,

@@ -158,7 +158,7 @@ async def test_owner_is_created_ready_to_use(db_session: AsyncSession, legacy_db
     settings = await db_session.scalar(select(UserSettings).where(UserSettings.user_id == owner.id))
     assert settings is not None
     # Carried over from the legacy key/value settings table.
-    assert settings.default_grade_circulation == "XF"
+    assert settings.default_grade == "XF"
 
 
 async def test_catalog_becomes_the_shared_one(db_session: AsyncSession, legacy_db: Path) -> None:

@@ -12,23 +12,22 @@ function fallbackBounds(): YearBounds {
 }
 
 /**
- * Overall bounds for a year filter: the selected country's own minYear/maxYear
- * when it has any coins at all, otherwise the span across every country in
- * the loaded list (countries with no coins skipped), otherwise 1900..this
- * year — an empty or bound-less directory still has to render two workable
- * dropdowns (docs/03-api-contract.md, docs/08-ui-map.md).
+ * Overall bounds for a year filter: the union of the selected countries' own
+ * minYear/maxYear when any of them has coins at all, otherwise the span
+ * across every country in the loaded list (countries with no coins
+ * skipped), otherwise 1900..this year — an empty or bound-less directory
+ * still has to render two workable dropdowns (docs/03-api-contract.md,
+ * docs/08-ui-map.md). An empty `countryIds` means "every country", the same
+ * as no selection did before country became multi-select (2026-09-12).
  */
-export function computeYearBounds(
-  countries: CountryOut[],
-  countryId: number | undefined,
-): YearBounds {
-  const country = countryId !== undefined ? countries.find((c) => c.id === countryId) : undefined;
-  if (country && country.minYear != null && country.maxYear != null) {
-    return { min: country.minYear, max: country.maxYear };
-  }
-  const years = countries.flatMap((c) =>
-    c.minYear != null && c.maxYear != null ? [c.minYear, c.maxYear] : [],
-  );
+export function computeYearBounds(countries: CountryOut[], countryIds: number[]): YearBounds {
+  const yearsOf = (list: CountryOut[]) =>
+    list.flatMap((c) => (c.minYear != null && c.maxYear != null ? [c.minYear, c.maxYear] : []));
+  const selected = countryIds.length > 0 ? countries.filter((c) => countryIds.includes(c.id)) : [];
+  // The selection's own span when it has any coins at all — falling back to
+  // the whole list (not straight to 1900..this year) when it does not, same
+  // as an unselected filter always has.
+  const years = yearsOf(selected).length > 0 ? yearsOf(selected) : yearsOf(countries);
   if (years.length === 0) return fallbackBounds();
   return { min: Math.min(...years), max: Math.max(...years) };
 }

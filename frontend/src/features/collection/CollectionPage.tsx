@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { fetchSeriesProgress } from '@/features/series/api';
 import { ApiError } from '@/shared/api/client';
+import type { CollectionGroup } from '@/shared/api/types';
 import { useDismissable } from '@/shared/lib/useDismissable';
 import { formatNumber, formatPercent, formatUah } from '@/shared/lib/format';
 import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
@@ -28,8 +29,8 @@ import {
   fetchCollection,
   fetchOwnedCountries,
   fetchOwnedDenominations,
+  fetchOwnedMaterials,
   fetchOwnedSeries,
-  PAGE_SIZE,
 } from './api';
 import { CollectionFiltersPanel } from './CollectionFiltersPanel';
 import { PositionCard } from './PositionCard';
@@ -49,6 +50,12 @@ import styles from './CollectionPage.module.css';
 // "Застосувати" does (docs/08-ui-map.md: apply-on-confirm, phone only).
 const EMPTY_FILTERS = parseCollectionFilters(new URLSearchParams());
 
+// Fixed column counts (1/2/3/5, CollectionPage.module.css) rather than an
+// auto-fill fluid grid: each one divides this evenly, so every page fills
+// complete rows instead of stranding a short one before the pager (same
+// fix as CatalogPage.tsx's GRID_PAGE_SIZE).
+const GRID_PAGE_SIZE = 30;
+
 const SORT_LABELS: Record<CollectionSort, string> = {
   title: 'collection.sortTitle',
   country: 'catalog.sortCountry',
@@ -60,17 +67,11 @@ const SORT_LABELS: Record<CollectionSort, string> = {
   grade: 'collection.sortGrade',
 };
 
-const GROUP_LABELS: Record<NonNullable<CollectionFilters['group']>, string> = {
+const GROUP_LABELS: Record<CollectionGroup, string> = {
   circulation: 'catalog.typeCirculation',
   commemorative: 'catalog.typeCommemorative',
   collector: 'catalog.typeCollector',
   other: 'catalog.typeOther',
-};
-
-const METAL_LABELS: Record<NonNullable<CollectionFilters['metalKind']>, string> = {
-  precious: 'catalog.metalPrecious',
-  base: 'catalog.metalBase',
-  unknown: 'catalog.metalUnknown',
 };
 
 export function CollectionPage() {
@@ -95,7 +96,7 @@ export function CollectionPage() {
   };
 
   const [searchParams] = useSearchParams();
-  const viewMode = useStoredViewMode('ck.viewMode.collection');
+  const viewMode = useStoredViewMode('ck.viewMode.collection', 'collectionViewMode');
   useEffect(() => {
     // Only on mount, and only when the URL itself says nothing: a shared
     // link's own `?view=` always wins over what was remembered here.
@@ -105,8 +106,8 @@ export function CollectionPage() {
   }, []);
 
   const collectionQuery = useQuery({
-    queryKey: ['collection', filters],
-    queryFn: () => fetchCollection(filters),
+    queryKey: ['collection', filters, GRID_PAGE_SIZE],
+    queryFn: () => fetchCollection(filters, GRID_PAGE_SIZE),
     placeholderData: keepPreviousData,
   });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
@@ -121,19 +122,27 @@ export function CollectionPage() {
     queryKey: ['collection', 'countries'],
     queryFn: () => fetchOwnedCountries(),
   });
+  // The panel only ever narrows against one country's own facets — a
+  // multi-country selection just shows the whole owned-scope list unnarrowed
+  // (same call as the catalog's own soleCountryId, CatalogPage.tsx).
+  const narrowCountryId = filters.countryIds.length === 1 ? filters.countryIds[0] : undefined;
   const seriesQuery = useQuery({
-    queryKey: ['collection', 'series', filters.countryId],
-    queryFn: () => fetchOwnedSeries(filters.countryId),
+    queryKey: ['collection', 'series', narrowCountryId],
+    queryFn: () => fetchOwnedSeries(narrowCountryId),
   });
   const denominationsQuery = useQuery({
-    queryKey: ['collection', 'denominations', filters.countryId],
-    queryFn: () => fetchOwnedDenominations(filters.countryId),
+    queryKey: ['collection', 'denominations', narrowCountryId],
+    queryFn: () => fetchOwnedDenominations(narrowCountryId),
+  });
+  const materialsQuery = useQuery({
+    queryKey: ['collection', 'materials', narrowCountryId],
+    queryFn: () => fetchOwnedMaterials(narrowCountryId),
   });
 
   const page = collectionQuery.data;
   const total = page?.total ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const shown = page ? page.items.length + (page.page - 1) * PAGE_SIZE : 0;
+  const pageCount = Math.max(1, Math.ceil(total / GRID_PAGE_SIZE));
+  const shown = page ? page.items.length + (page.page - 1) * GRID_PAGE_SIZE : 0;
   const dashboard = bootstrapQuery.data?.dashboard;
   const seriesStats = seriesProgressQuery.data
     ? {
@@ -158,26 +167,26 @@ export function CollectionPage() {
     if (source.q) {
       chips.push({ key: 'q', label: source.q, onRemove: () => apply({ q: '' }) });
     }
-    if (source.countryId !== undefined) {
-      const country = (countriesQuery.data ?? []).find((c) => c.id === source.countryId);
-      if (country) {
-        chips.push({
-          key: 'country',
-          label: country.name,
-          onRemove: () =>
-            apply({ countryId: undefined, seriesId: undefined, denominationId: undefined }),
-        });
-      }
+    for (const countryId of source.countryIds) {
+      const country = (countriesQuery.data ?? []).find((c) => c.id === countryId);
+      if (!country) continue;
+      chips.push({
+        key: `country-${countryId}`,
+        label: country.name,
+        onRemove: () => {
+          const countryIds = source.countryIds.filter((id) => id !== countryId);
+          apply({ countryIds, seriesIds: [], denominationIds: [], materialIds: [] });
+        },
+      });
     }
-    if (source.seriesId !== undefined) {
-      const series = (seriesQuery.data ?? []).find((s) => s.id === source.seriesId);
-      if (series) {
-        chips.push({
-          key: 'series',
-          label: series.name,
-          onRemove: () => apply({ seriesId: undefined }),
-        });
-      }
+    for (const seriesId of source.seriesIds) {
+      const series = (seriesQuery.data ?? []).find((s) => s.id === seriesId);
+      if (!series) continue;
+      chips.push({
+        key: `series-${seriesId}`,
+        label: series.name,
+        onRemove: () => apply({ seriesIds: source.seriesIds.filter((id) => id !== seriesId) }),
+      });
     }
     if (source.yearFrom !== undefined || source.yearTo !== undefined) {
       chips.push({
@@ -186,30 +195,31 @@ export function CollectionPage() {
         onRemove: () => apply({ yearFrom: undefined, yearTo: undefined }),
       });
     }
-    if (source.denominationId !== undefined) {
-      const denomination = (denominationsQuery.data ?? []).find(
-        (d) => d.id === source.denominationId,
-      );
-      if (denomination) {
-        chips.push({
-          key: 'denomination',
-          label: denomination.label,
-          onRemove: () => apply({ denominationId: undefined }),
-        });
-      }
-    }
-    if (source.group) {
+    for (const denominationId of source.denominationIds) {
+      const denomination = (denominationsQuery.data ?? []).find((d) => d.id === denominationId);
+      if (!denomination) continue;
       chips.push({
-        key: 'group',
-        label: t(GROUP_LABELS[source.group]),
-        onRemove: () => apply({ group: undefined }),
+        key: `denomination-${denominationId}`,
+        label: denomination.label,
+        onRemove: () =>
+          apply({ denominationIds: source.denominationIds.filter((id) => id !== denominationId) }),
       });
     }
-    if (source.metalKind) {
+    for (const group of source.groups) {
       chips.push({
-        key: 'metal',
-        label: t(METAL_LABELS[source.metalKind]),
-        onRemove: () => apply({ metalKind: undefined }),
+        key: `group-${group}`,
+        label: t(GROUP_LABELS[group]),
+        onRemove: () => apply({ groups: source.groups.filter((g) => g !== group) }),
+      });
+    }
+    for (const materialId of source.materialIds) {
+      const material = (materialsQuery.data ?? []).find((m) => m.id === materialId);
+      if (!material) continue;
+      chips.push({
+        key: `material-${materialId}`,
+        label: material.name,
+        onRemove: () =>
+          apply({ materialIds: source.materialIds.filter((id) => id !== materialId) }),
       });
     }
     if (source.grade) {
@@ -225,12 +235,20 @@ export function CollectionPage() {
   const activeChips = useMemo(
     () => buildChips(filters, update),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
-    [filters, countriesQuery.data, seriesQuery.data, denominationsQuery.data, update, t],
+    [
+      filters,
+      countriesQuery.data,
+      seriesQuery.data,
+      denominationsQuery.data,
+      materialsQuery.data,
+      update,
+      t,
+    ],
   );
   const draftChips = useMemo(
     () => buildChips(draft, (changes) => setDraft((current) => ({ ...current, ...changes }))),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildChips closes over the queries below, not worth listing
-    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, t],
+    [draft, countriesQuery.data, seriesQuery.data, denominationsQuery.data, materialsQuery.data, t],
   );
 
   const filtersPanel = (
@@ -242,6 +260,7 @@ export function CollectionPage() {
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
+      materials={materialsQuery.data ?? []}
       activeFilters={activeChips}
     />
   );
@@ -255,6 +274,7 @@ export function CollectionPage() {
       series={seriesQuery.data ?? []}
       seriesLoading={seriesQuery.isLoading}
       denominations={denominationsQuery.data ?? []}
+      materials={materialsQuery.data ?? []}
       activeFilters={draftChips}
     />
   );
@@ -268,7 +288,7 @@ export function CollectionPage() {
         actions={
           collectionEmpty ? undefined : (
             <>
-              <Link to="/collection/coins/new">
+              <Link to="/collection/add">
                 <Button>+ {t('card.addPurchase')}</Button>
               </Link>
               <Link to="/import">
@@ -290,7 +310,7 @@ export function CollectionPage() {
               <Link to="/catalog">
                 <Button>{t('common.backToCatalog')}</Button>
               </Link>
-              <Link to="/collection/coins/new">
+              <Link to="/collection/add">
                 <Button variant="secondary">{t('card.addPurchase')}</Button>
               </Link>
             </>

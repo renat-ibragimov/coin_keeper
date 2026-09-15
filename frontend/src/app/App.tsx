@@ -16,6 +16,7 @@ import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
 import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { parseFilters, serializeFilters } from '@/features/catalog/useCatalogFilters';
+import { AddPage } from '@/features/collection/add/AddPage';
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
@@ -30,6 +31,7 @@ import { ToastProvider } from '@/shared/ui';
 import { ComingSoon } from './ComingSoon';
 import { AppLayout } from './layout/AppLayout';
 import { ProtectedRoute } from './ProtectedRoute';
+import { ThemeSettingsSync } from './ThemeSettingsSync';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -61,16 +63,23 @@ function LocaleCacheReset() {
 }
 
 /**
- * The app never restores scroll position across navigations — every route
- * change (a new page, or a pagination query-string change on the same
- * path) should land at the top, not wherever the previous page was scrolled
- * to (docs/08-ui-map.md).
+ * The app never restores scroll position across navigations — a new route
+ * should land at the top, not wherever the previous page was scrolled to
+ * (docs/08-ui-map.md).
+ *
+ * Keyed on pathname alone, not the query string: a search-string change on
+ * the SAME path covers both "a new page of results" (pagination) and "the
+ * same rows, just re-sorted" (a sortable column header) — and only the
+ * first of those should jump the reader to the top. Pagination already
+ * gets its own explicit scrollPageToTop() (shared/ui/Pagination.tsx); a
+ * sort click clearing scroll position out from under someone reading the
+ * table was the actual bug (owner-reported, 2026-09-13).
  */
 function ScrollToTop() {
-  const { pathname, search } = useLocation();
+  const { pathname } = useLocation();
   useEffect(() => {
     scrollPageToTop();
-  }, [pathname, search]);
+  }, [pathname]);
   return null;
 }
 
@@ -140,11 +149,12 @@ function RedirectMissingToCatalog() {
 
 export function App() {
   return (
-    <ThemeProvider>
-      <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
         <LocaleCacheReset />
         <ToastProvider>
           <AuthProvider>
+            <ThemeSettingsSync />
             <BrowserRouter>
               <ScrollToTop />
               <Routes>
@@ -160,7 +170,7 @@ export function App() {
                   <Route element={<AppLayout />}>
                     <Route path="/collection" element={<DashboardPage />} />
                     <Route path="/collection/coins" element={<CollectionPage />} />
-                    <Route path="/collection/coins/new" element={<PurchaseFormPage />} />
+                    <Route path="/collection/add" element={<AddPage />} />
                     <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
                     <Route path="/collection/series" element={<SeriesListPage />} />
                     <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
@@ -179,11 +189,12 @@ export function App() {
                     <Route path="/missing" element={<RedirectMissingToCatalog />} />
                     <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
                     <Route path="/expenses" element={<Navigate to="/collection/money" replace />} />
-                    <Route
-                      path="/collection/new"
-                      element={<RedirectTo to="/collection/coins/new" />}
-                    />
                     <Route path="/collection/:id/edit" element={<RedirectCollectionEdit />} />
+                    <Route path="/collection/new" element={<RedirectTo to="/collection/add" />} />
+                    <Route
+                      path="/collection/coins/new"
+                      element={<RedirectTo to="/collection/add" />}
+                    />
                   </Route>
                 </Route>
                 <Route path="*" element={<Navigate to="/collection" replace />} />
@@ -191,7 +202,7 @@ export function App() {
             </BrowserRouter>
           </AuthProvider>
         </ToastProvider>
-      </QueryClientProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

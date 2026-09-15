@@ -41,6 +41,12 @@ class User(Base):
         Boolean, nullable=False, default=False, server_default="false"
     )
     locale: Mapped[str] = mapped_column(Text, nullable=False, default="uk", server_default="uk")
+    # The storage key of the profile picture, not a URL: the bucket's host can
+    # change, and the URL the API hands out is signed and short-lived anyway.
+    # A plain column rather than a media_files row — that table's CHECK ties
+    # every file to a catalog or collection item, and none of its
+    # provenance/role machinery means anything for a face.
+    avatar_key: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = created_at_column()
     updated_at: Mapped[datetime] = updated_at_column()
 
@@ -99,11 +105,43 @@ class UserSettings(Base):
     display_currency: Mapped[str] = mapped_column(
         Text, nullable=False, default="UAH", server_default="UAH"
     )
-    default_grade_commemorative: Mapped[str] = mapped_column(
+    # One default for every new purchase, regardless of catalog group: the
+    # commemorative/circulation split (migration 0014) never earned its
+    # complexity — a collector picks a grade per purchase anyway, and this is
+    # only ever the pre-filled starting point.
+    default_grade: Mapped[str] = mapped_column(
         Text, nullable=False, default="UNC", server_default="UNC"
     )
-    default_grade_circulation: Mapped[str] = mapped_column(
-        Text, nullable=False, default="VF", server_default="VF"
+    # On by default: a souvenir-packaging card (catalog_items.packaging_of_id
+    # points at the bare coin, docs/04-business-rules.md) shows in catalog
+    # listings until the viewer opts out.
+    show_packaging_variants: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
+    # Cross-device preferences (docs/03-api-contract.md): the client keeps a
+    # localStorage copy for instant paint before this row is fetched, but
+    # this is the value that survives a new browser or device.
+    theme: Mapped[str] = mapped_column(
+        Text, nullable=False, default="system", server_default="system"
+    )
+    catalog_view_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, default="cards", server_default="cards"
+    )
+    collection_view_mode: Mapped[str] = mapped_column(
+        Text, nullable=False, default="cards", server_default="cards"
+    )
+    # The primary amount stays UAH everywhere (it is the ledger currency —
+    # every purchase and expense converts to it, docs/04-business-rules.md);
+    # this only picks which already-computed historical/live conversion
+    # ("≈ $" today) shows alongside it. USD or EUR only: NBU rate history
+    # covers just those two (docs/03-api-contract.md).
+    secondary_currency: Mapped[str] = mapped_column(
+        Text, nullable=False, default="USD", server_default="USD"
+    )
+    # Pre-fills the purchase form's storage location for a brand-new purchase,
+    # same idea as default_grade. NULL until the owner sets one.
+    default_storage_location_id: Mapped[int | None] = mapped_column(
+        ForeignKey("storage_locations.id", ondelete="SET NULL")
     )
     updated_at: Mapped[datetime] = updated_at_column()
 

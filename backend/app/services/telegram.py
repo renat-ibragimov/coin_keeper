@@ -12,6 +12,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
@@ -22,7 +23,7 @@ from app.core.telegram.messages import (
     link_confirmed_message,
     no_runs_message,
 )
-from app.models import User
+from app.models import AuthToken, User
 from app.models.enums import AuthTokenKind, UserRole
 from app.repositories.jobs import JobRunRepository
 from app.repositories.telegram import TelegramRecipientRepository
@@ -67,6 +68,15 @@ class TelegramLinkService:
         return [chat.chat_id for chat in await self._recipients.list_for_user(user.id)]
 
     async def unlink(self, user: User) -> int:
+        await self._session.execute(
+            update(AuthToken)
+            .where(
+                AuthToken.user_id == user.id,
+                AuthToken.kind == AuthTokenKind.TELEGRAM_LINK,
+                AuthToken.used_at.is_(None),
+            )
+            .values(used_at=datetime.now(UTC))
+        )
         return await self._recipients.unlink_user(user.id)
 
 
@@ -90,7 +100,15 @@ class TelegramUpdateService:
         if not isinstance(chat, dict) or not isinstance(text, str):
             return
         chat_id = chat.get("id")
-        if not isinstance(chat_id, int):
+        sender = message.get("from")
+        if (
+            type(chat_id) is not int
+            or chat_id <= 0
+            or chat.get("type") != "private"
+            or not isinstance(sender, dict)
+            or sender.get("id") != chat_id
+            or sender.get("is_bot") is not False
+        ):
             return
 
         command, _, argument = text.strip().partition(" ")
@@ -105,13 +123,18 @@ class TelegramUpdateService:
         if not code:
             return
         record = await self._tokens.get_usable(
-            token_hash=hash_token(code), kind=AuthTokenKind.TELEGRAM_LINK
+            token_hash=hash_token(code), kind=AuthTokenKind.TELEGRAM_LINK, for_update=True
         )
         if record is None:
             logger.info("telegram link attempt with an unusable code from chat %s", chat_id)
             return
         user = await self._users.get_by_id(record.user_id)
-        if user is None or user.role != UserRole.ADMIN:
+        if (
+            user is None
+            or user.role != UserRole.ADMIN
+            or not user.is_active
+            or not user.email_verified
+        ):
             # The role can have been taken away between issuing the code and
             # pressing Start.
             logger.info("telegram link code belonged to a non-admin, ignoring")
@@ -122,7 +145,7 @@ class TelegramUpdateService:
         await self._sender.send(TelegramMessage(chat_id=chat_id, text=link_confirmed_message()))
 
     async def _last(self, chat_id: int) -> None:
-        if await self._recipients.get_by_chat(chat_id) is None:
+        if await self._recipients.get_authorized_chat(chat_id) is None:
             return
         runs, _ = await JobRunRepository(self._session).list_runs(job=None, limit=1, offset=0)
         if not runs:

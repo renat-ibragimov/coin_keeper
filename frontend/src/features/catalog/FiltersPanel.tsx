@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { CountryOut, DenominationOut, SeriesOut } from '@/shared/api/types';
+import type { CoinMaterial, CountryOut, DenominationOut, SeriesOut } from '@/shared/api/types';
 import { buildYearList, clampYear, computeYearBounds } from '@/shared/lib/yearRange';
-import type { ActiveFilterChip } from '@/shared/ui';
-import { Combobox, FiltersShell, Input, Select } from '@/shared/ui';
+import type { ActiveFilterChip, MultiSelectOption } from '@/shared/ui';
+import { Combobox, FiltersShell, Input, MultiSelect, Select } from '@/shared/ui';
 
 import type { CatalogFilters } from './useCatalogFilters';
 import styles from './FiltersPanel.module.css';
@@ -17,7 +17,16 @@ interface FiltersPanelProps {
   series: SeriesOut[];
   seriesLoading: boolean;
   denominations: DenominationOut[];
+  materials: CoinMaterial[];
   activeFilters: ActiveFilterChip[];
+}
+
+function idOptions(items: { id: number; name: string }[]): MultiSelectOption[] {
+  return items.map((item) => ({ value: String(item.id), label: item.name }));
+}
+
+function intValues(raw: string[]): number[] {
+  return raw.map((value) => Number.parseInt(value, 10)).filter((value) => Number.isFinite(value));
 }
 
 export function FiltersPanel({
@@ -28,6 +37,7 @@ export function FiltersPanel({
   series,
   seriesLoading,
   denominations,
+  materials,
   activeFilters,
 }: FiltersPanelProps) {
   const { t } = useTranslation();
@@ -46,13 +56,13 @@ export function FiltersPanel({
     return Number.isFinite(value) && value > 0 ? value : undefined;
   };
 
-  // Bounds for the year fields' suggestion lists: the selected country's own
-  // range, or the whole loaded catalog directory when none is selected
-  // (docs/03). Each field additionally narrows against the other's current
-  // value, so "до" never suggests a year before "від" and vice versa. Both
-  // fields stay free-text inputs — the list is a suggestion, not a
-  // constraint (docs/08-ui-map.md).
-  const yearBounds = computeYearBounds(countries, filters.countryId);
+  // Bounds for the year fields' suggestion lists: the union of the selected
+  // countries' own range, or the whole loaded catalog directory when none is
+  // selected (docs/03). Each field additionally narrows against the other's
+  // current value, so "до" never suggests a year before "від" and vice
+  // versa. Both fields stay free-text inputs — the list is a suggestion, not
+  // a constraint (docs/08-ui-map.md).
+  const yearBounds = computeYearBounds(countries, filters.countryIds);
   const yearFromList = buildYearList({
     min: yearBounds.min,
     max: filters.yearTo ?? yearBounds.max,
@@ -61,6 +71,13 @@ export function FiltersPanel({
     min: filters.yearFrom ?? yearBounds.min,
     max: yearBounds.max,
   });
+
+  const groupOptions: MultiSelectOption[] = [
+    { value: 'circulation', label: t('catalog.typeCirculation') },
+    { value: 'commemorative', label: t('catalog.typeCommemorative') },
+    { value: 'collector', label: t('catalog.typeCollector') },
+    { value: 'other', label: t('catalog.typeOther') },
+  ];
 
   return (
     <FiltersShell activeFilters={activeFilters} onReset={reset}>
@@ -75,50 +92,42 @@ export function FiltersPanel({
       </div>
 
       <div className={styles.field}>
-        <Select
+        <MultiSelect
           label={t('catalog.country')}
           centerLabel
-          value={filters.countryId ?? ''}
-          onChange={(event) => {
-            const countryId = numberOrUndefined(event.target.value);
-            const newBounds = computeYearBounds(countries, countryId);
+          placeholder={t('catalog.allCountries')}
+          options={idOptions(countries)}
+          value={filters.countryIds.map(String)}
+          onChange={(raw) => {
+            const countryIds = intValues(raw);
+            const newBounds = computeYearBounds(countries, countryIds);
             update({
-              countryId,
-              // A new country invalidates the series and denomination chosen under the old one.
-              seriesId: undefined,
-              denominationId: undefined,
+              countryIds,
+              // A changed country selection invalidates the series,
+              // denomination and material chosen under the old one.
+              seriesIds: [],
+              denominationIds: [],
+              materialIds: [],
               // Out-of-range years follow the country instead of silently clearing.
               yearFrom: clampYear(filters.yearFrom, newBounds),
               yearTo: clampYear(filters.yearTo, newBounds),
             });
           }}
-        >
-          <option value="">{t('catalog.allCountries')}</option>
-          {countries.map((country) => (
-            <option key={country.id} value={country.id}>
-              {country.name}
-            </option>
-          ))}
-        </Select>
+        />
       </div>
 
       <div className={styles.field}>
-        <Select
+        <MultiSelect
           label={t('catalog.tableSeries')}
           centerLabel
-          value={filters.seriesId ?? ''}
+          placeholder={t('catalog.allSeries')}
+          options={idOptions(series)}
+          value={filters.seriesIds.map(String)}
           disabled={seriesLoading}
-          onChange={(event) => update({ seriesId: numberOrUndefined(event.target.value) })}
+          onChange={(raw) => update({ seriesIds: intValues(raw) })}
           searchable
           searchPlaceholder={t('catalog.seriesSearchPlaceholder')}
-        >
-          <option value="">{t('catalog.allSeries')}</option>
-          {series.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </Select>
+        />
       </div>
 
       <div className={styles.yearField}>
@@ -147,53 +156,36 @@ export function FiltersPanel({
       </div>
 
       <div className={styles.field}>
-        <Select
+        <MultiSelect
           label={t('catalog.denomination')}
           centerLabel
-          value={filters.denominationId ?? ''}
-          onChange={(event) => update({ denominationId: numberOrUndefined(event.target.value) })}
-        >
-          <option value="">{t('catalog.anyDenomination')}</option>
-          {denominations.map((denomination) => (
-            <option key={denomination.id} value={denomination.id}>
-              {denomination.label}
-            </option>
-          ))}
-        </Select>
+          placeholder={t('catalog.anyDenomination')}
+          options={denominations.map((d) => ({ value: String(d.id), label: d.label }))}
+          value={filters.denominationIds.map(String)}
+          onChange={(raw) => update({ denominationIds: intValues(raw) })}
+        />
       </div>
 
       <div className={styles.field}>
-        <Select
+        <MultiSelect
           label={t('catalog.type')}
           centerLabel
-          value={filters.group ?? ''}
-          onChange={(event) =>
-            update({ group: (event.target.value || undefined) as CatalogFilters['group'] })
-          }
-        >
-          <option value="">{t('catalog.all')}</option>
-          <option value="circulation">{t('catalog.typeCirculation')}</option>
-          <option value="commemorative">{t('catalog.typeCommemorative')}</option>
-          <option value="collector">{t('catalog.typeCollector')}</option>
-        </Select>
+          placeholder={t('catalog.all')}
+          options={groupOptions}
+          value={filters.groups}
+          onChange={(raw) => update({ groups: raw as CatalogFilters['groups'] })}
+        />
       </div>
 
       <div className={styles.field}>
-        <Select
+        <MultiSelect
           label={t('catalog.metal')}
           centerLabel
-          value={filters.metalKind ?? ''}
-          onChange={(event) =>
-            update({
-              metalKind: (event.target.value || undefined) as CatalogFilters['metalKind'],
-            })
-          }
-        >
-          <option value="">{t('catalog.all')}</option>
-          <option value="precious">{t('catalog.metalPrecious')}</option>
-          <option value="base">{t('catalog.metalBase')}</option>
-          <option value="unknown">{t('catalog.metalUnknown')}</option>
-        </Select>
+          placeholder={t('catalog.all')}
+          options={materials.map((m) => ({ value: String(m.id), label: m.name }))}
+          value={filters.materialIds.map(String)}
+          onChange={(raw) => update({ materialIds: intValues(raw) })}
+        />
       </div>
 
       <div className={styles.field}>

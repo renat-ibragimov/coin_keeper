@@ -7,20 +7,25 @@ a 403.
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.locale import DEFAULT_LOCALE, pick_name
+from app.core.config import get_settings
+from app.core.locale import DEFAULT_LOCALE, LOCALE_EN, LOCALE_UK, pick_name
+from app.db.session import get_session_factory
 from app.models import (
     AuditLog,
     CatalogItem,
     CoinSeries,
     Country,
     Denomination,
+    EdgeType,
     Material,
-    MediaFile,
+    QualityType,
     User,
 )
 from app.models.enums import TranslationSource, UserRole
@@ -28,6 +33,8 @@ from app.reference_data.denominations import render_label
 from app.repositories.catalog import CatalogFilters, CatalogRepository, CatalogRow
 from app.repositories.collection import CollectionRepository
 from app.repositories.media import MediaRepository
+from app.repositories.rates import RateRepository
+from app.repositories.users import UserRepository
 from app.schemas.catalog import (
     ArchiveStateOut,
     CatalogCard,
@@ -36,11 +43,22 @@ from app.schemas.catalog import (
     CatalogItemUpdate,
     CatalogListItem,
     CoinDenomination,
-    CoinImageOut,
+    CoinDescriptions,
+    CoinEdgeType,
     CoinMaterial,
+    CoinQualityType,
+    NewCatalogItemIn,
     PriceHistoryItem,
 )
-from app.services.media_urls import CatalogImages, CoinImage, MediaUrlBuilder
+from app.services.media_urls import (
+    CatalogImages,
+    MediaUrlBuilder,
+    image_out,
+    images_by_catalog_item,
+)
+from app.services.translation import TranslationResult, translate_coin_title
+
+logger = logging.getLogger("app.services.catalog")
 
 
 class CatalogError(Exception):
@@ -88,17 +106,6 @@ def display_title(item: CatalogItem, locale: str = DEFAULT_LOCALE) -> str:
     return pick_name(locale, uk=item.title_uk, en=item.title_en, original=item.title_original)
 
 
-def _image_out(image: CoinImage | None) -> CoinImageOut | None:
-    if image is None:
-        return None
-    return CoinImageOut(
-        preview=image.preview,
-        medium=image.medium,
-        large=image.large,
-        attribution=image.attribution,
-    )
-
-
 def denomination_out(denomination: Denomination | None, locale: str) -> CoinDenomination | None:
     if denomination is None:
         return None
@@ -121,6 +128,90 @@ def material_out(material: Material | None, locale: str) -> CoinMaterial | None:
     )
 
 
+def edge_type_out(edge_type: EdgeType | None, locale: str) -> CoinEdgeType | None:
+    if edge_type is None:
+        return None
+    return CoinEdgeType(
+        id=edge_type.id,
+        code=edge_type.code,
+        name=edge_type.name_uk if locale == "uk" else edge_type.name_en,
+    )
+
+
+def quality_type_out(quality_type: QualityType | None, locale: str) -> CoinQualityType | None:
+    if quality_type is None:
+        return None
+    return CoinQualityType(
+        id=quality_type.id,
+        code=quality_type.code,
+        name=quality_type.name_uk if locale == "uk" else quality_type.name_en,
+    )
+
+
+def _descriptions_json(
+    locale: str, *, general: str | None, obverse: str | None, reverse: str | None
+) -> dict[str, object] | None:
+    """The `descriptions` column as docs/02-data-model.md fixes its shape:
+    every locale key and every part key present, `null` where there is no
+    text. Nothing typed at all leaves the column NULL — an untouched row,
+    not a row full of nulls."""
+    texts = {
+        "general": (general or "").strip() or None,
+        "obverse": (obverse or "").strip() or None,
+        "reverse": (reverse or "").strip() or None,
+    }
+    if not any(texts.values()):
+        return None
+    empty = {"general": None, "obverse": None, "reverse": None}
+    return {
+        LOCALE_UK: texts if locale == LOCALE_UK else empty,
+        LOCALE_EN: texts if locale != LOCALE_UK else empty,
+    }
+
+
+def description_out(descriptions: dict[str, object] | None, locale: str) -> CoinDescriptions | None:
+    """Text for the requested locale, falling back to the other one where the
+    parser found nothing to write there (docs/02-data-model.md)."""
+    if not descriptions:
+        return None
+    other = "en" if locale == "uk" else "uk"
+    primary = descriptions.get(locale)
+    fallback = descriptions.get(other)
+
+    def pick(key: str) -> str | None:
+        for locale_texts in (primary, fallback):
+            if isinstance(locale_texts, dict):
+                value = locale_texts.get(key)
+                if isinstance(value, str):
+                    return value
+        return None
+
+    general, obverse, reverse = pick("general"), pick("obverse"), pick("reverse")
+    if general is None and obverse is None and reverse is None:
+        return None
+    return CoinDescriptions(general=general, obverse=obverse, reverse=reverse)
+
+
+def _artist_name(entry: object, locale: str) -> str | None:
+    if isinstance(entry, str):
+        return entry
+    if isinstance(entry, dict):
+        other = "en" if locale == "uk" else "uk"
+        value = entry.get(locale) or entry.get(other)
+        return value if isinstance(value, str) else None
+    return None
+
+
+def artist_names(artists: dict[str, object] | None, role: str, locale: str) -> list[str]:
+    if not artists:
+        return []
+    entries = artists.get(role)
+    if not isinstance(entries, list):
+        return []
+    names = (_artist_name(entry, locale) for entry in entries)
+    return [name for name in names if name]
+
+
 class CatalogService:
     def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
         self._session = session
@@ -131,19 +222,45 @@ class CatalogService:
             session, user_id=user.id, is_admin=self._is_admin, locale=locale
         )
         self._media = MediaRepository(session, user_id=user.id)
+        self._users = UserRepository(session)
+        self._rates = RateRepository(session)
         self._urls = MediaUrlBuilder()
 
     # --------------------------------------------------------------- reading
 
     async def list_catalog(
-        self, filters: CatalogFilters, *, limit: int, offset: int
+        self,
+        filters: CatalogFilters,
+        *,
+        limit: int,
+        offset: int,
+        require_confirmed: bool = True,
+        apply_storefront: bool = True,
     ) -> tuple[list[CatalogListItem], int]:
-        page = await self._repo.list_items(filters, limit=limit, offset=offset)
+        """`require_confirmed=False` is for a caller about the user's own
+        collection rather than the catalogue browse experience (a series
+        screen) -- never from a request filter, see storefront_visible()
+        (app/repositories/catalog.py, docs/04-business-rules.md §13a).
+        `apply_storefront=False` goes one further and is the typeahead's
+        alone: see the same function's docstring."""
+        settings = await self._users.get_settings(self._user.id)
+        filters.show_packaging_variants = settings is None or settings.show_packaging_variants
+        page = await self._repo.list_items(
+            filters,
+            limit=limit,
+            offset=offset,
+            require_confirmed=require_confirmed,
+            apply_storefront=apply_storefront,
+        )
         images = await self._images_for([row.item.id for row in page.rows])
         items = [
             self._list_item(row, images.get(row.item.id, CatalogImages())) for row in page.rows
         ]
         return items, page.total
+
+    async def list_confirmed_materials(self, country_id: int | None) -> list[CoinMaterial]:
+        materials = await self._repo.list_confirmed_materials(country_id)
+        return [out for material in materials if (out := material_out(material, self._locale))]
 
     async def get_card(self, item_id: int) -> CatalogCard:
         row = await self._repo.get_row(item_id)
@@ -178,46 +295,100 @@ class CatalogService:
         row = await self._repo.get_row(item_id)
         if row is None:
             raise ItemNotFoundError
-        instances = await CollectionRepository(self._session, owner_id=self._user.id).list_for_item(
-            item_id
-        )
-        return [
-            CatalogCollectionItemOut(
-                id=instance.id,
-                catalog_item_id=instance.catalog_item_id,
-                quantity=instance.quantity,
-                grade=instance.grade,
-                acquisition_date=instance.acquisition_date,
-                seller=instance.seller,
-                purchase_price=instance.purchase_price,
-                purchase_currency=instance.purchase_currency,
-                purchase_rate_uah=instance.purchase_rate_uah,
-                total_uah=(instance.purchase_price or Decimal(0))
+        instances = await CollectionRepository(
+            self._session, owner_id=self._user.id, locale=self._locale
+        ).list_for_item(item_id)
+        out = []
+        for instance, storage_location in instances:
+            total_uah = (
+                (instance.purchase_price or Decimal(0))
                 * (instance.purchase_rate_uah or Decimal(1))
-                * instance.quantity,
-                notes=instance.notes,
+                * instance.quantity
             )
-            for instance in instances
-        ]
+            # The rate on THIS instance's own purchase date, not today's --
+            # what it cost then, not a live estimate (docs/BACKLOG.md,
+            # NBU rates follow-up).
+            usd_rate, eur_rate = (
+                (
+                    await self._rates.rate_on("USD", instance.acquisition_date),
+                    await self._rates.rate_on("EUR", instance.acquisition_date),
+                )
+                if instance.acquisition_date is not None
+                else (None, None)
+            )
+            out.append(
+                CatalogCollectionItemOut(
+                    id=instance.id,
+                    catalog_item_id=instance.catalog_item_id,
+                    quantity=instance.quantity,
+                    grade=instance.grade,
+                    acquisition_date=instance.acquisition_date,
+                    seller=instance.seller,
+                    purchase_price=instance.purchase_price,
+                    purchase_currency=instance.purchase_currency,
+                    purchase_rate_uah=instance.purchase_rate_uah,
+                    total_uah=total_uah,
+                    total_usd=total_uah / usd_rate if usd_rate else None,
+                    total_eur=total_uah / eur_rate if eur_rate else None,
+                    storage_location=storage_location,
+                    notes=instance.notes,
+                )
+            )
+        return out
 
     # --------------------------------------------------------------- writing
 
     async def create_item(self, payload: CatalogItemCreate) -> CatalogCard:
         if payload.shared and not self._is_admin:
             raise SharedRecordForbiddenError
-        await self._check_references(
-            country_id=payload.country_id,
-            series_id=payload.series_id,
-            denomination_id=payload.denomination_id,
-            composition_id=payload.composition_id,
-        )
-        values = payload.model_dump(exclude={"shared"})
-        item = CatalogItem(
-            **values,
+        item = await self._insert(
+            payload.model_dump(exclude={"shared"}),
             created_by=None if payload.shared else self._user.id,
         )
-        await self._repo.add(item)
         return await self.get_card(item.id)
+
+    async def create_personal_item(self, payload: NewCatalogItemIn) -> CatalogItem:
+        """A personal item entered on the purchase form, in the caller's transaction.
+
+        Returns the row rather than a card on purpose: the caller is
+        CollectionService, which goes on to create the instance and the
+        purchase expense before anything is committed (docs/04-business-rules.md,
+        rule 4). Both language slots start out holding the typed text, exactly
+        as a new storage location does, and the background job replaces the
+        one that is a translation rather than a copy.
+        """
+        values = payload.model_dump()
+        title = values["title_original"]
+        descriptions = _descriptions_json(
+            self._locale,
+            general=values.pop("description"),
+            obverse=values.pop("description_obverse"),
+            reverse=values.pop("description_reverse"),
+        )
+        return await self._insert(
+            {
+                **values,
+                "title_uk": title,
+                "title_uk_source": TranslationSource.MANUAL,
+                "title_en": title,
+                "title_en_source": TranslationSource.MANUAL,
+                "descriptions": descriptions,
+            },
+            created_by=self._user.id,
+        )
+
+    async def _insert(self, values: dict[str, Any], *, created_by: int | None) -> CatalogItem:
+        await self._check_references(
+            country_id=values["country_id"],
+            series_id=values.get("series_id"),
+            denomination_id=values.get("denomination_id"),
+            composition_id=values.get("composition_id"),
+            edge_type_id=values.get("edge_type_id"),
+            quality_type_id=values.get("quality_type_id"),
+        )
+        item = CatalogItem(**values, created_by=created_by)
+        await self._repo.add(item)
+        return item
 
     async def update_item(self, item_id: int, payload: CatalogItemUpdate) -> CatalogCard:
         item = await self._get_writable(item_id)
@@ -297,7 +468,7 @@ class CatalogService:
         """
         collection = CollectionRepository(self._session, owner_id=self._user.id)
         instances = await collection.list_for_item(item.id)
-        for instance in instances:
+        for instance, _storage_location in instances:
             expense = await collection.purchase_expense_for(instance.id)
             if expense is not None:
                 await self._session.delete(expense)
@@ -332,6 +503,8 @@ class CatalogService:
         series_id: int | None,
         denomination_id: int | None,
         composition_id: int | None = None,
+        edge_type_id: int | None = None,
+        quality_type_id: int | None = None,
     ) -> None:
         country = await self._session.get(Country, country_id)
         if country is None:
@@ -346,6 +519,13 @@ class CatalogService:
                 raise BadReferenceError("Unknown denominationId or it belongs to another country.")
         if composition_id is not None and await self._session.get(Material, composition_id) is None:
             raise BadReferenceError("Unknown compositionId.")
+        if edge_type_id is not None and await self._session.get(EdgeType, edge_type_id) is None:
+            raise BadReferenceError("Unknown edgeTypeId.")
+        if (
+            quality_type_id is not None
+            and await self._session.get(QualityType, quality_type_id) is None
+        ):
+            raise BadReferenceError("Unknown qualityTypeId.")
 
     def _audit(self, action: str, entity_id: int, details: dict[str, object] | None) -> None:
         self._session.add(
@@ -359,14 +539,8 @@ class CatalogService:
         )
 
     async def _images_for(self, item_ids: list[int]) -> dict[int, CatalogImages]:
-        files = await self._media.visible_for_catalog_items(item_ids)
-        by_item: dict[int, list[MediaFile]] = {}
-        for media in files:
-            if media.catalog_item_id is not None:
-                by_item.setdefault(media.catalog_item_id, []).append(media)
-        return {
-            item_id: self._urls.pick_catalog_images(items) for item_id, items in by_item.items()
-        }
+        """The catalog photo, or the owner's own — see images_by_catalog_item."""
+        return await images_by_catalog_item(self._media, self._urls, item_ids)
 
     def _base_fields(self, row: CatalogRow, images: CatalogImages) -> dict[str, object]:
         item = row.item
@@ -375,6 +549,7 @@ class CatalogService:
             "country": row.country,
             "series_name": row.series_name,
             "denomination": denomination_out(row.denomination, self._locale),
+            "denomination_text": item.denomination_text,
             "year": item.issue_year,
             "title": display_title(item, self._locale),
             "title_original": item.title_original,
@@ -384,7 +559,11 @@ class CatalogService:
             "title_en": item.title_en,
             "title_en_source": item.title_en_source,
             "variety": item.subtype,
-            "catalog_number": item.catalog_km or item.catalog_uc or item.catalog_numista,
+            # A named number wins; the unattributed one is the fallback a
+            # hand-entered coin brings (docs/02-data-model.md).
+            "catalog_number": (
+                item.catalog_km or item.catalog_uc or item.catalog_numista or item.catalog_number
+            ),
             "collection_group": item.collection_group,
             "metal_kind": item.metal_kind,
             "composition": material_out(row.composition, self._locale),
@@ -394,8 +573,10 @@ class CatalogService:
             "price_observed_at": row.price_observed_at,
             "quantity_owned": row.quantity_owned,
             "purchase_total_uah": row.purchase_total_uah,
-            "obverse_image": _image_out(images.obverse),
-            "reverse_image": _image_out(images.reverse),
+            "purchase_total_usd": row.purchase_total_usd,
+            "purchase_total_eur": row.purchase_total_eur,
+            "obverse_image": image_out(images.obverse),
+            "reverse_image": image_out(images.reverse),
             "thumbnail_url": images.thumbnail_url,
             "is_own": item.created_by == self._user.id,
             "is_archived": item.is_archived,
@@ -422,13 +603,71 @@ class CatalogService:
             diameter_mm=item.diameter_mm,
             thickness_mm=item.thickness_mm,
             shape=item.shape,
+            edge_type=edge_type_out(row.edge_type, self._locale),
             edge=item.edge,
             orientation=item.orientation,
+            quality_type=quality_type_out(row.quality_type, self._locale),
+            quality=item.quality,
             catalog_km=item.catalog_km,
             catalog_uc=item.catalog_uc,
             catalog_numista=item.catalog_numista,
             notes=item.notes,
+            description=description_out(item.descriptions, self._locale),
+            designers=artist_names(item.artists, "designers", self._locale),
+            sculptors=artist_names(item.artists, "sculptors", self._locale),
             archived_at=item.archived_at,
             created_at=item.created_at,
             updated_at=item.updated_at,
         )
+
+
+def apply_title_translation(item: CatalogItem, result: TranslationResult) -> None:
+    """The detected language's own slot stays exactly what the collector typed
+    -- only the other one is filled in by the model. Pure and DB-free on
+    purpose, the same way storage locations do it (app/services/storage_locations.py):
+    the one part with a real judgment call is testable without a database.
+    """
+    if result.language != "uk":
+        item.title_uk = result.name_uk
+        item.title_uk_source = TranslationSource.LLM
+    if result.language != "en":
+        item.title_en = result.name_en
+        item.title_en_source = TranslationSource.LLM
+
+
+async def translate_title_in_background(item_id: int) -> None:
+    """The BackgroundTasks entry point for a hand-entered coin: opens its own
+    session, since the request's is long gone by the time this runs.
+
+    Every early return is logged. A silent no-op leaves the record showing the
+    collector's own wording in both language slots forever, with nothing in
+    the interface to explain why -- the only way to notice is a log line (the
+    same lesson as storage locations, docs/04-business-rules.md, п. 16).
+    """
+    api_key = get_settings().anthropic_api_key
+    if not api_key:
+        logger.warning("catalog title translation skipped: no ANTHROPIC_API_KEY configured")
+        return
+    async with get_session_factory()() as session:
+        try:
+            item = await session.get(CatalogItem, item_id)
+            if item is None:
+                logger.warning("catalog item %s vanished before translation ran", item_id)
+                return
+            country = await session.get(Country, item.country_id)
+            result = await translate_coin_title(
+                item.title_original,
+                api_key,
+                country=(country.name_en or country.name_original) if country else None,
+                year=item.issue_year,
+            )
+            if result is None:
+                logger.warning("catalog item %s: translate_coin_title returned None", item_id)
+                return
+            apply_title_translation(item, result)
+            await session.commit()
+            logger.info(
+                "catalog item %s title translated (original language %s)", item_id, result.language
+            )
+        except Exception:
+            logger.exception("catalog title translation failed for %s", item_id)

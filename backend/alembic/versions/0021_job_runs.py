@@ -13,8 +13,8 @@ parser already uses ('ok', 'partial', 'failed'); only 'running' is ours.
 having to know what a given job counts. `details` stays empty on a good run:
 per docs/13-admin.md the report is one line unless something went wrong.
 
-Revision ID: 0008
-Revises: 0007
+Revision ID: 0021
+Revises: 0020
 Create Date: 2026-09-10
 """
 
@@ -27,8 +27,8 @@ from sqlalchemy.dialects import postgresql
 
 from alembic import op
 
-revision: str = "0008"
-down_revision: str | None = "0007"
+revision: str = "0021"
+down_revision: str | None = "0020"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -52,10 +52,16 @@ def upgrade() -> None:
         sa.Column("details", sa.Text(), nullable=True),
         sa.Column("exit_code", sa.SmallInteger(), nullable=True),
         sa.Column(
-            "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
         ),
         sa.Column(
-            "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
         ),
     )
     op.create_check_constraint(

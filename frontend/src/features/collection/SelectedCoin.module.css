@@ -1,0 +1,163 @@
+.coinHeader {
+  max-width: 560px;
+  text-align: center;
+}
+
+.coinBadges {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.coinBadges:empty {
+  display: none;
+}
+
+.coinTitle {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(22px, 2.6vw, 28px);
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+
+.coinTitle:hover {
+  color: var(--color-accent);
+}
+
+.coinMeta {
+  margin-top: var(--space-1);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.changeItem {
+  display: block;
+  margin: var(--space-2) auto 0;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-family: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.photos {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-5);
+}
+
+.photos {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-5);
+}
+
+.photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.photoFrame {
+  position: relative;
+  width: 132px;
+  height: 132px;
+}
+
+.photoImage {
+  width: 132px;
+  height: 132px;
+  border-radius: 50%;
+  background: var(--color-surface-control);
+}
+
+.photoLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* The hover control: a full circle over the photo, pencil plus label. Only
+   for pointers that actually hover — a touch tap would otherwise need two
+   taps, one to reveal it and one to use it. */
+.photoOverlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  background: rgb(0 0 0 / 55%);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--duration-fast) var(--ease-standard);
+}
+
+@media (hover: hover) {
+  .photoOverlay {
+    display: flex;
+  }
+
+  .photoFrame:hover .photoOverlay,
+  .photoFrame:focus-within .photoOverlay {
+    opacity: 1;
+  }
+}
+
+/* No hover to reveal a control on: a small permanent badge in the corner instead. */
+.photoEdit {
+  display: none;
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+@media (hover: none) {
+  .photoEdit {
+    display: flex;
+  }
+}
+
+.photoRemove {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+  background: var(--color-danger);
+  color: #fff;
+  cursor: pointer;
+}

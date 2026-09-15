@@ -29,6 +29,9 @@ PREVIEW_SIDE: Final = 300
 MEDIUM_SIDE: Final = 600
 LARGE_SIDE: Final = 1200
 VARIANT_SIDES: Final = (PREVIEW_SIDE, MEDIUM_SIDE, LARGE_SIDE)
+# A profile picture is shown at 26-40 css px and nowhere else, so one size is
+# enough; 256 still covers a 3x display without asking the browser to scale up.
+AVATAR_SIDE: Final = 256
 ACCEPTED_FORMATS = frozenset({"JPEG", "PNG", "WEBP"})
 
 
@@ -77,6 +80,49 @@ def process_image(payload: bytes, *, remove_background: bool = True) -> Processe
     docs/06-media-storage.md, "Удаление фона". A migration or other special
     path that must keep bytes exactly as given can pass False.
     """
+    stripped = _validated_stripped(payload)
+
+    # Already-transparent input (a manual upload, say) is left as it is;
+    # only an opaque source is a candidate for the white-background cut.
+    if remove_background and stripped.mode == "RGB":
+        verdict = classify(stripped)
+        if verdict.cut and verdict.mask is not None:
+            stripped = cut_background(stripped, verdict.mask)
+
+    # Of the source, not of our encoding: it identifies the file upstream
+    # and is what tells a second run that nothing has changed.
+    return encode_variants(stripped, sha256=hashlib.sha256(payload).hexdigest())
+
+
+def process_avatar(payload: bytes) -> bytes:
+    """One square WebP for a profile picture (users.avatar_key).
+
+    No background cut: `classify`/`cut_background` are tuned for a coin shot
+    against white paper and would happily eat the wall behind a person.
+
+    The centre crop repeats what the browser's cropper already did. It has to:
+    the endpoint takes raw bytes from whoever calls it, and a client that is
+    not our cropper must still not be able to store a picture that is not
+    square.
+    """
+    image = _validated_stripped(payload)
+    side = min(image.size)
+    left = (image.width - side) // 2
+    top = (image.height - side) // 2
+    square = image.crop((left, top, left + side, top + side))
+    # thumbnail() only shrinks, so a source smaller than 256 keeps its size
+    # rather than being blown up into a blurry square.
+    square.thumbnail((AVATAR_SIDE, AVATAR_SIDE), Image.Resampling.LANCZOS)
+    return _encode(square)
+
+
+def _validated_stripped(payload: bytes) -> Image.Image:
+    """Everything that must happen to any payload before we keep it.
+
+    The size limits, the verify-by-content check and the metadata strip are
+    the same whether the picture becomes a coin's three variants or somebody's
+    avatar; only what happens afterwards differs.
+    """
     if len(payload) > MAX_SOURCE_BYTES:
         msg = f"larger than {MAX_SOURCE_BYTES} bytes"
         raise ImageRejectedError(msg)
@@ -102,21 +148,12 @@ def process_image(payload: bytes, *, remove_background: bool = True) -> Processe
 
         # Drop every scrap of metadata: EXIF carries geotags and camera data.
         # Pasting into a blank canvas copies pixels only — the `info` dict,
-        # where Pillow keeps EXIF and ICC data, is left behind.
+        # where Pillow keeps EXIF and ICC data, is left behind. The copy also
+        # outlives the `with`, which the opened source would not.
         converted = source.convert("RGBA" if source.mode == "RGBA" else "RGB")
         stripped = Image.new(converted.mode, converted.size)
         stripped.paste(converted)
-
-        # Already-transparent input (a manual upload, say) is left as it is;
-        # only an opaque source is a candidate for the white-background cut.
-        if remove_background and stripped.mode == "RGB":
-            verdict = classify(stripped)
-            if verdict.cut and verdict.mask is not None:
-                stripped = cut_background(stripped, verdict.mask)
-
-        # Of the source, not of our encoding: it identifies the file upstream
-        # and is what tells a second run that nothing has changed.
-        return encode_variants(stripped, sha256=hashlib.sha256(payload).hexdigest())
+        return stripped
 
 
 def encode_variants(image: Image.Image, *, sha256: str) -> ProcessedImage:

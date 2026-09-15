@@ -1,0 +1,536 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+
+import {
+  fetchAllMaterials,
+  fetchCard,
+  fetchCurrencies,
+  fetchDenominations,
+  fetchSeries,
+} from '@/features/catalog/api';
+import { fetchBootstrap } from '@/features/dashboard/api';
+import { createExpense, MANUAL_CATEGORIES } from '@/features/expenses/api';
+import { ExpenseForm } from '@/features/expenses/ExpenseForm';
+import type { ExpenseValues } from '@/features/expenses/ExpenseForm';
+import type {
+  CatalogListItem,
+  CollectionItemCreate,
+  ExpenseCategory,
+  NewCatalogItem,
+} from '@/shared/api/types';
+import { coinDenomination } from '@/shared/lib/coinDenomination';
+import { coinTitle } from '@/shared/lib/coinTitle';
+import { parseDecimal } from '@/shared/lib/format';
+import { Button, Card, ErrorState, PageHeader, Select, Skeleton, useToast } from '@/shared/ui';
+
+import { createCollectionItem, fetchStorageLocations, uploadCoinPhoto } from '../api';
+import { CoinPhotoCropDialog } from '../CoinPhotoCropDialog';
+import { COLLECTION_DEPENDENT_KEYS } from '../model';
+import { PurchaseForm } from '../PurchaseForm';
+import type { PurchaseValues } from '../PurchaseForm';
+import type { CoinSide } from '../SelectedCoin';
+import { SelectedCoin } from '../SelectedCoin';
+import { useCoinPhotoPicker } from '../useCoinPhotoPicker';
+import styles from './AddPage.module.css';
+import { emptyCarried } from './carried';
+import type { CarriedValues } from './carried';
+import { emptyCoinFields } from './coinFields';
+import type { CoinFieldErrors, CoinFields } from './coinFields';
+import { CoinPicker } from './CoinPicker';
+import { collectExtraExpenses } from './extraExpenseRows';
+import type { ExtraExpenseErrors, ExtraExpenseRow } from './extraExpenseRows';
+import { ExtraExpenses } from './ExtraExpenses';
+import { NewCoinFields } from './NewCoinFields';
+
+/** "Покупка монети" plus every category a person records by hand. */
+const PURCHASE = 'coin_purchase' as const;
+type AddType = typeof PURCHASE | ExpenseCategory;
+
+function parseType(value: string | null): AddType {
+  if (value === PURCHASE) return PURCHASE;
+  return MANUAL_CATEGORIES.includes(value as ExpenseCategory)
+    ? (value as ExpenseCategory)
+    : PURCHASE;
+}
+
+function positiveInt(value: string | null): number | null {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function trimmedOrNull(value: string): string | null {
+  return value.trim() || null;
+}
+
+function decimalOrNull(value: string): string | null {
+  const parsed = parseDecimal(value);
+  return parsed === null ? null : String(parsed);
+}
+
+/**
+ * Resolves what was typed into a dictionary-or-own-words field: the id of the
+ * row whose name it matches, or the text itself when nothing matches. Never
+ * both, and an empty field is neither (docs/04-business-rules.md, §14).
+ */
+function matchByName<T extends { id: number }>(
+  rows: T[] | undefined,
+  typed: string,
+  nameOf: (row: T) => string,
+): { id: number | null; text: string | null } {
+  const value = typed.trim();
+  if (!value) return { id: null, text: null };
+  const found = (rows ?? []).find(
+    (row) => nameOf(row).toLocaleLowerCase() === value.toLocaleLowerCase(),
+  );
+  return found ? { id: found.id, text: null } : { id: null, text: value };
+}
+
+/**
+ * `/collection/add` — one page for everything that costs money.
+ *
+ * The first field is the type, and it decides what the rest of the form is:
+ * a coin purchase (the default) or one of the supporting expenses. The sum,
+ * the currency, the date, the seller and the note survive switching between
+ * them (`CarriedValues`) — they mean the same thing on both sides, and
+ * retyping them is the kind of friction that makes people stop recording
+ * things (docs/08-ui-map.md).
+ *
+ * The purchase branch is the interesting one. A coin is found by country and
+ * then by name; picking a suggestion collapses the form into the usual
+ * purchase view for that catalog item. Typing a name the catalog does not
+ * have opens "Про монету" instead, and the purchase then carries the coin
+ * with it in a single request (docs/03-api-contract.md, `newCatalogItem`).
+ */
+export function AddPage() {
+  const { t, i18n } = useTranslation();
+  const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+
+  const type = parseType(params.get('type'));
+  const isPurchase = type === PURCHASE;
+  const catalogItemId = positiveInt(params.get('catalogItemId'));
+
+  const [carried, setCarried] = useState<CarriedValues>(emptyCarried);
+  const [countryId, setCountryId] = useState<number | null>(null);
+  const [title, setTitle] = useState('');
+  const [coinFields, setCoinFields] = useState<CoinFields>(emptyCoinFields);
+  const [coinErrors, setCoinErrors] = useState<CoinFieldErrors>({});
+  const [pickerErrors, setPickerErrors] = useState<{ country?: string; title?: string }>({});
+  const [extras, setExtras] = useState<ExtraExpenseRow[]>([]);
+  const [extraErrors, setExtraErrors] = useState<ExtraExpenseErrors>({});
+
+  // Held in the form until the purchase itself is saved: there is no
+  // instance id to upload against yet (docs/06-media-storage.md — no server
+  // drafts). Keyed by side, not a fixed pair, so "no photo picked" needs no
+  // sentinel value.
+  const [pendingPhotos, setPendingPhotos] = useState<Partial<Record<CoinSide, Blob>>>({});
+  const [photoPreviews, setPhotoPreviews] = useState<Partial<Record<CoinSide, string>>>({});
+
+  function setPhoto(side: CoinSide, blob: Blob) {
+    setPhotoPreviews((current) => {
+      const previous = current[side];
+      if (previous) URL.revokeObjectURL(previous);
+      return { ...current, [side]: URL.createObjectURL(blob) };
+    });
+    setPendingPhotos((current) => ({ ...current, [side]: blob }));
+  }
+
+  function clearPhoto(side: CoinSide) {
+    setPhotoPreviews((current) => {
+      const previous = current[side];
+      if (previous) URL.revokeObjectURL(previous);
+      const next = { ...current };
+      delete next[side];
+      return next;
+    });
+    setPendingPhotos((current) => {
+      const next = { ...current };
+      delete next[side];
+      return next;
+    });
+  }
+
+  const photoPicker = useCoinPhotoPicker(setPhoto);
+
+  const cardQuery = useQuery({
+    queryKey: ['catalog', 'card', catalogItemId],
+    queryFn: () => fetchCard(catalogItemId!),
+    enabled: catalogItemId !== null,
+  });
+  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
+  const storageLocationsQuery = useQuery({
+    queryKey: ['collection', 'storage-locations'],
+    queryFn: fetchStorageLocations,
+  });
+  const materialsQuery = useQuery({
+    queryKey: ['materials', 'all'],
+    queryFn: fetchAllMaterials,
+    staleTime: Infinity,
+  });
+  // The same two queries "Про монету" renders from — resolving what was
+  // typed needs the rows, and the cache hands them over without a refetch.
+  const denominationsQuery = useQuery({
+    queryKey: ['denominations', countryId],
+    queryFn: () => fetchDenominations(countryId ?? undefined),
+    enabled: countryId !== null,
+  });
+  const seriesQuery = useQuery({
+    queryKey: ['series', countryId],
+    queryFn: () => fetchSeries(countryId ?? undefined),
+    enabled: countryId !== null,
+  });
+
+  const from = (location.state as { from?: string } | null)?.from;
+
+  const setType = (next: AddType) => {
+    const query = new URLSearchParams(params);
+    query.set('type', next);
+    // A coin chosen for a purchase is not a coin chosen for an expense: the
+    // expense branch links to one, the purchase branch is about one.
+    query.delete('catalogItemId');
+    setParams(query, { replace: true });
+    setPickerErrors({});
+  };
+
+  const chooseCoin = (item: CatalogListItem) => {
+    const query = new URLSearchParams(params);
+    query.set('catalogItemId', String(item.id));
+    setParams(query, { replace: true });
+    setPickerErrors({});
+  };
+
+  const clearCoin = () => {
+    const query = new URLSearchParams(params);
+    query.delete('catalogItemId');
+    setParams(query, { replace: true });
+  };
+
+  const purchaseMutation = useMutation({
+    mutationFn: (values: PurchaseValues) => createCollectionItem(purchaseBody(values)),
+    onSuccess: async (created) => {
+      // The coin exists the moment this resolves; a failed photo upload from
+      // here on is not a failed purchase — it is a reason to say so and send
+      // the owner to the edit page to try again (owner, 2026-09-14).
+      let photoFailed = false;
+      for (const [side, blob] of Object.entries(pendingPhotos) as [CoinSide, Blob][]) {
+        try {
+          await uploadCoinPhoto(created.id, side, blob);
+        } catch {
+          photoFailed = true;
+        }
+      }
+      for (const url of Object.values(photoPreviews)) if (url) URL.revokeObjectURL(url);
+
+      await Promise.all(
+        COLLECTION_DEPENDENT_KEYS.map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
+      );
+      toast.show(t(photoFailed ? 'purchase.photoUploadFailed' : 'purchase.created'));
+      navigate(from ?? `/catalog/${created.catalogItemId}`, { replace: true });
+    },
+  });
+
+  const expenseMutation = useMutation({
+    mutationFn: (values: ExpenseValues) => createExpense(values),
+    onSuccess: async () => {
+      await Promise.all(
+        ['expenses', 'bootstrap'].map((key) => queryClient.invalidateQueries({ queryKey: [key] })),
+      );
+      toast.show(t('expenses.created'));
+      navigate(from ?? '/collection/money', { replace: true });
+    },
+  });
+
+  /** Either a reference to a catalog item or the coin itself (docs/03-api-contract.md). */
+  function purchaseBody(values: PurchaseValues): CollectionItemCreate {
+    // Already validated by `validateExtras` — the submission would not have
+    // got this far otherwise, so the rows can be read straight off.
+    const extraExpenses = collectExtraExpenses(extras).values;
+    if (catalogItemId !== null) return { ...values, catalogItemId, extraExpenses };
+    return { ...values, newCatalogItem: newCatalogItem(), extraExpenses };
+  }
+
+  /** The supporting expenses, checked whichever coin the purchase is about. */
+  function validateExtras(): boolean {
+    const { errors } = collectExtraExpenses(extras);
+    setExtraErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
+  function newCatalogItem(): NewCatalogItem {
+    // Material, denomination and series are each one field over "the
+    // dictionary, or your own words": a typed value that matches a row goes
+    // as that row's id, anything else goes as text (docs/03-api-contract.md).
+    const material = matchByName(materialsQuery.data, coinFields.material, (row) => row.name);
+    const denomination = matchByName(
+      denominationsQuery.data,
+      coinFields.denomination,
+      (row) => row.label,
+    );
+    const series = matchByName(seriesQuery.data, coinFields.series, (row) => row.name);
+    return {
+      countryId: countryId!,
+      titleOriginal: title.trim(),
+      issueYear: Number.parseInt(coinFields.issueYear, 10),
+      collectionGroup: coinFields.collectionGroup,
+      metalKind: coinFields.metalKind,
+      seriesId: series.id,
+      seriesText: series.text,
+      denominationId: denomination.id,
+      denominationText: denomination.text,
+      compositionId: material.id,
+      material: material.text,
+      mintageAnnounced: positiveInt(coinFields.mintageAnnounced),
+      weightGrams: decimalOrNull(coinFields.weightGrams),
+      diameterMm: decimalOrNull(coinFields.diameterMm),
+      thicknessMm: decimalOrNull(coinFields.thicknessMm),
+      edgeTypeId: positiveInt(coinFields.edgeTypeId),
+      qualityTypeId: positiveInt(coinFields.qualityTypeId),
+      shape: trimmedOrNull(coinFields.shape),
+      catalogNumber: trimmedOrNull(coinFields.catalogNumber),
+      description: trimmedOrNull(coinFields.description),
+      descriptionObverse: trimmedOrNull(coinFields.descriptionObverse),
+      descriptionReverse: trimmedOrNull(coinFields.descriptionReverse),
+      edge: null,
+      quality: null,
+      issueDate: null,
+    };
+  }
+
+  /** Country, name and the three mandatory fields of "Про монету". */
+  function validateNewCoin(): boolean {
+    const picker: { country?: string; title?: string } = {};
+    if (countryId === null) picker.country = t('common.required');
+    if (!title.trim()) picker.title = t('common.required');
+
+    const coin: CoinFieldErrors = {};
+    const year = Number.parseInt(coinFields.issueYear, 10);
+    if (!Number.isInteger(year) || year < 1 || year > 2200) coin.issueYear = t('add.yearInvalid');
+    if (!coinFields.material.trim()) coin.material = t('common.required');
+    for (const key of ['weightGrams', 'diameterMm', 'thicknessMm'] as const) {
+      const value = coinFields[key];
+      if (value.trim() && decimalOrNull(value) === null) coin[key] = t('add.numberInvalid');
+    }
+    if (coinFields.mintageAnnounced.trim() && positiveInt(coinFields.mintageAnnounced) === null) {
+      coin.mintageAnnounced = t('add.numberInvalid');
+    }
+
+    setPickerErrors(picker);
+    setCoinErrors(coin);
+    return Object.keys(picker).length === 0 && Object.keys(coin).length === 0;
+  }
+
+  const card = cardQuery.data;
+  const settings = bootstrapQuery.data?.settings;
+  const currencies = currenciesQuery.data ?? [];
+  const storageLocations = (storageLocationsQuery.data ?? []).map((location) => location.name);
+  const cancel = () => navigate(from ?? (isPurchase ? '/collection/coins' : '/collection/money'));
+
+  const purchaseForm = (key: string, validateCoin?: () => boolean) =>
+    settings ? (
+      <PurchaseForm
+        key={key}
+        carried={carried}
+        onCarriedChange={setCarried}
+        // Both halves run, and neither short-circuits the other: someone
+        // fixing the form should see everything wrong with it at once.
+        beforeSubmit={() => {
+          const extrasOk = validateExtras();
+          return (validateCoin ? validateCoin() : true) && extrasOk;
+        }}
+        footer={
+          <ExtraExpenses
+            rows={extras}
+            onChange={setExtras}
+            errors={Object.fromEntries(
+              Object.entries(extraErrors).map(([rowKey, message]) => [rowKey, t(message)]),
+            )}
+            currencies={currencies}
+            defaultCurrency={carried.currency || 'UAH'}
+          />
+        }
+        defaultGrade={settings.defaultGrade}
+        defaultStorageLocation={settings.defaultStorageLocation}
+        storageLocations={storageLocations}
+        currencies={currencies}
+        busy={purchaseMutation.isPending}
+        submitError={purchaseMutation.error}
+        onSubmit={(values) => purchaseMutation.mutate(values)}
+        onCancel={cancel}
+      />
+    ) : (
+      <div className={styles.formSkeleton}>
+        <Skeleton height={42} />
+        <Skeleton height={42} />
+        <Skeleton height={96} />
+      </div>
+    );
+
+  return (
+    <div className={styles.page}>
+      <PageHeader
+        align="center"
+        title={t('add.title')}
+        subtitle={isPurchase ? t('add.subtitlePurchase') : t('add.subtitleExpense')}
+      />
+
+      <div className={styles.content}>
+        {catalogItemId !== null && card ? (
+          <SelectedCoin
+            card={card}
+            onChange={clearCoin}
+            photos={photoPreviews}
+            onPickPhoto={photoPicker.pick}
+            onRemovePhoto={clearPhoto}
+          />
+        ) : null}
+
+        <Card className={styles.form}>
+          <div className={styles.stack}>
+            <Select
+              label={t('add.type')}
+              value={type}
+              onChange={(event) => setType(event.target.value as AddType)}
+            >
+              <option value={PURCHASE}>{t('add.typeCoinPurchase')}</option>
+              {MANUAL_CATEGORIES.map((category) => (
+                <option key={category} value={category}>
+                  {t(`expenses.categories.${category}`)}
+                </option>
+              ))}
+            </Select>
+
+            {isPurchase ? (
+              catalogItemId !== null ? (
+                cardQuery.isError ? (
+                  <ErrorState
+                    title={t('card.notFoundTitle')}
+                    actions={
+                      <Button variant="secondary" onClick={clearCoin}>
+                        {t('purchase.changeItem')}
+                      </Button>
+                    }
+                  />
+                ) : card ? (
+                  purchaseForm(`coin-${catalogItemId}`)
+                ) : (
+                  <Skeleton height={240} />
+                )
+              ) : (
+                <>
+                  <CoinPicker
+                    countryId={countryId}
+                    onCountryChange={(next) => {
+                      setCountryId(next);
+                      // Series and denominations belong to a country; a
+                      // choice made under another one is meaningless here.
+                      setCoinFields((current) => ({
+                        ...current,
+                        series: '',
+                        denomination: '',
+                      }));
+                    }}
+                    title={title}
+                    onTitleChange={setTitle}
+                    onSelect={chooseCoin}
+                    titleLabel={t('add.coinTitle')}
+                    titleHint={t('add.coinTitleHint')}
+                    titleError={pickerErrors.title}
+                    countryError={pickerErrors.country}
+                  />
+                  {title.trim() ? (
+                    <NewCoinFields
+                      countryId={countryId}
+                      values={coinFields}
+                      errors={coinErrors}
+                      onChange={(key, value) =>
+                        setCoinFields((current) => ({ ...current, [key]: value }))
+                      }
+                      photos={photoPreviews}
+                      onPickPhoto={photoPicker.pick}
+                      onRemovePhoto={clearPhoto}
+                    />
+                  ) : null}
+                  {purchaseForm('new-coin', validateNewCoin)}
+                </>
+              )
+            ) : (
+              <ExpenseForm
+                key={`expense-${type}`}
+                category={type}
+                showCategory={false}
+                carried={carried}
+                onCarriedChange={setCarried}
+                catalogItemId={catalogItemId}
+                coinField={
+                  <div className={styles.linkedCoin}>
+                    <h3 className={styles.linkedTitle}>{t('add.linkedCoin')}</h3>
+                    <p className={styles.linkedLead}>{t('add.linkedCoinLead')}</p>
+                    {catalogItemId === null ? (
+                      // No country field here: the collector is naming a coin
+                      // they already own, so the name alone is the whole
+                      // question and the search covers every issuer (owner,
+                      // 2026-09-14).
+                      <CoinPicker
+                        title={title}
+                        onTitleChange={setTitle}
+                        onSelect={chooseCoin}
+                        titleLabel={t('add.coinTitle')}
+                        titleHint={t('add.linkedCoinHint')}
+                      />
+                    ) : (
+                      // The picked coin also appears above the form, big and
+                      // with both sides — and is easy to miss up there while
+                      // reading this block, so it is repeated where the
+                      // choice was made.
+                      <div className={styles.linkedChoice}>
+                        <span className={styles.linkedName}>
+                          {card ? coinTitle(card, i18n.language) : '…'}
+                        </span>
+                        {card ? (
+                          <span className={styles.linkedMeta}>
+                            {[card.country, String(card.year), coinDenomination(card)]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </span>
+                        ) : null}
+                        <button type="button" className={styles.linkedChange} onClick={clearCoin}>
+                          {t('purchase.changeItem')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                }
+                currencies={currencies}
+                busy={expenseMutation.isPending}
+                submitError={expenseMutation.error}
+                onSubmit={(values) => expenseMutation.mutate(values)}
+                onCancel={cancel}
+              />
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <input
+        ref={photoPicker.fileInput}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className={styles.fileInput}
+        onChange={photoPicker.onFileChange}
+      />
+      <CoinPhotoCropDialog
+        key={photoPicker.raw ?? 'none'}
+        image={photoPicker.raw}
+        busy={false}
+        onCancel={photoPicker.cancel}
+        onSave={photoPicker.onCropSave}
+      />
+    </div>
+  );
+}

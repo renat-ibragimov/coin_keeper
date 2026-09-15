@@ -29,6 +29,7 @@ from app.models import (
     CollectionItem,
     Denomination,
     MarketPriceSnapshot,
+    Material,
     MediaFile,
     PriceSourceLink,
 )
@@ -659,11 +660,12 @@ async def test_gaps_fills_the_face_value_the_metal_and_the_series(
     denomination = await db_session.get(Denomination, created.denomination_id)
     assert denomination is not None
     assert (denomination.value, denomination.unit) == (Decimal("1.000"), "hryvnia")
-    # Silver carries no fineness on the card, so there is no dictionary row —
-    # but the metal kind is known, and that is what the collection value uses.
+    # Silver carries no fineness on the card, and the dictionary has none
+    # either (2026-09-12) — the plain metal is the whole answer.
     assert created.metal_kind is MetalKind.PRECIOUS
-    assert created.composition_id is None
-    assert created.material == "срібло"
+    composition = await db_session.get(Material, created.composition_id)
+    assert composition is not None and composition.code == "silver"
+    assert created.material is None
     assert created.weight_grams == Decimal("31.100")
     assert created.diameter_mm == Decimal("38.60")
     assert created.edge == "рифлений"

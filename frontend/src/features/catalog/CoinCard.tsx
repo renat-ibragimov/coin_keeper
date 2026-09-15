@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 
 import type { CatalogListItem } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
+import { coinDenomination } from '@/shared/lib/coinDenomination';
 import { coinMaterial, shortMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
@@ -64,8 +65,9 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
   const title = coinTitle(item, i18n.language);
   const series = seriesLabel(item, t);
   const material = coinMaterial(item);
+  const denomination = coinDenomination(item);
   const cardUrl = `/catalog/${item.id}`;
-  const addUrl = `/collection/coins/new?catalogItemId=${item.id}`;
+  const addUrl = `/collection/add?catalogItemId=${item.id}`;
   const addState = backTo ? { from: backTo } : undefined;
   const sourceLabel = priceSourceLabel(item.priceSource, t);
 
@@ -90,9 +92,9 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
          * sits right of the face value, shortened to two words so it never
          * takes the whole line; either half may be missing — the record
          * simply says nothing (docs/08-ui-map.md). */}
-        {item.denomination || material ? (
+        {denomination || material ? (
           <div className={styles.specs}>
-            <span className={styles.denomination}>{item.denomination?.label ?? ''}</span>
+            <span className={styles.denomination}>{denomination ?? ''}</span>
             {material ? (
               <span className={styles.material} title={material}>
                 {shortMaterial(material)}

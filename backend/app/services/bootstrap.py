@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
-from app.models import User, UserSettings
+from app.models import User
 from app.repositories.dashboard import BreakdownRow, DashboardRepository
-from app.schemas.auth import UserOut
+from app.repositories.users import UserRepository
 from app.schemas.bootstrap import (
     BootstrapOut,
     BreakdownEntry,
@@ -18,6 +18,8 @@ from app.schemas.bootstrap import (
     SeriesBreakdownEntry,
     SettingsOut,
 )
+from app.services.avatars import user_out
+from app.services.storage_locations import StorageLocationService
 
 
 def _series_breakdown_entry(row: BreakdownRow) -> SeriesBreakdownEntry:
@@ -28,10 +30,20 @@ def _series_breakdown_entry(row: BreakdownRow) -> SeriesBreakdownEntry:
 
 
 class BootstrapService:
-    def __init__(self, session: AsyncSession, user: User, locale: str = DEFAULT_LOCALE) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        user: User,
+        locale: str = DEFAULT_LOCALE,
+        background_tasks: BackgroundTasks | None = None,
+    ) -> None:
         self._session = session
         self._user = user
         self._repo = DashboardRepository(session, user_id=user.id, locale=locale)
+        self._users = UserRepository(session)
+        self._storage_locations = StorageLocationService(
+            session, owner_id=user.id, locale=locale, background_tasks=background_tasks
+        )
 
     async def bootstrap(self) -> BootstrapOut:
         data = await self._repo.dashboard()
@@ -71,7 +83,7 @@ class BootstrapService:
             is_empty=data.collection_items == 0 and data.personal_items == 0,
         )
         return BootstrapOut(
-            user=UserOut.model_validate(self._user),
+            user=user_out(self._user),
             settings=settings,
             dashboard=dashboard,
             exchange_rates=[
@@ -96,21 +108,44 @@ class BootstrapService:
         )
 
     async def _settings(self) -> SettingsOut:
-        row = (
-            await self._session.execute(
-                select(UserSettings).where(UserSettings.user_id == self._user.id)
-            )
-        ).scalar_one_or_none()
+        row = await self._users.get_settings(self._user.id)
         if row is None:
             return SettingsOut(
                 locale=self._user.locale,
                 display_currency="UAH",
-                default_grade_commemorative="UNC",
-                default_grade_circulation="VF",
+                default_grade="UNC",
+                show_packaging_variants=True,
+                theme="system",
+                catalog_view_mode="cards",
+                collection_view_mode="cards",
+                secondary_currency="USD",
+                default_storage_location=None,
             )
         return SettingsOut(
             locale=row.locale,
             display_currency=row.display_currency,
-            default_grade_commemorative=row.default_grade_commemorative,
-            default_grade_circulation=row.default_grade_circulation,
+            default_grade=row.default_grade,
+            show_packaging_variants=row.show_packaging_variants,
+            theme=row.theme,
+            catalog_view_mode=row.catalog_view_mode,
+            collection_view_mode=row.collection_view_mode,
+            secondary_currency=row.secondary_currency,
+            default_storage_location=await self._storage_locations.name_for(
+                row.default_storage_location_id
+            ),
         )
+
+    async def update_settings(
+        self, *, default_storage_location: str | None = None, **fields: object
+    ) -> SettingsOut:
+        changes = {key: value for key, value in fields.items() if value is not None}
+        # A name, not an id, at the API boundary -- resolved the same way a
+        # purchase's storage_location is, so a fresh name here becomes a
+        # personal dictionary entry too, not a second, disconnected list.
+        if default_storage_location is not None:
+            changes["default_storage_location_id"] = await self._storage_locations.resolve(
+                default_storage_location
+            )
+        if changes:
+            await self._users.update_settings(self._user.id, **changes)
+        return await self._settings()

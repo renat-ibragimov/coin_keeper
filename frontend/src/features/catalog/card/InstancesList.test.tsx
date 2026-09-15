@@ -24,19 +24,31 @@ const INSTANCES: CatalogCollectionItem[] = [
     purchaseCurrency: 'USD',
     purchaseRateUah: '35.0000',
     totalUah: '350.00',
+    // Independent of purchaseRateUah on purpose: totalUsd/totalEur are the
+    // backend's own NBU-rate-on-purchase-date conversions, not a mirror of
+    // the purchase's own currency math (see InstancesList's secondaryRate
+    // prop doc).
+    totalUsd: '8.40',
+    totalEur: '7.70',
+    storageLocation: 'Вдома',
     notes: null,
   },
 ];
 
-function renderList() {
+function renderList(overrides: Partial<Parameters<typeof InstancesList>[0]> = {}) {
   return render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter>
         <InstancesList
           items={INSTANCES}
           loading={false}
-          addHref="/collection/coins/new?catalogItemId=7"
+          addHref="/collection/add?catalogItemId=7"
           coinTitle="Дельфін"
+          photo={{ src: null }}
+          currentPriceUah="460.00"
+          secondaryCurrency="USD"
+          secondaryRate={41.5}
+          {...overrides}
         />
       </MemoryRouter>
     </QueryClientProvider>,
@@ -50,6 +62,57 @@ describe('InstancesList', () => {
       'href',
       '/collection/coins/1/edit',
     );
+  });
+
+  it('shows the purchase total, the historical rate, and the storage place', () => {
+    renderList();
+    expect(screen.getByText('350 ₴')).toBeInTheDocument();
+    expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
+    expect(screen.getByText('Вдома')).toBeInTheDocument();
+  });
+
+  it('shows a dash when a purchase has no storage location', () => {
+    renderList({ items: [{ ...INSTANCES[0]!, storageLocation: null }] });
+    const row = screen.getByTestId('instance-row');
+    expect(row.textContent).toContain('—');
+  });
+
+  it('shows the seller, the ownership duration, and a ≈$ next to every UAH figure', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-13T00:00:00Z'));
+    try {
+      renderList();
+
+      expect(screen.getByText('Аукціон Violity')).toBeInTheDocument();
+      // 529 days between the purchase and "today" — one full year.
+      expect(screen.getByText('1 рік')).toBeInTheDocument();
+
+      // Purchased total: item.totalUsd (8.40) — the backend's historical-rate
+      // conversion, not a division by secondaryRate.
+      expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
+      // Current value: 460 (quantity 1) at the live secondaryRate=41.5 -> 11.08.
+      expect(screen.getByText('≈ 11,1 $')).toBeInTheDocument();
+      // Change: 11.08 (current, live rate) − 8.40 (purchased, historical) = 2.68.
+      expect(screen.getByText('≈ +2,7 $')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the purchased total in dollars when only the live rate is missing', () => {
+    // secondaryRate feeds current value/change, not the purchased total (item.totalUsd) --
+    // losing today's rate should not blank out what was already known historically.
+    renderList({ secondaryRate: null });
+    expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
+    expect(screen.getAllByText('немає даних').length).toBe(2); // current value, change
+  });
+
+  it('shows "no data" for the purchased total and the change when NBU has no rate that far back', () => {
+    renderList({ items: [{ ...INSTANCES[0]!, totalUsd: null }] });
+    // Current value still resolves from the live rate; change needs both
+    // sides of the subtraction, so it goes unknown along with the total.
+    expect(screen.getByText('≈ 11,1 $')).toBeInTheDocument();
+    expect(screen.getAllByText('немає даних').length).toBe(2); // purchased total, change
   });
 
   it('confirms and deletes a purchase, naming the coin in the confirmation', async () => {

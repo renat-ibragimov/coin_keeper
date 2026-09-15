@@ -15,12 +15,27 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   trailing?: ReactNode;
 }
 
-export function Input({ label, error, hint, trailing, id, className, ...rest }: InputProps) {
+export function Input({
+  label,
+  error,
+  hint,
+  trailing,
+  id,
+  className,
+  // Off by default: almost nothing here is a login field, and the browser's
+  // own memory of unrelated past inputs (docs/08-ui-map.md) has nothing to
+  // do with a display name, a note, or a storage location. Login/register/
+  // password screens pass their own real value and win, since this is a
+  // default on a named prop, not a value forced after the spread below.
+  autoComplete = 'off',
+  ...rest
+}: InputProps) {
   const autoId = useId();
   const inputId = id ?? autoId;
   const input = (
     <input
       {...rest}
+      autoComplete={autoComplete}
       id={inputId}
       className={[
         styles.input,

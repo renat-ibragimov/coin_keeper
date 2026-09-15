@@ -4,6 +4,7 @@ import type {
   ExpenseCreate,
   ExpenseOut,
   ExpensePage,
+  ExpensesChart,
   ExpensesSummary,
   ExpenseUpdate,
 } from '@/shared/api/types';
@@ -49,6 +50,12 @@ export function fetchExpenses(filters: ExpenseFilters): Promise<ExpensePage> {
 
 export function fetchExpensesSummary(): Promise<ExpensesSummary> {
   return api<ExpensesSummary>('/expenses/summary');
+}
+
+/** The two chart widgets, scoped to a caller-picked range — unlike
+ *  `fetchExpensesSummary`'s fixed 12-month/all-time windows. */
+export function fetchExpensesChart(dateFrom: string, dateTo: string): Promise<ExpensesChart> {
+  return api<ExpensesChart>(`/expenses/chart-summary${toQuery({ dateFrom, dateTo })}`);
 }
 
 export function createExpense(body: ExpenseCreate): Promise<ExpenseOut> {
