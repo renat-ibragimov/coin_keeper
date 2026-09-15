@@ -1,8 +1,10 @@
 import {
   BarChart3,
   ChevronDown,
+  Coffee,
   Coins,
   Heart,
+  Headphones,
   Layers,
   LayoutGrid,
   LogOut,
@@ -21,6 +23,7 @@ import { useDismissable } from '@/shared/lib/useDismissable';
 import { Brand } from './Brand';
 import { LocaleSwitcher, ThemeSwitcher } from './HeaderControls';
 import { SiteFooter } from './SiteFooter';
+import { useSupportLink } from './useSupportLink';
 import styles from './AppLayout.module.css';
 
 const COLLECTION_TABS = [
@@ -59,6 +62,7 @@ export function AppLayout() {
   const inCollection =
     location.pathname === '/collection' || location.pathname.startsWith('/collection/');
   const mobileLinks = inCollection ? MOBILE_COLLECTION : MOBILE_PLAIN;
+  const { openSupport, openingSupport } = useSupportLink();
 
   const [accountOpen, setAccountOpen] = useState(false);
   const accountMenu = useRef<HTMLDivElement>(null);
@@ -171,6 +175,23 @@ export function AppLayout() {
                     {t('nav.admin')}
                   </NavLink>
                 ) : null}
+                <button
+                  type="button"
+                  className={styles.accountMenuLink}
+                  disabled={openingSupport}
+                  onClick={() => {
+                    closeAccount();
+                    void openSupport();
+                  }}
+                >
+                  <Headphones size={16} aria-hidden="true" />
+                  {t('footer.support')}
+                </button>
+                <button type="button" className={styles.accountMenuLink} disabled>
+                  <Coffee size={16} aria-hidden="true" />
+                  {t('footer.donate')}
+                </button>
+                <span className={styles.accountMenuDivider} aria-hidden="true" />
                 <button
                   type="button"
                   role="menuitem"

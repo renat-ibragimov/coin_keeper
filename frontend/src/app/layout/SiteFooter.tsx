@@ -1,6 +1,8 @@
+import { Coffee, Headphones } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 import styles from './SiteFooter.module.css';
+import { useSupportLink } from './useSupportLink';
 
 interface SiteFooterProps {
   reserveMobileNav?: boolean;
@@ -8,6 +10,7 @@ interface SiteFooterProps {
 
 export function SiteFooter({ reserveMobileNav = false }: SiteFooterProps) {
   const { t } = useTranslation();
+  const { openSupport, openingSupport } = useSupportLink();
   const year = new Date().getFullYear();
 
   return (
@@ -24,10 +27,17 @@ export function SiteFooter({ reserveMobileNav = false }: SiteFooterProps) {
         © {year} {t('brand.name')}
       </span>
       <nav className={styles.links} aria-label={t('footer.linksLabel')}>
-        <a className={styles.link} aria-disabled="true">
+        <button
+          type="button"
+          className={styles.link}
+          onClick={() => void openSupport()}
+          disabled={openingSupport}
+        >
+          <Headphones size={14} strokeWidth={1.8} aria-hidden="true" />
           {t('footer.support')}
-        </a>
+        </button>
         <a className={styles.link} aria-disabled="true">
+          <Coffee size={14} strokeWidth={1.8} aria-hidden="true" />
           {t('footer.donate')}
         </a>
       </nav>

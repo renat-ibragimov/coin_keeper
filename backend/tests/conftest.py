@@ -45,6 +45,8 @@ DEFAULT_REDIS_URL = "redis://localhost:6379/15"
 JOB_TOKEN = "test-job-token-not-used-anywhere-else"
 # What telegram would put in X-Telegram-Bot-Api-Secret-Token.
 WEBHOOK_SECRET = "test-webhook-secret-not-used-anywhere-else"
+SUPPORT_WEBHOOK_SECRET = "test-support-webhook-secret"
+SUPPORT_SETUP_SECRET = "test-support-setup-secret"
 
 
 class RecordingMailBackend(ConsoleMailBackend):
@@ -88,6 +90,10 @@ def _configure_environment(url: str) -> None:
     os.environ["TELEGRAM_BOT_TOKEN"] = ""
     os.environ["TELEGRAM_BOT_USERNAME"] = "bakost_test_bot"
     os.environ["TELEGRAM_WEBHOOK_SECRET"] = WEBHOOK_SECRET
+    os.environ["SUPPORT_TELEGRAM_BOT_TOKEN"] = "test-support-token"
+    os.environ["SUPPORT_TELEGRAM_BOT_USERNAME"] = "bakost_support_test_bot"
+    os.environ["SUPPORT_TELEGRAM_WEBHOOK_SECRET"] = SUPPORT_WEBHOOK_SECRET
+    os.environ["SUPPORT_TELEGRAM_SETUP_SECRET"] = SUPPORT_SETUP_SECRET
 
     from app.core.config import get_settings
 
@@ -208,9 +214,51 @@ class RecordingTelegramSender(TelegramSender):
         self.sent.append(message)
 
 
+class RecordingSupportTelegram:
+    def __init__(self) -> None:
+        self.sent: list[tuple[int, str, int | None, int | None]] = []
+        self.copied: list[tuple[int, int, int, int | None]] = []
+        self.created: list[tuple[int, str]] = []
+        self.closed: list[tuple[int, int]] = []
+        self.callbacks: list[tuple[str, str]] = []
+
+    async def send_message(
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        thread_id: int | None = None,
+        close_ticket_id: int | None = None,
+    ) -> int:
+        self.sent.append((chat_id, text, thread_id, close_ticket_id))
+        return len(self.sent)
+
+    async def copy_message(
+        self, *, from_chat_id: int, message_id: int, chat_id: int, thread_id: int | None = None
+    ) -> int:
+        self.copied.append((from_chat_id, message_id, chat_id, thread_id))
+        return len(self.copied)
+
+    async def create_topic(self, group_chat_id: int, name: str) -> int:
+        self.created.append((group_chat_id, name))
+        return 1000 + len(self.created)
+
+    async def close_topic(self, group_chat_id: int, thread_id: int) -> bool:
+        self.closed.append((group_chat_id, thread_id))
+        return True
+
+    async def answer_callback(self, callback_id: str, text: str) -> None:
+        self.callbacks.append((callback_id, text))
+
+
 @pytest.fixture
 def telegram_sender() -> RecordingTelegramSender:
     return RecordingTelegramSender()
+
+
+@pytest.fixture
+def support_telegram() -> RecordingSupportTelegram:
+    return RecordingSupportTelegram()
 
 
 @pytest.fixture
@@ -219,8 +267,10 @@ async def client(
     redis_client: None,
     mail_outbox: list[EmailMessage],
     telegram_sender: RecordingTelegramSender,
+    support_telegram: RecordingSupportTelegram,
 ) -> AsyncIterator[AsyncClient]:
     from app.core.mail import get_mail_backend
+    from app.core.support_telegram import get_support_telegram_client
     from app.core.telegram import get_telegram_sender
     from app.db.session import get_db_session
     from app.main import create_app
@@ -242,6 +292,7 @@ async def client(
     app.dependency_overrides[get_db_session] = override_session
     app.dependency_overrides[get_mail_backend] = lambda: RecordingMailBackend(mail_outbox)
     app.dependency_overrides[get_telegram_sender] = lambda: telegram_sender
+    app.dependency_overrides[get_support_telegram_client] = lambda: support_telegram
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as http:

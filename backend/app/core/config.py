@@ -69,6 +69,15 @@ class Settings(BaseSettings):
     telegram_webhook_secret: str = Field(default="", alias="TELEGRAM_WEBHOOK_SECRET")
     telegram_link_ttl_minutes: int = 15
 
+    # --- public Telegram support bot ---
+    support_telegram_bot_token: str = Field(default="", alias="SUPPORT_TELEGRAM_BOT_TOKEN")
+    support_telegram_bot_username: str = Field(default="", alias="SUPPORT_TELEGRAM_BOT_USERNAME")
+    support_telegram_webhook_secret: str = Field(
+        default="", alias="SUPPORT_TELEGRAM_WEBHOOK_SECRET"
+    )
+    support_telegram_setup_secret: str = Field(default="", alias="SUPPORT_TELEGRAM_SETUP_SECRET")
+    support_telegram_link_ttl_minutes: int = 15
+
     # --- job reporting, docs/13-admin.md ---
     # Shared with the coin-parser container, which reads it from the same
     # .env this stack uses. Empty means job reporting is switched off and the

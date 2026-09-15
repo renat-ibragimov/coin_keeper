@@ -28,7 +28,13 @@ from app.models.collection import (
 from app.models.jobs import JobRun
 from app.models.media import MediaFile
 from app.models.pricing import MarketPriceSnapshot, PriceSourceLink
-from app.models.telegram import TelegramRecipient
+from app.models.telegram import (
+    SupportLinkToken,
+    SupportMessage,
+    SupportTelegramSettings,
+    SupportTicket,
+    TelegramRecipient,
+)
 from app.models.user import (
     AuditLog,
     AuthToken,
@@ -64,6 +70,10 @@ __all__ = [
     "RefreshToken",
     "Sale",
     "StorageLocation",
+    "SupportLinkToken",
+    "SupportMessage",
+    "SupportTelegramSettings",
+    "SupportTicket",
     "TelegramRecipient",
     "UcoinCatalogSource",
     "User",

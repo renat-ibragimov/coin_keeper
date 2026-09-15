@@ -34,16 +34,25 @@
 }
 
 .link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
   color: var(--color-text-muted);
   text-decoration: underline;
   text-decoration-color: var(--color-border-strong);
   text-underline-offset: 3px;
-  cursor: default;
+  cursor: pointer;
   white-space: nowrap;
 }
 
-.link[aria-disabled='true'] {
+.link[aria-disabled='true'],
+.link:disabled {
   opacity: 0.8;
+  cursor: default;
 }
 
 @media (max-width: 900px) {

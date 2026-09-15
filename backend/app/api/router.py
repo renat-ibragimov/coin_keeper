@@ -15,6 +15,7 @@ from app.api.v1 import (
     jobs,
     reference,
     series,
+    support,
     telegram,
 )
 
@@ -30,3 +31,4 @@ api_router.include_router(series.router)
 api_router.include_router(reference.router)
 api_router.include_router(jobs.router)
 api_router.include_router(telegram.router)
+api_router.include_router(support.router)

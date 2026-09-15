@@ -302,6 +302,16 @@
   background: var(--color-surface-hover);
 }
 
+.accountMenuLink:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+  opacity: 0.72;
+}
+
+.accountMenuLink:disabled:hover {
+  background: none;
+}
+
 .subnav {
   display: flex;
   justify-content: center;

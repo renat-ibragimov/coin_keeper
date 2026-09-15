@@ -6,8 +6,9 @@
     "madeInUkraine": "From Ukraine with love",
     "ukraineFlag": "Flag of Ukraine",
     "linksLabel": "Help and support",
-    "support": "Support",
-    "donate": "Support the project"
+    "support": "Help",
+    "donate": "Support the project",
+    "supportUnavailable": "Support is temporarily unavailable. Please try again later."
   },
   "nav": {
     "label": "Main navigation",
