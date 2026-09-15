@@ -101,6 +101,16 @@
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
+  .overlay.mobileCentered {
+    align-items: center;
+    padding: var(--space-4);
+  }
+
+  .mobileCentered .dialog {
+    max-width: 440px;
+    border-radius: var(--radius-lg);
+  }
+
   .footer {
     flex-direction: column-reverse;
   }

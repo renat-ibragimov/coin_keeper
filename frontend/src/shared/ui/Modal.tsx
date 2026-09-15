@@ -17,10 +17,19 @@ interface ModalProps {
   /** Buttons rendered in the footer; the footer is omitted without them. */
   footer?: ReactNode;
   size?: 'sm' | 'md';
+  mobilePlacement?: 'bottom' | 'center';
 }
 
 /** A centred dialog: Escape and a click on the backdrop close it. */
-export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  size = 'md',
+  mobilePlacement = 'bottom',
+}: ModalProps) {
   const { t } = useTranslation();
 
   useDismissable(open, onClose);
@@ -32,7 +41,12 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
 
   if (!open) return null;
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div
+      className={[styles.overlay, mobilePlacement === 'center' ? styles.mobileCentered : '']
+        .filter(Boolean)
+        .join(' ')}
+      onClick={onClose}
+    >
       <div
         className={[styles.dialog, styles[size]].join(' ')}
         role="dialog"

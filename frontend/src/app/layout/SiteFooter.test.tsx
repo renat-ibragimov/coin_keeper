@@ -36,7 +36,7 @@ describe('SiteFooter', () => {
     expect(
       screen.getByText(`© ${new Date().getFullYear()} Bakost Numismatics`),
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Допомога' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: "Зв'язок" })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Підтримати проєкт' })).toBeEnabled();
   });
 
@@ -46,7 +46,7 @@ describe('SiteFooter', () => {
 
     expect(screen.getByText('From Ukraine with love')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Flag of Ukraine' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Help' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Connect' })).toBeInTheDocument();
     expect(screen.getByText('Support the project')).toBeInTheDocument();
   });
 

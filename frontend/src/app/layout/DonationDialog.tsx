@@ -30,7 +30,13 @@ export function DonationDialog({ open, onClose }: DonationDialogProps) {
   const { t } = useTranslation();
 
   return (
-    <Modal open={open} onClose={onClose} title={t('donation.title')} size="sm">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={t('donation.title')}
+      size="sm"
+      mobilePlacement="center"
+    >
       <div className={styles.content}>
         <p className={styles.description}>{t('donation.description')}</p>
         <a
