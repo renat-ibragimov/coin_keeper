@@ -13,12 +13,89 @@ from fastapi import APIRouter, Query, status
 
 from app.api.deps import AdminUser, AppSettings, DbSession, Pagination
 from app.api.errors import ProblemError
+from app.models import User
+from app.models.enums import UserRole
+from app.repositories.admin_users import AdminUserRepository
 from app.repositories.jobs import JobRunRepository
+from app.schemas.admin_users import (
+    AdminUserOut,
+    AdminUserRoleIn,
+    AdminUsersOut,
+    AdminUserSummary,
+)
 from app.schemas.jobs import JobRunOut, JobRunsOut
 from app.schemas.telegram import TelegramLinkOut, TelegramStatusOut
+from app.services.admin_users import (
+    AdminUserIneligibleError,
+    AdminUserNotFoundError,
+    AdminUserService,
+    CannotDemoteSelfError,
+    LastAdminError,
+)
 from app.services.telegram import BotNotConfiguredError, TelegramLinkService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _user_out(user: User, coin_count: int) -> AdminUserOut:
+    return AdminUserOut.model_validate(
+        {
+            "id": user.id,
+            "email": user.email,
+            "display_name": user.display_name,
+            "role": user.role.value,
+            "is_active": user.is_active,
+            "email_verified": user.email_verified,
+            "created_at": user.created_at,
+            "coin_count": coin_count,
+        }
+    )
+
+
+@router.get("/users")
+async def list_users(session: DbSession, _: AdminUser, pagination: Pagination) -> AdminUsersOut:
+    repo = AdminUserRepository(session)
+    rows, total = await repo.list_users(limit=pagination.page_size, offset=pagination.offset)
+    return AdminUsersOut(
+        items=[_user_out(row.user, row.coin_count) for row in rows],
+        total=total,
+        page=pagination.page,
+        page_size=pagination.page_size,
+        summary=AdminUserSummary(total_users=total, collectors=await repo.collector_count()),
+    )
+
+
+@router.patch("/users/{user_id}/role")
+async def set_user_role(
+    session: DbSession,
+    actor: AdminUser,
+    user_id: int,
+    payload: AdminUserRoleIn,
+) -> AdminUserOut:
+    try:
+        user = await AdminUserService(session).set_role(
+            actor=actor, user_id=user_id, role=UserRole(payload.role)
+        )
+    except AdminUserNotFoundError as exc:
+        raise ProblemError(
+            404, "admin-user-not-found", "Not found", "No user with this id."
+        ) from exc
+    except CannotDemoteSelfError as exc:
+        raise ProblemError(
+            409, "cannot-demote-self", "Conflict", "You cannot remove your own administrator role."
+        ) from exc
+    except LastAdminError as exc:
+        raise ProblemError(
+            409, "last-admin", "Conflict", "The system must keep at least one administrator."
+        ) from exc
+    except AdminUserIneligibleError as exc:
+        raise ProblemError(
+            409,
+            "admin-user-ineligible",
+            "Conflict",
+            "Only an active user with a verified email can become an administrator.",
+        ) from exc
+    return _user_out(user, 0)
 
 
 @router.get("/jobs")

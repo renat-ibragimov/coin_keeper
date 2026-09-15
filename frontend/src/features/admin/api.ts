@@ -1,5 +1,12 @@
 import { api, toQuery } from '@/shared/api/client';
-import type { JobRunOut, JobRunsPage, TelegramLink, TelegramStatus } from '@/shared/api/types';
+import type {
+  AdminUser,
+  AdminUsersPage,
+  JobRunOut,
+  JobRunsPage,
+  TelegramLink,
+  TelegramStatus,
+} from '@/shared/api/types';
 
 export const PAGE_SIZE = 20;
 
@@ -41,4 +48,12 @@ export function createTelegramLink(): Promise<TelegramLink> {
 
 export function unlinkTelegram(): Promise<void> {
   return api<void>('/admin/telegram', { method: 'DELETE' });
+}
+
+export function fetchAdminUsers(page: number): Promise<AdminUsersPage> {
+  return api<AdminUsersPage>(`/admin/users${toQuery({ page, pageSize: PAGE_SIZE })}`);
+}
+
+export function setAdminUserRole(id: number, role: 'user' | 'admin'): Promise<AdminUser> {
+  return api<AdminUser>(`/admin/users/${id}/role`, { method: 'PATCH', body: { role } });
 }

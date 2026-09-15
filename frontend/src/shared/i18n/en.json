@@ -633,6 +633,34 @@
   "admin": {
     "title": "Administration",
     "subtitle": "Background jobs, catalogue and users.",
+    "sections": {
+      "label": "Administration sections",
+      "jobs": "Background jobs",
+      "users": "Users",
+      "proposals": "Coin proposals"
+    },
+    "proposals": {
+      "emptyTitle": "No proposals yet",
+      "emptyText": "Proposals for new coins from the parser and users will appear here."
+    },
+    "users": {
+      "title": "Users",
+      "total": "Total users",
+      "collectors": "Started a collection",
+      "collectorsHint": "Added at least one coin",
+      "user": "User",
+      "registered": "Registered",
+      "emailStatus": "Email",
+      "coins": "Coins",
+      "role": "Role",
+      "verified": "Verified",
+      "unverified": "Unverified",
+      "roles": { "admin": "Administrator", "user": "User" },
+      "makeAdmin": "Make admin",
+      "removeAdmin": "Remove role",
+      "roleSaved": "User role updated.",
+      "roleFailed": "Could not change the user role."
+    },
     "jobs": {
       "title": "Background jobs",
       "job": "Job",
