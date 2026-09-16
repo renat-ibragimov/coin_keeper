@@ -1,7 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import { fetchCard } from '@/features/catalog/api';
 import type { CollectionPosition } from '@/shared/api/types';
+import { imageSources } from '@/shared/lib/coinImage';
 import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
 import { Badge, Button, CoinImage } from '@/shared/ui';
@@ -10,6 +13,29 @@ import styles from './PositionCard.module.css';
 
 interface PositionCardProps {
   item: CollectionPosition;
+}
+
+function PositionImages({ item }: PositionCardProps) {
+  const cardQuery = useQuery({
+    queryKey: ['catalog', 'card', item.catalogItemId],
+    queryFn: () => fetchCard(item.catalogItemId),
+  });
+  const obverse = cardQuery.data
+    ? imageSources(cardQuery.data.obverseImage, 'list')
+    : { src: item.thumbnailUrl };
+  const reverse = imageSources(cardQuery.data?.reverseImage, 'list');
+  const shown = [obverse, reverse].filter((side) => side.src);
+
+  if (shown.length < 2) {
+    return <CoinImage {...(shown[0] ?? { src: null })} alt="" className={styles.imageSingle} />;
+  }
+
+  return (
+    <>
+      <CoinImage {...obverse} alt="" className={styles.image} />
+      <CoinImage {...reverse} alt="" className={styles.image} />
+    </>
+  );
 }
 
 /** One catalog item's card in "Мої монети": every purchase of it, rolled up. */
@@ -24,7 +50,7 @@ export function PositionCard({ item }: PositionCardProps) {
   return (
     <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
       <Link to={cardUrl} className={styles.media} tabIndex={-1}>
-        <CoinImage src={item.thumbnailUrl} alt="" className={styles.image} />
+        <PositionImages item={item} />
       </Link>
       <div className={styles.body}>
         <div className={styles.headline}>

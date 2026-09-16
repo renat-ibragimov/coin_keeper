@@ -1,11 +1,18 @@
-import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
 import type { CollectionPosition } from '@/shared/api/types';
 
 import { PositionCard } from './PositionCard';
+
+const fetchCard = vi.fn();
+
+vi.mock('@/features/catalog/api', () => ({
+  fetchCard: (...args: unknown[]) => fetchCard(...args),
+}));
 
 const BASE: CollectionPosition = {
   catalogItemId: 7,
@@ -26,14 +33,21 @@ const BASE: CollectionPosition = {
 };
 
 function renderCard(item: CollectionPosition) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <PositionCard item={item} />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <PositionCard item={item} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 describe('PositionCard', () => {
+  beforeEach(() => {
+    fetchCard.mockReturnValue(new Promise(() => undefined));
+  });
+
   it('rolls up every purchase of the coin into one set of totals', () => {
     renderCard(BASE);
     expect(screen.getByText('2 шт.')).toBeInTheDocument();
@@ -61,6 +75,23 @@ describe('PositionCard', () => {
   it('joins several distinct grades with a middle dot', () => {
     renderCard({ ...BASE, grades: ['UNC', 'XF'] });
     expect(screen.getByText('UNC · XF')).toBeInTheDocument();
+  });
+
+  it('shows the catalog obverse and reverse as an overlapping pair', async () => {
+    fetchCard.mockResolvedValue({
+      obverseImage: { preview: '/obverse-preview.webp', medium: '/obverse-medium.webp' },
+      reverseImage: { preview: '/reverse-preview.webp', medium: '/reverse-medium.webp' },
+    });
+
+    const { container } = renderCard({ ...BASE, thumbnailUrl: '/fallback.webp' });
+    const images = await waitFor(() => {
+      const rendered = container.querySelectorAll('img');
+      expect(rendered).toHaveLength(2);
+      return rendered;
+    });
+
+    expect(images[0]).toHaveAttribute('src', '/obverse-preview.webp');
+    expect(images[1]).toHaveAttribute('src', '/reverse-preview.webp');
   });
 
   it('links the whole title and the "add another" action to the right places', () => {
