@@ -40,9 +40,11 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    has_passwordless = op.get_bind().execute(
-        sa.text("SELECT EXISTS (SELECT 1 FROM users WHERE password_hash IS NULL)")
-    ).scalar()
+    has_passwordless = (
+        op.get_bind()
+        .execute(sa.text("SELECT EXISTS (SELECT 1 FROM users WHERE password_hash IS NULL)"))
+        .scalar()
+    )
     if has_passwordless:
         raise RuntimeError("Cannot downgrade while passwordless accounts exist")
     op.drop_index("ix_auth_identities_user_id", table_name="auth_identities")
