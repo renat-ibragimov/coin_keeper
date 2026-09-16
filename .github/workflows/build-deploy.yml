@@ -239,9 +239,12 @@ jobs:
           HOST: ${{ secrets.DEPLOY_HOST }}
           USER: ${{ secrets.DEPLOY_USER }}
           PATH_ON_SERVER: ${{ secrets.DEPLOY_PATH }}
+          SERVER_ENV: ${{ secrets.SERVER_ENV }}
         run: |
           # SERVER_ENV is the single source of truth for the server .env.
-          printf '%s\n' "${{ secrets.SERVER_ENV }}" > server.env
+          # Pass it as an environment value: interpolating multiline secrets
+          # into shell source breaks on quotes and angle brackets in SMTP_FROM.
+          printf '%s\n' "$SERVER_ENV" > server.env
           printf 'API_IMAGE=%s:%s\n' "$IMAGE" "$SHA" >> server.env
           scp -o BatchMode=yes server.env "$USER@$HOST:$PATH_ON_SERVER/.env"
           rm -f server.env
