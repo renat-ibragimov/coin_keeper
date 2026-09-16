@@ -26,16 +26,20 @@ export function SiteFooter({ reserveMobileNav = false }: SiteFooterProps) {
           🇺🇦
         </span>
       </span>
-      <span className={styles.copyright}>
-        © {year} {t('brand.name')}
-      </span>
+      <div className={styles.imprint}>
+        <span className={styles.copyright}>
+          © {year} {t('brand.name')}
+        </span>
+        <nav className={styles.legalLinks} aria-label={t('footer.legalLinksLabel')}>
+          <Link to="/privacy" className={styles.link}>
+            {t('footer.privacy')}
+          </Link>
+          <Link to="/terms" className={styles.link}>
+            {t('footer.terms')}
+          </Link>
+        </nav>
+      </div>
       <nav className={styles.links} aria-label={t('footer.linksLabel')}>
-        <Link to="/privacy" className={styles.link}>
-          {t('footer.privacy')}
-        </Link>
-        <Link to="/terms" className={styles.link}>
-          {t('footer.terms')}
-        </Link>
         <button
           type="button"
           className={styles.link}
