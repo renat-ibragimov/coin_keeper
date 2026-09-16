@@ -88,9 +88,10 @@ PUBLIC_BASE_URL=https://<домен>
 MAIL_BACKEND=smtp
 SMTP_HOST=smtp.resend.com
 SMTP_PORT=587
-SMTP_USER=***
+SMTP_USER=resend
 SMTP_PASSWORD=***
 SMTP_FROM="Bakost Numismatics <noreply@<домен>>"
+SMTP_STARTTLS=true
 LOG_LEVEL=INFO
 JOB_REPORT_TOKEN=***
 TELEGRAM_BOT_TOKEN=***
@@ -138,7 +139,8 @@ presigned-URL, подписанный на него, в браузере не о
 достаёт ссылку подтверждения из `docker compose logs`. Заглушек в коде для этого не нужно —
 подменяется только транспорт, вся остальная логика одна и та же.
 
-Локальный `.env.example` идёт с `MAIL_BACKEND=console` и пустыми `SMTP_*`. На сервере —
+Локальный `.env.example` идёт с `MAIL_BACKEND=console` и примером `SMTP_*` для Resend;
+значения SMTP в этом режиме не используются. На сервере —
 `smtp` с первого дня (`11-roadmap.md`, этап 1). Тесты всегда гоняются на `console`,
 и это проверяется: тест, который отправил бы настоящее письмо, — сломанный тест.
 
@@ -174,7 +176,7 @@ coins.renat-ibragimov.com {
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options nosniff
-        Referrer-Policy strict-origin-when-cross-origin
+        Referrer-Policy no-referrer
     }
 }
 ```
@@ -411,9 +413,26 @@ docker compose build && docker compose up -d     # если нужно собр�
   не в этапе 7: регистрация второго администратора с настоящим письмом — часть приёмки
   этапа 1. Локально и в тестах работает `MAIL_BACKEND=console`, секреты для этого не нужны.
 
-**Внешний SMTP — Resend или Postmark.** Оба дают бесплатный объём, которого хватит с
-запасом: писем тут единицы в день. Свой почтовый сервер не поднимаем — доставляемость с
-одиночного VPS плохая, письма уйдут в спам.
+**Внешний SMTP — Resend.** Для небольшого проекта подходит бесплатный тариф
+(на сентябрь 2026: 3000 писем в месяц, до 100 в день). Свой почтовый сервер не
+поднимаем — доставляемость с одиночного VPS плохая. Текущий SMTP-транспорт приложения
+работает с Resend без дополнительной библиотеки.
+
+Порядок настройки:
+
+1. Создать аккаунт в Resend и добавить свой домен или почтовый поддомен.
+2. Добавить в DNS записи, которые покажет Resend, дождаться статуса `Verified`.
+   Настроить DMARC для того же домена.
+3. Выпустить API key с правом отправки писем. Ключ хранить только в серверном `.env`.
+4. На сервере задать `MAIL_BACKEND=smtp`, `SMTP_HOST=smtp.resend.com`,
+   `SMTP_PORT=587`, `SMTP_USER=resend`, `SMTP_PASSWORD=<API key>`,
+   `SMTP_STARTTLS=true`, `SMTP_FROM="Bakost Numismatics <noreply@<verified-domain>>"`.
+   Адрес в `SMTP_FROM` должен принадлежать подтверждённому домену.
+5. Пересоздать контейнер API, зарегистрировать тестовый аккаунт и проверить письмо
+   подтверждения, затем запросить сброс пароля и проверить второе письмо.
+
+На центральном Caddy для этого сайта установить `Referrer-Policy: no-referrer`, как в
+репозиторном `Caddyfile`. Токены в ссылках не должны уходить в заголовке `Referer`.
 
 Что настроить обязательно:
 

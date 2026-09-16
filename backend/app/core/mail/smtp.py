@@ -33,8 +33,8 @@ class SmtpMailBackend(MailBackend):
                 password=self._settings.smtp_password or None,
                 start_tls=self._settings.smtp_starttls,
             )
-        except aiosmtplib.SMTPException:
+        except Exception:
             # A failed verification email means the user cannot sign in at all,
             # so this must be visible immediately rather than through a report.
-            logger.exception("failed to send email to %s", message.to)
+            logger.exception("failed to send %s email", message.subject)
             raise

@@ -148,6 +148,9 @@ class AuthService:
             token_hash=hash_token(raw),
             expires_at=datetime.now(UTC) + timedelta(hours=self._settings.email_verify_ttl_hours),
         )
+        # The email must never contain a token that can be rolled back later.
+        # If delivery fails, the inactive account remains and the user can resend.
+        await self._session.commit()
         url = f"{self._settings.public_base_url}/verify-email?token={quote(raw)}"
         await self._mail.send(
             verification_email(user.email, url, self._settings.email_verify_ttl_hours)
@@ -157,7 +160,7 @@ class AuthService:
         self, *, token: str, user_agent: str | None, ip: str | None
     ) -> IssuedSession:
         record = await self._auth_tokens.get_usable(
-            token_hash=hash_token(token), kind=AuthTokenKind.EMAIL_VERIFY
+            token_hash=hash_token(token), kind=AuthTokenKind.EMAIL_VERIFY, for_update=True
         )
         if record is None:
             raise InvalidOrExpiredTokenError
@@ -265,6 +268,7 @@ class AuthService:
             token_hash=hash_token(raw),
             expires_at=datetime.now(UTC) + timedelta(hours=self._settings.password_reset_ttl_hours),
         )
+        await self._session.commit()
         url = f"{self._settings.public_base_url}/reset-password?token={quote(raw)}"
         await self._mail.send(
             password_reset_email(user.email, url, self._settings.password_reset_ttl_hours)
@@ -273,7 +277,7 @@ class AuthService:
     async def reset_password(self, *, token: str, new_password: str) -> None:
         self._validate_password(new_password)
         record = await self._auth_tokens.get_usable(
-            token_hash=hash_token(token), kind=AuthTokenKind.PASSWORD_RESET
+            token_hash=hash_token(token), kind=AuthTokenKind.PASSWORD_RESET, for_update=True
         )
         if record is None:
             raise InvalidOrExpiredTokenError

@@ -4,11 +4,39 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.mail.base import EmailMessage
+from app.repositories.users import UserRepository
+from app.services.auth import AuthService
 from tests.helpers import PASSWORD, extract_token, register_and_verify, unique_email
 
 REFRESH_COOKIE = "coinkeeper_refresh"
+
+
+async def test_failed_delivery_keeps_account_available_for_resend(
+    db_session: AsyncSession, mail_outbox: list[EmailMessage]
+) -> None:
+    class FailingMail:
+        async def send(self, _message: EmailMessage) -> None:
+            raise OSError("SMTP unavailable")
+
+    class RecordingMail:
+        async def send(self, message: EmailMessage) -> None:
+            mail_outbox.append(message)
+
+    email = unique_email()
+    service = AuthService(db_session, get_settings(), FailingMail())
+    with pytest.raises(OSError, match="SMTP unavailable"):
+        await service.register(email=email, password=PASSWORD, display_name=None, honeypot=None)
+
+    user = await UserRepository(db_session).get_by_email(email)
+    assert user is not None
+    assert not user.email_verified
+
+    await AuthService(db_session, get_settings(), RecordingMail()).resend_verification(email)
+    assert mail_outbox[-1].to == email
 
 
 async def test_registration_verification_login_refresh_logout(

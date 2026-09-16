@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Button } from '@/shared/ui';
@@ -12,8 +12,11 @@ import styles from './authForms.module.css';
 
 export function ResetPasswordPage() {
   const { t } = useTranslation();
-  const [params] = useSearchParams();
-  const token = params.get('token');
+  const [token] = useState(() => new URLSearchParams(window.location.search).get('token'));
+
+  useEffect(() => {
+    window.history.replaceState(window.history.state, '', window.location.pathname);
+  }, []);
 
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');

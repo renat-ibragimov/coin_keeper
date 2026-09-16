@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { Button, Spinner } from '@/shared/ui';
 
@@ -12,18 +12,17 @@ type VerifyState = 'pending' | 'success' | 'error' | 'missing-token';
 
 export function VerifyEmailPage() {
   const { t } = useTranslation();
-  const [params] = useSearchParams();
+  const [token] = useState(() => new URLSearchParams(window.location.search).get('token'));
   const { acceptSession } = useAuth();
   const navigate = useNavigate();
   const [state, setState] = useState<VerifyState>('pending');
   const started = useRef(false);
 
-  const token = params.get('token');
-
   useEffect(() => {
     // React StrictMode mounts twice; the token is single-use, so guard.
     if (started.current) return;
     started.current = true;
+    window.history.replaceState(window.history.state, '', window.location.pathname);
 
     if (!token) {
       setState('missing-token');
