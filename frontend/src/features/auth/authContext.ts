@@ -7,7 +7,8 @@ export interface AuthContextValue {
   /** false while the initial silent session restore is still running */
   ready: boolean;
   signIn: (email: string, password: string, remember: boolean) => Promise<void>;
-  acceptSession: (session: SessionOut) => void;
+  acceptSession: (session: SessionOut, remember?: boolean) => void;
+  completeGoogleSession: (remember?: boolean) => Promise<void>;
   /** Replace the cached profile after PATCH /auth/me. */
   updateUser: (user: UserOut) => void;
   signOut: () => Promise<void>;

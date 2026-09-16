@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
 
 import { useAuth } from '../useAuth';
 import { PasswordInput } from './PasswordInput';
+import { GoogleSignIn } from './GoogleSignIn';
 import styles from './authForms.module.css';
 
 export function LoginPage() {
@@ -15,6 +16,7 @@ export function LoginPage() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [params] = useSearchParams();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,6 +53,11 @@ export function LoginPage() {
       <h2 className={styles.title}>{t('auth.loginTitle')}</h2>
       <p className={styles.subtitle}>{t('auth.loginSubtitle')}</p>
       <form className={styles.form} onSubmit={(event) => void submit(event)}>
+        {params.get('google') === 'link-required' ? (
+          <div className={styles.formInfo}>{t('auth.googleLinkRequired')}</div>
+        ) : params.has('google') ? (
+          <div className={styles.formError}>{t('auth.googleError')}</div>
+        ) : null}
         {error ? <div className={styles.formError}>{error}</div> : null}
         <Input
           label={t('auth.email')}
@@ -84,6 +91,7 @@ export function LoginPage() {
           {t('auth.signIn')}
         </Button>
       </form>
+      <GoogleSignIn />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
         {t('auth.noAccount')} <Link to="/register">{t('auth.createAccount')}</Link>

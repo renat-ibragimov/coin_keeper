@@ -5,7 +5,11 @@ import type { components } from './generated/openapi';
 // avatarUrl is on the server's UserOut already; the checked-in OpenAPI
 // snapshot predates it. Drop the intersection after `npm run gen:api` runs
 // against a backend carrying migration 0020.
-export type UserOut = components['schemas']['UserOut'] & { avatarUrl?: string | null };
+export type UserOut = components['schemas']['UserOut'] & {
+  avatarUrl?: string | null;
+  hasPassword?: boolean;
+  googleLinked?: boolean;
+};
 export type SessionOut = components['schemas']['SessionOut'];
 export type TokensOut = components['schemas']['TokensOut'];
 

@@ -180,7 +180,11 @@ class AuthService:
         self, *, email: str, password: str, user_agent: str | None, ip: str | None
     ) -> IssuedSession:
         user = await self._users.get_by_email(email)
-        if user is None or not verify_password(password, user.password_hash):
+        if (
+            user is None
+            or user.password_hash is None
+            or not verify_password(password, user.password_hash)
+        ):
             raise InvalidCredentialsError
 
         # Only past this point do we say anything specific: whoever knows the
@@ -255,6 +259,13 @@ class AuthService:
             refresh_expires_at=expires_at,
         )
 
+    async def issue_session_for_user(
+        self, user: User, *, user_agent: str | None, ip: str | None
+    ) -> IssuedSession:
+        if not user.is_active or not user.email_verified:
+            raise AccountDisabledError
+        return await self._issue_session(user, user_agent=user_agent, ip=ip)
+
     # ----------------------------------------------------------------- password
 
     async def forgot_password(self, email: str) -> None:
@@ -294,11 +305,19 @@ class AuthService:
     async def change_password(
         self, *, user: User, current_password: str, new_password: str
     ) -> None:
-        if not verify_password(current_password, user.password_hash):
+        if user.password_hash is None or not verify_password(current_password, user.password_hash):
             raise InvalidCredentialsError
         self._validate_password(new_password)
         user.password_hash = hash_password(new_password)
         await self._refresh.revoke_all_for_user(user.id)
+        await self._session.flush()
+
+    async def set_password(self, *, user: User, new_password: str) -> None:
+        """Add a password to a verified Google-only account, without another user."""
+        if user.password_hash is not None:
+            raise InvalidCredentialsError
+        self._validate_password(new_password)
+        user.password_hash = hash_password(new_password)
         await self._session.flush()
 
     async def update_profile(

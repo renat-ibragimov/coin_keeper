@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     smtp_from: str = Field(default="Bakost Numismatics <noreply@localhost>", alias="SMTP_FROM")
     smtp_starttls: bool = Field(default=True, alias="SMTP_STARTTLS")
 
+    # --- Google OpenID Connect ---
+    google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
+
     # --- external sources, wired up in stages 5 and 6 ---
     nbu_catalog_base: str = Field(
         default="https://bank.gov.ua/ua/numismatic-products", alias="NBU_CATALOG_BASE"

@@ -52,9 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const acceptSession = useCallback((session: SessionOut) => {
+  const acceptSession = useCallback((session: SessionOut, remember?: boolean) => {
+    if (remember !== undefined) setRemembered(remember);
     setAccessToken(session.tokens.accessToken);
     setUser(session.user);
+  }, []);
+
+  const completeGoogleSession = useCallback(async (remember?: boolean) => {
+    if (!(await tryRefresh())) throw new Error('Google session refresh failed');
+    const profile = await authApi.me();
+    if (remember !== undefined) setRemembered(remember);
+    setUser(profile);
   }, []);
 
   const signIn = useCallback(
@@ -79,8 +87,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUser = useCallback((profile: UserOut) => setUser(profile), []);
 
   const value = useMemo(
-    () => ({ user, ready, signIn, acceptSession, updateUser, signOut }),
-    [user, ready, signIn, acceptSession, updateUser, signOut],
+    () => ({ user, ready, signIn, acceptSession, completeGoogleSession, updateUser, signOut }),
+    [user, ready, signIn, acceptSession, completeGoogleSession, updateUser, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

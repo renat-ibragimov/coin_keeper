@@ -13,6 +13,7 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import CITEXT, ENUM, INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -26,7 +27,7 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(CITEXT, nullable=False, unique=True)
-    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    password_hash: Mapped[str | None] = mapped_column(Text)
     display_name: Mapped[str | None] = mapped_column(Text)
     role: Mapped[UserRole] = mapped_column(
         ENUM(UserRole, name="user_role", values_callable=lambda e: [m.value for m in e]),
@@ -52,6 +53,37 @@ class User(Base):
 
     settings: Mapped[UserSettings | None] = relationship(
         back_populates="user", cascade="all, delete-orphan", uselist=False
+    )
+    identities: Mapped[list[AuthIdentity]] = relationship(
+        back_populates="user", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    @property
+    def has_password(self) -> bool:
+        return self.password_hash is not None
+
+    @property
+    def google_linked(self) -> bool:
+        return any(identity.provider == "google" for identity in self.identities)
+
+
+class AuthIdentity(Base):
+    """A provider subject identifies an account even when its email changes."""
+
+    __tablename__ = "auth_identities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider: Mapped[str] = mapped_column(Text, nullable=False)
+    subject: Mapped[str] = mapped_column(Text, nullable=False)
+    email_at_link: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = created_at_column()
+
+    user: Mapped[User] = relationship(back_populates="identities")
+
+    __table_args__ = (
+        UniqueConstraint("provider", "subject", name="uq_auth_identities_provider_subject"),
+        UniqueConstraint("user_id", "provider", name="uq_auth_identities_user_provider"),
     )
 
 

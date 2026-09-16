@@ -24,6 +24,7 @@ from app.schemas.auth import (
     RegisterRequest,
     ResetPasswordRequest,
     SessionOut,
+    SetPasswordRequest,
     TokensOut,
     UpdateMeRequest,
     UserOut,
@@ -348,6 +349,24 @@ async def change_password(
         raise _weak_password_problem(exc) from exc
     # Every session was revoked, including this one.
     _clear_refresh_cookie(response, settings)
+
+
+@router.post("/set-password", status_code=status.HTTP_204_NO_CONTENT)
+async def set_password(
+    payload: SetPasswordRequest, user: CurrentUser, service: AuthServiceDep
+) -> None:
+    """A Google-only account can add password sign-in to the same user id."""
+    try:
+        await service.set_password(user=user, new_password=payload.new_password)
+    except InvalidCredentialsError as exc:
+        raise ProblemError(
+            status.HTTP_409_CONFLICT,
+            "password-already-set",
+            "Conflict",
+            "A password is already set for this account.",
+        ) from exc
+    except WeakPasswordError as exc:
+        raise _weak_password_problem(exc) from exc
 
 
 __all__ = ["router"]

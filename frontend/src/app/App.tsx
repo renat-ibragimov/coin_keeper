@@ -9,6 +9,7 @@ import { AuthLayout } from '@/features/auth/AuthLayout';
 import { useAuth } from '@/features/auth/useAuth';
 import { CheckEmailPage } from '@/features/auth/pages/CheckEmailPage';
 import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
+import { GoogleCompletePage } from '@/features/auth/pages/GoogleCompletePage';
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { RegisterPage } from '@/features/auth/pages/RegisterPage';
 import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
@@ -165,6 +166,7 @@ export function App() {
                     <Route path="/check-email" element={<CheckEmailPage />} />
                     <Route path="/verify-email" element={<VerifyEmailPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/google-complete" element={<GoogleCompletePage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                   </Route>
                   <Route element={<ProtectedRoute />}>

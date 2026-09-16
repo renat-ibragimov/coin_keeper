@@ -67,6 +67,11 @@ PATCH  /auth/me              {displayName?, locale?}          → {user}
 PUT    /auth/me/avatar       <сырые байты изображения>        → {user}
 DELETE /auth/me/avatar       —                                → {user}
 POST   /auth/change-password {currentPassword, newPassword}   → 204
+POST   /auth/set-password    {newPassword}                    → 204 (только без пароля)
+GET    /auth/google/status   —                                → {enabled}
+GET    /auth/google/start    —                                → 302 в Google
+POST   /auth/google/link/start —                              → {url} (Bearer)
+GET    /auth/google/callback {state, code}                    → 303 в приложение
 ```
 
 `tokens` — `{accessToken, expiresIn}`. **Refresh-токен в теле не передаётся ни в запросе,
@@ -82,6 +87,12 @@ POST   /auth/change-password {currentPassword, newPassword}   → 204
 адрес или нет. Ограничения частоты по всем этим эндпоинтам — в `07-auth.md`.
 
 `locale` в `PATCH /auth/me` — `'uk' | 'en'`, по умолчанию `'uk'`.
+
+`user` также содержит `hasPassword` и `googleLinked`. Google callback выставляет
+обычную refresh-cookie и ведёт на `/google-complete`, где фронт вызывает `/auth/refresh`.
+`link/start` доступен только вошедшему пользователю; при совпадении email привязка
+сохраняет его `user.id` и коллекцию. При конфликте callback ведёт на страницу входа
+с предложением сначала войти существующим способом.
 
 `user` везде содержит `avatarUrl` — подписанная ссылка на час или `null`, не ключ в
 бакете (`06-media-storage.md`). Она собирается в одном месте на бэкенде, поэтому приходит

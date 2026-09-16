@@ -47,6 +47,7 @@ REFRESH = RateLimit("refresh", limit=30, window_seconds=HOUR)
 FORGOT_PASSWORD = RateLimit("forgot_password", limit=3, window_seconds=HOUR)
 RESEND_VERIFICATION = RateLimit("resend_verification", limit=3, window_seconds=HOUR)
 RESET_PASSWORD = RateLimit("reset_password", limit=5, window_seconds=HOUR)
+GOOGLE_START = RateLimit("google_start", limit=10, window_seconds=HOUR)
 
 
 class RateLimitExceededError(Exception):

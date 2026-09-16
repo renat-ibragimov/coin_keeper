@@ -8,6 +8,7 @@ import { Button, Input } from '@/shared/ui';
 
 import * as authApi from '../api';
 import { PasswordInput } from './PasswordInput';
+import { GoogleSignIn } from './GoogleSignIn';
 import styles from './authForms.module.css';
 
 export function RegisterPage() {
@@ -92,6 +93,7 @@ export function RegisterPage() {
           {t('auth.signUp')}
         </Button>
       </form>
+      <GoogleSignIn />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
         {t('auth.haveAccount')} <Link to="/login">{t('auth.signIn')}</Link>

@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 
+import * as authApi from '@/features/auth/api';
 import { useAuth } from '@/features/auth/useAuth';
 import { deleteStorageLocation, fetchStorageLocations } from '@/features/collection/api';
 import { GRADES } from '@/features/collection/grades';
@@ -13,6 +15,7 @@ import { useTheme } from '@/shared/theme/useTheme';
 import type { ThemePreference } from '@/shared/theme/themeContext';
 import {
   Badge,
+  Button,
   Card,
   Combobox,
   ConfirmDialog,
@@ -26,7 +29,7 @@ import {
   useToast,
 } from '@/shared/ui';
 
-import { changePassword, updateProfile, updateSettings } from './api';
+import { changePassword, setPassword, updateProfile, updateSettings } from './api';
 import { AvatarSection } from './AvatarSection';
 import { PasswordForm } from './PasswordForm';
 import styles from './SettingsPage.module.css';
@@ -37,6 +40,19 @@ export function SettingsPage() {
   const { preference, setPreference } = useTheme();
   const toast = useToast();
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const googleResult = searchParams.get('google');
+  const googleStatus = useQuery({ queryKey: ['google-status'], queryFn: authApi.googleStatus });
+
+  useEffect(() => {
+    if (googleResult === 'linked') toast.show(t('settings.googleLinked'));
+    else if (googleResult) toast.show(t('settings.googleLinkFailed'));
+    if (googleResult) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('google');
+      setSearchParams(next, { replace: true });
+    }
+  }, [googleResult, searchParams, setSearchParams, t, toast]);
 
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const storageLocationsQuery = useQuery({
@@ -79,8 +95,19 @@ export function SettingsPage() {
   });
   const passwordMutation = useMutation({
     mutationFn: ({ current, next }: { current: string; next: string }) =>
-      changePassword(current, next),
-    onSuccess: () => toast.show(t('settings.passwordChanged')),
+      user?.hasPassword === false ? setPassword(next) : changePassword(current, next),
+    onSuccess: () => {
+      if (user?.hasPassword === false) updateUser({ ...user, hasPassword: true });
+      toast.show(t('settings.passwordChanged'));
+    },
+  });
+
+  const googleLinkMutation = useMutation({
+    mutationFn: authApi.startGoogleLink,
+    onSuccess: ({ url }) => {
+      window.location.assign(url);
+    },
+    onError: () => toast.show(t('settings.googleLinkFailed')),
   });
   const packagingMutation = useMutation({
     mutationFn: (showPackagingVariants: boolean) => updateSettings({ showPackagingVariants }),
@@ -195,10 +222,30 @@ export function SettingsPage() {
             <PasswordForm
               busy={passwordMutation.isPending}
               submitError={passwordMutation.error}
+              requireCurrent={user?.hasPassword !== false}
               onSubmit={(current, next) =>
                 passwordMutation.mutateAsync({ current, next }).then(() => {})
               }
             />
+            {googleStatus.data?.enabled ? (
+              <div>
+                <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
+                  {t('settings.googleTitle')}
+                </h3>
+                {user?.googleLinked ? (
+                  <p>{t('settings.googleLinked')}</p>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    loading={googleLinkMutation.isPending}
+                    onClick={() => googleLinkMutation.mutate()}
+                  >
+                    {t('settings.googleLink')}
+                  </Button>
+                )}
+              </div>
+            ) : null}
           </Card>
         </div>
 

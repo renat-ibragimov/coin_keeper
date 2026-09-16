@@ -35,3 +35,7 @@ export function changePassword(currentPassword: string, newPassword: string): Pr
     body: { currentPassword, newPassword },
   });
 }
+
+export function setPassword(newPassword: string): Promise<void> {
+  return api<void>('/auth/set-password', { method: 'POST', body: { newPassword } });
+}

@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AuthToken, RefreshToken, User, UserSettings
+from app.models import AuthIdentity, AuthToken, RefreshToken, User, UserSettings
 from app.models.enums import AuthTokenKind
 
 
@@ -57,6 +57,28 @@ class UserRepository:
             select(UserSettings).where(UserSettings.user_id == user_id)
         )
         return result.scalar_one_or_none()
+
+
+class AuthIdentityRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_google(self, subject: str) -> AuthIdentity | None:
+        result = await self._session.execute(
+            select(AuthIdentity).where(
+                AuthIdentity.provider == "google", AuthIdentity.subject == subject
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def link_google(self, user: User, *, subject: str, email: str) -> AuthIdentity:
+        identity = AuthIdentity(
+            user_id=user.id, provider="google", subject=subject, email_at_link=email
+        )
+        self._session.add(identity)
+        await self._session.flush()
+        await self._session.refresh(user, ["identities"])
+        return identity
 
 
 class RefreshTokenRepository:

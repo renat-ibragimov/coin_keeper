@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/shared/ui';
 
@@ -12,6 +12,8 @@ const RESEND_COOLDOWN_SECONDS = 60;
 export function CheckEmailPage() {
   const { t } = useTranslation();
   const location = useLocation();
+  const [params] = useSearchParams();
+  const googleVerification = params.get('google') === 'verify';
   const email = (location.state as { email?: string } | null)?.email ?? '';
 
   const [cooldown, setCooldown] = useState(RESEND_COOLDOWN_SECONDS);
@@ -39,11 +41,15 @@ export function CheckEmailPage() {
   return (
     <div className={styles.centered}>
       <h2 className={styles.title}>{t('auth.checkEmailTitle')}</h2>
-      <p className={styles.subtitle}>{t('auth.checkEmailText', { email })}</p>
+      <p className={styles.subtitle}>
+        {googleVerification ? t('auth.googleCheckEmail') : t('auth.checkEmailText', { email })}
+      </p>
       {sentAgain ? <div className={styles.formInfo}>{t('auth.resendDone')}</div> : null}
-      <Button variant="secondary" disabled={cooldown > 0 || !email} onClick={() => void resend()}>
-        {cooldown > 0 ? t('auth.resendCountdown', { seconds: cooldown }) : t('auth.resend')}
-      </Button>
+      {!googleVerification ? (
+        <Button variant="secondary" disabled={cooldown > 0 || !email} onClick={() => void resend()}>
+          {cooldown > 0 ? t('auth.resendCountdown', { seconds: cooldown }) : t('auth.resend')}
+        </Button>
+      ) : null}
       <p className={styles.switch}>
         <Link to="/login">{t('auth.goToLogin')}</Link>
       </p>

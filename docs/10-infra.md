@@ -92,6 +92,8 @@ SMTP_USER=resend
 SMTP_PASSWORD=***
 SMTP_FROM="Bakost Numismatics <noreply@<домен>>"
 SMTP_STARTTLS=true
+GOOGLE_CLIENT_ID=***
+GOOGLE_CLIENT_SECRET=***
 LOG_LEVEL=INFO
 JOB_REPORT_TOKEN=***
 TELEGRAM_BOT_TOKEN=***
@@ -433,6 +435,21 @@ docker compose build && docker compose up -d     # если нужно собр�
 
 На центральном Caddy для этого сайта установить `Referrer-Policy: no-referrer`, как в
 репозиторном `Caddyfile`. Токены в ссылках не должны уходить в заголовке `Referer`.
+
+## Google-вход
+
+В Google Cloud Console создать OAuth client типа **Web application**. Для текущего
+окружения разрешить точный redirect URI
+`https://coins.renat-ibragimov.com/api/v1/auth/google/callback`; для отдельного prod
+добавить `https://numismatics.bakost.club/api/v1/auth/google/callback` в его клиент.
+Запросить только `openid email profile`. `GOOGLE_CLIENT_ID` и
+`GOOGLE_CLIENT_SECRET` добавить в `SERVER_ENV` соответствующего окружения; секрет не
+попадает во фронтенд. Пока оба значения пусты, кнопка Google не показывается.
+
+На экране согласия Google приложение в режиме Testing доступно только тестовым
+пользователям. Перед публичным запуском перевести его в Production и завершить
+необходимую настройку экрана согласия. Проверить вход с новым Google-адресом,
+конфликт с существующим email, привязку из настроек и вход обоими способами.
 
 Что настроить обязательно:
 

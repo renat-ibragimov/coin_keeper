@@ -45,3 +45,11 @@ export function logout(): Promise<void> {
 export function me(): Promise<UserOut> {
   return api<UserOut>('/auth/me');
 }
+
+export function googleStatus(): Promise<{ enabled: boolean }> {
+  return api<{ enabled: boolean }>('/auth/google/status', { auth: false });
+}
+
+export function startGoogleLink(): Promise<{ url: string }> {
+  return api<{ url: string }>('/auth/google/link/start', { method: 'POST' });
+}

@@ -11,6 +11,7 @@ from app.api.v1 import (
     catalog,
     collection,
     expenses,
+    google_auth,
     health,
     jobs,
     reference,
@@ -23,6 +24,7 @@ api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health.router)
 api_router.include_router(admin.router)
 api_router.include_router(auth.router)
+api_router.include_router(google_auth.router)
 api_router.include_router(bootstrap.router)
 api_router.include_router(catalog.router)
 api_router.include_router(collection.router)

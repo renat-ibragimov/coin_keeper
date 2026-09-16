@@ -37,6 +37,7 @@ from app.models.telegram import (
 )
 from app.models.user import (
     AuditLog,
+    AuthIdentity,
     AuthToken,
     Currency,
     RefreshToken,
@@ -47,6 +48,7 @@ from app.models.user import (
 
 __all__ = [
     "AuditLog",
+    "AuthIdentity",
     "AuthToken",
     "Base",
     "CatalogItem",

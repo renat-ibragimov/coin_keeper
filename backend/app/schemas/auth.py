@@ -43,6 +43,10 @@ class ChangePasswordRequest(CamelModel):
     new_password: str = Field(min_length=1)
 
 
+class SetPasswordRequest(CamelModel):
+    new_password: str = Field(min_length=1)
+
+
 class UpdateMeRequest(CamelModel):
     display_name: str | None = Field(default=None, max_length=200)
     locale: Locale | None = None
@@ -55,6 +59,8 @@ class UserOut(CamelModel):
     role: str
     locale: str
     email_verified: bool
+    has_password: bool
+    google_linked: bool
     # A signed, short-lived URL, never the storage key: the bucket is private
     # and its host can change. Built by app.services.avatars.user_out, which
     # is the only place this model should be assembled.
