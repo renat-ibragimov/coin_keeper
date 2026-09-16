@@ -20,7 +20,7 @@
 }
 
 .card {
-  margin: auto auto var(--space-6);
+  margin: auto;
   width: 100%;
   max-width: 1060px;
   display: grid;
@@ -122,6 +122,7 @@
   }
 
   .card {
+    margin: 0 auto var(--space-6);
     grid-template-columns: 1fr;
   }
 

@@ -1,5 +1,6 @@
 import { Coffee, Headphones } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 
 import styles from './SiteFooter.module.css';
 import { useDonationDialog } from './donationDialogContext';
@@ -29,6 +30,12 @@ export function SiteFooter({ reserveMobileNav = false }: SiteFooterProps) {
         © {year} {t('brand.name')}
       </span>
       <nav className={styles.links} aria-label={t('footer.linksLabel')}>
+        <Link to="/privacy" className={styles.link}>
+          {t('footer.privacy')}
+        </Link>
+        <Link to="/terms" className={styles.link}>
+          {t('footer.terms')}
+        </Link>
         <button
           type="button"
           className={styles.link}

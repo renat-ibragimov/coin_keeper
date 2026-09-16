@@ -33,6 +33,7 @@ import { AppLayout } from './layout/AppLayout';
 import { DonationDialogProvider } from './layout/DonationDialog';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ThemeSettingsSync } from './ThemeSettingsSync';
+import { LegalPage } from './legal/LegalPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -160,6 +161,8 @@ export function App() {
               <ScrollToTop />
               <DonationDialogProvider>
                 <Routes>
+                  <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+                  <Route path="/terms" element={<LegalPage kind="terms" />} />
                   <Route element={<AuthLayout />}>
                     <Route path="/login" element={<LoginPage />} />
                     <Route path="/register" element={<RegisterPage />} />
