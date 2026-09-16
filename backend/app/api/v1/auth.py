@@ -36,6 +36,7 @@ from app.services.auth import (
     InvalidCredentialsError,
     InvalidOrExpiredTokenError,
     IssuedSession,
+    PasswordRequiredError,
     RegistrationClosedError,
     WeakPasswordError,
 )
@@ -111,6 +112,7 @@ def _weak_password_problem(exc: WeakPasswordError) -> ProblemError:
 async def register(payload: RegisterRequest, service: AuthServiceDep, ip: ClientIp) -> AcceptedOut:
     """Always 202: the answer must not reveal whether the address is taken."""
     await _enforce(rate_limit.REGISTER, ip)
+    await _enforce(rate_limit.REGISTER, payload.email.lower())
     try:
         await service.register(
             email=payload.email,
@@ -118,8 +120,6 @@ async def register(payload: RegisterRequest, service: AuthServiceDep, ip: Client
             display_name=payload.display_name,
             honeypot=payload.website,
         )
-    except WeakPasswordError as exc:
-        raise _weak_password_problem(exc) from exc
     except RegistrationClosedError as exc:
         raise ProblemError(
             status.HTTP_403_FORBIDDEN,
@@ -151,7 +151,21 @@ async def verify_email(
 ) -> SessionOut:
     """Confirming the address activates the account and signs the user in."""
     try:
-        session = await service.verify_email(token=payload.token, user_agent=agent, ip=ip)
+        session = await service.verify_email(
+            token=payload.token,
+            new_password=payload.new_password,
+            user_agent=agent,
+            ip=ip,
+        )
+    except PasswordRequiredError as exc:
+        raise ProblemError(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "password-required",
+            "Password required",
+            "Choose a password to confirm this address.",
+        ) from exc
+    except WeakPasswordError as exc:
+        raise _weak_password_problem(exc) from exc
     except InvalidOrExpiredTokenError as exc:
         raise ProblemError(
             status.HTTP_400_BAD_REQUEST,

@@ -11,7 +11,6 @@ export function login(email: string, password: string): Promise<SessionOut> {
 
 export function register(input: {
   email: string;
-  password: string;
   displayName?: string;
   website?: string;
 }): Promise<void> {
@@ -22,8 +21,12 @@ export function resendVerification(email: string): Promise<void> {
   return api<void>('/auth/resend-verification', { method: 'POST', body: { email }, auth: false });
 }
 
-export function verifyEmail(token: string): Promise<SessionOut> {
-  return api<SessionOut>('/auth/verify-email', { method: 'POST', body: { token }, auth: false });
+export function verifyEmail(token: string, newPassword?: string): Promise<SessionOut> {
+  return api<SessionOut>('/auth/verify-email', {
+    method: 'POST',
+    body: { token, newPassword },
+    auth: false,
+  });
 }
 
 export function forgotPassword(email: string): Promise<void> {

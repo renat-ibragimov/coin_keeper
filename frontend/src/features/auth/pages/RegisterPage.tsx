@@ -7,7 +7,6 @@ import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
 
 import * as authApi from '../api';
-import { PasswordInput } from './PasswordInput';
 import { GoogleSignIn } from './GoogleSignIn';
 import styles from './authForms.module.css';
 
@@ -17,7 +16,6 @@ export function RegisterPage() {
 
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [password, setPassword] = useState('');
   const [website, setWebsite] = useState(''); // honeypot, docs/07-auth.md
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,15 +27,12 @@ export function RegisterPage() {
     try {
       await authApi.register({
         email,
-        password,
         displayName: displayName || undefined,
         website: website || undefined,
       });
       navigate('/check-email', { state: { email } });
     } catch (cause) {
-      if (cause instanceof ApiError && cause.problemType === 'weak-password') {
-        setError(t('auth.weakPassword'));
-      } else if (cause instanceof ApiError && cause.status === 429) {
+      if (cause instanceof ApiError && cause.status === 429) {
         setError(t('errors.rateLimited'));
       } else {
         setError(t('errors.generic'));
@@ -68,16 +63,6 @@ export function RegisterPage() {
           hint={t('auth.displayNameHint')}
           value={displayName}
           onChange={(event) => setDisplayName(event.target.value)}
-        />
-        <PasswordInput
-          label={t('auth.password')}
-          autoComplete="new-password"
-          required
-          minLength={10}
-          hint={t('auth.passwordHint')}
-          placeholder={t('auth.passwordPlaceholder')}
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
         />
         <div className={styles.honeypot} aria-hidden="true">
           <input

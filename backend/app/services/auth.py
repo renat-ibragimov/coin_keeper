@@ -58,6 +58,10 @@ class RegistrationClosedError(AuthError):
     pass
 
 
+class PasswordRequiredError(AuthError):
+    pass
+
+
 class WeakPasswordError(AuthError):
     def __init__(self, min_length: int) -> None:
         super().__init__(f"password must be at least {min_length} characters")
@@ -96,7 +100,7 @@ class AuthService:
     # ------------------------------------------------------------- registration
 
     async def register(
-        self, *, email: str, password: str, display_name: str | None, honeypot: str | None
+        self, *, email: str, password: str | None, display_name: str | None, honeypot: str | None
     ) -> None:
         """Create an inactive account and send the verification email.
 
@@ -110,8 +114,6 @@ class AuthService:
         if not self._settings.allow_registration:
             raise RegistrationClosedError
 
-        self._validate_password(password)
-
         existing = await self._users.get_by_email(email)
         if existing is not None:
             if existing.email_verified:
@@ -119,13 +121,13 @@ class AuthService:
                 # the address instead, out of band.
                 logger.info("registration attempt for an existing verified account")
                 return
-            # Unverified: treat as a repeated attempt and resend the link.
+            # The mailbox owner chooses the password when consuming the link.
             await self._send_verification(existing)
             return
 
         user = User(
             email=email,
-            password_hash=hash_password(password),
+            password_hash=None,
             display_name=display_name,
             role=UserRole.USER,
             is_active=False,
@@ -152,12 +154,15 @@ class AuthService:
         # If delivery fails, the inactive account remains and the user can resend.
         await self._session.commit()
         url = f"{self._settings.public_base_url}/verify-email?token={quote(raw)}"
+        await self._session.refresh(user, ["identities"])
+        if user.google_linked:
+            url += "&google=1"
         await self._mail.send(
             verification_email(user.email, url, self._settings.email_verify_ttl_hours)
         )
 
     async def verify_email(
-        self, *, token: str, user_agent: str | None, ip: str | None
+        self, *, token: str, new_password: str | None, user_agent: str | None, ip: str | None
     ) -> IssuedSession:
         record = await self._auth_tokens.get_usable(
             token_hash=hash_token(token), kind=AuthTokenKind.EMAIL_VERIFY, for_update=True
@@ -167,6 +172,15 @@ class AuthService:
         user = await self._users.get_by_id(record.user_id)
         if user is None:
             raise InvalidOrExpiredTokenError
+
+        if new_password is None and not user.google_linked:
+            raise PasswordRequiredError
+        if new_password is not None:
+            self._validate_password(new_password)
+            user.password_hash = hash_password(new_password)
+        else:
+            # A legacy pending Google account must not retain an unverified password.
+            user.password_hash = None
 
         await self._auth_tokens.mark_used(record)
         user.email_verified = True
@@ -340,6 +354,7 @@ __all__ = [
     "InvalidCredentialsError",
     "InvalidOrExpiredTokenError",
     "IssuedSession",
+    "PasswordRequiredError",
     "RegistrationClosedError",
     "WeakPasswordError",
 ]

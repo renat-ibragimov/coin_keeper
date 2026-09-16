@@ -54,8 +54,8 @@ REST + JSON. Префикс `/api/v1`. Аутентификация — Bearer-�
 ## Аутентификация
 
 ```
-POST   /auth/register        {email, password, displayName?, website?}  → 202
-POST   /auth/verify-email    {token}                          → {user, tokens}
+POST   /auth/register        {email, displayName?, website?}   → 202
+POST   /auth/verify-email    {token, newPassword?}             → {user, tokens}
 POST   /auth/resend-verification {email}                      → 202
 POST   /auth/login           {email, password}                → {user, tokens}
 POST   /auth/refresh         —                                → {tokens}
@@ -80,6 +80,9 @@ GET    /auth/google/callback {state, code}                    → 303 в при�
 эндпоинтов тела запроса нет. Решение и обоснование — `07-auth.md`.
 
 Регистрация возвращает `202`, а не токены: аккаунт неактивен до подтверждения адреса.
+Пароль задаётся при `/auth/verify-email` владельцем почты; только для аккаунта,
+созданного через Google, `newPassword` можно опустить. Старое поле `password` в
+`/auth/register` принимается для совместимости, но игнорируется.
 Токены выдаёт `/auth/verify-email`. `website` — honeypot-поле формы регистрации
 (`07-auth.md`): заполнено — ответ тот же `202`, пользователь не создаётся.
 

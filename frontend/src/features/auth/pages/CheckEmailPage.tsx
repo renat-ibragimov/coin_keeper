@@ -53,6 +53,11 @@ export function CheckEmailPage() {
       <p className={styles.switch}>
         <Link to="/login">{t('auth.goToLogin')}</Link>
       </p>
+      {!googleVerification ? (
+        <p className={styles.switch}>
+          <Link to="/forgot-password">{t('auth.forgotPassword')}</Link>
+        </p>
+      ) : null}
     </div>
   );
 }

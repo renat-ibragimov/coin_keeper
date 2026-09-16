@@ -19,7 +19,7 @@ from app.core.rate_limit import get_redis
 from app.repositories.users import UserRepository
 from app.services import google_auth as google_module
 from app.services.google_auth import GoogleClaims, GoogleOAuth, GoogleOAuthError, PendingFlow
-from tests.helpers import PASSWORD, register_and_verify, unique_email
+from tests.helpers import PASSWORD, extract_token, register_and_verify, unique_email
 
 
 def enable_google(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,6 +78,70 @@ async def test_google_creates_one_account_and_can_add_password(
     assert password_login.status_code == 200
     assert password_login.json()["user"]["id"] == user["id"]
     assert (await UserRepository(db_session).get_by_email(email)).id == user["id"]
+
+
+async def test_password_registration_for_existing_google_account_is_generic_but_recoverable(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mail_outbox: list[EmailMessage],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    enable_google(monkeypatch)
+    email = f"google-{unique_email().split('@')[0]}@gmail.com"
+    google_claims(monkeypatch, email, "google-sub-register-collision")
+    start = await client.get("/api/v1/auth/google/start")
+    await client.get(
+        "/api/v1/auth/google/callback",
+        params={"state": oauth_state(start.headers["location"]), "code": "test-code"},
+    )
+    original = await UserRepository(db_session).get_by_email(email)
+    assert original is not None
+
+    repeated = await client.post(
+        "/api/v1/auth/register", json={"email": email, "password": PASSWORD}
+    )
+    assert repeated.status_code == 202
+    assert mail_outbox == []
+    assert (await UserRepository(db_session).get_by_email(email)).id == original.id
+
+    recovery = await client.post("/api/v1/auth/forgot-password", json={"email": email})
+    assert recovery.status_code == 202
+    assert mail_outbox[-1].to == email
+    reset = await client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": extract_token(mail_outbox), "newPassword": PASSWORD},
+    )
+    assert reset.status_code == 204
+    password_login = await client.post(
+        "/api/v1/auth/login", json={"email": email, "password": PASSWORD}
+    )
+    assert password_login.status_code == 200
+    assert password_login.json()["user"]["id"] == original.id
+
+
+async def test_second_google_identity_cannot_replace_a_linked_one(
+    client: AsyncClient, mail_outbox: list[EmailMessage], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    enable_google(monkeypatch)
+    email, access = await register_and_verify(client, mail_outbox)
+    google_claims(monkeypatch, email, "first-google-sub")
+    auth = {"Authorization": f"Bearer {access}"}
+    link = await client.post("/api/v1/auth/google/link/start", headers=auth)
+    assert link.status_code == 200
+    linked = await client.get(
+        "/api/v1/auth/google/callback",
+        params={"state": oauth_state(link.json()["url"]), "code": "test-code"},
+    )
+    assert linked.headers["location"].endswith("google=linked")
+
+    assert (await client.post("/api/v1/auth/google/link/start", headers=auth)).status_code == 409
+    google_claims(monkeypatch, email, "second-google-sub")
+    start = await client.get("/api/v1/auth/google/start")
+    collision = await client.get(
+        "/api/v1/auth/google/callback",
+        params={"state": oauth_state(start.headers["location"]), "code": "test-code"},
+    )
+    assert collision.headers["location"].endswith("/login?google=link-required")
 
 
 async def test_matching_email_requires_explicit_link_to_existing_user(
@@ -140,7 +204,14 @@ async def test_external_google_email_still_needs_our_email_verification(
     )
     assert callback.headers["location"].endswith("/check-email?google=verify")
     assert mail_outbox[-1].to == email
+    assert "&google=1" in mail_outbox[-1].body
     assert (await client.post("/api/v1/auth/refresh")).status_code == 401
+    confirmed = await client.post(
+        "/api/v1/auth/verify-email", json={"token": extract_token(mail_outbox)}
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.json()["user"]["googleLinked"] is True
+    assert confirmed.json()["user"]["hasPassword"] is False
 
 
 async def test_link_rejects_different_google_email(

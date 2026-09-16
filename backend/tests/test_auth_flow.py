@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.mail.base import EmailMessage
+from app.core.security import hash_password
 from app.repositories.users import UserRepository
 from app.services.auth import AuthService
 from tests.helpers import PASSWORD, extract_token, register_and_verify, unique_email
@@ -53,11 +54,11 @@ async def test_registration_verification_login_refresh_logout(
 
     # The account exists but cannot be used until the address is confirmed.
     blocked = await client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
-    assert blocked.status_code == 403
-    assert blocked.json()["type"].endswith("email-not-verified")
+    assert blocked.status_code == 401
 
     verified = await client.post(
-        "/api/v1/auth/verify-email", json={"token": extract_token(mail_outbox)}
+        "/api/v1/auth/verify-email",
+        json={"token": extract_token(mail_outbox), "newPassword": PASSWORD},
     )
     assert verified.status_code == 200
     body = verified.json()
@@ -96,10 +97,48 @@ async def test_verification_token_is_single_use(
     token = extract_token(mail_outbox)
 
     assert (
-        await client.post("/api/v1/auth/verify-email", json={"token": token})
+        await client.post(
+            "/api/v1/auth/verify-email", json={"token": token, "newPassword": PASSWORD}
+        )
     ).status_code == 200
     replayed = await client.post("/api/v1/auth/verify-email", json={"token": token})
     assert replayed.status_code == 400
+
+
+async def test_repeated_registration_cannot_preserve_an_attackers_password(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list[EmailMessage]
+) -> None:
+    email = unique_email()
+    attackers_password = "attacker-chosen-password"
+    await client.post(
+        "/api/v1/auth/register", json={"email": email, "password": attackers_password}
+    )
+    pending = await UserRepository(db_session).get_by_email(email)
+    assert pending is not None
+    assert pending.password_hash is None
+
+    # Simulate a pending row created by the previous release.
+    pending.password_hash = hash_password(attackers_password)
+    await db_session.flush()
+
+    await client.post("/api/v1/auth/register", json={"email": email, "password": PASSWORD})
+    token = extract_token(mail_outbox)
+    missing = await client.post("/api/v1/auth/verify-email", json={"token": token})
+    assert missing.status_code == 422
+    assert missing.json()["type"].endswith("password-required")
+    verified = await client.post(
+        "/api/v1/auth/verify-email", json={"token": token, "newPassword": PASSWORD}
+    )
+    assert verified.status_code == 200
+    assert (await UserRepository(db_session).get_by_email(email)).id == pending.id
+    assert (
+        await client.post(
+            "/api/v1/auth/login", json={"email": email, "password": attackers_password}
+        )
+    ).status_code == 401
+    assert (
+        await client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
+    ).status_code == 200
 
 
 async def test_honeypot_silently_rejects_registration(
@@ -145,10 +184,12 @@ async def test_unauthenticated_me_returns_problem_json(client: AsyncClient) -> N
 
 @pytest.mark.parametrize("password", ["short", "123456789"])
 async def test_password_shorter_than_ten_characters_is_rejected(
-    client: AsyncClient, password: str
+    client: AsyncClient, mail_outbox: list[EmailMessage], password: str
 ) -> None:
+    await client.post("/api/v1/auth/register", json={"email": unique_email()})
     response = await client.post(
-        "/api/v1/auth/register", json={"email": unique_email(), "password": password}
+        "/api/v1/auth/verify-email",
+        json={"token": extract_token(mail_outbox), "newPassword": password},
     )
     assert response.status_code == 422
     assert response.json()["type"].endswith("weak-password")

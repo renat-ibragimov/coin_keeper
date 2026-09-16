@@ -40,7 +40,10 @@ async def register_and_verify(
     )
     assert response.status_code == 202, response.text
 
-    verify = await client.post("/api/v1/auth/verify-email", json={"token": extract_token(outbox)})
+    verify = await client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": extract_token(outbox), "newPassword": PASSWORD},
+    )
     assert verify.status_code == 200, verify.text
     token: str = verify.json()["tokens"]["accessToken"]
     return address, token

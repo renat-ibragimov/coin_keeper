@@ -13,7 +13,8 @@ Locale = Literal["uk", "en"]
 
 class RegisterRequest(CamelModel):
     email: EmailStr
-    password: str = Field(min_length=1)
+    # Accepted for old clients during rollout, but deliberately ignored.
+    password: str | None = None
     display_name: str | None = Field(default=None, max_length=200)
     # Honeypot: invisible to people, filled in by simple bots. A filled value
     # gets the same 202 as success and creates nothing. docs/07-auth.md.
@@ -31,6 +32,7 @@ class EmailOnlyRequest(CamelModel):
 
 class VerifyEmailRequest(CamelModel):
     token: str = Field(min_length=1, max_length=512)
+    new_password: str | None = None
 
 
 class ResetPasswordRequest(CamelModel):
