@@ -88,7 +88,6 @@ export function DashboardPage() {
                 </Link>
               </>
             }
-            note={<Link to="/import">{t('catalog.importUcoin')}</Link>}
           />
         </div>
       ) : (

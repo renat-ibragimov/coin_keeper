@@ -96,10 +96,7 @@ describe('DashboardPage', () => {
       'href',
       '/collection/add',
     );
-    expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
-      'href',
-      '/import',
-    );
+    expect(screen.queryByText('Імпортувати з uCoin')).toBeNull();
     expect(screen.queryByText('Фінанси')).toBeNull();
   });
 

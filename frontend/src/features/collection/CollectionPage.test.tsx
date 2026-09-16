@@ -154,10 +154,7 @@ describe('CollectionPage', () => {
       'href',
       '/collection/add',
     );
-    expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
-      'href',
-      '/import',
-    );
+    expect(screen.queryByText('Імпортувати з uCoin')).toBeNull();
     expect(screen.queryByPlaceholderText('Пошук у колекції…')).toBeNull();
     // No header actions ("+ Додати покупку" would collide with the card's
     // own "Додати покупку" link if it rendered — this one has no "+").

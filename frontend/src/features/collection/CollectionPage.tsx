@@ -291,9 +291,6 @@ export function CollectionPage() {
               <Link to="/collection/add">
                 <Button>+ {t('card.addPurchase')}</Button>
               </Link>
-              <Link to="/import">
-                <Button variant="ghost">{t('catalog.importUcoin')}</Button>
-              </Link>
             </>
           )
         }
@@ -315,7 +312,6 @@ export function CollectionPage() {
               </Link>
             </>
           }
-          note={<Link to="/import">{t('catalog.importUcoin')}</Link>}
         />
       ) : (
         <>

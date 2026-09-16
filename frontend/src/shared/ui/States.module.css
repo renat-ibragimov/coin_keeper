@@ -49,21 +49,6 @@
   justify-content: center;
 }
 
-.note {
-  font-size: 13.5px;
-  color: var(--color-text-muted);
-}
-
-.note a,
-.note a:visited {
-  color: inherit;
-}
-
-.note a:hover {
-  color: var(--color-text-secondary);
-  text-decoration: underline;
-}
-
 .skeleton {
   border-radius: var(--radius-md);
   background: linear-gradient(

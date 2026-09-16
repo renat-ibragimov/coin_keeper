@@ -211,10 +211,7 @@ describe('ExpensesPage', () => {
       'href',
       '/collection/add',
     );
-    expect(screen.getByRole('link', { name: 'Імпортувати з uCoin' })).toHaveAttribute(
-      'href',
-      '/import',
-    );
+    expect(screen.queryByText('Імпортувати з uCoin')).toBeNull();
     // No header action, zero-value KPI tiles, charts or category chips above the empty state.
     expect(screen.queryByRole('button', { name: /Додати витрату/ })).toBeNull();
     expect(screen.queryByText('Разом на хобі')).toBeNull();

@@ -28,7 +28,6 @@ import { scrollPageToTop } from '@/shared/lib/pageScroll';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 import { ToastProvider } from '@/shared/ui';
 
-import { ComingSoon } from './ComingSoon';
 import { AppLayout } from './layout/AppLayout';
 import { DonationDialogProvider } from './layout/DonationDialog';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -179,10 +178,6 @@ export function App() {
                       <Route path="/collection/money" element={<ExpensesPage />} />
                       <Route path="/catalog" element={<CatalogPage />} />
                       <Route path="/catalog/:id" element={<CoinCardPage />} />
-                      <Route
-                        path="/import"
-                        element={<ComingSoon titleKey="catalog.importUcoin" />}
-                      />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="/admin" element={<AdminRoute />} />
 

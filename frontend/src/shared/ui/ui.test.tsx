@@ -237,11 +237,6 @@ describe('EmptyState', () => {
     const rule = css.match(/\.cardVariant\s*{([^}]*)}/)?.[1] ?? '';
     expect(rule).toMatch(/width:\s*100%/);
   });
-
-  it('renders the note below the actions', () => {
-    render(<EmptyState title="Nothing here" note={<a href="/import">Import</a>} />);
-    expect(screen.getByRole('link', { name: 'Import' })).toHaveAttribute('href', '/import');
-  });
 });
 
 describe('ErrorState', () => {
