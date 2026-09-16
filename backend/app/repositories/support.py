@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import exists, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import SupportLinkToken, SupportMessage, SupportTelegramSettings, SupportTicket
@@ -87,6 +87,17 @@ class SupportRepository:
     async def add_message(self, **values: object) -> None:
         self.session.add(SupportMessage(**values))
         await self.session.flush()
+
+    async def has_user_message(self, ticket_id: int) -> bool:
+        result = await self.session.execute(
+            select(
+                exists().where(
+                    SupportMessage.ticket_id == ticket_id,
+                    SupportMessage.direction == "user_to_admin",
+                )
+            )
+        )
+        return bool(result.scalar())
 
     async def close(self, ticket: SupportTicket) -> None:
         ticket.status = "closed"

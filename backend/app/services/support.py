@@ -112,6 +112,7 @@ class SupportService:
             thread_id=ticket.admin_topic_id,
         )
         if copied_id is not None:
+            is_first_user_message = not await self.repo.has_user_message(ticket.id)
             await self.repo.add_message(
                 ticket_id=ticket.id,
                 direction="user_to_admin",
@@ -119,7 +120,8 @@ class SupportService:
                 kind=self._kind(message),
                 text=self._text(message),
             )
-            await self.telegram.send_message(chat_id, self._received(ticket.locale))
+            if is_first_user_message:
+                await self.telegram.send_message(chat_id, self._received(ticket.locale))
 
     async def _new_ticket(
         self, chat_id: int, sender: dict[str, Any], token: SupportLinkToken | None = None

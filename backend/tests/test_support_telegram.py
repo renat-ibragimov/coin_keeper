@@ -89,6 +89,35 @@ async def test_setup_then_anonymous_message_creates_topic_and_relays(
     assert support_telegram.sent[-1][0] == USER_CHAT_ID
 
 
+async def test_received_reply_is_sent_only_for_first_message_in_ticket(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    support_telegram: RecordingSupportTelegram,
+) -> None:
+    await setup_group(client)
+    await client.post(WEBHOOK, headers=HEADERS, json=private_message("Перше", message_id=1))
+    replies_after_first = [
+        text for chat, text, _, _ in support_telegram.sent if chat == USER_CHAT_ID
+    ]
+
+    await client.post(WEBHOOK, headers=HEADERS, json=private_message("Друге", message_id=2))
+
+    assert support_telegram.copied == [
+        (USER_CHAT_ID, 1, GROUP_ID, 1001),
+        (USER_CHAT_ID, 2, GROUP_ID, 1001),
+    ]
+    assert [text for chat, text, _, _ in support_telegram.sent if chat == USER_CHAT_ID] == (
+        replies_after_first
+    )
+
+    ticket = (await db_session.execute(select(SupportTicket))).scalar_one()
+    ticket.status = "closed"
+    await db_session.flush()
+    await client.post(WEBHOOK, headers=HEADERS, json=private_message("Нова сесія", message_id=3))
+
+    assert len([text for chat, text, _, _ in support_telegram.sent if chat == USER_CHAT_ID]) == 2
+
+
 async def test_account_start_adds_identity_and_source_page(
     client: AsyncClient,
     mail_outbox: list[EmailMessage],
