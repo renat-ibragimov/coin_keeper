@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -31,12 +31,50 @@ export function Modal({
   mobilePlacement = 'bottom',
 }: ModalProps) {
   const { t } = useTranslation();
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   useDismissable(open, onClose);
 
   useEffect(() => {
     if (!open) return;
     return lockPageScroll();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const previousFocus =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    const focusable = () =>
+      Array.from(
+        dialog?.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]):not([tabindex="-1"]), select:not([disabled]), textarea:not([disabled])',
+        ) ?? [],
+      );
+    (
+      dialog?.querySelector<HTMLElement>('input:not([disabled]):not([tabindex="-1"])') ??
+      focusable()[0]
+    )?.focus({ preventScroll: true });
+
+    const keepFocusInside = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements.at(-1);
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    dialog?.addEventListener('keydown', keepFocusInside);
+    return () => {
+      dialog?.removeEventListener('keydown', keepFocusInside);
+      if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
+    };
   }, [open]);
 
   if (!open) return null;
@@ -48,6 +86,7 @@ export function Modal({
       onClick={onClose}
     >
       <div
+        ref={dialogRef}
         className={[styles.dialog, styles[size]].join(' ')}
         role="dialog"
         aria-modal="true"

@@ -5,9 +5,11 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
+import { AuthDialogContext } from '@/features/auth/authDialogContext';
 const authState = vi.hoisted(() => ({
   user: { id: 1, role: 'user' } as { id: number; role: string } | null,
 }));
+const openAuth = vi.fn();
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => authState }));
 import { ApiError } from '@/shared/api/client';
 import type {
@@ -244,9 +246,11 @@ function renderPage(path = '/catalog/7') {
         value={{ theme: 'light', preference: 'light', setPreference: () => {} }}
       >
         <MemoryRouter initialEntries={[path]}>
-          <Routes>
-            <Route path="/catalog/:id" element={<CoinCardPage />} />
-          </Routes>
+          <AuthDialogContext.Provider value={openAuth}>
+            <Routes>
+              <Route path="/catalog/:id" element={<CoinCardPage />} />
+            </Routes>
+          </AuthDialogContext.Provider>
         </MemoryRouter>
       </ThemeContext.Provider>
     </QueryClientProvider>,
@@ -268,17 +272,17 @@ describe('CoinCardPage', () => {
     renderPage();
     expect(await screen.findByRole('heading', { level: 1, name: 'Дельфін' })).toBeInTheDocument();
     expect(screen.getByText('Доступно після реєстрації', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Увійти' })).toBeInTheDocument();
     expect(screen.queryByText('460 ₴')).not.toBeInTheDocument();
     expect(screen.queryByText('UA-Coins')).not.toBeInTheDocument();
     expect(vi.mocked(fetchPrices)).not.toHaveBeenCalled();
     expect(vi.mocked(fetchOwnInstances)).not.toHaveBeenCalled();
     expect(vi.mocked(fetchBootstrap)).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: /Додати до колекції/ }));
-    expect(screen.getByRole('dialog', { name: 'Створіть власну колекцію' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Створити акаунт' })).toHaveAttribute(
-      'href',
-      '/register',
-    );
+    expect(openAuth).toHaveBeenCalledWith('register', {
+      from: '/catalog/7',
+      purpose: 'collection',
+    });
   });
   it('shows the title and the identity fields in the specs table', async () => {
     vi.mocked(fetchCard).mockResolvedValue(makeCard());

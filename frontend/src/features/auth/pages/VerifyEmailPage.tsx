@@ -8,6 +8,7 @@ import { Button, Spinner } from '@/shared/ui';
 
 import { useAuth } from '../useAuth';
 import * as authApi from '../api';
+import { takeAuthReturn } from '../authReturn';
 import { PasswordInput } from './PasswordInput';
 import styles from './authForms.module.css';
 
@@ -105,9 +106,7 @@ export function VerifyEmailPage() {
           <div className={styles.formInfo}>{t('auth.verifySuccess')}</div>
           <Button
             onClick={() => {
-              const from = sessionStorage.getItem('ck-auth-return');
-              sessionStorage.removeItem('ck-auth-return');
-              navigate(from?.startsWith('/') && !from.startsWith('//') ? from : '/', {
+              navigate(takeAuthReturn() ?? '/', {
                 replace: true,
               });
             }}

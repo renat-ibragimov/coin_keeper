@@ -15,8 +15,9 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
+import { useAuthDialog } from '@/features/auth/authDialogContext';
 import { useAuth } from '@/features/auth/useAuth';
 import { useDismissable } from '@/shared/lib/useDismissable';
 
@@ -59,10 +60,11 @@ export function AppLayout() {
   const { t } = useTranslation();
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const openAuth = useAuthDialog();
   const isAdmin = user?.role === 'admin';
   const inCollection =
     location.pathname === '/collection' || location.pathname.startsWith('/collection/');
-  const mobileLinks = inCollection && user ? MOBILE_COLLECTION : MOBILE_PLAIN;
+  const mobileLinks = inCollection ? MOBILE_COLLECTION : MOBILE_PLAIN;
   const { openSupport, openingSupport } = useSupportLink();
   const openDonation = useDonationDialog();
 
@@ -104,20 +106,9 @@ export function AppLayout() {
           </div>
           {!user ? (
             <div className={styles.guestDesktopActions}>
-              <Link
-                to="/login"
-                state={{ from: location.pathname + location.search }}
-                className={styles.guestLogin}
-              >
+              <button type="button" onClick={() => openAuth()} className={styles.guestLogin}>
                 {t('guest.login')}
-              </Link>
-              <Link
-                to="/register"
-                state={{ from: location.pathname + location.search }}
-                className={styles.guestRegister}
-              >
-                {t('guest.register')}
-              </Link>
+              </button>
             </div>
           ) : null}
           <div className={`${styles.account} ${!user ? styles.guestAccount : ''}`}>
@@ -227,24 +218,17 @@ export function AppLayout() {
                 <span className={styles.accountMenuDivider} aria-hidden="true" />
                 {!user ? (
                   <>
-                    <NavLink
-                      to="/login"
-                      state={{ from: location.pathname + location.search }}
+                    <button
+                      type="button"
                       className={styles.accountMenuLink}
                       role="menuitem"
-                      onClick={closeAccount}
+                      onClick={() => {
+                        closeAccount();
+                        openAuth();
+                      }}
                     >
                       {t('guest.login')}
-                    </NavLink>
-                    <NavLink
-                      to="/register"
-                      state={{ from: location.pathname + location.search }}
-                      className={styles.accountMenuLink}
-                      role="menuitem"
-                      onClick={closeAccount}
-                    >
-                      {t('guest.register')}
-                    </NavLink>
+                    </button>
                   </>
                 ) : null}
                 {user ? (
@@ -270,7 +254,7 @@ export function AppLayout() {
           (docs/08-ui-map.md). On the phone layout the CSS hands scrolling
           back to the document. */}
       <div className={styles.scrollArea} data-scroll-area>
-        {inCollection && user ? (
+        {inCollection ? (
           <nav className={styles.subnav} aria-label={t('nav.collectionLabel')}>
             {COLLECTION_TABS.map((tab) => (
               <NavLink

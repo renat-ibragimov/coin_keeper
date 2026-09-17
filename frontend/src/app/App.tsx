@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from '
 
 import { AdminPage } from '@/features/admin/AdminPage';
 import { AuthProvider } from '@/features/auth/AuthProvider';
+import { AuthDialogProvider } from '@/features/auth/AuthDialog';
 import { AuthLayout } from '@/features/auth/AuthLayout';
 import { useAuth } from '@/features/auth/useAuth';
 import { CheckEmailPage } from '@/features/auth/pages/CheckEmailPage';
@@ -90,7 +91,9 @@ function AuthCacheReset() {
 function ReadyRoute() {
   const { ready } = useAuth();
   return ready ? (
-    <AppLayout />
+    <AuthDialogProvider>
+      <AppLayout />
+    </AuthDialogProvider>
   ) : (
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
       <Spinner size={32} />
@@ -106,6 +109,14 @@ export function RootRoute() {
 export function CollectionRoot() {
   const { user } = useAuth();
   return user ? <DashboardPage /> : <GuestCollectionPage />;
+}
+
+function CollectionSectionRoute({ section }: { section: 'coins' | 'series' | 'money' }) {
+  const { user } = useAuth();
+  if (!user) return <GuestCollectionPage section={section} />;
+  if (section === 'coins') return <CollectionPage />;
+  if (section === 'series') return <SeriesListPage />;
+  return <ExpensesPage />;
 }
 
 function ScrollToTop() {
@@ -206,16 +217,25 @@ export function App() {
                   </Route>
                   <Route element={<ReadyRoute />}>
                     <Route path="/collection" element={<CollectionRoot />} />
+                    <Route
+                      path="/collection/coins"
+                      element={<CollectionSectionRoute section="coins" />}
+                    />
+                    <Route
+                      path="/collection/series"
+                      element={<CollectionSectionRoute section="series" />}
+                    />
+                    <Route
+                      path="/collection/money"
+                      element={<CollectionSectionRoute section="money" />}
+                    />
                     <Route path="/catalog" element={<CatalogPage />} />
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
                     <Route path="/" element={<RootRoute />} />
                     <Route element={<ProtectedRoute />}>
-                      <Route path="/collection/coins" element={<CollectionPage />} />
                       <Route path="/collection/add" element={<AddPage />} />
                       <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
-                      <Route path="/collection/series" element={<SeriesListPage />} />
                       <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
-                      <Route path="/collection/money" element={<ExpensesPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="/admin" element={<AdminRoute />} />
 

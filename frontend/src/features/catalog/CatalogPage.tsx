@@ -101,7 +101,12 @@ export function CatalogPage() {
   };
 
   const [searchParams] = useSearchParams();
-  const viewMode = useStoredViewMode('ck.viewMode.catalog', 'catalogViewMode');
+  // Guest choices have their own local cache; a signed-in user's previous
+  // table preference must not turn a fresh public catalog visit into a table.
+  const viewMode = useStoredViewMode(
+    user ? 'ck.viewMode.catalog' : 'ck.viewMode.catalog.guest',
+    'catalogViewMode',
+  );
   useEffect(() => {
     // Only on mount, and only when the URL itself says nothing: a shared
     // link's own `?view=` always wins over what was remembered here.

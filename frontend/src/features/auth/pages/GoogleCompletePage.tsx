@@ -5,6 +5,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Spinner } from '@/shared/ui';
 
 import { useAuth } from '../useAuth';
+import { takeAuthReturn } from '../authReturn';
 import styles from './authForms.module.css';
 
 export function GoogleCompletePage() {
@@ -22,9 +23,14 @@ export function GoogleCompletePage() {
     started.current = true;
     void completeGoogleSession(isLink ? undefined : true)
       .then(() => {
-        navigate(isLink ? `/settings?google=${linkResult ?? 'error'}` : '/collection', {
-          replace: true,
-        });
+        navigate(
+          isLink
+            ? `/settings?google=${linkResult ?? 'error'}`
+            : (takeAuthReturn() ?? '/collection'),
+          {
+            replace: true,
+          },
+        );
       })
       .catch(() => setError(true));
   }, [completeGoogleSession, navigate, isLink, linkResult]);

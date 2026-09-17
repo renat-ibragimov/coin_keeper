@@ -302,6 +302,15 @@ button.photoFrame {
   text-align: center;
 }
 
+.guestPriceBlock {
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.guestPriceBlock .muted {
+  margin: 0;
+}
+
 .priceLabel {
   font-size: 11.5px;
   font-weight: 600;

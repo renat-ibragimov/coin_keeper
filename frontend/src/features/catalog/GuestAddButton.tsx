@@ -1,9 +1,8 @@
-import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Link, useLocation } from 'react-router-dom';
 
+import { useAuthDialog } from '@/features/auth/authDialogContext';
 import { useAuth } from '@/features/auth/useAuth';
-import { Button, Modal } from '@/shared/ui';
+import { Button } from '@/shared/ui';
 
 export function GuestAddButton({
   itemId,
@@ -19,9 +18,7 @@ export function GuestAddButton({
   block?: boolean;
 }) {
   const { user } = useAuth();
-  const { t } = useTranslation();
   const location = useLocation();
-  const [open, setOpen] = useState(false);
   if (user) {
     return (
       <Link
@@ -36,28 +33,31 @@ export function GuestAddButton({
   }
   const from = backTo ?? location.pathname + location.search;
   return (
-    <>
-      <Button size={size} block={block} onClick={() => setOpen(true)}>
-        {children}
-      </Button>
-      <Modal
-        open={open}
-        onClose={() => setOpen(false)}
-        title={t('guest.addTitle')}
-        size="sm"
-        footer={
-          <>
-            <Link to="/register" state={{ from }} onClick={() => setOpen(false)}>
-              <Button>{t('guest.register')}</Button>
-            </Link>
-            <Link to="/login" state={{ from }} onClick={() => setOpen(false)}>
-              <Button variant="secondary">{t('guest.login')}</Button>
-            </Link>
-          </>
-        }
-      >
-        <p>{t('guest.addText')}</p>
-      </Modal>
-    </>
+    <GuestAction from={from} size={size} block={block}>
+      {children}
+    </GuestAction>
+  );
+}
+
+function GuestAction({
+  from,
+  size,
+  block,
+  children,
+}: {
+  from: string;
+  size: 'sm' | 'md';
+  block: boolean;
+  children: React.ReactNode;
+}) {
+  const openAuth = useAuthDialog();
+  return (
+    <Button
+      size={size}
+      block={block}
+      onClick={() => openAuth('register', { from, purpose: 'collection' })}
+    >
+      {children}
+    </Button>
   );
 }

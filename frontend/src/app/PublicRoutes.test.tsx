@@ -3,11 +3,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
+import { AuthDialogContext } from '@/features/auth/authDialogContext';
 import { CollectionRoot, RootRoute } from './App';
+import { GuestCollectionPage } from '@/features/collection/guest/GuestCollectionPage';
 import { ProtectedRoute } from './ProtectedRoute';
 
 const auth = vi.hoisted(() => ({ user: null as null | { id: number; role: string }, ready: true }));
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => auth }));
+const openAuth = vi.fn();
 
 describe('public routes', () => {
   it('sends anonymous root visitors to the catalog', () => {
@@ -27,16 +30,31 @@ describe('public routes', () => {
     auth.user = null;
     render(
       <MemoryRouter initialEntries={['/collection']}>
-        <Routes>
-          <Route path="/collection" element={<CollectionRoot />} />
-        </Routes>
+        <AuthDialogContext.Provider value={openAuth}>
+          <Routes>
+            <Route path="/collection" element={<CollectionRoot />} />
+          </Routes>
+        </AuthDialogContext.Provider>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Тут з’явиться ваша колекція.')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Створити колекцію' })).toHaveAttribute(
-      'href',
-      '/register',
+    expect(screen.getByText('Колекція поки порожня')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Увійти' })).toBeInTheDocument();
+  });
+  it.each([
+    ['coins', 'У колекції ще немає монет'],
+    ['series', 'Серій ще немає'],
+    ['money', 'Фінансової історії поки немає'],
+  ] as const)('shows the %s guest section with a login action', (section, title) => {
+    auth.user = null;
+    render(
+      <MemoryRouter initialEntries={[`/collection/${section}`]}>
+        <AuthDialogContext.Provider value={openAuth}>
+          <GuestCollectionPage section={section} />
+        </AuthDialogContext.Provider>
+      </MemoryRouter>,
     );
+    expect(screen.getByText(title)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Увійти' })).toBeInTheDocument();
   });
   it('keeps personal pages behind authentication', () => {
     auth.user = null;

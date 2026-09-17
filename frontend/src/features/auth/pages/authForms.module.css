@@ -58,6 +58,20 @@
   color: var(--color-text-secondary);
 }
 
+.textButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-strong);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.textButton:hover {
+  color: var(--color-accent);
+}
+
 .formError {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-md);

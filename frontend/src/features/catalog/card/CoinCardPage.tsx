@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
+import { useAuthDialog } from '@/features/auth/authDialogContext';
 import { GuestAddButton } from '../GuestAddButton';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
@@ -421,16 +422,19 @@ function SidebarCard({
         </>
       ) : null}
 
-      <div className={styles.priceBlock}>
+      <div className={`${styles.priceBlock} ${guest ? styles.guestPriceBlock : ''}`}>
         <span className={styles.priceLabel}>
           {t(guest ? 'guest.estimatedValue' : 'card.currentPrice')}
         </span>
         {guest ? (
-          <p className={styles.muted}>
-            <strong>{t('guest.lockedShort')}</strong>
-            <br />
-            {t('guest.lockedText')}
-          </p>
+          <>
+            <p className={styles.muted}>
+              <strong>{t('guest.lockedShort')}</strong>
+              <br />
+              {t('guest.lockedText')}
+            </p>
+            <GuestPriceLogin />
+          </>
         ) : card.marketPriceUah !== null ? (
           <>
             <p className={styles.priceValue}>{formatUah(card.marketPriceUah, locale)}</p>
@@ -468,6 +472,16 @@ function SidebarCard({
         </a>
       ) : null}
     </Card>
+  );
+}
+
+function GuestPriceLogin() {
+  const { t } = useTranslation();
+  const openAuth = useAuthDialog();
+  return (
+    <Button variant="secondary" onClick={() => openAuth()}>
+      {t('guest.login')}
+    </Button>
   );
 }
 

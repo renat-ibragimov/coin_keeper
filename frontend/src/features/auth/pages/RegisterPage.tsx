@@ -7,14 +7,34 @@ import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
 
 import * as authApi from '../api';
+import { saveAuthReturn } from '../authReturn';
 import { GoogleSignIn } from './GoogleSignIn';
 import styles from './authForms.module.css';
 
 export function RegisterPage() {
-  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
+  return (
+    <RegisterForm
+      from={from}
+      onSuccess={(email) => navigate('/check-email', { state: { email } })}
+    />
+  );
+}
+
+export function RegisterForm({
+  from,
+  onSuccess,
+  onSwitch,
+  showHeading = true,
+}: {
+  from?: string;
+  onSuccess: (email: string) => void;
+  onSwitch?: () => void;
+  showHeading?: boolean;
+}) {
+  const { t } = useTranslation();
 
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -32,9 +52,8 @@ export function RegisterPage() {
         displayName: displayName || undefined,
         website: website || undefined,
       });
-      if (from?.startsWith('/') && !from.startsWith('//'))
-        sessionStorage.setItem('ck-auth-return', from);
-      navigate('/check-email', { state: { email } });
+      saveAuthReturn(from);
+      onSuccess(email);
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 429) {
         setError(t('errors.rateLimited'));
@@ -48,7 +67,7 @@ export function RegisterPage() {
 
   return (
     <div>
-      <h2 className={styles.title}>{t('auth.registerTitle')}</h2>
+      {showHeading ? <h2 className={styles.title}>{t('auth.registerTitle')}</h2> : null}
       <p className={styles.subtitle}>{t('auth.registerSubtitle')}</p>
       <form className={styles.form} onSubmit={(event) => void submit(event)}>
         {error ? <div className={styles.formError}>{error}</div> : null}
@@ -82,10 +101,19 @@ export function RegisterPage() {
           {t('auth.signUp')}
         </Button>
       </form>
-      <GoogleSignIn />
+      <GoogleSignIn returnTo={from ?? '/'} />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
-        {t('auth.haveAccount')} <Link to="/login">{t('auth.signIn')}</Link>
+        {t('auth.haveAccount')}{' '}
+        {onSwitch ? (
+          <button type="button" className={styles.textButton} onClick={onSwitch}>
+            {t('auth.signIn')}
+          </button>
+        ) : (
+          <Link to="/login" state={{ from }}>
+            {t('auth.signIn')}
+          </Link>
+        )}
       </p>
     </div>
   );

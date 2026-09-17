@@ -7,15 +7,32 @@ import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
 
 import { useAuth } from '../useAuth';
+import { readAuthReturn, safeAuthReturn, saveAuthReturn, takeAuthReturn } from '../authReturn';
 import { PasswordInput } from './PasswordInput';
 import { GoogleSignIn } from './GoogleSignIn';
 import styles from './authForms.module.css';
 
 export function LoginPage() {
-  const { t } = useTranslation();
-  const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const from =
+    safeAuthReturn((location.state as { from?: string } | null)?.from) ?? readAuthReturn() ?? '/';
+  return <LoginForm from={from} onSuccess={() => navigate(from, { replace: true })} />;
+}
+
+export function LoginForm({
+  from,
+  onSuccess,
+  onSwitch,
+  showHeading = true,
+}: {
+  from: string;
+  onSuccess: () => void;
+  onSwitch?: () => void;
+  showHeading?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { signIn } = useAuth();
   const [params] = useSearchParams();
 
   const [email, setEmail] = useState('');
@@ -24,15 +41,14 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const from = (location.state as { from?: string } | null)?.from ?? '/';
-
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
     setBusy(true);
     try {
       await signIn(email, password, remember);
-      navigate(from, { replace: true });
+      takeAuthReturn();
+      onSuccess();
     } catch (cause) {
       if (cause instanceof ApiError && cause.problemType === 'invalid-credentials') {
         setError(t('auth.invalidCredentials'));
@@ -50,7 +66,7 @@ export function LoginPage() {
 
   return (
     <div>
-      <h2 className={styles.title}>{t('auth.loginTitle')}</h2>
+      {showHeading ? <h2 className={styles.title}>{t('auth.loginTitle')}</h2> : null}
       <p className={styles.subtitle}>{t('auth.loginSubtitle')}</p>
       <form className={styles.form} onSubmit={(event) => void submit(event)}>
         {params.get('google') === 'link-required' ? (
@@ -85,16 +101,27 @@ export function LoginPage() {
             />
             {t('auth.rememberMe')}
           </label>
-          <Link to="/forgot-password">{t('auth.forgotPassword')}</Link>
+          <Link to="/forgot-password" onClick={() => saveAuthReturn(from)}>
+            {t('auth.forgotPassword')}
+          </Link>
         </div>
         <Button type="submit" block loading={busy}>
           {t('auth.signIn')}
         </Button>
       </form>
-      <GoogleSignIn />
+      <GoogleSignIn returnTo={from} />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
-        {t('auth.noAccount')} <Link to="/register">{t('auth.createAccount')}</Link>
+        {t('auth.noAccount')}{' '}
+        {onSwitch ? (
+          <button type="button" className={styles.textButton} onClick={onSwitch}>
+            {t('auth.createAccount')}
+          </button>
+        ) : (
+          <Link to="/register" state={{ from }}>
+            {t('auth.createAccount')}
+          </Link>
+        )}
       </p>
     </div>
   );
