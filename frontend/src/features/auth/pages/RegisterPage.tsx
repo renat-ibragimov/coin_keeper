@@ -19,6 +19,7 @@ export function RegisterPage() {
     <RegisterForm
       from={from}
       onSuccess={(email) => navigate('/check-email', { state: { email } })}
+      onGoogleSuccess={() => navigate(from ?? '/', { replace: true })}
     />
   );
 }
@@ -27,11 +28,13 @@ export function RegisterForm({
   from,
   onSuccess,
   onSwitch,
+  onGoogleSuccess,
   showHeading = true,
 }: {
   from?: string;
   onSuccess: (email: string) => void;
   onSwitch?: () => void;
+  onGoogleSuccess?: () => void;
   showHeading?: boolean;
 }) {
   const { t } = useTranslation();
@@ -101,7 +104,7 @@ export function RegisterForm({
           {t('auth.signUp')}
         </Button>
       </form>
-      <GoogleSignIn returnTo={from ?? '/'} />
+      <GoogleSignIn returnTo={from ?? '/'} onSuccess={onGoogleSuccess} />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
         {t('auth.haveAccount')}{' '}

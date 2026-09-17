@@ -93,6 +93,7 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
                 setSentAgain(false);
                 setDialog({ ...dialog, mode: 'check-email', email });
               }}
+              onGoogleSuccess={() => setDialog(null)}
               onSwitch={() => setDialog({ ...dialog, mode: 'login' })}
             />
           </>

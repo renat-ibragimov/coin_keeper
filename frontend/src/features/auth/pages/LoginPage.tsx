@@ -109,7 +109,7 @@ export function LoginForm({
           {t('auth.signIn')}
         </Button>
       </form>
-      <GoogleSignIn returnTo={from} />
+      <GoogleSignIn returnTo={from} onSuccess={onSuccess} />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
         {t('auth.noAccount')}{' '}

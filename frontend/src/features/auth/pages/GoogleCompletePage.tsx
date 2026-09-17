@@ -6,6 +6,7 @@ import { Spinner } from '@/shared/ui';
 
 import { useAuth } from '../useAuth';
 import { takeAuthReturn } from '../authReturn';
+import { GOOGLE_POPUP_CHANNEL, GOOGLE_POPUP_FLOW_KEY } from '../googlePopup';
 import styles from './authForms.module.css';
 
 export function GoogleCompletePage() {
@@ -21,6 +22,17 @@ export function GoogleCompletePage() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
+    const popupFlowId = sessionStorage.getItem(GOOGLE_POPUP_FLOW_KEY);
+    if (!isLink && popupFlowId) {
+      sessionStorage.removeItem(GOOGLE_POPUP_FLOW_KEY);
+      if (typeof BroadcastChannel !== 'undefined') {
+        const channel = new BroadcastChannel(GOOGLE_POPUP_CHANNEL);
+        channel.postMessage({ type: 'complete', flowId: popupFlowId });
+        channel.close();
+        const closeTimer = window.setTimeout(() => window.close(), 150);
+        return () => window.clearTimeout(closeTimer);
+      }
+    }
     void completeGoogleSession(isLink ? undefined : true)
       .then(() => {
         navigate(
