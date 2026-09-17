@@ -171,7 +171,7 @@ coins.renat-ibragimov.com {
     }
     handle {
         root * /srv/coinkeeper/frontend
-        try_files {path} /index.html
+        try_files {path} {path}/index.html /index.html
         file_server
     }
     encode gzip zstd
@@ -184,9 +184,11 @@ coins.renat-ibragimov.com {
 ```
 
 Порядок `handle` важен: без `handle` для `/api/*` и `/media/*` SPA-fallback отдал бы
-`index.html` вместо ответа API. `try_files {path} /index.html` — это и есть fallback для
-клиентского роутера: `/catalog?page=3` и `/reset-password?token=…` открываются по прямой
-ссылке.
+`index.html` вместо ответа API. `try_files {path} {path}/index.html /index.html`
+сначала находит подготовленный HTML каталога и монет, затем SPA fallback для остальных
+маршрутов. `/catalog?page=3` и `/reset-password?token=…` открываются по прямой ссылке.
+Центральный Caddy живёт вне репозитория, поэтому эту строку нужно обновить в его реальном
+Caddyfile перед публикацией подготовленных страниц.
 
 `request_body` на `/api/*` — мегабайтом выше 12 МБ, которые может нести загрузка
 изображения (`MAX_SOURCE_BYTES`): тело сверх лимита отсекается на границе, а не течёт в
@@ -219,8 +221,9 @@ API-адрес в сборку не зашит: клиент ходит на о�
 
 ```
 1. actions/download-artifact  → dist/
-2. rsync dist/ → deploy@<host>:~/frontend-dist/        (staging-каталог деплой-пользователя)
-3. ssh: rsync -a --delete --delay-updates ~/frontend-dist/ /srv/coinkeeper/frontend/
+2. после подъёма API `frontend/scripts/prerender-catalog.mjs` получает публичные страницы каталога и добавляет в `dist/` HTML монет, `sitemap.xml`, `robots.txt`;
+3. rsync dist/ → deploy@<host>:~/frontend-dist/        (staging-каталог деплой-пользователя)
+4. ssh: rsync -a --delete --delay-updates ~/frontend-dist/ /srv/coinkeeper/frontend/
 ```
 
 Каталог назначения задаётся входом `frontend-deploy-path` reusable workflow
@@ -256,9 +259,9 @@ handle {
     root * /srv/coinkeeper/frontend
     @assets path /assets/* /brand/*
     header @assets Cache-Control "public, max-age=31536000, immutable"
-    @entry path / /index.html /manifest.webmanifest
+    @entry path / /index.html /catalog /catalog/* /manifest.webmanifest
     header @entry Cache-Control "no-cache"
-    try_files {path} /index.html
+    try_files {path} {path}/index.html /index.html
     file_server
 }
 ```

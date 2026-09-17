@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
+import { useAuth } from '@/features/auth/useAuth';
+import { GuestAddButton } from '../GuestAddButton';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
 import type { CatalogCard } from '@/shared/api/types';
@@ -92,6 +94,7 @@ export function CoinCardPage() {
 
 function CardBody({ card }: { card: CatalogCard }) {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const locale = i18n.language;
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,14 +103,20 @@ function CardBody({ card }: { card: CatalogCard }) {
   const pricesQuery = useQuery({
     queryKey: ['catalog', 'prices', card.id],
     queryFn: () => fetchPrices(card.id),
+    enabled: Boolean(user),
   });
   const instancesQuery = useQuery({
     queryKey: ['catalog', 'instances', card.id],
     queryFn: () => fetchOwnInstances(card.id),
+    enabled: Boolean(user),
   });
   // Shares the 'bootstrap' cache key with the dashboard, so this is not a
   // second network round trip once that page has already loaded it.
-  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const bootstrapQuery = useQuery({
+    queryKey: ['bootstrap'],
+    queryFn: fetchBootstrap,
+    enabled: Boolean(user),
+  });
   const secondaryCurrency: SecondaryCurrency =
     bootstrapQuery.data?.settings.secondaryCurrency === 'EUR' ? 'EUR' : 'USD';
   const secondaryRate = secondaryRateFrom(bootstrapQuery.data?.exchangeRates, secondaryCurrency);
@@ -219,6 +228,7 @@ function CardBody({ card }: { card: CatalogCard }) {
           addState={addState}
           secondaryCurrency={secondaryCurrency}
           secondaryRate={secondaryRate}
+          guest={!user}
         />
       </div>
 
@@ -294,18 +304,20 @@ function CardBody({ card }: { card: CatalogCard }) {
         {card.notes ? <p className={styles.notes}>{card.notes}</p> : null}
       </Card>
 
-      <Card className={styles.sectionCard}>
-        <h2 className={styles.sectionTitle}>{t('card.priceHistory')}</h2>
-        {pricesQuery.isPending ? <Skeleton height={180} /> : null}
-        {pricesQuery.isError ? <ErrorState onRetry={() => void pricesQuery.refetch()} /> : null}
-        {pricesQuery.data && chartPoints.length === 0 ? (
-          <p className={styles.muted}>{t('card.pricesEmpty')}</p>
-        ) : null}
-        {chartPoints.length === 1 ? (
-          <SinglePricePoint point={chartPoints[0]!} locale={locale} t={t} />
-        ) : null}
-        {chartPoints.length >= 2 ? <PriceHistoryChart items={priceItems} /> : null}
-      </Card>
+      {user ? (
+        <Card className={styles.sectionCard}>
+          <h2 className={styles.sectionTitle}>{t('card.priceHistory')}</h2>
+          {pricesQuery.isPending ? <Skeleton height={180} /> : null}
+          {pricesQuery.isError ? <ErrorState onRetry={() => void pricesQuery.refetch()} /> : null}
+          {pricesQuery.data && chartPoints.length === 0 ? (
+            <p className={styles.muted}>{t('card.pricesEmpty')}</p>
+          ) : null}
+          {chartPoints.length === 1 ? (
+            <SinglePricePoint point={chartPoints[0]!} locale={locale} t={t} />
+          ) : null}
+          {chartPoints.length >= 2 ? <PriceHistoryChart items={priceItems} /> : null}
+        </Card>
+      ) : null}
 
       <Lightbox
         open={enlargedSide !== undefined}
@@ -343,6 +355,7 @@ interface SidebarCardProps {
   addState: { from: string };
   secondaryCurrency: SecondaryCurrency;
   secondaryRate: number | null;
+  guest: boolean;
 }
 
 /**
@@ -359,6 +372,7 @@ function SidebarCard({
   addState,
   secondaryCurrency,
   secondaryRate,
+  guest,
 }: SidebarCardProps) {
   const owned = card.quantityOwned > 0;
   const sourceLabel = priceSourceLabel(card.priceSource, t);
@@ -367,7 +381,7 @@ function SidebarCard({
     ? t('card.openOnSource', { source: sourceLabel })
     : t('catalog.sourceLink');
   const priceApprox =
-    card.marketPriceUah !== null
+    !guest && card.marketPriceUah != null
       ? formatSecondary(toSecondary(Number(card.marketPriceUah), secondaryRate), locale)
       : null;
   const priceApproxText =
@@ -377,34 +391,47 @@ function SidebarCard({
 
   return (
     <Card className={styles.sidebarCard} padded={false}>
-      <div className={styles.statusRow}>
-        <span
-          className={[
-            styles.statusIcon,
-            owned ? styles.statusIconOwned : styles.statusIconAbsent,
-          ].join(' ')}
-          aria-hidden="true"
-        >
-          {owned ? <CircleCheck strokeWidth={1.75} /> : <CircleMinus strokeWidth={1.75} />}
-        </span>
-        <h2
-          className={[styles.statusHeading, owned ? styles.statusOwned : styles.statusAbsent].join(
-            ' ',
-          )}
-        >
-          {owned ? t('card.inCollection') : t('card.notInCollection')}
-        </h2>
-      </div>
-      {owned ? (
-        <p className={styles.quantityLine}>
-          {t('card.quantity')}:{' '}
-          <strong className="tabular">{t('card.pieces', { count: card.quantityOwned })}</strong>
-        </p>
+      {!guest ? (
+        <>
+          <div className={styles.statusRow}>
+            <span
+              className={[
+                styles.statusIcon,
+                owned ? styles.statusIconOwned : styles.statusIconAbsent,
+              ].join(' ')}
+              aria-hidden="true"
+            >
+              {owned ? <CircleCheck strokeWidth={1.75} /> : <CircleMinus strokeWidth={1.75} />}
+            </span>
+            <h2
+              className={[
+                styles.statusHeading,
+                owned ? styles.statusOwned : styles.statusAbsent,
+              ].join(' ')}
+            >
+              {owned ? t('card.inCollection') : t('card.notInCollection')}
+            </h2>
+          </div>
+          {owned ? (
+            <p className={styles.quantityLine}>
+              {t('card.quantity')}:{' '}
+              <strong className="tabular">{t('card.pieces', { count: card.quantityOwned })}</strong>
+            </p>
+          ) : null}
+        </>
       ) : null}
 
       <div className={styles.priceBlock}>
-        <span className={styles.priceLabel}>{t('card.currentPrice')}</span>
-        {card.marketPriceUah !== null ? (
+        <span className={styles.priceLabel}>
+          {t(guest ? 'guest.estimatedValue' : 'card.currentPrice')}
+        </span>
+        {guest ? (
+          <p className={styles.muted}>
+            <strong>{t('guest.lockedShort')}</strong>
+            <br />
+            {t('guest.lockedText')}
+          </p>
+        ) : card.marketPriceUah !== null ? (
           <>
             <p className={styles.priceValue}>{formatUah(card.marketPriceUah, locale)}</p>
             <span className={styles.priceApprox}>{priceApproxText}</span>
@@ -422,14 +449,20 @@ function SidebarCard({
       </div>
 
       <div className={styles.cardActions}>
-        <Link to={addUrl} state={addState}>
-          <Button block>
-            {owned ? t('catalog.addAnotherCopy') : `+ ${t('catalog.addToCollection')}`}
-          </Button>
-        </Link>
+        {guest ? (
+          <GuestAddButton itemId={card.id} block>
+            + {t('catalog.addToCollection')}
+          </GuestAddButton>
+        ) : (
+          <Link to={addUrl} state={addState}>
+            <Button block>
+              {owned ? t('catalog.addAnotherCopy') : `+ ${t('catalog.addToCollection')}`}
+            </Button>
+          </Link>
+        )}
       </div>
 
-      {card.sourceUrl ? (
+      {!guest && card.sourceUrl ? (
         <a className={styles.sourceLink} href={card.sourceUrl} target="_blank" rel="noreferrer">
           {openLabel} ↗
         </a>

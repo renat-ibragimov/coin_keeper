@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:api": "openapi-typescript https://coins.renat-ibragimov.com/api/v1/openapi.json -o src/shared/api/generated/openapi.ts",
-    "brand": "python3 scripts/build-brand.py"
+    "brand": "python3 scripts/build-brand.py",
+    "test:seo": "node --test scripts/prerender-catalog.node.mjs"
   },
   "dependencies": {
     "@fontsource/playfair-display": "^5.1.0",

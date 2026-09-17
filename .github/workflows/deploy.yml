@@ -26,4 +26,5 @@ jobs:
       deploy: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
       # The central Caddy serves the bundle from here (docs/10-infra.md).
       frontend-deploy-path: /srv/coinkeeper/frontend
+      site-url: https://coins.renat-ibragimov.com
     secrets: inherit

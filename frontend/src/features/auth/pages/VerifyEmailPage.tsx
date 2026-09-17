@@ -103,7 +103,17 @@ export function VerifyEmailPage() {
       {state === 'success' ? (
         <>
           <div className={styles.formInfo}>{t('auth.verifySuccess')}</div>
-          <Button onClick={() => navigate('/', { replace: true })}>{t('auth.goToApp')}</Button>
+          <Button
+            onClick={() => {
+              const from = sessionStorage.getItem('ck-auth-return');
+              sessionStorage.removeItem('ck-auth-return');
+              navigate(from?.startsWith('/') && !from.startsWith('//') ? from : '/', {
+                replace: true,
+              });
+            }}
+          >
+            {t('auth.goToApp')}
+          </Button>
         </>
       ) : null}
       {state === 'error' ? (

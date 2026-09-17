@@ -578,7 +578,7 @@ class CatalogService:
             "obverse_image": image_out(images.obverse),
             "reverse_image": image_out(images.reverse),
             "thumbnail_url": images.thumbnail_url,
-            "is_own": item.created_by == self._user.id,
+            "is_own": item.created_by == self._user.id if self._user else False,
             "is_archived": item.is_archived,
             "archive_reason": item.archive_reason,
             "source_url": row.source_url,
@@ -671,3 +671,40 @@ async def translate_title_in_background(item_id: int) -> None:
             )
         except Exception:
             logger.exception("catalog title translation failed for %s", item_id)
+
+
+class PublicCatalogService(CatalogService):
+    """Reuse catalog presentation, with read-only shared queries and an allowlisted response."""
+
+    def __init__(self, session: AsyncSession, locale: str = DEFAULT_LOCALE) -> None:
+        from app.repositories.public_catalog import PublicCatalogRepository
+
+        self._session = session
+        self._user = None
+        self._locale = locale
+        self._repo = PublicCatalogRepository(session, locale)
+        self._media = MediaRepository(session, user_id=-1)
+        self._urls = MediaUrlBuilder()
+
+    async def list_catalog(self, filters: CatalogFilters, *, limit: int, offset: int):
+        from app.schemas.catalog import PublicCatalogListItem
+
+        page = await self._repo.list_items(filters, limit=limit, offset=offset)
+        images = await self._images_for([row.item.id for row in page.rows])
+        return [
+            PublicCatalogListItem.model_validate(
+                self._list_item(row, images.get(row.item.id, CatalogImages())).model_dump()
+            )
+            for row in page.rows
+        ], page.total
+
+    async def get_card(self, item_id: int):
+        from app.schemas.catalog import PublicCatalogCard
+
+        row = await self._repo.get_row(item_id)
+        if row is None:
+            raise ItemNotFoundError
+        images = await self._images_for([item_id])
+        return PublicCatalogCard.model_validate(
+            self._card(row, images.get(item_id, CatalogImages())).model_dump()
+        )

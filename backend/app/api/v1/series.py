@@ -6,8 +6,17 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
+from app.api.deps import (
+    ClientIp,
+    CurrentUser,
+    DbSession,
+    OptionalCurrentUser,
+    Pagination,
+    RequestLocale,
+)
 from app.api.errors import ProblemError
+from app.api.public_rate_limit import enforce_public_read
+from app.core import rate_limit
 from app.schemas.catalog import CatalogListItem
 from app.schemas.common import Page
 from app.schemas.series import SeriesCreate, SeriesOut, SeriesProgressOut, SeriesSummaryOut
@@ -25,8 +34,9 @@ router = APIRouter(prefix="/series", tags=["series"])
 @router.get("")
 async def list_series(
     session: DbSession,
-    user: CurrentUser,
+    user: OptionalCurrentUser,
     locale: RequestLocale,
+    ip: ClientIp,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
     scope: Annotated[Literal["mine", "catalog"], Query()] = "mine",
 ) -> list[SeriesOut]:
@@ -35,6 +45,22 @@ async def list_series(
     project has confirmed. `scope=catalog` is `GET /catalog`'s own series
     filter: a harder, separate gate (§13a), only a `catalog_confirmed`
     country's series."""
+    await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
+    if user is None:
+        if scope != "catalog":
+            raise ProblemError(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "private-series-filter",
+                "Invalid filter",
+                "This filter requires an account.",
+            )
+        from app.repositories.series import SeriesRepository
+        from app.services.series import _out
+
+        series = await SeriesRepository(session, user_id=-1, locale=locale).list_series(
+            country_id, confirmed_only=True
+        )
+        return [_out(item, locale) for item in series]
     return await SeriesService(session, user, locale).list_series(
         country_id, confirmed_only=scope == "catalog"
     )

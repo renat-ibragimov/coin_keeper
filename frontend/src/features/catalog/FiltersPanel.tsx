@@ -10,6 +10,7 @@ import type { CatalogFilters } from './useCatalogFilters';
 import styles from './FiltersPanel.module.css';
 
 interface FiltersPanelProps {
+  personalFilters?: boolean;
   filters: CatalogFilters;
   update: (changes: Partial<CatalogFilters>) => void;
   reset: () => void;
@@ -31,6 +32,7 @@ function intValues(raw: string[]): number[] {
 
 export function FiltersPanel({
   filters,
+  personalFilters = true,
   update,
   reset,
   countries,
@@ -188,21 +190,23 @@ export function FiltersPanel({
         />
       </div>
 
-      <div className={styles.field}>
-        <Select
-          label={t('catalog.availability')}
-          centerLabel
-          value={filters.owned === undefined ? '' : String(filters.owned)}
-          onChange={(event) => {
-            const raw = event.target.value;
-            update({ owned: raw === '' ? undefined : raw === 'true' });
-          }}
-        >
-          <option value="">{t('catalog.all')}</option>
-          <option value="true">{t('catalog.availabilityOwned')}</option>
-          <option value="false">{t('catalog.availabilityMissing')}</option>
-        </Select>
-      </div>
+      {personalFilters ? (
+        <div className={styles.field}>
+          <Select
+            label={t('catalog.availability')}
+            centerLabel
+            value={filters.owned === undefined ? '' : String(filters.owned)}
+            onChange={(event) => {
+              const raw = event.target.value;
+              update({ owned: raw === '' ? undefined : raw === 'true' });
+            }}
+          >
+            <option value="">{t('catalog.all')}</option>
+            <option value="true">{t('catalog.availabilityOwned')}</option>
+            <option value="false">{t('catalog.availabilityMissing')}</option>
+          </Select>
+        </div>
+      ) : null}
     </FiltersShell>
   );
 }

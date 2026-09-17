@@ -15,9 +15,10 @@ from tests.seed import (
 
 
 async def test_reference_endpoints_require_auth(client: AsyncClient) -> None:
-    for path in ("/api/v1/countries", "/api/v1/denominations", "/api/v1/currencies"):
+    for path in ("/api/v1/countries", "/api/v1/denominations"):
         response = await client.get(path)
-        assert response.status_code == 401, path
+        assert response.status_code == 200, path
+    assert (await client.get("/api/v1/currencies")).status_code == 401
 
 
 async def test_active_countries_lead_with_ukraine(

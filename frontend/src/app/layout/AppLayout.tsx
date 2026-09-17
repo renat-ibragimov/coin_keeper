@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
 import { useDismissable } from '@/shared/lib/useDismissable';
@@ -62,7 +62,7 @@ export function AppLayout() {
   const isAdmin = user?.role === 'admin';
   const inCollection =
     location.pathname === '/collection' || location.pathname.startsWith('/collection/');
-  const mobileLinks = inCollection ? MOBILE_COLLECTION : MOBILE_PLAIN;
+  const mobileLinks = inCollection && user ? MOBILE_COLLECTION : MOBILE_PLAIN;
   const { openSupport, openingSupport } = useSupportLink();
   const openDonation = useDonationDialog();
 
@@ -77,7 +77,7 @@ export function AppLayout() {
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <Brand to="/collection" />
+        <Brand to={user ? '/collection' : '/catalog'} />
         <nav className={styles.nav} aria-label={t('nav.label')}>
           <NavLink to="/catalog" className={navClass(styles.navLink, styles.navLinkActive)}>
             {t('nav.catalog')}
@@ -102,7 +102,25 @@ export function AppLayout() {
             <LocaleSwitcher />
             <ThemeSwitcher />
           </div>
-          <div className={styles.account}>
+          {!user ? (
+            <div className={styles.guestDesktopActions}>
+              <Link
+                to="/login"
+                state={{ from: location.pathname + location.search }}
+                className={styles.guestLogin}
+              >
+                {t('guest.login')}
+              </Link>
+              <Link
+                to="/register"
+                state={{ from: location.pathname + location.search }}
+                className={styles.guestRegister}
+              >
+                {t('guest.register')}
+              </Link>
+            </div>
+          ) : null}
+          <div className={`${styles.account} ${!user ? styles.guestAccount : ''}`}>
             <button
               ref={accountButton}
               type="button"
@@ -118,28 +136,32 @@ export function AppLayout() {
                   <User size={16} />
                 )}
               </span>
-              <span className={styles.accountName}>{user?.displayName || user?.email}</span>
+              <span className={styles.accountName}>
+                {user?.displayName || user?.email || t('header.account')}
+              </span>
               <ChevronDown className={styles.accountChevron} size={15} aria-hidden="true" />
             </button>
             {accountOpen ? (
               <div ref={accountMenu} className={styles.accountMenu} role="menu">
-                <div className={styles.accountMenuProfile}>
-                  <span className={`${styles.avatar} ${styles.avatarLarge}`} aria-hidden="true">
-                    {user?.avatarUrl ? (
-                      <img className={styles.avatarImage} src={user.avatarUrl} alt="" />
-                    ) : (
-                      <User size={20} />
-                    )}
-                  </span>
-                  <span className={styles.accountMenuProfileText}>
-                    <span className={styles.accountMenuProfileName}>
-                      {user?.displayName || user?.email}
+                {user ? (
+                  <div className={styles.accountMenuProfile}>
+                    <span className={`${styles.avatar} ${styles.avatarLarge}`} aria-hidden="true">
+                      {user?.avatarUrl ? (
+                        <img className={styles.avatarImage} src={user.avatarUrl} alt="" />
+                      ) : (
+                        <User size={20} />
+                      )}
                     </span>
-                    {user?.displayName ? (
-                      <span className={styles.accountMenuProfileEmail}>{user?.email}</span>
-                    ) : null}
-                  </span>
-                </div>
+                    <span className={styles.accountMenuProfileText}>
+                      <span className={styles.accountMenuProfileName}>
+                        {user?.displayName || user?.email}
+                      </span>
+                      {user?.displayName ? (
+                        <span className={styles.accountMenuProfileEmail}>{user?.email}</span>
+                      ) : null}
+                    </span>
+                  </div>
+                ) : null}
 
                 {/* Desktop shows these standalone in the header instead
                     (styles.headerSwitches above) — repeating them here too
@@ -157,15 +179,17 @@ export function AppLayout() {
 
                 <span className={styles.accountMenuDivider} aria-hidden="true" />
 
-                <NavLink
-                  to="/settings"
-                  className={styles.accountMenuLink}
-                  role="menuitem"
-                  onClick={closeAccount}
-                >
-                  <Settings size={16} aria-hidden="true" />
-                  {t('nav.settings')}
-                </NavLink>
+                {user ? (
+                  <NavLink
+                    to="/settings"
+                    className={styles.accountMenuLink}
+                    role="menuitem"
+                    onClick={closeAccount}
+                  >
+                    <Settings size={16} aria-hidden="true" />
+                    {t('nav.settings')}
+                  </NavLink>
+                ) : null}
                 {isAdmin ? (
                   <NavLink
                     to="/admin"
@@ -201,15 +225,39 @@ export function AppLayout() {
                   {t('footer.donate')}
                 </button>
                 <span className={styles.accountMenuDivider} aria-hidden="true" />
-                <button
-                  type="button"
-                  role="menuitem"
-                  className={styles.accountMenuLink}
-                  onClick={() => void signOut()}
-                >
-                  <LogOut size={16} aria-hidden="true" />
-                  {t('header.logout')}
-                </button>
+                {!user ? (
+                  <>
+                    <NavLink
+                      to="/login"
+                      state={{ from: location.pathname + location.search }}
+                      className={styles.accountMenuLink}
+                      role="menuitem"
+                      onClick={closeAccount}
+                    >
+                      {t('guest.login')}
+                    </NavLink>
+                    <NavLink
+                      to="/register"
+                      state={{ from: location.pathname + location.search }}
+                      className={styles.accountMenuLink}
+                      role="menuitem"
+                      onClick={closeAccount}
+                    >
+                      {t('guest.register')}
+                    </NavLink>
+                  </>
+                ) : null}
+                {user ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className={styles.accountMenuLink}
+                    onClick={() => void signOut()}
+                  >
+                    <LogOut size={16} aria-hidden="true" />
+                    {t('header.logout')}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -222,7 +270,7 @@ export function AppLayout() {
           (docs/08-ui-map.md). On the phone layout the CSS hands scrolling
           back to the document. */}
       <div className={styles.scrollArea} data-scroll-area>
-        {inCollection ? (
+        {inCollection && user ? (
           <nav className={styles.subnav} aria-label={t('nav.collectionLabel')}>
             {COLLECTION_TABS.map((tab) => (
               <NavLink

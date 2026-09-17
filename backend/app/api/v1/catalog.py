@@ -6,8 +6,17 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
 
-from app.api.deps import CurrentUser, DbSession, Pagination, RequestLocale
+from app.api.deps import (
+    ClientIp,
+    CurrentUser,
+    DbSession,
+    OptionalCurrentUser,
+    Pagination,
+    RequestLocale,
+)
 from app.api.errors import ProblemError
+from app.api.public_rate_limit import enforce_public_read
+from app.core import rate_limit
 from app.models.enums import CollectionGroup
 from app.repositories.catalog import CatalogFilters
 from app.schemas.catalog import (
@@ -20,6 +29,8 @@ from app.schemas.catalog import (
     CatalogListItem,
     CoinMaterial,
     PriceHistoryItem,
+    PublicCatalogCard,
+    PublicCatalogListItem,
 )
 from app.schemas.common import Page
 from app.services.catalog import (
@@ -29,6 +40,7 @@ from app.services.catalog import (
     ItemHasReferencesError,
     ItemNotFoundError,
     NotApplicableToPersonalError,
+    PublicCatalogService,
     SharedRecordForbiddenError,
 )
 
@@ -57,12 +69,13 @@ def _shared_forbidden() -> ProblemError:
     )
 
 
-@router.get("")
+@router.get("", response_model=None)
 async def list_catalog(
     session: DbSession,
-    user: CurrentUser,
+    user: OptionalCurrentUser,
     locale: RequestLocale,
     pagination: Pagination,
+    ip: ClientIp,
     q: Annotated[str | None, Query(max_length=200)] = None,
     country_id: Annotated[list[int] | None, Query(alias="countryId")] = None,
     series_id: Annotated[list[int] | None, Query(alias="seriesId")] = None,
@@ -77,7 +90,22 @@ async def list_catalog(
     archived: Annotated[bool, Query()] = False,
     sort: Annotated[SortField, Query()] = "title",
     order: Annotated[Literal["asc", "desc"], Query()] = "asc",
-) -> Page[CatalogListItem]:
+) -> Page[CatalogListItem] | Page[PublicCatalogListItem]:
+    if user is None and (
+        owned is not None
+        or scope not in ("all", "shared")
+        or archived
+        or sort in ("owned", "purchase", "price")
+    ):
+        raise ProblemError(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            "private-catalog-filter",
+            "Invalid filter",
+            "This filter requires an account.",
+        )
+    await enforce_public_read(
+        rate_limit.PUBLIC_SEARCH if q else rate_limit.PUBLIC_CATALOG, user, ip
+    )
     filters = CatalogFilters(
         q=q,
         country_ids=country_id,
@@ -94,7 +122,10 @@ async def list_catalog(
         sort=sort,
         order=order,
     )
-    items, total = await CatalogService(session, user, locale).list_catalog(
+    service = (
+        CatalogService(session, user, locale) if user else PublicCatalogService(session, locale)
+    )
+    items, total = await service.list_catalog(
         filters, limit=pagination.page_size, offset=pagination.offset
     )
     return Page(items=items, total=total, page=pagination.page, page_size=pagination.page_size)
@@ -138,21 +169,31 @@ async def lookup_catalog(
 @router.get("/materials")
 async def list_catalog_materials(
     session: DbSession,
-    user: CurrentUser,
+    user: OptionalCurrentUser,
     locale: RequestLocale,
+    ip: ClientIp,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
 ) -> list[CoinMaterial]:
     """Materials the material filter offers on `GET /catalog` — only what a
     `catalog_confirmed` item actually uses (docs/04-business-rules.md, §14)."""
-    return await CatalogService(session, user, locale).list_confirmed_materials(country_id)
+    await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
+    return (
+        await CatalogService(session, user, locale).list_confirmed_materials(country_id)
+        if user
+        else await PublicCatalogService(session, locale).list_confirmed_materials(country_id)
+    )
 
 
-@router.get("/{item_id}")
+@router.get("/{item_id}", response_model=None)
 async def get_card(
-    session: DbSession, user: CurrentUser, locale: RequestLocale, item_id: int
-) -> CatalogCard:
+    session: DbSession, user: OptionalCurrentUser, locale: RequestLocale, ip: ClientIp, item_id: int
+) -> CatalogCard | PublicCatalogCard:
+    await enforce_public_read(rate_limit.PUBLIC_CATALOG, user, ip)
     try:
-        return await CatalogService(session, user, locale).get_card(item_id)
+        service = (
+            CatalogService(session, user, locale) if user else PublicCatalogService(session, locale)
+        )
+        return await service.get_card(item_id)
     except ItemNotFoundError as exc:
         raise _not_found() from exc
 

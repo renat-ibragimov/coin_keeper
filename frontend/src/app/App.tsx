@@ -18,6 +18,7 @@ import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
 import { CatalogPage } from '@/features/catalog/CatalogPage';
 import { parseFilters, serializeFilters } from '@/features/catalog/useCatalogFilters';
 import { AddPage } from '@/features/collection/add/AddPage';
+import { GuestCollectionPage } from '@/features/collection/guest/GuestCollectionPage';
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
@@ -27,7 +28,7 @@ import { SeriesListPage } from '@/features/series/SeriesListPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { scrollPageToTop } from '@/shared/lib/pageScroll';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
-import { ToastProvider } from '@/shared/ui';
+import { Spinner, ToastProvider } from '@/shared/ui';
 
 import { AppLayout } from './layout/AppLayout';
 import { DonationDialogProvider } from './layout/DonationDialog';
@@ -77,6 +78,36 @@ function LocaleCacheReset() {
  * sort click clearing scroll position out from under someone reading the
  * table was the actual bug (owner-reported, 2026-09-13).
  */
+function AuthCacheReset() {
+  const { user } = useAuth();
+  const client = useQueryClient();
+  useEffect(() => {
+    client.clear();
+  }, [user?.id, client]);
+  return null;
+}
+
+function ReadyRoute() {
+  const { ready } = useAuth();
+  return ready ? (
+    <AppLayout />
+  ) : (
+    <div style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
+      <Spinner size={32} />
+    </div>
+  );
+}
+
+export function RootRoute() {
+  const { user } = useAuth();
+  return <Navigate to={user ? '/collection' : '/catalog'} replace />;
+}
+
+export function CollectionRoot() {
+  const { user } = useAuth();
+  return user ? <DashboardPage /> : <GuestCollectionPage />;
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
@@ -157,6 +188,7 @@ export function App() {
         <ToastProvider>
           <AuthProvider>
             <ThemeSettingsSync />
+            <AuthCacheReset />
             <BrowserRouter>
               <ScrollToTop />
               <DonationDialogProvider>
@@ -172,22 +204,22 @@ export function App() {
                     <Route path="/google-complete" element={<GoogleCompletePage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                   </Route>
-                  <Route element={<ProtectedRoute />}>
-                    <Route element={<AppLayout />}>
-                      <Route path="/collection" element={<DashboardPage />} />
+                  <Route element={<ReadyRoute />}>
+                    <Route path="/collection" element={<CollectionRoot />} />
+                    <Route path="/catalog" element={<CatalogPage />} />
+                    <Route path="/catalog/:id" element={<CoinCardPage />} />
+                    <Route path="/" element={<RootRoute />} />
+                    <Route element={<ProtectedRoute />}>
                       <Route path="/collection/coins" element={<CollectionPage />} />
                       <Route path="/collection/add" element={<AddPage />} />
                       <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
                       <Route path="/collection/series" element={<SeriesListPage />} />
                       <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
                       <Route path="/collection/money" element={<ExpensesPage />} />
-                      <Route path="/catalog" element={<CatalogPage />} />
-                      <Route path="/catalog/:id" element={<CoinCardPage />} />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="/admin" element={<AdminRoute />} />
 
                       {/* Retired paths, kept as redirects for old bookmarks and links. */}
-                      <Route path="/" element={<Navigate to="/collection" replace />} />
                       <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
                       <Route
                         path="/series"
@@ -208,7 +240,7 @@ export function App() {
                       />
                     </Route>
                   </Route>
-                  <Route path="*" element={<Navigate to="/collection" replace />} />
+                  <Route path="*" element={<Navigate to="/catalog" replace />} />
                 </Routes>
               </DonationDialogProvider>
             </BrowserRouter>

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 
+import { useAuth } from '@/features/auth/useAuth';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { updateSettings } from '@/features/settings/api';
 
@@ -32,9 +33,14 @@ function readStoredView(key: string): ViewMode | undefined {
  */
 export function useStoredViewMode(storageKey: string, settingsField: ViewModeSettingsField) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   // Shares the cache with every other `['bootstrap']` query in the app — this
   // never fires an extra network request on its own.
-  const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  const bootstrapQuery = useQuery({
+    queryKey: ['bootstrap'],
+    queryFn: fetchBootstrap,
+    enabled: Boolean(user),
+  });
   const mutation = useMutation({
     mutationFn: (view: ViewMode) =>
       settingsField === 'catalogViewMode'
@@ -60,9 +66,9 @@ export function useStoredViewMode(storageKey: string, settingsField: ViewModeSet
       } catch {
         /* remembering locally is a convenience, not a requirement */
       }
-      mutation.mutate(view);
+      if (user) mutation.mutate(view);
     },
-    [storageKey, mutation],
+    [storageKey, mutation, user],
   );
 
   return { resolve, remember };

@@ -43,6 +43,10 @@ on:
           DEPLOY_USER (docs/10-infra.md, "Фронтенд").
         type: string
         default: ""
+      site-url:
+        description: Public origin used to build catalog HTML and sitemap at deploy time.
+        type: string
+        default: ""
     secrets:
       DEPLOY_SSH_KEY:
         required: false
@@ -160,6 +164,9 @@ jobs:
 
       - name: Vitest
         run: npm test
+
+      - name: Catalog prerender test
+        run: npm run test:seo
 
       - name: Build
         run: npm run build
@@ -282,10 +289,23 @@ jobs:
       group: deploy-frontend-${{ github.repository }}
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
       - uses: actions/download-artifact@v4
         with:
           name: frontend-dist
           path: dist
+
+      - name: Prepare public catalog HTML and sitemap
+        if: inputs.site-url != ''
+        env:
+          SITE_URL: ${{ inputs.site-url }}
+          DIST_DIR: dist
+        run: node ${{ inputs.frontend-path }}/scripts/prerender-catalog.mjs
 
       - name: Configure SSH
         run: |

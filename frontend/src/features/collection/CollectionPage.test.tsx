@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
+vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => ({ user: { id: 1, role: 'user' } }) }));
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { fetchSeriesProgress } from '@/features/series/api';
 import type {

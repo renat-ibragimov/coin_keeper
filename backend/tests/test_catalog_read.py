@@ -50,9 +50,10 @@ async def ctx(
     )
 
 
-async def test_requires_auth(client: AsyncClient) -> None:
+async def test_public_catalog_empty(client: AsyncClient) -> None:
     response = await client.get("/api/v1/catalog")
-    assert response.status_code == 401
+    assert response.status_code == 200
+    assert response.json()["items"] == []
 
 
 async def test_listing_shape_and_pagination(
@@ -971,3 +972,59 @@ async def test_nbu_outranks_ucoin_and_yields_no_link(
     response = await client.get(f"/api/v1/catalog/{item_id}", headers=auth(ctx.token_a))
     assert response.status_code == 200
     assert response.json()["sourceUrl"] is None
+
+
+async def test_public_catalog_allowlist_and_boundaries(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    shared = await make_catalog_item(
+        db_session, country=ctx.refs.ukraine, title="Публічна монета", year=2020
+    )
+    own = await make_catalog_item(
+        db_session,
+        country=ctx.refs.ukraine,
+        title="Особиста монета",
+        year=2021,
+        created_by=ctx.id_a,
+    )
+    await add_snapshot(db_session, item=shared, price="321")
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=shared, price="100")
+
+    listing = await client.get("/api/v1/catalog?q=монета&pageSize=1")
+    assert listing.status_code == 200
+    assert listing.json()["total"] == 1
+    assert listing.json()["items"][0]["id"] == shared.id
+    card = await client.get(f"/api/v1/catalog/{shared.id}")
+    assert card.status_code == 200
+    for payload in (listing.json()["items"][0], card.json()):
+        assert not (
+            set(payload)
+            & {
+                "marketPriceUah",
+                "priceSource",
+                "priceObservedAt",
+                "sourceUrl",
+                "quantityOwned",
+                "purchaseTotalUah",
+                "purchaseTotalUsd",
+                "purchaseTotalEur",
+                "isOwn",
+                "notes",
+                "isArchived",
+                "archiveReason",
+                "archivedAt",
+            }
+        )
+    assert (await client.get(f"/api/v1/catalog/{own.id}")).status_code == 404
+    for query in ("scope=own", "owned=true", "sort=price", "sort=purchase", "archived=true"):
+        assert (await client.get(f"/api/v1/catalog?{query}")).status_code == 422
+    assert (await client.get(f"/api/v1/catalog/{shared.id}/prices")).status_code == 401
+    assert (await client.get(f"/api/v1/catalog/{shared.id}/collection-items")).status_code == 401
+    assert (await client.get("/api/v1/collection")).status_code == 401
+    assert (await client.post("/api/v1/catalog", json={})).status_code == 401
+    assert (await client.get("/api/v1/admin/users")).status_code == 401
+
+    authenticated = await client.get(f"/api/v1/catalog/{shared.id}", headers=auth(ctx.token_a))
+    assert authenticated.status_code == 200
+    assert authenticated.json()["quantityOwned"] == 1
+    assert authenticated.json()["marketPriceUah"] is not None

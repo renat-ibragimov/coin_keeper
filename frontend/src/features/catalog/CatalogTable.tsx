@@ -8,16 +8,9 @@ import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import type { SortOrder } from '@/shared/ui';
-import {
-  Badge,
-  Button,
-  cellAlign,
-  clampTwoLines,
-  CoinImage,
-  DataTable,
-  SortHeader,
-} from '@/shared/ui';
+import { Badge, cellAlign, clampTwoLines, CoinImage, DataTable, SortHeader } from '@/shared/ui';
 
+import { GuestAddButton } from './GuestAddButton';
 import type { CatalogFilters, SortField } from './useCatalogFilters';
 import styles from './CatalogTable.module.css';
 
@@ -25,6 +18,7 @@ interface CatalogTableProps {
   items: CatalogListItem[];
   filters: CatalogFilters;
   update: (changes: Partial<CatalogFilters>) => void;
+  guest?: boolean;
 }
 
 // Every column carries its own width. Left to itself the table measures each
@@ -44,7 +38,7 @@ const COLUMNS: { key: string; sort?: SortField; className?: string }[] = [
   { key: 'tableActions', className: styles.actionsColumn },
 ];
 
-export function CatalogTable({ items, filters, update }: CatalogTableProps) {
+export function CatalogTable({ items, filters, update, guest = false }: CatalogTableProps) {
   const { t, i18n } = useTranslation();
 
   function sortBy(sort: SortField, order: SortOrder) {
@@ -56,7 +50,9 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
       <thead>
         <tr>
           <th aria-hidden="true" className={styles.ownedHeader} />
-          {COLUMNS.map((column) =>
+          {COLUMNS.filter(
+            (column) => !guest || !['tablePurchase', 'tablePrice'].includes(column.key),
+          ).map((column) =>
             column.sort ? (
               <SortHeader
                 key={column.key}
@@ -134,14 +130,18 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                   '—'
                 )}
               </td>
-              <td className={`${cellAlign.center} tabular`}>
-                {owned ? (formatUah(item.purchaseTotalUah, i18n.language) ?? '—') : '—'}
-              </td>
-              <td className={`${cellAlign.center} tabular`}>
-                {formatUah(item.marketPriceUah, i18n.language) ?? (
-                  <span className={styles.muted}>{t('catalog.noPrice')}</span>
-                )}
-              </td>
+              {!guest ? (
+                <>
+                  <td className={`${cellAlign.center} tabular`}>
+                    {owned ? (formatUah(item.purchaseTotalUah, i18n.language) ?? '—') : '—'}
+                  </td>
+                  <td className={`${cellAlign.center} tabular`}>
+                    {formatUah(item.marketPriceUah, i18n.language) ?? (
+                      <span className={styles.muted}>{t('catalog.noPrice')}</span>
+                    )}
+                  </td>
+                </>
+              ) : null}
               <td className={`${cellAlign.center} ${styles.actionsCell}`}>
                 {owned ? (
                   <div className={styles.ownedPill}>
@@ -158,12 +158,10 @@ export function CatalogTable({ items, filters, update }: CatalogTableProps) {
                     </Link>
                   </div>
                 ) : (
-                  <Link to={addUrl}>
-                    <Button size="sm" className={styles.addButton}>
-                      <Plus size={14} aria-hidden="true" />
-                      {t('catalog.addToCollection')}
-                    </Button>
-                  </Link>
+                  <GuestAddButton itemId={item.id} size="sm">
+                    <Plus size={14} aria-hidden="true" />
+                    {t('catalog.addToCollection')}
+                  </GuestAddButton>
                 )}
               </td>
             </tr>

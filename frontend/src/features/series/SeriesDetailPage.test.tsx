@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
+vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => ({ user: { id: 1, role: 'user' } }) }));
 import type { CatalogListItem, CountryOut, SeriesOut } from '@/shared/api/types';
 
 import { fetchCountries, fetchSeries } from '../catalog/api';

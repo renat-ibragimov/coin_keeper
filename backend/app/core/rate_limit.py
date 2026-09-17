@@ -49,6 +49,12 @@ RESEND_VERIFICATION = RateLimit("resend_verification", limit=3, window_seconds=H
 RESET_PASSWORD = RateLimit("reset_password", limit=5, window_seconds=HOUR)
 GOOGLE_START = RateLimit("google_start", limit=10, window_seconds=HOUR)
 
+# Public catalog browsing: a normal page loads several references alongside its
+# listing. These are abuse backstops, not quotas for ordinary visitors.
+PUBLIC_CATALOG = RateLimit("public_catalog", limit=300, window_seconds=60)
+PUBLIC_SEARCH = RateLimit("public_search", limit=90, window_seconds=60)
+PUBLIC_REFERENCE = RateLimit("public_reference", limit=300, window_seconds=60)
+
 
 class RateLimitExceededError(Exception):
     def __init__(self, retry_after_seconds: int) -> None:

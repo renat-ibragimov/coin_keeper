@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
@@ -13,6 +13,8 @@ import styles from './authForms.module.css';
 export function RegisterPage() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
 
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -30,6 +32,8 @@ export function RegisterPage() {
         displayName: displayName || undefined,
         website: website || undefined,
       });
+      if (from?.startsWith('/') && !from.startsWith('//'))
+        sessionStorage.setItem('ck-auth-return', from);
       navigate('/check-email', { state: { email } });
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 429) {

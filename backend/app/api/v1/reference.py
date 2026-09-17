@@ -9,7 +9,9 @@ from typing import Annotated, Literal, Protocol
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import CurrentUser, DbSession, RequestLocale
+from app.api.deps import ClientIp, CurrentUser, DbSession, OptionalCurrentUser, RequestLocale
+from app.api.public_rate_limit import enforce_public_read
+from app.core import rate_limit
 from app.core.locale import LOCALE_UK, pick_name
 from app.models.enums import UserRole
 from app.reference_data.denominations import render_label
@@ -35,8 +37,9 @@ def _localised(row: _Named, locale: str) -> str:
 @router.get("/countries")
 async def list_countries(
     session: DbSession,
-    user: CurrentUser,
+    user: OptionalCurrentUser,
     locale: RequestLocale,
+    ip: ClientIp,
     scope: Annotated[Literal["active", "all", "confirmed"], Query()] = "active",
 ) -> list[CountryOut]:
     """`scope=active` is the storefront; `scope=all` is the personal-item form,
@@ -47,12 +50,18 @@ async def list_countries(
     actually visible to this user in that country (docs/03-api-contract.md) —
     feeds the year filter's dropdown range, not a global catalog fact.
     """
+    await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
     countries = await ReferenceRepository(session, locale).list_countries(
         active_only=scope == "active", confirmed_only=scope == "confirmed"
     )
-    year_bounds = await CatalogRepository(
-        session, user_id=user.id, is_admin=user.role == UserRole.ADMIN
-    ).year_bounds_by_country()
+    if user:
+        year_bounds = await CatalogRepository(
+            session, user_id=user.id, is_admin=user.role == UserRole.ADMIN
+        ).year_bounds_by_country()
+    else:
+        from app.repositories.public_catalog import PublicCatalogRepository
+
+        year_bounds = await PublicCatalogRepository(session, locale).year_bounds_by_country()
     return [
         CountryOut(
             id=country.id,
@@ -78,16 +87,18 @@ async def list_countries(
 @router.get("/denominations")
 async def list_denominations(
     session: DbSession,
-    user: CurrentUser,
+    user: OptionalCurrentUser,
     locale: RequestLocale,
+    ip: ClientIp,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
     scope: Annotated[Literal["all", "confirmed"], Query()] = "all",
 ) -> list[DenominationOut]:
     """`scope=confirmed` is the catalog's own filter panel: only a
     `catalog_confirmed` country's denominations that a catalog item actually
     visible to this user still uses (§13a)."""
+    await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
     denominations = await ReferenceRepository(session, locale).list_denominations(
-        country_id, confirmed_only=scope == "confirmed", user_id=user.id
+        country_id, confirmed_only=scope == "confirmed", user_id=user.id if user else -1
     )
     return [
         DenominationOut(

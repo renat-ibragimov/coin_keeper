@@ -5,6 +5,10 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
+const authState = vi.hoisted(() => ({
+  user: { id: 1, role: 'user' } as { id: number; role: string } | null,
+}));
+vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => authState }));
 import { ApiError } from '@/shared/api/client';
 import type {
   BootstrapOut,
@@ -251,12 +255,31 @@ function renderPage(path = '/catalog/7') {
 
 describe('CoinCardPage', () => {
   beforeEach(() => {
+    authState.user = { id: 1, role: 'user' };
     vi.mocked(fetchCard).mockReset();
     vi.mocked(fetchPrices).mockReset().mockResolvedValue([]);
     vi.mocked(fetchOwnInstances).mockReset().mockResolvedValue([]);
     vi.mocked(fetchBootstrap).mockReset().mockResolvedValue(makeBootstrap());
   });
 
+  it('keeps public coin details and locks prices without requesting private endpoints', async () => {
+    authState.user = null;
+    vi.mocked(fetchCard).mockResolvedValue(makeCard({ quantityOwned: 0 }));
+    renderPage();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Дельфін' })).toBeInTheDocument();
+    expect(screen.getByText('Доступно після реєстрації', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText('460 ₴')).not.toBeInTheDocument();
+    expect(screen.queryByText('UA-Coins')).not.toBeInTheDocument();
+    expect(vi.mocked(fetchPrices)).not.toHaveBeenCalled();
+    expect(vi.mocked(fetchOwnInstances)).not.toHaveBeenCalled();
+    expect(vi.mocked(fetchBootstrap)).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: /Додати до колекції/ }));
+    expect(screen.getByRole('dialog', { name: 'Створіть власну колекцію' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Створити акаунт' })).toHaveAttribute(
+      'href',
+      '/register',
+    );
+  });
   it('shows the title and the identity fields in the specs table', async () => {
     vi.mocked(fetchCard).mockResolvedValue(makeCard());
     renderPage();

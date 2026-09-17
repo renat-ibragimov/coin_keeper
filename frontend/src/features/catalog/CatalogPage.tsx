@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
+import { useAuth } from '@/features/auth/useAuth';
 import { ApiError } from '@/shared/api/client';
 import type { CollectionGroup } from '@/shared/api/types';
 import { useDismissable } from '@/shared/lib/useDismissable';
@@ -76,6 +77,7 @@ const GRID_PAGE_SIZE = 30;
 
 export function CatalogPage() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { filters, update, reset } = useCatalogFilters();
 
   // The phone's filters drawer edits this instead of the real, applied
@@ -109,8 +111,20 @@ export function CatalogPage() {
   }, []);
 
   const catalogQuery = useQuery({
-    queryKey: ['catalog', filters, GRID_PAGE_SIZE],
-    queryFn: () => fetchCatalog(filters, GRID_PAGE_SIZE),
+    queryKey: ['catalog', user?.id ?? 'public', filters, GRID_PAGE_SIZE],
+    queryFn: () =>
+      fetchCatalog(
+        user
+          ? filters
+          : {
+              ...filters,
+              owned: undefined,
+              scope: 'shared',
+              archived: false,
+              sort: ['owned', 'purchase', 'price'].includes(filters.sort) ? 'title' : filters.sort,
+            },
+        GRID_PAGE_SIZE,
+      ),
     placeholderData: keepPreviousData,
   });
   const countriesQuery = useQuery({
@@ -243,6 +257,7 @@ export function CatalogPage() {
 
   const filtersPanel = (
     <FiltersPanel
+      personalFilters={Boolean(user)}
       filters={filters}
       update={update}
       reset={reset}
@@ -257,6 +272,7 @@ export function CatalogPage() {
 
   const draftFiltersPanel = (
     <FiltersPanel
+      personalFilters={Boolean(user)}
       filters={draft}
       update={(changes) => setDraft((current) => ({ ...current, ...changes }))}
       reset={() => setDraft(EMPTY_FILTERS)}
@@ -305,7 +321,9 @@ export function CatalogPage() {
             viewMode.remember(view);
           }}
           sort={filters.sort}
-          sortOptions={SORT_FIELDS.map((field) => ({ value: field, label: t(SORT_LABELS[field]) }))}
+          sortOptions={SORT_FIELDS.filter(
+            (field) => user || !['owned', 'purchase', 'price'].includes(field),
+          ).map((field) => ({ value: field, label: t(SORT_LABELS[field]) }))}
           onSortChange={(sort) => update({ sort: sort as SortField })}
           order={filters.order}
           onOrderChange={() => update({ order: filters.order === 'asc' ? 'desc' : 'asc' })}
@@ -347,7 +365,7 @@ export function CatalogPage() {
               ))}
             </div>
           ) : (
-            <CatalogTable items={page.items} filters={filters} update={update} />
+            <CatalogTable items={page.items} filters={filters} update={update} guest={!user} />
           )
         ) : null}
 

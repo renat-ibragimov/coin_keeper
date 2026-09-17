@@ -87,18 +87,12 @@ def user_agent(request: Request) -> str | None:
 UserAgent = Annotated[str | None, Depends(user_agent)]
 
 
-async def get_current_user(
+async def get_optional_current_user(
     session: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
-) -> User:
+) -> User | None:
     if credentials is None:
-        raise ProblemError(
-            status.HTTP_401_UNAUTHORIZED,
-            "not-authenticated",
-            "Not authenticated",
-            "An access token is required.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        return None
     try:
         user_id = decode_access_token(credentials.credentials)
     except InvalidTokenError as exc:
@@ -132,6 +126,21 @@ async def get_current_user(
             "account-disabled",
             "Forbidden",
             "This account is disabled.",
+        )
+    return user
+
+
+OptionalCurrentUser = Annotated[User | None, Depends(get_optional_current_user)]
+
+
+async def get_current_user(user: OptionalCurrentUser) -> User:
+    if user is None:
+        raise ProblemError(
+            status.HTTP_401_UNAUTHORIZED,
+            "not-authenticated",
+            "Not authenticated",
+            "An access token is required.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     return user
 

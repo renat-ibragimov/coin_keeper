@@ -128,6 +128,59 @@ class CatalogCard(CatalogListItem):
     updated_at: datetime
 
 
+class PublicCatalogListItem(CamelModel):
+    """Allowlisted anonymous catalog data; private and price fields cannot serialize."""
+
+    id: int
+    country: str
+    series_name: str | None
+    denomination: CoinDenomination | None
+    denomination_text: str | None
+    year: int
+    title: str
+    title_original: str
+    original_lang: str
+    title_uk: str | None
+    title_uk_source: TranslationSource | None
+    title_en: str | None
+    title_en_source: TranslationSource | None
+    variety: str | None
+    catalog_number: str | None
+    collection_group: CollectionGroup
+    metal_kind: MetalKind
+    composition: CoinMaterial | None
+    material: str | None
+    obverse_image: CoinImageOut | None
+    reverse_image: CoinImageOut | None
+    thumbnail_url: str | None
+
+
+class PublicCatalogCard(PublicCatalogListItem):
+    country_id: int
+    series_id: int | None
+    denomination_id: int | None
+    item_type: str
+    subtype: str | None
+    issue_date: date | None
+    mintage_announced: int | None
+    mintage_actual: int | None
+    weight_grams: Rate | None
+    diameter_mm: Rate | None
+    thickness_mm: Rate | None
+    shape: str | None
+    edge_type: CoinEdgeType | None
+    edge: str | None
+    orientation: str | None
+    quality_type: CoinQualityType | None
+    quality: str | None
+    catalog_km: str | None
+    catalog_uc: str | None
+    catalog_numista: str | None
+    description: CoinDescriptions | None
+    designers: list[str]
+    sculptors: list[str]
+
+
 class CatalogItemCreate(CamelModel):
     country_id: int
     series_id: int | None = None

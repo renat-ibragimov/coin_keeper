@@ -1,9 +1,11 @@
+import { vi } from 'vitest';
 import { fireEvent, render as renderBare, screen, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
 
 import '@/shared/i18n';
+vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => ({ user: { id: 1, role: 'user' } }) }));
 import type { CatalogListItem } from '@/shared/api/types';
 
 import { CoinCard } from './CoinCard';

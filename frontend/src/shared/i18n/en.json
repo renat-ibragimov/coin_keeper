@@ -683,7 +683,10 @@
       "role": "Role",
       "verified": "Verified",
       "unverified": "Unverified",
-      "roles": { "admin": "Administrator", "user": "User" },
+      "roles": {
+        "admin": "Administrator",
+        "user": "User"
+      },
       "makeAdmin": "Make admin",
       "removeAdmin": "Remove role",
       "roleSaved": "User role updated.",
@@ -730,5 +733,21 @@
       "disconnected": "Telegram disconnected.",
       "linkFailed": "Could not create the link. Try again."
     }
+  },
+  "guest": {
+    "login": "Sign in",
+    "register": "Create account",
+    "lockedShort": "🔒 Available after registration",
+    "lockedText": "Create a free account to view current estimates and price history.",
+    "addTitle": "Create your collection",
+    "addText": "Add coins, save details about your specimens, and follow your collection.",
+    "collectionTitle": "Your collection will appear here.",
+    "collectionText": "An account unlocks your personal collection sections:",
+    "saveCoins": "Save coins you own",
+    "manageInstances": "Manage individual specimens",
+    "followProgress": "Follow collection progress",
+    "trackFinance": "Track collection spending and value",
+    "createCollection": "Create a collection",
+    "estimatedValue": "Estimated value"
   }
 }

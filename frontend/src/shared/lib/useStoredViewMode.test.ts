@@ -8,6 +8,9 @@ import { updateSettings } from '@/features/settings/api';
 
 import { useStoredViewMode } from './useStoredViewMode';
 
+const auth = vi.hoisted(() => ({ user: { id: 1 } as { id: number } | null }));
+vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => auth }));
+
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
 vi.mock('@/features/settings/api', () => ({ updateSettings: vi.fn() }));
 
@@ -20,6 +23,7 @@ function renderStoredViewMode(key: string, field: 'catalogViewMode' | 'collectio
 
 describe('useStoredViewMode', () => {
   beforeEach(() => {
+    auth.user = { id: 1 };
     localStorage.clear();
     vi.mocked(fetchBootstrap)
       .mockReset()
@@ -68,5 +72,13 @@ describe('useStoredViewMode', () => {
 
     const other = renderStoredViewMode('ck.viewMode.collection', 'collectionViewMode');
     expect(other.result.current.resolve(undefined)).toBe('cards');
+  });
+  it('keeps the view local for a guest without requesting bootstrap or settings', () => {
+    auth.user = null;
+    const { result } = renderStoredViewMode('ck.viewMode.catalog', 'catalogViewMode');
+    act(() => result.current.remember('table'));
+    expect(localStorage.getItem('ck.viewMode.catalog')).toBe('table');
+    expect(fetchBootstrap).not.toHaveBeenCalled();
+    expect(updateSettings).not.toHaveBeenCalled();
   });
 });

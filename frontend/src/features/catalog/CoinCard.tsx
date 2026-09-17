@@ -1,4 +1,5 @@
 import { Check, ExternalLink, Plus } from 'lucide-react';
+import { useAuth } from '@/features/auth/useAuth';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
@@ -9,8 +10,9 @@ import { coinMaterial, shortMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
-import { Badge, Button, CoinImage } from '@/shared/ui';
+import { Badge, CoinImage } from '@/shared/ui';
 
+import { GuestAddButton } from './GuestAddButton';
 import styles from './CoinCard.module.css';
 
 function CoinImages({ item }: { item: CatalogListItem }) {
@@ -60,6 +62,7 @@ interface CoinCardProps {
  */
 export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
   const { t, i18n } = useTranslation();
+  const { user } = useAuth();
   const price = formatUah(item.marketPriceUah, i18n.language);
   const owned = item.quantityOwned > 0;
   const title = coinTitle(item, i18n.language);
@@ -115,7 +118,11 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
         {series ? (
           item.seriesName && seriesIdByName?.[item.seriesName] != null ? (
             <Link
-              to={`/collection/series/${seriesIdByName[item.seriesName]}`}
+              to={
+                user
+                  ? `/collection/series/${seriesIdByName[item.seriesName]}`
+                  : `/catalog?seriesId=${seriesIdByName[item.seriesName]}`
+              }
               className={styles.seriesLink}
             >
               {series}
@@ -128,28 +135,30 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
          * the gold CTA for a coin that's missing, the green row for one
          * that isn't (docs/08-ui-map.md). */}
       </div>
-      <div className={styles.footer}>
-        {price ? (
-          <span className={`${styles.price} tabular`}>{price}</span>
-        ) : (
-          <span className={styles.noPrice}>{t('catalog.noPrice')}</span>
-        )}
-        {sourceLabel ? (
-          item.sourceUrl ? (
-            <a
-              className={styles.priceSourceLink}
-              href={item.sourceUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {sourceLabel}
-              <ExternalLink size={11} aria-hidden="true" />
-            </a>
+      {user ? (
+        <div className={styles.footer}>
+          {price ? (
+            <span className={`${styles.price} tabular`}>{price}</span>
           ) : (
-            <span className={styles.priceSource}>{sourceLabel}</span>
-          )
-        ) : null}
-      </div>
+            <span className={styles.noPrice}>{t('catalog.noPrice')}</span>
+          )}
+          {user && sourceLabel ? (
+            item.sourceUrl ? (
+              <a
+                className={styles.priceSourceLink}
+                href={item.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                {sourceLabel}
+                <ExternalLink size={11} aria-hidden="true" />
+              </a>
+            ) : (
+              <span className={styles.priceSource}>{sourceLabel}</span>
+            )
+          ) : null}
+        </div>
+      ) : null}
       <div className={styles.action}>
         {owned ? (
           <div className={styles.ownedRow}>
@@ -167,12 +176,10 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
             </Link>
           </div>
         ) : (
-          <Link to={addUrl} state={addState}>
-            <Button block>
-              <Plus size={16} aria-hidden="true" />
-              {t('catalog.addToCollection')}
-            </Button>
-          </Link>
+          <GuestAddButton itemId={item.id} backTo={backTo} block>
+            <Plus size={16} aria-hidden="true" />
+            {t('catalog.addToCollection')}
+          </GuestAddButton>
         )}
       </div>
     </article>

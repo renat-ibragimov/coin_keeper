@@ -79,3 +79,25 @@ async def test_forgot_password_attempts_are_capped(client: AsyncClient) -> None:
 
     blocked = await client.post("/api/v1/auth/forgot-password", json={"email": email})
     assert blocked.status_code == 429
+
+
+async def test_public_catalog_limit_only_applies_to_guests(
+    client: AsyncClient, mail_outbox: list[EmailMessage], monkeypatch
+) -> None:
+    from app.core.rate_limit import RateLimit
+
+    monkeypatch.setattr(rate_limit, "PUBLIC_CATALOG", RateLimit("test_public_catalog", 2, 60))
+    headers = {"X-Forwarded-For": "192.0.2.42"}
+    for _ in range(2):
+        assert (await client.get("/api/v1/catalog", headers=headers)).status_code == 200
+    blocked = await client.get("/api/v1/catalog", headers=headers)
+    assert blocked.status_code == 429
+    assert int(blocked.headers["Retry-After"]) > 0
+
+    _, token = await register_and_verify(client, mail_outbox)
+    authenticated = await client.get(
+        "/api/v1/catalog", headers={**headers, "Authorization": f"Bearer {token}"}
+    )
+    assert authenticated.status_code == 200
+    assert (await client.get("/api/v1/catalog?q=Ukraine", headers=headers)).status_code == 200
+    assert (await client.get("/api/v1/countries", headers=headers)).status_code == 200
