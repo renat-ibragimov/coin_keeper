@@ -49,6 +49,8 @@ from app.schemas.catalog import (
     CoinQualityType,
     NewCatalogItemIn,
     PriceHistoryItem,
+    PublicCatalogCard,
+    PublicCatalogListItem,
 )
 from app.services.media_urls import (
     CatalogImages,
@@ -680,15 +682,15 @@ class PublicCatalogService(CatalogService):
         from app.repositories.public_catalog import PublicCatalogRepository
 
         self._session = session
-        self._user = None
+        self._user = None  # type: ignore[assignment]  # Anonymous presentation only.
         self._locale = locale
-        self._repo = PublicCatalogRepository(session, locale)
+        self._repo = PublicCatalogRepository(session, locale)  # type: ignore[assignment]
         self._media = MediaRepository(session, user_id=-1)
         self._urls = MediaUrlBuilder()
 
-    async def list_catalog(self, filters: CatalogFilters, *, limit: int, offset: int):
-        from app.schemas.catalog import PublicCatalogListItem
-
+    async def list_catalog(  # type: ignore[override]
+        self, filters: CatalogFilters, *, limit: int, offset: int
+    ) -> tuple[list[PublicCatalogListItem], int]:
         page = await self._repo.list_items(filters, limit=limit, offset=offset)
         images = await self._images_for([row.item.id for row in page.rows])
         return [
@@ -698,9 +700,7 @@ class PublicCatalogService(CatalogService):
             for row in page.rows
         ], page.total
 
-    async def get_card(self, item_id: int):
-        from app.schemas.catalog import PublicCatalogCard
-
+    async def get_card(self, item_id: int) -> PublicCatalogCard:  # type: ignore[override]
         row = await self._repo.get_row(item_id)
         if row is None:
             raise ItemNotFoundError

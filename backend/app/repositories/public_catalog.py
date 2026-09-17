@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import func, not_, select
+from sqlalchemy import Row, Select, func, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import SQLColumnExpression
 
 from app.core.locale import DEFAULT_LOCALE
 from app.models import (
@@ -32,7 +33,7 @@ class PublicCatalogRepository:
         self.session = session
         self.locale = locale
 
-    def conditions(self, filters: CatalogFilters):
+    def conditions(self, filters: CatalogFilters) -> list[SQLColumnExpression[bool]]:
         conditions = [
             CatalogItem.created_by.is_(None),
             not_(CatalogItem.is_archived),
@@ -60,7 +61,7 @@ class PublicCatalogRepository:
             conditions.append(CatalogItem.packaging_of_id.is_(None))
         return conditions
 
-    def query(self):
+    def query(self) -> Select[tuple[CatalogItem, str, str, Denomination, Material]]:
         country = localized(
             self.locale, uk=Country.name_uk, en=Country.name_en, original=Country.name_original
         ).label("country")
@@ -74,7 +75,7 @@ class PublicCatalogRepository:
         )
 
     @staticmethod
-    def row(result) -> CatalogRow:
+    def row(result: Row[tuple[CatalogItem, str, str, Denomination, Material]]) -> CatalogRow:
         return CatalogRow(
             item=result.CatalogItem,
             country=result.country,
@@ -152,7 +153,7 @@ class PublicCatalogRepository:
         )
         return {row[0]: (row[1], row[2]) for row in (await self.session.execute(query))}
 
-    async def list_confirmed_materials(self, country_id: int | None = None):
+    async def list_confirmed_materials(self, country_id: int | None = None) -> list[Material]:
         conditions = self.conditions(
             CatalogFilters(country_ids=[country_id] if country_id else None)
         )
@@ -166,4 +167,4 @@ class PublicCatalogRepository:
             )
             .order_by(Material.name_uk if self.locale == "uk" else Material.name_en)
         )
-        return (await self.session.execute(query)).scalars().all()
+        return list((await self.session.execute(query)).scalars().all())
