@@ -21,6 +21,7 @@ import {
 import styles from './AdminPage.module.css';
 import { fetchJobRuns, isStale, PAGE_SIZE } from './api';
 import { JobRunDialog } from './JobRunDialog';
+import { ProposalsSection } from './ProposalsSection';
 import { TelegramCard } from './TelegramCard';
 import { UsersSection } from './UsersSection';
 import { formatDuration, formatMoment, statusTone } from './jobRunView';
@@ -109,13 +110,7 @@ export function AdminPage() {
       ) : null}
 
       {section === 'proposals' ? (
-        <Card variant="panel">
-          <div className={styles.proposalsEmpty}>
-            <Coins size={28} strokeWidth={1.5} aria-hidden="true" />
-            <h2 className={styles.sectionTitle}>{t('admin.proposals.emptyTitle')}</h2>
-            <p>{t('admin.proposals.emptyText')}</p>
-          </div>
-        </Card>
+        <ProposalsSection page={page} onPageChange={(next) => setParam('page', String(next))} />
       ) : null}
 
       {section === 'jobs' ? (

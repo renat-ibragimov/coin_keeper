@@ -36,6 +36,7 @@ class PublicCatalogRepository:
     def conditions(self, filters: CatalogFilters) -> list[SQLColumnExpression[bool]]:
         conditions = [
             CatalogItem.created_by.is_(None),
+            CatalogItem.status == "active",
             not_(CatalogItem.is_archived),
             Country.is_active,
             Country.catalog_confirmed,

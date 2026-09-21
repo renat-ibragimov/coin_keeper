@@ -173,6 +173,7 @@ def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> Colum
             .correlate(CatalogItem)
         ),
     )
+    visible = and_(CatalogItem.status == "active", visible)
     if not require_confirmed:
         return visible
     return and_(
@@ -294,7 +295,10 @@ class CatalogRepository:
     # ------------------------------------------------------------ visibility
 
     def _visible(self) -> ColumnElement[bool]:
-        return or_(CatalogItem.created_by.is_(None), CatalogItem.created_by == self._user_id)
+        ownership = or_(CatalogItem.created_by.is_(None), CatalogItem.created_by == self._user_id)
+        if self._is_admin:
+            return ownership
+        return and_(ownership, CatalogItem.status == "active")
 
     def _snapshot_visible(self) -> ColumnElement[bool]:
         return or_(

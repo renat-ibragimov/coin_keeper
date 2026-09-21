@@ -87,6 +87,10 @@ class ArchiveStateError(CatalogError):
         self.detail = detail
 
 
+class DraftStateError(CatalogError):
+    pass
+
+
 class ItemHasReferencesError(CatalogError):
     """Deletion blocked by existing references: 409."""
 
@@ -443,6 +447,29 @@ class CatalogService:
         self._audit("catalog_item.unarchive", item.id, None)
         await self._session.flush()
         return ArchiveStateOut(is_archived=False)
+
+    async def publish_draft(self, item_id: int) -> CatalogCard:
+        item = await self._get_shared_for_admin(item_id)
+        if item.is_archived or item.status != "draft":
+            raise DraftStateError
+        item.status = "active"
+        self._audit("catalog_item.publish", item.id, None)
+        await self._session.flush()
+        return await self.get_card(item.id)
+
+    async def reject_draft(self, item_id: int, reason: str) -> ArchiveStateOut:
+        item = await self._get_shared_for_admin(item_id)
+        if item.is_archived or item.status != "draft":
+            raise DraftStateError
+        item.status = "rejected"
+        item.is_archived = True
+        item.archived_at = datetime.now(UTC)
+        item.archive_reason = reason
+        self._audit("catalog_item.reject", item.id, {"reason": reason})
+        await self._session.flush()
+        return ArchiveStateOut(
+            is_archived=True, archived_at=item.archived_at, archive_reason=reason
+        )
 
     # ------------------------------------------------------------- internals
 

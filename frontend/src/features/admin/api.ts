@@ -2,6 +2,8 @@ import { api, toQuery } from '@/shared/api/client';
 import type {
   AdminUser,
   AdminUsersPage,
+  AdminProposalsPage,
+  CatalogCard,
   JobRunOut,
   JobRunsPage,
   TelegramLink,
@@ -56,4 +58,19 @@ export function fetchAdminUsers(page: number): Promise<AdminUsersPage> {
 
 export function setAdminUserRole(id: number, role: 'user' | 'admin'): Promise<AdminUser> {
   return api<AdminUser>(`/admin/users/${id}/role`, { method: 'PATCH', body: { role } });
+}
+
+export function fetchAdminProposals(page: number): Promise<AdminProposalsPage> {
+  return api<AdminProposalsPage>(`/admin/proposals${toQuery({ page, pageSize: PAGE_SIZE })}`);
+}
+
+export function approveAdminProposal(id: number): Promise<CatalogCard> {
+  return api<CatalogCard>(`/admin/proposals/${id}/approve`, { method: 'POST' });
+}
+
+export function rejectAdminProposal(id: number, reason: string): Promise<void> {
+  return api<void>(`/admin/proposals/${id}/reject`, {
+    method: 'POST',
+    body: { reason },
+  });
 }

@@ -15,14 +15,17 @@ from app.api.deps import AdminUser, AppSettings, DbSession, Pagination
 from app.api.errors import ProblemError
 from app.models import User
 from app.models.enums import UserRole
+from app.repositories.admin_proposals import AdminProposalRepository
 from app.repositories.admin_users import AdminUserRepository
 from app.repositories.jobs import JobRunRepository
+from app.schemas.admin_proposals import AdminProposalOut, AdminProposalsOut
 from app.schemas.admin_users import (
     AdminUserOut,
     AdminUserRoleIn,
     AdminUsersOut,
     AdminUserSummary,
 )
+from app.schemas.catalog import ArchiveRequest, ArchiveStateOut, CatalogCard
 from app.schemas.jobs import JobRunOut, JobRunsOut
 from app.schemas.telegram import TelegramLinkOut, TelegramStatusOut
 from app.services.admin_users import (
@@ -32,9 +35,16 @@ from app.services.admin_users import (
     CannotDemoteSelfError,
     LastAdminError,
 )
+from app.services.catalog import CatalogService, DraftStateError, ItemNotFoundError
 from app.services.telegram import BotNotConfiguredError, TelegramLinkService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+def _proposal_conflict() -> ProblemError:
+    return ProblemError(
+        409, "proposal-not-draft", "Conflict", "This proposal is no longer a draft."
+    )
 
 
 def _user_out(user: User, coin_count: int) -> AdminUserOut:
@@ -129,6 +139,54 @@ async def get_job_run(session: DbSession, _: AdminUser, run_id: int) -> JobRunOu
             "No job run with this id.",
         )
     return JobRunOut.model_validate(run)
+
+
+@router.get("/proposals")
+async def list_proposals(
+    session: DbSession, user: AdminUser, pagination: Pagination
+) -> AdminProposalsOut:
+    rows, total = await AdminProposalRepository(session).list_drafts(
+        limit=pagination.page_size, offset=pagination.offset
+    )
+    service = CatalogService(session, user)
+    return AdminProposalsOut(
+        items=[
+            AdminProposalOut(status=row.status, card=await service.get_card(row.id))
+            for row in rows
+        ],
+        total=total,
+        page=pagination.page,
+        page_size=pagination.page_size,
+    )
+
+
+@router.post("/proposals/{item_id}/approve")
+async def approve_proposal(session: DbSession, user: AdminUser, item_id: int) -> CatalogCard:
+    try:
+        return await CatalogService(session, user).publish_draft(item_id)
+    except ItemNotFoundError as exc:
+        raise ProblemError(
+            404, "proposal-not-found", "Not found", "No proposal with this id."
+        ) from exc
+    except DraftStateError as exc:
+        raise _proposal_conflict() from exc
+
+
+@router.post("/proposals/{item_id}/reject")
+async def reject_proposal(
+    session: DbSession, user: AdminUser, item_id: int, payload: ArchiveRequest
+) -> ArchiveStateOut:
+    reason = payload.reason.strip()
+    if not reason:
+        raise ProblemError(400, "archive-reason-required", "Bad request", "A reason is required.")
+    try:
+        return await CatalogService(session, user).reject_draft(item_id, reason)
+    except ItemNotFoundError as exc:
+        raise ProblemError(
+            404, "proposal-not-found", "Not found", "No proposal with this id."
+        ) from exc
+    except DraftStateError as exc:
+        raise _proposal_conflict() from exc
 
 
 @router.get("/telegram")

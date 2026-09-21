@@ -79,5 +79,12 @@ export type TelegramStatus = components['schemas']['TelegramStatusOut'];
 export type TelegramLink = components['schemas']['TelegramLinkOut'];
 export type AdminUser = components['schemas']['AdminUserOut'];
 export type AdminUsersPage = components['schemas']['AdminUsersOut'];
+export type AdminProposal = { status: string; card: CatalogCard };
+export type AdminProposalsPage = {
+  items: AdminProposal[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
 export type ExpensePeriodTotal = components['schemas']['ExpensePeriodTotal'];
 export type ExpensesChart = components['schemas']['ExpensesChartOut'];

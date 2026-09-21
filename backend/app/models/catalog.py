@@ -290,9 +290,8 @@ class CatalogItem(Base):
     # CASCADE, not SET NULL: deleting a user must not silently promote their
     # personal items into the shared catalog. See docs/02-data-model.md.
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
-    # Where an imported record sits before it is published. Nothing reads it
-    # yet -- keeping drafts out of the catalogue is an admin-stage task, and
-    # until then only 'active' is written.
+    # Where an imported record sits before it is published. Drafts are visible
+    # only to administrators and enter the storefront after explicit approval.
     status: Mapped[str] = mapped_column(
         Text, nullable=False, default="active", server_default="active"
     )

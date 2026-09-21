@@ -669,7 +669,16 @@
     },
     "proposals": {
       "emptyTitle": "No proposals yet",
-      "emptyText": "Proposals for new coins from the parser and users will appear here."
+      "emptyText": "Proposals for new coins from the parser and users will appear here.",
+      "coin": "Coin",
+      "year": "Year",
+      "actions": "Actions",
+      "approve": "Publish",
+      "reject": "Reject",
+      "approved": "Coin published",
+      "rejected": "Proposal rejected",
+      "failed": "Could not update the proposal",
+      "rejectionReason": "Rejected by administrator"
     },
     "users": {
       "title": "Users",
