@@ -399,11 +399,18 @@ class CatalogService:
     async def update_item(self, item_id: int, payload: CatalogItemUpdate) -> CatalogCard:
         item = await self._get_writable(item_id)
         changes = payload.model_dump(exclude_unset=True)
+        description_fields = {
+            key: changes.pop(key)
+            for key in ("description", "description_obverse", "description_reverse")
+            if key in changes
+        }
         await self._check_references(
             country_id=changes.get("country_id", item.country_id),
             series_id=changes.get("series_id", item.series_id),
             denomination_id=changes.get("denomination_id", item.denomination_id),
             composition_id=changes.get("composition_id", item.composition_id),
+            edge_type_id=changes.get("edge_type_id", item.edge_type_id),
+            quality_type_id=changes.get("quality_type_id", item.quality_type_id),
         )
         for field_name, value in changes.items():
             setattr(item, field_name, value)
@@ -414,6 +421,18 @@ class CatalogService:
             item.title_uk_source = TranslationSource.MANUAL
         if "title_en" in changes:
             item.title_en_source = TranslationSource.MANUAL
+        if description_fields:
+            current = description_out(item.descriptions, self._locale)
+            item.descriptions = _descriptions_json(
+                self._locale,
+                general=description_fields.get("description", current.general if current else None),
+                obverse=description_fields.get(
+                    "description_obverse", current.obverse if current else None
+                ),
+                reverse=description_fields.get(
+                    "description_reverse", current.reverse if current else None
+                ),
+            )
         await self._session.flush()
         return await self.get_card(item_id)
 

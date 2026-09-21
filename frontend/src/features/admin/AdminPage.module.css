@@ -30,6 +30,17 @@
   color: var(--color-text);
 }
 
+.proposalsGrid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+@media (min-width: 560px) { .proposalsGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 900px) { .proposalsGrid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1200px) { .proposalsGrid { grid-template-columns: repeat(5, 1fr); } }
+
 .sectionHead {
   display: flex;
   align-items: center;

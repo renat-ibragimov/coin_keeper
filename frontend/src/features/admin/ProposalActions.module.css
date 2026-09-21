@@ -1,0 +1,3 @@
+.bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4); border: 1px solid var(--color-warning); border-radius: var(--radius-md); background: var(--color-surface-raised); }
+.actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+@media (max-width: 700px) { .bar { align-items: stretch; flex-direction: column; } .actions > * { flex: 1; } }

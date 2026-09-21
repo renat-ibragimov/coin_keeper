@@ -34,6 +34,8 @@ function CoinImages({ item }: { item: CatalogListItem }) {
 
 interface CoinCardProps {
   item: CatalogListItem;
+  /** Administrative review uses the catalogue tile without collection controls. */
+  review?: boolean;
   /**
    * Where "add to collection" / "+1" return to after the purchase form is
    * saved or cancelled (router state, read back by PurchaseFormPage).
@@ -60,7 +62,7 @@ interface CoinCardProps {
  * state footer, so all three never drift apart into subtly different cards
  * again (docs/08-ui-map.md).
  */
-export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
+export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinCardProps) {
   const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const price = formatUah(item.marketPriceUah, i18n.language);
@@ -85,6 +87,7 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
           <CoinImages item={item} />
         </Link>
         <span className={styles.mediaBadges}>
+          {review ? <Badge tone="warning">{t('admin.proposals.draft')}</Badge> : null}
           {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
           {item.isArchived ? <Badge tone="warning">{t('catalog.badgeArchived')}</Badge> : null}
         </span>
@@ -135,7 +138,7 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
          * the gold CTA for a coin that's missing, the green row for one
          * that isn't (docs/08-ui-map.md). */}
       </div>
-      {user ? (
+      {user && !review ? (
         <div className={styles.footer}>
           {price ? (
             <span className={`${styles.price} tabular`}>{price}</span>
@@ -159,7 +162,7 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
           ) : null}
         </div>
       ) : null}
-      <div className={styles.action}>
+      {!review ? <div className={styles.action}>
         {owned ? (
           <div className={styles.ownedRow}>
             <span className={styles.ownedStatus}>
@@ -181,7 +184,7 @@ export function CoinCard({ item, backTo, seriesIdByName }: CoinCardProps) {
             {t('catalog.addToCollection')}
           </GuestAddButton>
         )}
-      </div>
+      </div> : null}
     </article>
   );
 }

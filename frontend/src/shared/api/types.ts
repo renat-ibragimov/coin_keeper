@@ -59,6 +59,11 @@ export type CollectionPage = components['schemas']['Page_CollectionPositionOut_'
 export type StorageLocation = components['schemas']['StorageLocationOut'];
 
 export type CatalogItemCreate = components['schemas']['CatalogItemCreate'];
+export type CatalogItemUpdate = components['schemas']['CatalogItemUpdate'] & {
+  description?: string | null;
+  descriptionObverse?: string | null;
+  descriptionReverse?: string | null;
+};
 export type NewCatalogItem = components['schemas']['NewCatalogItemIn'];
 
 export type SeriesProgress = components['schemas']['SeriesProgressOut'];

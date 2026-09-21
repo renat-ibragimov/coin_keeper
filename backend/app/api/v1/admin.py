@@ -7,14 +7,15 @@ server.
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, Request, status
 
 from app.api.deps import AdminUser, AppSettings, DbSession, Pagination
 from app.api.errors import ProblemError
+from app.core.images import MAX_SOURCE_BYTES, ImageRejectedError
 from app.models import User
-from app.models.enums import UserRole
+from app.models.enums import MediaRole, UserRole
 from app.repositories.admin_proposals import AdminProposalRepository
 from app.repositories.admin_users import AdminUserRepository
 from app.repositories.jobs import JobRunRepository
@@ -36,9 +37,11 @@ from app.services.admin_users import (
     LastAdminError,
 )
 from app.services.catalog import CatalogService, DraftStateError, ItemNotFoundError
+from app.services.catalog_photos import CatalogPhotoNotFoundError, CatalogPhotoService
 from app.services.telegram import BotNotConfiguredError, TelegramLinkService
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+PhotoRole = Literal["obverse", "reverse"]
 
 
 def _proposal_conflict() -> ProblemError:
@@ -157,6 +160,59 @@ async def list_proposals(
         page=pagination.page,
         page_size=pagination.page_size,
     )
+
+
+@router.get("/proposals/{item_id}")
+async def get_proposal(session: DbSession, user: AdminUser, item_id: int) -> AdminProposalOut:
+    row = await AdminProposalRepository(session).get_draft(item_id)
+    if row is None:
+        raise ProblemError(
+            404, "proposal-not-found", "Not found", "No draft proposal with this id."
+        )
+    return AdminProposalOut(
+        status=row.status, card=await CatalogService(session, user).get_card(row.id)
+    )
+
+
+@router.put("/proposals/{item_id}/photos/{role}")
+async def set_proposal_photo(
+    request: Request, session: DbSession, user: AdminUser, item_id: int, role: PhotoRole
+) -> CatalogCard:
+    payload = await request.body()
+    declared = request.headers.get("content-length")
+    if (declared and declared.isdigit() and int(declared) > MAX_SOURCE_BYTES) or len(
+        payload
+    ) > MAX_SOURCE_BYTES:
+        raise ProblemError(
+            422, "invalid-image", "Image rejected", "Upload a JPEG, PNG or WebP image up to 12 MB."
+        )
+    if await AdminProposalRepository(session).get_draft(item_id) is None:
+        raise ProblemError(
+            404, "proposal-not-found", "Not found", "No draft proposal with this id."
+        )
+    try:
+        await CatalogPhotoService(session).set_photo(item_id, MediaRole(role), payload)
+    except CatalogPhotoNotFoundError as exc:
+        raise ProblemError(
+            404, "proposal-not-found", "Not found", "No proposal with this id."
+        ) from exc
+    except ImageRejectedError as exc:
+        raise ProblemError(
+            422, "invalid-image", "Image rejected", "Upload a JPEG, PNG or WebP image up to 12 MB."
+        ) from exc
+    return await CatalogService(session, user).get_card(item_id)
+
+
+@router.delete("/proposals/{item_id}/photos/{role}")
+async def delete_proposal_photo(
+    session: DbSession, user: AdminUser, item_id: int, role: PhotoRole
+) -> CatalogCard:
+    if await AdminProposalRepository(session).get_draft(item_id) is None:
+        raise ProblemError(
+            404, "proposal-not-found", "Not found", "No draft proposal with this id."
+        )
+    await CatalogPhotoService(session).remove_photo(item_id, MediaRole(role))
+    return await CatalogService(session, user).get_card(item_id)
 
 
 @router.post("/proposals/{item_id}/approve")

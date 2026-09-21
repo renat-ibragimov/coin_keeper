@@ -322,6 +322,9 @@ class CatalogItemUpdate(CamelModel):
     catalog_numista: str | None = Field(default=None, max_length=100)
     catalog_number: str | None = Field(default=None, max_length=100)
     notes: str | None = Field(default=None, max_length=4000)
+    description: str | None = Field(default=None, max_length=4000)
+    description_obverse: str | None = Field(default=None, max_length=4000)
+    description_reverse: str | None = Field(default=None, max_length=4000)
 
 
 class ArchiveRequest(CamelModel):

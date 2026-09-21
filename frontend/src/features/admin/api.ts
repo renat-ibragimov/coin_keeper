@@ -3,7 +3,9 @@ import type {
   AdminUser,
   AdminUsersPage,
   AdminProposalsPage,
+  AdminProposal,
   CatalogCard,
+  CatalogItemUpdate,
   JobRunOut,
   JobRunsPage,
   TelegramLink,
@@ -62,6 +64,24 @@ export function setAdminUserRole(id: number, role: 'user' | 'admin'): Promise<Ad
 
 export function fetchAdminProposals(page: number): Promise<AdminProposalsPage> {
   return api<AdminProposalsPage>(`/admin/proposals${toQuery({ page, pageSize: PAGE_SIZE })}`);
+}
+
+export function fetchAdminProposal(id: number): Promise<AdminProposal> {
+  return api<AdminProposal>(`/admin/proposals/${id}`);
+}
+
+export function updateAdminProposal(id: number, body: CatalogItemUpdate): Promise<CatalogCard> {
+  return api<CatalogCard>(`/catalog/${id}`, { method: 'PATCH', body });
+}
+
+export function uploadAdminProposalPhoto(id: number, side: 'obverse' | 'reverse', blob: Blob) {
+  return api<CatalogCard>(`/admin/proposals/${id}/photos/${side}`, {
+    method: 'PUT', body: blob,
+  });
+}
+
+export function deleteAdminProposalPhoto(id: number, side: 'obverse' | 'reverse') {
+  return api<CatalogCard>(`/admin/proposals/${id}/photos/${side}`, { method: 'DELETE' });
 }
 
 export function approveAdminProposal(id: number): Promise<CatalogCard> {

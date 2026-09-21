@@ -33,3 +33,14 @@ class AdminProposalRepository:
             .all()
         )
         return list(items), total
+
+    async def get_draft(self, item_id: int) -> CatalogItem | None:
+        result = await self._session.execute(
+            select(CatalogItem).where(
+                CatalogItem.id == item_id,
+                CatalogItem.created_by.is_(None),
+                CatalogItem.status == "draft",
+                CatalogItem.is_archived.is_(False),
+            )
+        )
+        return result.scalar_one_or_none()

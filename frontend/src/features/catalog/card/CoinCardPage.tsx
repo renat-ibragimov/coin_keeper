@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
+import { ProposalActions } from '@/features/admin/ProposalActions';
 import { useAuthDialog } from '@/features/auth/authDialogContext';
 import { GuestAddButton } from '../GuestAddButton';
 import { fetchBootstrap } from '@/features/dashboard/api';
@@ -190,6 +191,8 @@ function CardBody({ card }: { card: CatalogCard }) {
           </p>
         ) : null}
       </header>
+
+      {user?.role === 'admin' ? <ProposalActions card={card} /> : null}
 
       <div className={styles.hero}>
         {/* display:contents — groups the two photos for assistive tech
