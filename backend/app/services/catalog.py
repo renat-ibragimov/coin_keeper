@@ -645,7 +645,6 @@ class CatalogService:
             denomination_id=item.denomination_id,
             item_type=item.item_type,
             subtype=item.subtype,
-            issue_date=item.issue_date,
             mintage_announced=item.mintage_announced,
             mintage_actual=item.mintage_actual,
             weight_grams=item.weight_grams,
