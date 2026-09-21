@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import type { CollectionPosition } from '@/shared/api/types';
 import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
+import { isRecentRelease } from '@/shared/lib/recentRelease';
 import type { SortOrder } from '@/shared/ui';
 import { Badge, cellAlign, clampTwoLines, CoinImage, DataTable, SortHeader } from '@/shared/ui';
 
@@ -69,6 +70,9 @@ export function PositionTable({ items, sort, order, onSort }: PositionTableProps
                    * than every other (docs/08-ui-map.md). */}
                   <span className={styles.coinMeta}>
                     {[String(item.year), item.denomination].filter(Boolean).join(' · ')}
+                    {isRecentRelease(item.issueDate) ? (
+                      <Badge tone="success">{t('catalog.badgeNew')}</Badge>
+                    ) : null}
                     {item.isArchived ? (
                       <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
                     ) : null}

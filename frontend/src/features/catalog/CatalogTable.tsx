@@ -7,6 +7,7 @@ import { coinDenomination } from '@/shared/lib/coinDenomination';
 import { coinMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
+import { isRecentRelease } from '@/shared/lib/recentRelease';
 import type { SortOrder } from '@/shared/ui';
 import { Badge, cellAlign, clampTwoLines, CoinImage, DataTable, SortHeader } from '@/shared/ui';
 
@@ -74,6 +75,7 @@ export function CatalogTable({ items, filters, update, guest = false }: CatalogT
       <tbody>
         {items.map((item) => {
           const owned = item.quantityOwned > 0;
+          const recent = isRecentRelease(item.issueDate);
           const material = coinMaterial(item);
           const addUrl = `/collection/add?catalogItemId=${item.id}`;
           return (
@@ -104,8 +106,9 @@ export function CatalogTable({ items, filters, update, guest = false }: CatalogT
                     >
                       {coinTitle(item, i18n.language)}
                     </Link>
-                    {item.isOwn || item.isArchived ? (
+                    {recent || item.isOwn || item.isArchived ? (
                       <span className={styles.coinBadges}>
+                        {recent ? <Badge tone="success">{t('catalog.badgeNew')}</Badge> : null}
                         {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
                         {item.isArchived ? (
                           <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>

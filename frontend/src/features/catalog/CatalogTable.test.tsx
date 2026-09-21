@@ -17,6 +17,7 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
     denomination: null,
     denominationText: null,
     year: 2021,
+    issueDate: null,
     title: 'Sikorsky',
     titleOriginal: 'Ihor Sikorsky',
     originalLang: 'uk',
@@ -100,5 +101,11 @@ describe('CatalogTable', () => {
     expect(screen.getByText('Срібло')).toBeInTheDocument();
     expect(screen.queryByText('Latten')).not.toBeInTheDocument();
     expect(screen.getByText('Нейзильбер')).toBeInTheDocument();
+  });
+
+  it('marks a coin released within the last 30 days as new', () => {
+    renderTable([makeItem({ issueDate: new Date().toISOString().slice(0, 10) })]);
+
+    expect(screen.getByText('Нова')).toBeInTheDocument();
   });
 });
