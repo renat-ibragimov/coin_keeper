@@ -151,8 +151,7 @@ async def list_proposals(
     service = CatalogService(session, user)
     return AdminProposalsOut(
         items=[
-            AdminProposalOut(status=row.status, card=await service.get_card(row.id))
-            for row in rows
+            AdminProposalOut(status=row.status, card=await service.get_card(row.id)) for row in rows
         ],
         total=total,
         page=pagination.page,

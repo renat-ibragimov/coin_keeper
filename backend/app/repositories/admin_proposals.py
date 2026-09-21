@@ -20,12 +20,16 @@ class AdminProposalRepository:
             await self._session.execute(select(func.count(CatalogItem.id)).where(*where))
         ).scalar_one()
         items = (
-            await self._session.execute(
-                select(CatalogItem)
-                .where(*where)
-                .order_by(CatalogItem.created_at.asc(), CatalogItem.id.asc())
-                .limit(limit)
-                .offset(offset)
+            (
+                await self._session.execute(
+                    select(CatalogItem)
+                    .where(*where)
+                    .order_by(CatalogItem.created_at.asc(), CatalogItem.id.asc())
+                    .limit(limit)
+                    .offset(offset)
+                )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
         return list(items), total

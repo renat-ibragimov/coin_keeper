@@ -12,4 +12,3 @@ class AdminProposalOut(CamelModel):
 
 class AdminProposalsOut(Page[AdminProposalOut]):
     pass
-
