@@ -76,7 +76,8 @@ export function updateAdminProposal(id: number, body: CatalogItemUpdate): Promis
 
 export function uploadAdminProposalPhoto(id: number, side: 'obverse' | 'reverse', blob: Blob) {
   return api<CatalogCard>(`/admin/proposals/${id}/photos/${side}`, {
-    method: 'PUT', body: blob,
+    method: 'PUT',
+    body: blob,
   });
 }
 

@@ -32,7 +32,9 @@ export function ProposalsSection({
   return (
     <div>
       <div className={styles.proposalsGrid}>
-        {query.data.items.map(({ card }) => <CoinCard key={card.id} item={card} review />)}
+        {query.data.items.map(({ card }) => (
+          <CoinCard key={card.id} item={card} review />
+        ))}
       </div>
       <Pagination
         page={query.data.page}

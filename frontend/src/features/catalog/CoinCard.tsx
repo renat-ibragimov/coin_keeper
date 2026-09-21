@@ -162,29 +162,31 @@ export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinC
           ) : null}
         </div>
       ) : null}
-      {!review ? <div className={styles.action}>
-        {owned ? (
-          <div className={styles.ownedRow}>
-            <span className={styles.ownedStatus}>
-              <Check size={15} aria-hidden="true" />
-              {t('catalog.badgeInCollection')}
-            </span>
-            <Link
-              to={addUrl}
-              state={addState}
-              className={styles.addOneMore}
-              aria-label={t('catalog.addOneMore')}
-            >
-              +1
-            </Link>
-          </div>
-        ) : (
-          <GuestAddButton itemId={item.id} backTo={backTo} block>
-            <Plus size={16} aria-hidden="true" />
-            {t('catalog.addToCollection')}
-          </GuestAddButton>
-        )}
-      </div> : null}
+      {!review ? (
+        <div className={styles.action}>
+          {owned ? (
+            <div className={styles.ownedRow}>
+              <span className={styles.ownedStatus}>
+                <Check size={15} aria-hidden="true" />
+                {t('catalog.badgeInCollection')}
+              </span>
+              <Link
+                to={addUrl}
+                state={addState}
+                className={styles.addOneMore}
+                aria-label={t('catalog.addOneMore')}
+              >
+                +1
+              </Link>
+            </div>
+          ) : (
+            <GuestAddButton itemId={item.id} backTo={backTo} block>
+              <Plus size={16} aria-hidden="true" />
+              {t('catalog.addToCollection')}
+            </GuestAddButton>
+          )}
+        </div>
+      ) : null}
     </article>
   );
 }
