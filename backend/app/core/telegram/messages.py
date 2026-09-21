@@ -99,13 +99,33 @@ def _generic_lines(run: JobRun) -> list[str]:
     return [run.summary] if run.summary else []
 
 
+def _catalog_run_lines(stats: dict[str, Any], admin_url: str | None) -> list[str]:
+    """Human wording for the daily NBU draft scan."""
+    found = _int(stats, "new")
+    drafted = _int(stats, "drafted")
+    if not found:
+        return ["Нових монет не знайдено."]
+
+    lines = [f"Знайдено {counted(found, 'нову монету', 'нові монети', 'нових монет')}."]
+    if drafted:
+        lines.append(f"На перевірку додано {counted(drafted, 'чернетку', 'чернетки', 'чернеток')}.")
+    if admin_url:
+        lines.extend(["", f"Переглянути пропозиції: {admin_url}?section=proposals"])
+    return lines
+
+
 def job_run_message(run: JobRun, admin_url: str | None = None) -> str:
     """One finished run, as a person reads it."""
     job_label = JOB_LABELS.get(run.job, run.job)
     head = STATUS_HEADS.get(run.status, "{job}").format(job=job_label)
 
     stats = run.stats if isinstance(run.stats, dict) else {}
-    lines = _price_run_lines(stats) if run.job == "update-prices" and stats else _generic_lines(run)
+    if run.job == "update-prices" and stats:
+        lines = _price_run_lines(stats)
+    elif run.job == "nbu-catalog-sync" and stats:
+        lines = _catalog_run_lines(stats, admin_url)
+    else:
+        lines = _generic_lines(run)
 
     if run.finished_at and run.started_at:
         seconds = int((run.finished_at - run.started_at).total_seconds())
