@@ -7,6 +7,7 @@ import type { CollectionPosition } from '@/shared/api/types';
 import { imageSources } from '@/shared/lib/coinImage';
 import { seriesLabel } from '@/shared/lib/coinTitle';
 import { formatDate, formatUah } from '@/shared/lib/format';
+import { isRecentRelease } from '@/shared/lib/recentRelease';
 import { Badge, Button, CoinImage } from '@/shared/ui';
 
 import styles from './PositionCard.module.css';
@@ -46,11 +47,17 @@ export function PositionCard({ item }: PositionCardProps) {
   const addUrl = `/collection/add?catalogItemId=${item.catalogItemId}`;
   const meta = [String(item.year), item.denomination].filter(Boolean).join(' · ');
   const series = seriesLabel(item, t);
+  const recent = isRecentRelease(item.issueDate);
 
   return (
     <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
       <Link to={cardUrl} className={styles.media} tabIndex={-1}>
         <PositionImages item={item} />
+        {recent ? (
+          <span className={styles.mediaBadge}>
+            <Badge tone="success">{t('catalog.badgeNew')}</Badge>
+          </span>
+        ) : null}
       </Link>
       <div className={styles.body}>
         <div className={styles.headline}>

@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import type { CollectionGroup } from '@/shared/api/types';
+import type { CollectionGroup, MetalKind } from '@/shared/api/types';
 
 export const SORT_FIELDS = [
   'title',
@@ -28,6 +28,7 @@ export interface CatalogFilters {
   denominationIds: number[];
   groups: CollectionGroup[];
   materialIds: number[];
+  metalKinds: MetalKind[];
   owned?: boolean;
   scope: Scope;
   archived: boolean;
@@ -38,6 +39,7 @@ export interface CatalogFilters {
 }
 
 const GROUPS: CollectionGroup[] = ['circulation', 'commemorative', 'collector', 'other'];
+const METAL_KINDS: MetalKind[] = ['precious', 'base'];
 
 function intParam(params: URLSearchParams, key: string): number | undefined {
   const raw = params.get(key);
@@ -66,6 +68,12 @@ function groupListParam(params: URLSearchParams, key: string): CollectionGroup[]
   return [...seen];
 }
 
+function metalKindListParam(params: URLSearchParams): MetalKind[] {
+  return params
+    .getAll('metalKind')
+    .filter((value): value is MetalKind => METAL_KINDS.includes(value as MetalKind));
+}
+
 /** The URL is the single source of truth: a shared link or F5 restores the
  *  exact same listing (docs/03 filters ↔ query parameters one to one). */
 export function parseFilters(params: URLSearchParams): CatalogFilters {
@@ -82,11 +90,12 @@ export function parseFilters(params: URLSearchParams): CatalogFilters {
     denominationIds: intListParam(params, 'denominationId'),
     groups: groupListParam(params, 'group'),
     materialIds: intListParam(params, 'materialId'),
+    metalKinds: metalKindListParam(params),
     owned: ownedRaw === 'true' ? true : ownedRaw === 'false' ? false : undefined,
     scope: scope === 'shared' || scope === 'own' ? scope : 'all',
     archived: params.get('archived') === 'true',
-    sort: SORT_FIELDS.includes(sort as SortField) ? (sort as SortField) : 'title',
-    order: params.get('order') === 'desc' ? 'desc' : 'asc',
+    sort: SORT_FIELDS.includes(sort as SortField) ? (sort as SortField) : 'year',
+    order: params.get('order') === 'asc' ? 'asc' : 'desc',
     page: intParam(params, 'page') ?? 1,
     // A stale `?view=map` (the completeness map was removed) quietly degrades to cards.
     view: view === 'table' ? 'table' : 'cards',
@@ -110,11 +119,12 @@ export function serializeFilters(filters: CatalogFilters): URLSearchParams {
   setList('denominationId', filters.denominationIds);
   setList('group', filters.groups);
   setList('materialId', filters.materialIds);
+  setList('metalKind', filters.metalKinds);
   if (filters.owned !== undefined) params.set('owned', String(filters.owned));
   setIf('scope', filters.scope, 'all');
   if (filters.archived) params.set('archived', 'true');
-  setIf('sort', filters.sort, 'title');
-  setIf('order', filters.order, 'asc');
+  setIf('sort', filters.sort, 'year');
+  setIf('order', filters.order, 'desc');
   setIf('page', filters.page, 1);
   setIf('view', filters.view, 'cards');
   return params;

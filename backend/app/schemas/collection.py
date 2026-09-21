@@ -41,6 +41,7 @@ class CollectionPositionOut(CamelModel):
     collection_group: CollectionGroup
     denomination: str | None
     year: int
+    issue_date: date | None
     is_archived: bool
     archive_reason: str | None
     total_quantity: int

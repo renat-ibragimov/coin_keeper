@@ -68,6 +68,7 @@ class CatalogListItem(CamelModel):
     # their country; shown in place of `denomination` (docs/04, §14).
     denomination_text: str | None
     year: int
+    issue_date: date | None
     # The name in the requested locale, and the slots it was chosen from.
     title: str
     title_original: str
@@ -104,7 +105,6 @@ class CatalogCard(CatalogListItem):
     denomination_id: int | None
     item_type: str
     subtype: str | None
-    issue_date: date | None
     mintage_announced: int | None
     mintage_actual: int | None
     weight_grams: Rate | None
@@ -137,6 +137,7 @@ class PublicCatalogListItem(CamelModel):
     denomination: CoinDenomination | None
     denomination_text: str | None
     year: int
+    issue_date: date | None
     title: str
     title_original: str
     original_lang: str
@@ -161,7 +162,6 @@ class PublicCatalogCard(PublicCatalogListItem):
     denomination_id: int | None
     item_type: str
     subtype: str | None
-    issue_date: date | None
     mintage_announced: int | None
     mintage_actual: int | None
     weight_grams: Rate | None

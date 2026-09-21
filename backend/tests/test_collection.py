@@ -384,10 +384,20 @@ async def test_listing_filters_and_sorting(
     assert by_material.json()["total"] == 1
     assert by_material.json()["items"][0]["title"] == "Lincoln cent"
 
+    by_metal_kind = await client.get("/api/v1/collection?metalKind=precious", headers=headers)
+    assert by_metal_kind.json()["total"] == 1
+    assert by_metal_kind.json()["items"][0]["title"] == "Lincoln cent"
+
     newest_first = await client.get("/api/v1/collection?sort=date&order=desc", headers=headers)
     assert [row["title"] for row in newest_first.json()["items"]] == [
         "Lincoln cent",
         "Дельфін",
+    ]
+
+    release_default = await client.get("/api/v1/collection", headers=headers)
+    assert [row["title"] for row in release_default.json()["items"]] == [
+        "Дельфін",
+        "Lincoln cent",
     ]
 
     by_total = await client.get("/api/v1/collection?sort=total&order=desc", headers=headers)

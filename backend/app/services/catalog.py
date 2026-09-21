@@ -599,6 +599,7 @@ class CatalogService:
             "denomination": denomination_out(row.denomination, self._locale),
             "denomination_text": item.denomination_text,
             "year": item.issue_year,
+            "issue_date": item.issue_date,
             "title": display_title(item, self._locale),
             "title_original": item.title_original,
             "original_lang": item.original_lang,

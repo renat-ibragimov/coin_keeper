@@ -15,7 +15,7 @@ from app.api.deps import (
 )
 from app.api.errors import ProblemError
 from app.core.images import MAX_SOURCE_BYTES, ImageRejectedError
-from app.models.enums import CollectionGroup, MediaRole
+from app.models.enums import CollectionGroup, MediaRole, MetalKind
 from app.repositories.collection import CollectionFilters
 from app.schemas.catalog import CoinMaterial
 from app.schemas.collection import (
@@ -88,12 +88,23 @@ async def list_collection(
     denomination_id: Annotated[list[int] | None, Query(alias="denominationId")] = None,
     group: Annotated[list[CollectionGroup] | None, Query()] = None,
     material_id: Annotated[list[int] | None, Query(alias="materialId")] = None,
+    metal_kind: Annotated[list[MetalKind] | None, Query(alias="metalKind")] = None,
     grade: Annotated[str | None, Query(max_length=50)] = None,
     sort: Annotated[
-        Literal["date", "title", "country", "series", "quantity", "total", "valuation", "grade"],
+        Literal[
+            "release",
+            "date",
+            "title",
+            "country",
+            "series",
+            "quantity",
+            "total",
+            "valuation",
+            "grade",
+        ],
         Query(),
-    ] = "title",
-    order: Annotated[Literal["asc", "desc"], Query()] = "asc",
+    ] = "release",
+    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[CollectionPositionOut]:
     filters = CollectionFilters(
         q=q,
@@ -105,6 +116,7 @@ async def list_collection(
         denomination_ids=denomination_id,
         groups=group,
         material_ids=material_id,
+        metal_kinds=metal_kind,
         grade=grade,
         sort=sort,
         order=order,

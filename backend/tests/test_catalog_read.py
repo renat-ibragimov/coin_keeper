@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
 from app.models import EdgeType, Material, QualityType
-from app.models.enums import CollectionGroup
+from app.models.enums import CollectionGroup, MetalKind
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
@@ -64,7 +64,7 @@ async def test_listing_shape_and_pagination(
         await make_catalog_item(db_session, country=refs.ukraine, title=f"Монета {year}", year=year)
 
     response = await client.get(
-        "/api/v1/catalog?page=2&pageSize=2&sort=year", headers=auth(ctx.token_a)
+        "/api/v1/catalog?page=2&pageSize=2&sort=year&order=asc", headers=auth(ctx.token_a)
     )
     assert response.status_code == 200
     body = response.json()
@@ -81,6 +81,47 @@ async def test_listing_shape_and_pagination(
     assert first["quantityOwned"] == 0
     assert first["purchaseTotalUah"] == "0.00"
     assert first["marketPriceUah"] is None
+
+
+async def test_default_sort_uses_exact_release_date_and_survives_filters(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    refs = ctx.refs
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Рання",
+        year=2025,
+        issue_date=date(2025, 2, 1),
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Пізня",
+        year=2025,
+        issue_date=date(2025, 11, 1),
+    )
+    await make_catalog_item(db_session, country=refs.ukraine, title="Без дати", year=2025)
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Торішня",
+        year=2024,
+        issue_date=date(2024, 12, 1),
+    )
+
+    response = await client.get(
+        f"/api/v1/catalog?countryId={refs.ukraine.id}&group=commemorative",
+        headers=auth(ctx.token_a),
+    )
+
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()["items"]] == [
+        "Пізня",
+        "Рання",
+        "Без дати",
+        "Торішня",
+    ]
 
 
 async def test_personal_items_are_isolated(
@@ -445,6 +486,7 @@ async def test_multi_select_filters_union_within_a_facet(
         denomination=refs.uah_2,
         group=CollectionGroup.COMMEMORATIVE,
         composition_id=silver.id,
+        metal_kind=MetalKind.PRECIOUS,
     )
     kyiv = await make_catalog_item(
         db_session,
@@ -455,6 +497,7 @@ async def test_multi_select_filters_union_within_a_facet(
         denomination=refs.uah_5,
         group=CollectionGroup.OTHER,
         composition_id=gold.id,
+        metal_kind=MetalKind.PRECIOUS,
     )
     await make_catalog_item(
         db_session,
@@ -484,6 +527,9 @@ async def test_multi_select_filters_union_within_a_facet(
         f"/api/v1/catalog?materialId={silver.id}&materialId={gold.id}", headers=headers
     )
     assert {i["id"] for i in by_material.json()["items"]} == {dolphin.id, kyiv.id}
+
+    by_metal_kind = await client.get("/api/v1/catalog?metalKind=precious", headers=headers)
+    assert {i["id"] for i in by_metal_kind.json()["items"]} == {dolphin.id, kyiv.id}
 
 
 async def test_catalog_materials_only_offers_what_the_confirmed_catalog_uses(

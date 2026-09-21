@@ -65,12 +65,22 @@
 /* The collection tile uses the catalogue's exact two-side composition while
  * keeping its own card body and facts untouched. */
 .media {
+  position: relative;
   display: flex;
   aspect-ratio: 2 / 1;
   min-height: 0;
   padding: var(--space-2) var(--space-2) var(--space-1);
   align-items: center;
   justify-content: center;
+}
+
+.mediaBadge {
+  position: absolute;
+  z-index: 3;
+  top: var(--space-2);
+  left: var(--space-2);
+  transform: rotate(-4deg);
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 18%));
 }
 
 .image {

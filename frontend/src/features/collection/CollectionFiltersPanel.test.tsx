@@ -115,6 +115,7 @@ describe('CollectionFiltersPanel multi-select', () => {
       seriesIds: [10],
       denominationIds: [20],
       materialIds: [30],
+      metalKinds: [],
     });
     fireEvent.click(screen.getByLabelText('Країна'));
     fireEvent.click(screen.getByRole('option', { name: 'США' }));
@@ -135,6 +136,14 @@ describe('CollectionFiltersPanel multi-select', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Срібло' }));
     fireEvent.click(screen.getByRole('option', { name: 'Золото' }));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ materialIds: [1, 2] }));
+  });
+
+  it('filters by precious and base metal independently of the material', () => {
+    const { onChange } = renderControlledPanel();
+    fireEvent.click(screen.getByLabelText('Цінність металу'));
+    fireEvent.click(screen.getByRole('option', { name: 'Дорогоцінні' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Недорогоцінні' }));
+    expect(onChange).toHaveBeenLastCalledWith({ metalKinds: ['precious', 'base'] });
   });
 });
 

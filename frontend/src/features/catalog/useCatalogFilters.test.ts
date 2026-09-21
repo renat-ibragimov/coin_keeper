@@ -12,10 +12,11 @@ describe('catalog filters ↔ URL', () => {
       denominationIds: [],
       groups: [],
       materialIds: [],
+      metalKinds: [],
       scope: 'all',
       archived: false,
-      sort: 'title',
-      order: 'asc',
+      sort: 'year',
+      order: 'desc',
       page: 1,
       view: 'cards',
     });
@@ -25,7 +26,7 @@ describe('catalog filters ↔ URL', () => {
   it('round-trips a full filter set, including repeated multi-select keys', () => {
     const params = new URLSearchParams(
       'q=dolphin&countryId=2&countryId=3&yearFrom=2010&yearTo=2020&denominationId=5' +
-        '&group=commemorative&group=other&materialId=7&materialId=8&owned=true&scope=own' +
+        '&group=commemorative&group=other&materialId=7&materialId=8&metalKind=precious&owned=true&scope=own' +
         '&archived=true&sort=price&order=desc&page=3&view=table',
     );
     const filters = parseFilters(params);
@@ -37,6 +38,7 @@ describe('catalog filters ↔ URL', () => {
       denominationIds: [5],
       groups: ['commemorative', 'other'],
       materialIds: [7, 8],
+      metalKinds: ['precious'],
       owned: true,
       scope: 'own',
       archived: true,
@@ -56,11 +58,14 @@ describe('catalog filters ↔ URL', () => {
   });
 
   it('ignores garbage values', () => {
-    const params = new URLSearchParams('countryId=abc&group=bogus&sort=hack&page=-1&owned=maybe');
+    const params = new URLSearchParams(
+      'countryId=abc&group=bogus&metalKind=plastic&sort=hack&page=-1&owned=maybe',
+    );
     const filters = parseFilters(params);
     expect(filters.countryIds).toEqual([]);
     expect(filters.groups).toEqual([]);
-    expect(filters.sort).toBe('title');
+    expect(filters.metalKinds).toEqual([]);
+    expect(filters.sort).toBe('year');
     expect(filters.page).toBe(1);
     expect(filters.owned).toBeUndefined();
   });

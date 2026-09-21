@@ -13,7 +13,9 @@ export type UserOut = components['schemas']['UserOut'] & {
 export type SessionOut = components['schemas']['SessionOut'];
 export type TokensOut = components['schemas']['TokensOut'];
 
-export type CatalogListItem = components['schemas']['CatalogListItem'];
+export type CatalogListItem = components['schemas']['CatalogListItem'] & {
+  issueDate?: string | null;
+};
 export type CatalogCard = components['schemas']['CatalogCard'];
 export type CatalogPage = components['schemas']['Page_CatalogListItem_'];
 export type CoinMaterial = components['schemas']['CoinMaterial'];
@@ -54,7 +56,9 @@ export type CollectionItem = components['schemas']['CollectionItemOut'] & {
 export type CollectionItemPhotos = { obverse: CoinImage | null; reverse: CoinImage | null };
 export type CollectionItemCreate = components['schemas']['CollectionItemCreate'];
 export type CollectionItemUpdate = components['schemas']['CollectionItemUpdate'];
-export type CollectionPosition = components['schemas']['CollectionPositionOut'];
+export type CollectionPosition = components['schemas']['CollectionPositionOut'] & {
+  issueDate?: string | null;
+};
 export type CollectionPage = components['schemas']['Page_CollectionPositionOut_'];
 export type StorageLocation = components['schemas']['StorageLocationOut'];
 

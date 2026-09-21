@@ -33,6 +33,7 @@ export function fetchCollection(
     denominationId: filters.denominationIds,
     group: filters.groups,
     materialId: filters.materialIds,
+    metalKind: filters.metalKinds,
     grade: filters.grade,
     sort: filters.sort,
     order: filters.order,

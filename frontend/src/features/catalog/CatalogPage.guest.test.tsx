@@ -59,7 +59,7 @@ describe('public CatalogPage', () => {
     expect(fetchCatalog).toHaveBeenCalled();
     const filters = vi.mocked(fetchCatalog).mock.calls[0]![0];
     expect(filters.owned).toBeUndefined();
-    expect(filters.sort).toBe('title');
+    expect(filters.sort).toBe('year');
     expect(screen.queryByText('Наявність')).not.toBeInTheDocument();
   });
 });

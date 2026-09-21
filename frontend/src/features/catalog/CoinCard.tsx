@@ -10,6 +10,7 @@ import { coinMaterial, shortMaterial } from '@/shared/lib/coinMaterial';
 import { coinTitle, seriesLabel } from '@/shared/lib/coinTitle';
 import { formatUah } from '@/shared/lib/format';
 import { priceSourceLabel } from '@/shared/lib/priceSource';
+import { isRecentRelease } from '@/shared/lib/recentRelease';
 import { Badge, CoinImage } from '@/shared/ui';
 
 import { GuestAddButton } from './GuestAddButton';
@@ -75,6 +76,7 @@ export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinC
   const addUrl = `/collection/add?catalogItemId=${item.id}`;
   const addState = backTo ? { from: backTo } : undefined;
   const sourceLabel = priceSourceLabel(item.priceSource, t);
+  const recent = isRecentRelease(item.issueDate);
 
   return (
     <article
@@ -87,6 +89,11 @@ export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinC
           <CoinImages item={item} />
         </Link>
         <span className={styles.mediaBadges}>
+          {recent ? (
+            <span className={styles.newSticker}>
+              <Badge tone="success">{t('catalog.badgeNew')}</Badge>
+            </span>
+          ) : null}
           {review ? <Badge tone="warning">{t('admin.proposals.draft')}</Badge> : null}
           {item.isOwn ? <Badge tone="accent">{t('catalog.badgeOwn')}</Badge> : null}
           {item.isArchived ? <Badge tone="warning">{t('catalog.badgeArchived')}</Badge> : null}

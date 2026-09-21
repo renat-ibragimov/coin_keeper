@@ -26,7 +26,7 @@ from app.models import (
     Material,
     StorageLocation,
 )
-from app.models.enums import CollectionGroup, ExpenseCategory
+from app.models.enums import CollectionGroup, ExpenseCategory, MetalKind
 from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
 from app.repositories.localization import localized, series_display_name
 
@@ -42,10 +42,11 @@ class CollectionFilters:
     denomination_ids: list[int] | None = None
     groups: list[CollectionGroup] | None = None
     material_ids: list[int] | None = None
+    metal_kinds: list[MetalKind] | None = None
     grade: str | None = None
     # Every column of the "Мої монети" table sorts (docs/08-ui-map.md).
-    sort: str = "title"  # date | title | country | series | quantity | total | valuation | grade
-    order: str = "asc"
+    sort: str = "release"
+    order: str = "desc"
 
 
 @dataclass
@@ -125,6 +126,8 @@ class CollectionRepository:
             conditions.append(CatalogItem.collection_group.in_(filters.groups))
         if filters.material_ids:
             conditions.append(CatalogItem.composition_id.in_(filters.material_ids))
+        if filters.metal_kinds:
+            conditions.append(CatalogItem.metal_kind.in_(filters.metal_kinds))
         if filters.q:
             conditions.append(catalog_search_condition(filters.q))
         return conditions
@@ -171,6 +174,7 @@ class CollectionRepository:
         # sorts by what the reader sees.
         valuation = latest_price_uah_for(CatalogItem.id, self._owner_id) * agg.c.total_quantity
         sort_columns: dict[str, Any] = {
+            "release": CatalogItem.issue_date,
             "date": agg.c.last_acquisition_date,
             "title": localized(
                 self._locale,
@@ -197,8 +201,16 @@ class CollectionRepository:
             # what a column of "AU · XF" chips reads as.
             "grade": agg.c.grades,
         }
-        column = sort_columns.get(filters.sort, sort_columns["title"])
-        ordering = column.desc().nulls_last() if descending else column.asc().nulls_last()
+        column = sort_columns.get(filters.sort, sort_columns["release"])
+
+        def direction(value: Any) -> Any:
+            return value.desc().nulls_last() if descending else value.asc().nulls_last()
+
+        ordering = (
+            [direction(CatalogItem.issue_year), direction(CatalogItem.issue_date)]
+            if filters.sort == "release"
+            else [direction(column)]
+        )
 
         query = (
             select(
@@ -222,7 +234,7 @@ class CollectionRepository:
             .outerjoin(Denomination, Denomination.id == CatalogItem.denomination_id)
             .join(agg, true())
             .where(*conditions)
-            .order_by(ordering, CatalogItem.id)
+            .order_by(*ordering, CatalogItem.id)
             .limit(limit)
             .offset(offset)
         )

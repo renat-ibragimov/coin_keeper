@@ -231,6 +231,14 @@ export function CatalogPage() {
           apply({ materialIds: source.materialIds.filter((id) => id !== materialId) }),
       });
     }
+    for (const metalKind of source.metalKinds) {
+      chips.push({
+        key: `metal-kind-${metalKind}`,
+        label: t(metalKind === 'precious' ? 'catalog.metalPrecious' : 'catalog.metalBase'),
+        onRemove: () =>
+          apply({ metalKinds: source.metalKinds.filter((kind) => kind !== metalKind) }),
+      });
+    }
     if (source.owned !== undefined) {
       chips.push({
         key: 'owned',

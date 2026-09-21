@@ -33,6 +33,7 @@ export function fetchCatalog(
     denominationId: filters.denominationIds,
     group: filters.groups,
     materialId: filters.materialIds,
+    metalKind: filters.metalKinds,
     owned: filters.owned,
     scope: filters.scope === 'all' ? undefined : filters.scope,
     archived: filters.archived ? true : undefined,

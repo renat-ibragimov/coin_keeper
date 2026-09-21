@@ -91,6 +91,7 @@ const POSITION: CollectionPosition = {
   collectionGroup: 'commemorative',
   denomination: '2 ₴',
   year: 2018,
+  issueDate: null,
   isArchived: false,
   archiveReason: null,
   totalQuantity: 2,

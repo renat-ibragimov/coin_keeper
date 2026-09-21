@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
-import type { CollectionGroup } from '@/shared/api/types';
+import type { CollectionGroup, MetalKind } from '@/shared/api/types';
 
 // Every column of the table sorts, and the toolbar offers the same list
 // (docs/08-ui-map.md); the order here is the order of the columns.
 export const COLLECTION_SORTS = [
+  'release',
   'title',
   'country',
   'series',
@@ -27,6 +28,7 @@ export interface CollectionFilters {
   denominationIds: number[];
   groups: CollectionGroup[];
   materialIds: number[];
+  metalKinds: MetalKind[];
   grade?: string;
   sort: CollectionSort;
   order: 'asc' | 'desc';
@@ -35,6 +37,7 @@ export interface CollectionFilters {
 }
 
 const GROUPS: CollectionGroup[] = ['circulation', 'commemorative', 'collector', 'other'];
+const METAL_KINDS: MetalKind[] = ['precious', 'base'];
 
 function intParam(params: URLSearchParams, key: string): number | undefined {
   const raw = params.get(key);
@@ -63,6 +66,12 @@ function groupListParam(params: URLSearchParams, key: string): CollectionGroup[]
   return [...seen];
 }
 
+function metalKindListParam(params: URLSearchParams): MetalKind[] {
+  return params
+    .getAll('metalKind')
+    .filter((value): value is MetalKind => METAL_KINDS.includes(value as MetalKind));
+}
+
 /** The URL is the state (same rule as the catalog): F5 and shared links restore the listing. */
 export function parseCollectionFilters(params: URLSearchParams): CollectionFilters {
   const sort = params.get('sort');
@@ -77,9 +86,10 @@ export function parseCollectionFilters(params: URLSearchParams): CollectionFilte
     denominationIds: intListParam(params, 'denominationId'),
     groups: groupListParam(params, 'group'),
     materialIds: intListParam(params, 'materialId'),
+    metalKinds: metalKindListParam(params),
     grade: grade || undefined,
-    sort: COLLECTION_SORTS.includes(sort as CollectionSort) ? (sort as CollectionSort) : 'title',
-    order: params.get('order') === 'desc' ? 'desc' : 'asc',
+    sort: COLLECTION_SORTS.includes(sort as CollectionSort) ? (sort as CollectionSort) : 'release',
+    order: params.get('order') === 'asc' ? 'asc' : 'desc',
     page: intParam(params, 'page') ?? 1,
     view: view === 'table' ? 'table' : 'cards',
   };
@@ -102,9 +112,10 @@ export function serializeCollectionFilters(filters: CollectionFilters): URLSearc
   setList('denominationId', filters.denominationIds);
   setList('group', filters.groups);
   setList('materialId', filters.materialIds);
+  setList('metalKind', filters.metalKinds);
   setIf('grade', filters.grade);
-  if (filters.sort !== 'title') params.set('sort', filters.sort);
-  if (filters.order !== 'asc') params.set('order', filters.order);
+  if (filters.sort !== 'release') params.set('sort', filters.sort);
+  if (filters.order !== 'desc') params.set('order', filters.order);
   if (filters.page > 1) params.set('page', String(filters.page));
   if (filters.view !== 'cards') params.set('view', filters.view);
   return params;
@@ -120,6 +131,7 @@ export function hasActiveFilters(filters: CollectionFilters): boolean {
     filters.denominationIds.length > 0 ||
     filters.groups.length > 0 ||
     filters.materialIds.length > 0 ||
+    filters.metalKinds.length > 0 ||
     filters.grade,
   );
 }

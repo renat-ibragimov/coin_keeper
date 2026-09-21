@@ -57,6 +57,7 @@ const EMPTY_FILTERS = parseCollectionFilters(new URLSearchParams());
 const GRID_PAGE_SIZE = 30;
 
 const SORT_LABELS: Record<CollectionSort, string> = {
+  release: 'catalog.sortYear',
   title: 'collection.sortTitle',
   country: 'catalog.sortCountry',
   series: 'catalog.sortSeries',
@@ -220,6 +221,14 @@ export function CollectionPage() {
         label: material.name,
         onRemove: () =>
           apply({ materialIds: source.materialIds.filter((id) => id !== materialId) }),
+      });
+    }
+    for (const metalKind of source.metalKinds) {
+      chips.push({
+        key: `metal-kind-${metalKind}`,
+        label: t(metalKind === 'precious' ? 'catalog.metalPrecious' : 'catalog.metalBase'),
+        onRemove: () =>
+          apply({ metalKinds: source.metalKinds.filter((kind) => kind !== metalKind) }),
       });
     }
     if (source.grade) {

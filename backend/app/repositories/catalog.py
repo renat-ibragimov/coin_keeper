@@ -52,7 +52,7 @@ from app.models import (
     PriceSourceLink,
     QualityType,
 )
-from app.models.enums import CollectionGroup
+from app.models.enums import CollectionGroup, MetalKind
 from app.repositories.localization import localized, series_display_name
 
 
@@ -67,11 +67,12 @@ class CatalogFilters:
     denomination_ids: list[int] | None = None
     groups: list[CollectionGroup] | None = None
     material_ids: list[int] | None = None
+    metal_kinds: list[MetalKind] | None = None
     owned: bool | None = None
     scope: str = "all"  # all | shared | own
     archived: bool = False
-    sort: str = "title"
-    order: str = "asc"
+    sort: str = "year"
+    order: str = "desc"
     # Set by CatalogService from the viewer's settings, not a client filter.
     show_packaging_variants: bool = True
 
@@ -359,6 +360,8 @@ class CatalogRepository:
             conditions.append(CatalogItem.collection_group.in_(filters.groups))
         if filters.material_ids:
             conditions.append(CatalogItem.composition_id.in_(filters.material_ids))
+        if filters.metal_kinds:
+            conditions.append(CatalogItem.metal_kind.in_(filters.metal_kinds))
         if filters.owned is True:
             conditions.append(self._own_instance_exists())
         elif filters.owned is False:
@@ -497,7 +500,7 @@ class CatalogRepository:
             "title": [_display_title(self._locale)],
             "country": [self._country_name()],
             "series": [self._series_name()],
-            "year": [CatalogItem.issue_year],
+            "year": [CatalogItem.issue_year, CatalogItem.issue_date],
             "denomination": [Denomination.sort_order, Denomination.value],
             "material": [self._material_name()],
             "owned": [owned.c.quantity_owned],

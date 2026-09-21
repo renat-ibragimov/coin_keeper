@@ -37,6 +37,7 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
     },
     denominationText: null,
     year: 2021,
+    issueDate: null,
     title: 'Sikorsky',
     titleOriginal: 'Ihor Sikorsky',
     originalLang: 'uk',
@@ -73,6 +74,14 @@ describe('CoinCard', () => {
     render(<CoinCard item={makeItem({ titleUk: 'Сікорський', title: 'Sikorsky' })} />);
     const heading = screen.getByRole('heading', { name: 'Сікорський' });
     expect(within(heading).getByRole('link')).toHaveAttribute('href', '/catalog/1');
+  });
+
+  it('marks a coin released within the last 30 days as new', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-21T12:00:00Z'));
+    render(<CoinCard item={makeItem({ issueDate: '2026-09-01' })} />);
+    expect(screen.getByText('Нова')).toBeInTheDocument();
+    vi.useRealTimers();
   });
 });
 

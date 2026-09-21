@@ -17,7 +17,7 @@ from app.api.deps import (
 from app.api.errors import ProblemError
 from app.api.public_rate_limit import enforce_public_read
 from app.core import rate_limit
-from app.models.enums import CollectionGroup
+from app.models.enums import CollectionGroup, MetalKind
 from app.repositories.catalog import CatalogFilters
 from app.schemas.catalog import (
     ArchiveRequest,
@@ -85,11 +85,12 @@ async def list_catalog(
     denomination_id: Annotated[list[int] | None, Query(alias="denominationId")] = None,
     group: Annotated[list[CollectionGroup] | None, Query()] = None,
     material_id: Annotated[list[int] | None, Query(alias="materialId")] = None,
+    metal_kind: Annotated[list[MetalKind] | None, Query(alias="metalKind")] = None,
     owned: Annotated[bool | None, Query()] = None,
     scope: Annotated[Literal["all", "shared", "own"], Query()] = "all",
     archived: Annotated[bool, Query()] = False,
-    sort: Annotated[SortField, Query()] = "title",
-    order: Annotated[Literal["asc", "desc"], Query()] = "asc",
+    sort: Annotated[SortField, Query()] = "year",
+    order: Annotated[Literal["asc", "desc"], Query()] = "desc",
 ) -> Page[CatalogListItem] | Page[PublicCatalogListItem]:
     if user is None and (
         owned is not None
@@ -116,6 +117,7 @@ async def list_catalog(
         denomination_ids=denomination_id,
         groups=group,
         material_ids=material_id,
+        metal_kinds=metal_kind,
         owned=owned,
         scope=scope,
         archived=archived,

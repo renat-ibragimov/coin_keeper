@@ -159,6 +159,12 @@
   gap: var(--space-1);
 }
 
+.newSticker {
+  display: inline-flex;
+  transform: rotate(-4deg);
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 18%));
+}
+
 .body {
   padding: var(--space-3) var(--space-4);
   display: flex;

@@ -425,6 +425,7 @@ class CollectionService:
             collection_group=item.collection_group,
             denomination=_denomination_label(row.denomination, item, self._locale),
             year=item.issue_year,
+            issue_date=item.issue_date,
             is_archived=item.is_archived,
             archive_reason=item.archive_reason,
             total_quantity=row.total_quantity,

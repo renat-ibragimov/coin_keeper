@@ -80,6 +80,10 @@ export function FiltersPanel({
     { value: 'collector', label: t('catalog.typeCollector') },
     { value: 'other', label: t('catalog.typeOther') },
   ];
+  const metalKindOptions: MultiSelectOption[] = [
+    { value: 'precious', label: t('catalog.metalPrecious') },
+    { value: 'base', label: t('catalog.metalBase') },
+  ];
 
   return (
     <FiltersShell activeFilters={activeFilters} onReset={reset}>
@@ -187,6 +191,17 @@ export function FiltersPanel({
           options={materials.map((m) => ({ value: String(m.id), label: m.name }))}
           value={filters.materialIds.map(String)}
           onChange={(raw) => update({ materialIds: intValues(raw) })}
+        />
+      </div>
+
+      <div className={styles.compactField}>
+        <MultiSelect
+          label={t('catalog.metalKind')}
+          centerLabel
+          placeholder={t('catalog.all')}
+          options={metalKindOptions}
+          value={filters.metalKinds}
+          onChange={(raw) => update({ metalKinds: raw as CatalogFilters['metalKinds'] })}
         />
       </div>
 
