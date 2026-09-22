@@ -1,5 +1,5 @@
 import { api, toQuery } from '@/shared/api/client';
-import { periodToYearRange } from '@/shared/lib/periodFilter';
+import { periodToApiParams } from '@/shared/lib/periodFilter';
 import type {
   CatalogCard,
   CatalogCollectionItem,
@@ -23,7 +23,7 @@ export function fetchCatalog(
   filters: CatalogFilters,
   pageSize: number = PAGE_SIZE,
 ): Promise<CatalogPage> {
-  const { yearFrom, yearTo } = periodToYearRange(filters.period);
+  const { yearFrom, yearTo, dateFrom, dateTo } = periodToApiParams(filters.period);
   const query = toQuery({
     page: filters.page,
     pageSize,
@@ -32,6 +32,8 @@ export function fetchCatalog(
     seriesId: filters.seriesIds,
     yearFrom,
     yearTo,
+    dateFrom,
+    dateTo,
     denominationId: filters.denominationIds,
     group: filters.groups,
     materialId: filters.materialIds,

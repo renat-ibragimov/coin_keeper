@@ -24,6 +24,7 @@ from app.repositories.catalog import (
     CatalogRow,
     _display_title,
     catalog_search_condition,
+    issue_date_range_condition,
 )
 from app.repositories.localization import localized, series_display_name
 
@@ -58,6 +59,9 @@ class PublicCatalogRepository:
             conditions.append(CatalogItem.issue_year >= filters.year_from)
         if filters.year_to is not None:
             conditions.append(CatalogItem.issue_year <= filters.year_to)
+        date_condition = issue_date_range_condition(filters.date_from, filters.date_to)
+        if date_condition is not None:
+            conditions.append(date_condition)
         if not filters.show_packaging_variants:
             conditions.append(CatalogItem.packaging_of_id.is_(None))
         return conditions

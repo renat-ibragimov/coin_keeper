@@ -27,7 +27,11 @@ from app.models import (
     StorageLocation,
 )
 from app.models.enums import CollectionGroup, ExpenseCategory, MetalKind
-from app.repositories.catalog import catalog_search_condition, latest_price_uah_for
+from app.repositories.catalog import (
+    catalog_search_condition,
+    issue_date_range_condition,
+    latest_price_uah_for,
+)
 from app.repositories.localization import localized, series_display_name
 
 
@@ -39,6 +43,8 @@ class CollectionFilters:
     year: int | None = None
     year_from: int | None = None
     year_to: int | None = None
+    date_from: date | None = None
+    date_to: date | None = None
     denomination_ids: list[int] | None = None
     groups: list[CollectionGroup] | None = None
     material_ids: list[int] | None = None
@@ -120,6 +126,9 @@ class CollectionRepository:
             conditions.append(CatalogItem.issue_year >= filters.year_from)
         if filters.year_to is not None:
             conditions.append(CatalogItem.issue_year <= filters.year_to)
+        date_condition = issue_date_range_condition(filters.date_from, filters.date_to)
+        if date_condition is not None:
+            conditions.append(date_condition)
         if filters.denomination_ids:
             conditions.append(CatalogItem.denomination_id.in_(filters.denomination_ids))
         if filters.groups:

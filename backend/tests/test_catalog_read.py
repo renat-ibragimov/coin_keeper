@@ -244,6 +244,48 @@ async def test_filters(client: AsyncClient, db_session: AsyncSession, ctx: Simpl
     assert owned_b.json()["total"] == 0
 
 
+async def test_date_range_filter(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """`dateFrom`/`dateTo` narrow by `issue_date`, falling back to `issue_year`
+    when a coin only has the year (docs/03-api-contract.md, docs/02-data-model.md).
+    """
+    refs = ctx.refs
+    exact_date_in_range = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Точна дата в межах",
+        # A year well outside the query range, on purpose: only the exact
+        # `issue_date` should be what puts this one in the result.
+        year=1900,
+        issue_date=date(2018, 6, 15),
+    )
+    exact_date_out_of_range = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Точна дата поза межами",
+        year=2018,
+        issue_date=date(2018, 1, 1),
+    )
+    year_only_in_range = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Лише рік, в межах", year=2018
+    )
+    year_only_out_of_range = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Лише рік, поза межами", year=2015
+    )
+
+    headers = auth(ctx.token_a)
+    resp = await client.get(
+        "/api/v1/catalog?dateFrom=2018-06-01&dateTo=2018-12-31", headers=headers
+    )
+    ids = {i["id"] for i in resp.json()["items"]}
+
+    assert exact_date_in_range.id in ids
+    assert year_only_in_range.id in ids
+    assert exact_date_out_of_range.id not in ids
+    assert year_only_out_of_range.id not in ids
+
+
 async def test_search(client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace) -> None:
     refs = ctx.refs
     dolphin = await make_catalog_item(

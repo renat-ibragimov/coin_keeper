@@ -18,7 +18,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -64,6 +64,8 @@ class CatalogFilters:
     year: int | None = None
     year_from: int | None = None
     year_to: int | None = None
+    date_from: date | None = None
+    date_to: date | None = None
     denomination_ids: list[int] | None = None
     groups: list[CollectionGroup] | None = None
     material_ids: list[int] | None = None
@@ -279,6 +281,29 @@ def catalog_search_condition(q: str) -> ColumnElement[bool]:
     return or_(*alternatives)
 
 
+def issue_date_range_condition(
+    date_from: date | None, date_to: date | None
+) -> ColumnElement[bool] | None:
+    """`issue_date` within [date_from, date_to], or NULL with `issue_year`
+    inside the same range's years — a coin whose exact issue date isn't
+    recorded still matches a date-range filter by year (docs/03-api-contract.md,
+    docs/02-data-model.md: `issue_date` nullable, `issue_year` NOT NULL).
+    `None` when neither bound is set, so callers can skip it like any other
+    absent filter.
+    """
+    if date_from is None and date_to is None:
+        return None
+    exact_date: list[ColumnElement[bool]] = [CatalogItem.issue_date.is_not(None)]
+    year_fallback: list[ColumnElement[bool]] = [CatalogItem.issue_date.is_(None)]
+    if date_from is not None:
+        exact_date.append(CatalogItem.issue_date >= date_from)
+        year_fallback.append(CatalogItem.issue_year >= date_from.year)
+    if date_to is not None:
+        exact_date.append(CatalogItem.issue_date <= date_to)
+        year_fallback.append(CatalogItem.issue_year <= date_to.year)
+    return or_(and_(*exact_date), and_(*year_fallback))
+
+
 class CatalogRepository:
     def __init__(
         self,
@@ -354,6 +379,9 @@ class CatalogRepository:
             conditions.append(CatalogItem.issue_year >= filters.year_from)
         if filters.year_to is not None:
             conditions.append(CatalogItem.issue_year <= filters.year_to)
+        date_condition = issue_date_range_condition(filters.date_from, filters.date_to)
+        if date_condition is not None:
+            conditions.append(date_condition)
         if filters.denomination_ids:
             conditions.append(CatalogItem.denomination_id.in_(filters.denomination_ids))
         if filters.groups:

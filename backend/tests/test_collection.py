@@ -427,6 +427,54 @@ async def test_listing_filters_and_sorting(
     assert await titles("valuation", "asc") == ["Lincoln cent", "Дельфін"]
 
 
+async def test_date_range_filter(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """`dateFrom`/`dateTo` narrow by `issue_date`, falling back to `issue_year`
+    when a position's coin only has the year (docs/03-api-contract.md,
+    docs/02-data-model.md) — the same rule `GET /catalog` follows.
+    """
+    refs = ctx.refs
+    exact_date_in_range = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Точна дата в межах",
+        year=1900,
+        issue_date=date(2018, 6, 15),
+    )
+    exact_date_out_of_range = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Точна дата поза межами",
+        year=2018,
+        issue_date=date(2018, 1, 1),
+    )
+    year_only_in_range = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Лише рік, в межах", year=2018
+    )
+    year_only_out_of_range = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Лише рік, поза межами", year=2015
+    )
+    for item in (
+        exact_date_in_range,
+        exact_date_out_of_range,
+        year_only_in_range,
+        year_only_out_of_range,
+    ):
+        await add_collection_item(db_session, owner_id=ctx.id_a, item=item, price="100")
+
+    headers = auth(ctx.token_a)
+    resp = await client.get(
+        "/api/v1/collection?dateFrom=2018-06-01&dateTo=2018-12-31", headers=headers
+    )
+    titles = {row["title"] for row in resp.json()["items"]}
+
+    assert "Точна дата в межах" in titles
+    assert "Лише рік, в межах" in titles
+    assert "Точна дата поза межами" not in titles
+    assert "Лише рік, поза межами" not in titles
+
+
 async def test_get_single_instance_is_owner_only(client: AsyncClient, ctx: SimpleNamespace) -> None:
     created = await client.post(
         "/api/v1/collection",

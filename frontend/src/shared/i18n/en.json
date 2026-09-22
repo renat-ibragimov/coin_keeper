@@ -163,6 +163,7 @@
     "periodClear": "Clear",
     "periodPickFrom": "Pick the start date",
     "periodPickTo": "Pick the end date",
+    "periodChipDates": "Dates",
     "yearFrom": "from",
     "yearTo": "to",
     "denomination": "Denomination",

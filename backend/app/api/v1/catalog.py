@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, status
@@ -82,6 +83,8 @@ async def list_catalog(
     year: Annotated[int | None, Query()] = None,
     year_from: Annotated[int | None, Query(alias="yearFrom")] = None,
     year_to: Annotated[int | None, Query(alias="yearTo")] = None,
+    date_from: Annotated[date | None, Query(alias="dateFrom")] = None,
+    date_to: Annotated[date | None, Query(alias="dateTo")] = None,
     denomination_id: Annotated[list[int] | None, Query(alias="denominationId")] = None,
     group: Annotated[list[CollectionGroup] | None, Query()] = None,
     material_id: Annotated[list[int] | None, Query(alias="materialId")] = None,
@@ -114,6 +117,8 @@ async def list_catalog(
         year=year,
         year_from=year_from,
         year_to=year_to,
+        date_from=date_from,
+        date_to=date_to,
         denomination_ids=denomination_id,
         groups=group,
         material_ids=material_id,

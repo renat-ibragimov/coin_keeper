@@ -214,10 +214,13 @@ query-строка сохраняется, поэтому старая ссыл�
   `period: { mode; year?; yearFrom?; yearTo?; dateFrom?; dateTo? }` (`shared/lib/periodFilter.ts`)
   вместо двух отдельных `yearFrom`/`yearTo`; в URL те же ключи, что были, плюс
   `year`/`dateFrom`/`dateTo` и необязательный `periodMode` (пишется только когда режим не «діапазон
-  років» — старые расшаренные ссылки с одними `yearFrom`/`yearTo` читаются как раньше). **Режим
-  «Діапазон дат» пока не сужает выдачу** — API понимает только `yearFrom`/`yearTo` по `issue_year`;
-  `dateFrom`/`dateTo` только в UI и URL до бэкенд-задачи под `issue_date` с фолбэком на `issue_year`
-  (`docs/02-data-model.md`, `catalog_items.issue_date`).
+  років» — старые расшаренные ссылки с одними `yearFrom`/`yearTo` читаются как раньше). Режим
+  «Діапазон дат» фильтрует по `issue_date` с фолбэком на `issue_year`, когда точная дата не
+  указана — `issue_date_range_condition()` (`backend/app/repositories/catalog.py`, переиспользуется
+  `collection.py`), маппинг режима на query-параметры — `periodToApiParams()`
+  (`shared/lib/periodFilter.ts`), а не мимо-режимный `period.dateFrom`/`dateTo` напрямую: значения
+  неактивных режимов не обнуляются при переключении (выше), и наивное чтение утекло бы в запрос
+  даже когда активен «Рік»/«Діапазон років» (`docs/03-api-contract.md`).
 - **Календарь диапазона дат — `react-day-picker` (10.0.1), первая внешняя UI-зависимость в
   проекте** (решение владельца 2026-09-22, после `<input type="date">`: нативный календарь и
   плейсхолдер берут язык из браузера/ОС, а не из переключателя `uk`/`en` — ни `lang` на элементе,

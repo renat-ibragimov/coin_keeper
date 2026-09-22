@@ -179,6 +179,8 @@ GET /catalog
   &countryId
   &seriesId
   &year, yearFrom, yearTo
+  &dateFrom, dateTo — диапазон issue_date (ISO-дата); монета без issue_date всё равно
+                      попадает в выдачу, если её issue_year — в границах лет dateFrom..dateTo
   &denominationId
   &group           — circulation | commemorative | collector | other
   &metalKind       — precious | base | unknown
@@ -417,8 +419,8 @@ DELETE /catalog/{id}
 ## Коллекция
 
 ```
-GET    /collection?page&pageSize&countryId&seriesId&year&yearFrom&yearTo&denominationId
-                   &group&metalKind&grade&q&sort&order
+GET    /collection?page&pageSize&countryId&seriesId&year&yearFrom&yearTo&dateFrom&dateTo
+                   &denominationId&group&metalKind&grade&q&sort&order
 GET    /collection/{id}
 POST   /collection    {catalogItemId, quantity, price, currency, purchaseDate, seller?, notes?, grade?}
 PATCH  /collection/{id}
@@ -435,8 +437,11 @@ DELETE /collection/{id}
 только через `GET/PATCH/DELETE /collection/{id}` (id покупки, `CollectionItem`) и
 `GET /catalog/{id}/collection-items` («Мої екземпляри» на карточке монеты).
 
-Фильтры `countryId`, `seriesId`, `year`, `yearFrom`, `yearTo`, `denominationId`, `group`,
-`metalKind`, `q` — зеркально `GET /catalog`, работают по атрибутам каталожной монеты.
+Фильтры `countryId`, `seriesId`, `year`, `yearFrom`, `yearTo`, `dateFrom`, `dateTo`,
+`denominationId`, `group`, `metalKind`, `q` — зеркально `GET /catalog`, работают по
+атрибутам каталожной монеты. `dateFrom`/`dateTo` фильтруют по `issue_date`, а не по
+`acquisition_date` покупки (у последней своего фильтра пока нет) — с тем же фолбэком
+на `issue_year`, что у `GET /catalog`, когда точная дата выпуска не указана.
 `grade` — свой для коллекции: позиция попадает в выдачу, если **хотя бы одна** её покупка
 имеет такой стан; агрегаты при этом считаются по **всем** покупкам позиции, не только по
 совпавшей — грейд-фильтр показывает позицию целиком, а не отфильтрованный кусок.

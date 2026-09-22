@@ -194,7 +194,7 @@ export function CollectionPage() {
     if (period.year !== undefined) {
       chips.push({
         key: 'period',
-        label: `${t('catalog.years')}: ${period.year}`,
+        label: `${t('catalog.periodModeYear')}: ${period.year}`,
         onRemove: () => apply({ period: { mode: period.mode } }),
       });
     } else if (period.yearFrom !== undefined || period.yearTo !== undefined) {
@@ -208,7 +208,7 @@ export function CollectionPage() {
       const to = formatPeriodDateForDisplay(period.dateTo, i18n.language) ?? '…';
       chips.push({
         key: 'period',
-        label: `${t('catalog.years')}: ${from}–${to}`,
+        label: `${t('catalog.periodChipDates')}: ${from}–${to}`,
         onRemove: () => apply({ period: { mode: period.mode } }),
       });
     }

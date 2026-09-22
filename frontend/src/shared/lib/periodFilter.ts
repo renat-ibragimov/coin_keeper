@@ -61,17 +61,39 @@ export function serializePeriod(params: URLSearchParams, period: PeriodFilterVal
 }
 
 /**
- * The `issue_year` range the API currently understands: an exact year
- * collapses to a one-year range, and the date-range mode has no backend
- * support yet, so it narrows nothing until that lands.
+ * The query parameters the API understands for narrowing by period: an
+ * exact year collapses to a one-year `yearFrom`/`yearTo`, "year range" sends
+ * them as-is, and "date range" sends `dateFrom`/`dateTo` instead — narrowing
+ * by `issue_date` with a fallback to `issue_year` when a coin only has the
+ * year (docs/03-api-contract.md). One function, not one per mode: a caller
+ * that read `dateFrom`/`dateTo` straight off `period` would leak a stale
+ * date range into the request even while mode is "year" — switching modes
+ * keeps the other modes' own values around instead of clearing them
+ * (`PeriodFilter.tsx`), which is exactly what a mode-blind read would trip on.
  */
-export function periodToYearRange(period: PeriodFilterValue): {
+export function periodToApiParams(period: PeriodFilterValue): {
   yearFrom: number | undefined;
   yearTo: number | undefined;
+  dateFrom: string | undefined;
+  dateTo: string | undefined;
 } {
-  if (period.mode === 'year') return { yearFrom: period.year, yearTo: period.year };
-  if (period.mode === 'yearRange') return { yearFrom: period.yearFrom, yearTo: period.yearTo };
-  return { yearFrom: undefined, yearTo: undefined };
+  if (period.mode === 'year') {
+    return { yearFrom: period.year, yearTo: period.year, dateFrom: undefined, dateTo: undefined };
+  }
+  if (period.mode === 'yearRange') {
+    return {
+      yearFrom: period.yearFrom,
+      yearTo: period.yearTo,
+      dateFrom: undefined,
+      dateTo: undefined,
+    };
+  }
+  return {
+    yearFrom: undefined,
+    yearTo: undefined,
+    dateFrom: period.dateFrom,
+    dateTo: period.dateTo,
+  };
 }
 
 export function hasPeriodValue(period: PeriodFilterValue): boolean {
