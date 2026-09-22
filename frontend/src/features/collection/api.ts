@@ -1,4 +1,5 @@
 import { api, toQuery } from '@/shared/api/client';
+import { periodToYearRange } from '@/shared/lib/periodFilter';
 import type {
   CoinMaterial,
   CollectionItem,
@@ -22,14 +23,15 @@ export function fetchCollection(
   filters: CollectionFilters,
   pageSize: number = PAGE_SIZE,
 ): Promise<CollectionPage> {
+  const { yearFrom, yearTo } = periodToYearRange(filters.period);
   const query = toQuery({
     page: filters.page,
     pageSize,
     q: filters.q,
     countryId: filters.countryIds,
     seriesId: filters.seriesIds,
-    yearFrom: filters.yearFrom,
-    yearTo: filters.yearTo,
+    yearFrom,
+    yearTo,
     denominationId: filters.denominationIds,
     group: filters.groups,
     materialId: filters.materialIds,

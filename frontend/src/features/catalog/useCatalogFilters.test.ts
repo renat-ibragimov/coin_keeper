@@ -33,8 +33,7 @@ describe('catalog filters ↔ URL', () => {
     expect(filters).toMatchObject({
       q: 'dolphin',
       countryIds: [2, 3],
-      yearFrom: 2010,
-      yearTo: 2020,
+      period: { mode: 'yearRange', yearFrom: 2010, yearTo: 2020 },
       denominationIds: [5],
       groups: ['commemorative', 'other'],
       materialIds: [7, 8],

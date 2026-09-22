@@ -20,6 +20,7 @@ export { ConfirmDialog, Modal } from './Modal';
 export { PageHeader } from './PageHeader';
 export { pageItems } from './pageItems';
 export { Pagination } from './Pagination';
+export { PeriodFilter } from './PeriodFilter';
 export { ProgressRing } from './ProgressRing';
 export { PropertyList } from './PropertyList';
 export type { PropertyRow } from './PropertyList';

@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CoinMaterial, CountryOut, DenominationOut, SeriesOut } from '@/shared/api/types';
-import { buildYearList, clampYear, computeYearBounds } from '@/shared/lib/yearRange';
+import { buildYearList, clampPeriod, computeYearBounds } from '@/shared/lib/yearRange';
 import type { ActiveFilterChip, MultiSelectOption } from '@/shared/ui';
-import { Combobox, FiltersShell, Input, MultiSelect, Select } from '@/shared/ui';
+import { FiltersShell, Input, MultiSelect, PeriodFilter, Select } from '@/shared/ui';
 
 import type { CatalogFilters } from './useCatalogFilters';
 import styles from './FiltersPanel.module.css';
@@ -53,24 +53,20 @@ export function FiltersPanel({
     return () => clearTimeout(timer);
   }, [search, filters.q, update]);
 
-  const numberOrUndefined = (raw: string) => {
-    const value = Number.parseInt(raw, 10);
-    return Number.isFinite(value) && value > 0 ? value : undefined;
-  };
-
-  // Bounds for the year fields' suggestion lists: the union of the selected
+  // Bounds for the period fields' suggestion lists: the union of the selected
   // countries' own range, or the whole loaded catalog directory when none is
-  // selected (docs/03). Each field additionally narrows against the other's
-  // current value, so "до" never suggests a year before "від" and vice
-  // versa. Both fields stay free-text inputs — the list is a suggestion, not
-  // a constraint (docs/08-ui-map.md).
+  // selected (docs/03). In "year range" mode each field additionally narrows
+  // against the other's current value, so "до" never suggests a year before
+  // "від" and vice versa. All year fields stay free-text inputs — the list
+  // is a suggestion, not a constraint (docs/08-ui-map.md).
   const yearBounds = computeYearBounds(countries, filters.countryIds);
+  const yearList = buildYearList(yearBounds);
   const yearFromList = buildYearList({
     min: yearBounds.min,
-    max: filters.yearTo ?? yearBounds.max,
+    max: filters.period.yearTo ?? yearBounds.max,
   });
   const yearToList = buildYearList({
-    min: filters.yearFrom ?? yearBounds.min,
+    min: filters.period.yearFrom ?? yearBounds.min,
     max: yearBounds.max,
   });
 
@@ -115,8 +111,7 @@ export function FiltersPanel({
               denominationIds: [],
               materialIds: [],
               // Out-of-range years follow the country instead of silently clearing.
-              yearFrom: clampYear(filters.yearFrom, newBounds),
-              yearTo: clampYear(filters.yearTo, newBounds),
+              period: clampPeriod(filters.period, newBounds),
             });
           }}
         />
@@ -136,30 +131,13 @@ export function FiltersPanel({
         />
       </div>
 
-      <div className={styles.yearField}>
-        <div className={styles.groupTitle}>{t('catalog.years')}</div>
-        <div className={styles.yearRow}>
-          <Combobox
-            inputMode="numeric"
-            options={yearFromList.map(String)}
-            placeholder={t('catalog.yearFrom')}
-            value={filters.yearFrom !== undefined ? String(filters.yearFrom) : ''}
-            onChange={(event) => update({ yearFrom: numberOrUndefined(event.target.value) })}
-            aria-label={t('catalog.yearFrom')}
-            className={styles.yearInput}
-          />
-          <span className={styles.yearDash}>—</span>
-          <Combobox
-            inputMode="numeric"
-            options={yearToList.map(String)}
-            placeholder={t('catalog.yearTo')}
-            value={filters.yearTo !== undefined ? String(filters.yearTo) : ''}
-            onChange={(event) => update({ yearTo: numberOrUndefined(event.target.value) })}
-            aria-label={t('catalog.yearTo')}
-            className={styles.yearInput}
-          />
-        </div>
-      </div>
+      <PeriodFilter
+        value={filters.period}
+        onChange={(period) => update({ period })}
+        yearOptions={yearList.map(String)}
+        yearFromOptions={yearFromList.map(String)}
+        yearToOptions={yearToList.map(String)}
+      />
 
       <div className={styles.field}>
         <MultiSelect

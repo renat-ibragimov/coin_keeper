@@ -1,5 +1,7 @@
 import type { CountryOut } from '@/shared/api/types';
 
+import type { PeriodFilterValue } from './periodFilter';
+
 export interface YearBounds {
   min: number;
   max: number;
@@ -46,4 +48,21 @@ export function clampYear(value: number | undefined, bounds: YearBounds): number
   if (value < bounds.min) return bounds.min;
   if (value > bounds.max) return bounds.max;
   return value;
+}
+
+/** Follows a country selection change the same way `clampYear` always did,
+ *  for whichever field the period's active mode actually uses. The date
+ *  range mode is left alone — `bounds` is in years, not calendar dates. */
+export function clampPeriod(period: PeriodFilterValue, bounds: YearBounds): PeriodFilterValue {
+  if (period.mode === 'year') {
+    return { ...period, year: clampYear(period.year, bounds) };
+  }
+  if (period.mode === 'yearRange') {
+    return {
+      ...period,
+      yearFrom: clampYear(period.yearFrom, bounds),
+      yearTo: clampYear(period.yearTo, bounds),
+    };
+  }
+  return period;
 }

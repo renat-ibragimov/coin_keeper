@@ -2,6 +2,8 @@ import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import type { CollectionGroup, MetalKind } from '@/shared/api/types';
+import type { PeriodFilterValue } from '@/shared/lib/periodFilter';
+import { hasPeriodValue, parsePeriod, serializePeriod } from '@/shared/lib/periodFilter';
 
 // Every column of the table sorts, and the toolbar offers the same list
 // (docs/08-ui-map.md); the order here is the order of the columns.
@@ -23,8 +25,7 @@ export interface CollectionFilters {
   q: string;
   countryIds: number[];
   seriesIds: number[];
-  yearFrom?: number;
-  yearTo?: number;
+  period: PeriodFilterValue;
   denominationIds: number[];
   groups: CollectionGroup[];
   materialIds: number[];
@@ -81,8 +82,7 @@ export function parseCollectionFilters(params: URLSearchParams): CollectionFilte
     q: params.get('q') ?? '',
     countryIds: intListParam(params, 'countryId'),
     seriesIds: intListParam(params, 'seriesId'),
-    yearFrom: intParam(params, 'yearFrom'),
-    yearTo: intParam(params, 'yearTo'),
+    period: parsePeriod(params),
     denominationIds: intListParam(params, 'denominationId'),
     groups: groupListParam(params, 'group'),
     materialIds: intListParam(params, 'materialId'),
@@ -107,8 +107,7 @@ export function serializeCollectionFilters(filters: CollectionFilters): URLSearc
   setIf('q', filters.q);
   setList('countryId', filters.countryIds);
   setList('seriesId', filters.seriesIds);
-  setIf('yearFrom', filters.yearFrom);
-  setIf('yearTo', filters.yearTo);
+  serializePeriod(params, filters.period);
   setList('denominationId', filters.denominationIds);
   setList('group', filters.groups);
   setList('materialId', filters.materialIds);
@@ -126,8 +125,7 @@ export function hasActiveFilters(filters: CollectionFilters): boolean {
     filters.q ||
     filters.countryIds.length > 0 ||
     filters.seriesIds.length > 0 ||
-    filters.yearFrom ||
-    filters.yearTo ||
+    hasPeriodValue(filters.period) ||
     filters.denominationIds.length > 0 ||
     filters.groups.length > 0 ||
     filters.materialIds.length > 0 ||

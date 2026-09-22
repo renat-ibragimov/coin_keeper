@@ -2,6 +2,8 @@ import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import type { CollectionGroup, MetalKind } from '@/shared/api/types';
+import type { PeriodFilterValue } from '@/shared/lib/periodFilter';
+import { parsePeriod, serializePeriod } from '@/shared/lib/periodFilter';
 
 export const SORT_FIELDS = [
   'title',
@@ -23,8 +25,7 @@ export interface CatalogFilters {
   q: string;
   countryIds: number[];
   seriesIds: number[];
-  yearFrom?: number;
-  yearTo?: number;
+  period: PeriodFilterValue;
   denominationIds: number[];
   groups: CollectionGroup[];
   materialIds: number[];
@@ -85,8 +86,7 @@ export function parseFilters(params: URLSearchParams): CatalogFilters {
     q: params.get('q') ?? '',
     countryIds: intListParam(params, 'countryId'),
     seriesIds: intListParam(params, 'seriesId'),
-    yearFrom: intParam(params, 'yearFrom'),
-    yearTo: intParam(params, 'yearTo'),
+    period: parsePeriod(params),
     denominationIds: intListParam(params, 'denominationId'),
     groups: groupListParam(params, 'group'),
     materialIds: intListParam(params, 'materialId'),
@@ -114,8 +114,7 @@ export function serializeFilters(filters: CatalogFilters): URLSearchParams {
   setIf('q', filters.q);
   setList('countryId', filters.countryIds);
   setList('seriesId', filters.seriesIds);
-  setIf('yearFrom', filters.yearFrom);
-  setIf('yearTo', filters.yearTo);
+  serializePeriod(params, filters.period);
   setList('denominationId', filters.denominationIds);
   setList('group', filters.groups);
   setList('materialId', filters.materialIds);

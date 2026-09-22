@@ -197,11 +197,24 @@ export function CatalogPage() {
         onRemove: () => apply({ seriesIds: source.seriesIds.filter((id) => id !== seriesId) }),
       });
     }
-    if (source.yearFrom !== undefined || source.yearTo !== undefined) {
+    const { period } = source;
+    if (period.year !== undefined) {
       chips.push({
-        key: 'years',
-        label: `${t('catalog.years')}: ${source.yearFrom ?? '…'}–${source.yearTo ?? '…'}`,
-        onRemove: () => apply({ yearFrom: undefined, yearTo: undefined }),
+        key: 'period',
+        label: `${t('catalog.years')}: ${period.year}`,
+        onRemove: () => apply({ period: { mode: period.mode } }),
+      });
+    } else if (period.yearFrom !== undefined || period.yearTo !== undefined) {
+      chips.push({
+        key: 'period',
+        label: `${t('catalog.years')}: ${period.yearFrom ?? '…'}–${period.yearTo ?? '…'}`,
+        onRemove: () => apply({ period: { mode: period.mode } }),
+      });
+    } else if (period.dateFrom || period.dateTo) {
+      chips.push({
+        key: 'period',
+        label: `${t('catalog.years')}: ${period.dateFrom ?? '…'}–${period.dateTo ?? '…'}`,
+        onRemove: () => apply({ period: { mode: period.mode } }),
       });
     }
     for (const denominationId of source.denominationIds) {

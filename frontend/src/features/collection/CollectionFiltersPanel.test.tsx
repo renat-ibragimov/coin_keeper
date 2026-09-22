@@ -148,18 +148,29 @@ describe('CollectionFiltersPanel multi-select', () => {
 });
 
 describe('CollectionFiltersPanel year fields', () => {
+  /** The period fields live behind the "Період" dropdown now (docs/08-ui-map.md). */
+  function openPeriodPanel() {
+    fireEvent.click(screen.getByRole('button', { name: 'Період' }));
+  }
+
   it('clamps out-of-range years to the newly selected country instead of clearing them', () => {
-    const { update } = renderPanel({ yearFrom: 1950, yearTo: 2025 });
+    const { update } = renderPanel({
+      period: { mode: 'yearRange', yearFrom: 1950, yearTo: 2025 },
+    });
     fireEvent.click(screen.getByLabelText('Країна'));
     fireEvent.click(screen.getByRole('option', { name: 'Україна' }));
 
     expect(update).toHaveBeenCalledWith(
-      expect.objectContaining({ countryIds: [1], yearFrom: 1996, yearTo: 2018 }),
+      expect.objectContaining({
+        countryIds: [1],
+        period: { mode: 'yearRange', yearFrom: 1996, yearTo: 2018 },
+      }),
     );
   });
 
   it('suggests "до" years no earlier than the chosen "від", oldest first', () => {
-    renderPanel({ countryIds: [1], yearFrom: 2010 });
+    renderPanel({ countryIds: [1], period: { mode: 'yearRange', yearFrom: 2010 } });
+    openPeriodPanel();
     const values = suggestedYears('до');
     expect(values).not.toContain('2005');
     expect(values[0]).toBe('2010');
