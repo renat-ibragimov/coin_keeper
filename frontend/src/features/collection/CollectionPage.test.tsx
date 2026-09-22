@@ -97,6 +97,7 @@ const POSITION: CollectionPosition = {
   archiveReason: null,
   totalQuantity: 2,
   totalSpendUah: '1100.00',
+  supportingExpensesUah: null,
   marketValueUah: '1600.00',
   lastAcquisitionDate: '2024-03-05',
   grades: ['UNC', 'XF'],

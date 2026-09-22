@@ -46,6 +46,7 @@ class CollectionPositionOut(CamelModel):
     archive_reason: str | None
     total_quantity: int
     total_spend_uah: Money
+    supporting_expenses_uah: Money | None
     market_value_uah: Money | None
     last_acquisition_date: date | None
     grades: list[str]

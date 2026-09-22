@@ -563,6 +563,42 @@ async def test_two_purchases_of_the_same_coin_group_into_one_position(
     assert position["grades"] == ["UNC", "XF"]
 
 
+async def test_position_carries_supporting_expenses_separate_from_the_spend(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """`totalSpendUah` stays coin-only; `supportingExpensesUah` is the
+    position's delivery/holder/grading total, same split as the coin card
+    (docs/03-api-contract.md)."""
+    item = await db_session.get(CatalogItem, ctx.item_id)
+    assert item is not None
+    instance = await add_collection_item(
+        db_session,
+        owner_id=ctx.id_a,
+        item=item,
+        quantity=1,
+        price="500.00",
+        acquisition_date=date(2024, 1, 10),
+    )
+    db_session.add(
+        Expense(
+            owner_id=ctx.id_a,
+            category=ExpenseCategory.DELIVERY,
+            amount=Decimal("60.00"),
+            currency_code="UAH",
+            rate_uah=Decimal("1"),
+            expense_date=date(2024, 1, 10),
+            catalog_item_id=item.id,
+            collection_item_id=instance.id,
+        )
+    )
+    await db_session.commit()
+
+    listed = (await client.get("/api/v1/collection", headers=auth(ctx.token_a))).json()
+    position = listed["items"][0]
+    assert position["totalSpendUah"] == "500.00"
+    assert position["supportingExpensesUah"] == "60.00"
+
+
 async def test_grade_filter_matches_the_whole_position(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:

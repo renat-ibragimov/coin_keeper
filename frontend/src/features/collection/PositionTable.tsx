@@ -16,6 +16,10 @@ interface PositionTableProps {
   sort: CollectionSort;
   order: SortOrder;
   onSort: (sort: CollectionSort, order: SortOrder) => void;
+  /** The viewer's own accounting preference (settings.includeSupportingExpenses,
+   *  default on) — whether delivery/holder/grading fold into "Витрачено", same
+   *  as "Куплено загалом" on the coin card. */
+  includeSupportingExpenses: boolean;
 }
 
 // Widths of their own, for the same reason as the catalogue table: measured
@@ -32,7 +36,13 @@ const COLUMNS: { key: string; sort: CollectionSort; className: string | undefine
   { key: 'collection.grade', sort: 'grade', className: styles.gradeColumn },
 ];
 
-export function PositionTable({ items, sort, order, onSort }: PositionTableProps) {
+export function PositionTable({
+  items,
+  sort,
+  order,
+  onSort,
+  includeSupportingExpenses,
+}: PositionTableProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   return (
@@ -53,58 +63,67 @@ export function PositionTable({ items, sort, order, onSort }: PositionTableProps
         </tr>
       </thead>
       <tbody>
-        {items.map((item) => (
-          <tr key={item.catalogItemId} className={item.isArchived ? styles.archivedRow : undefined}>
-            <td>
-              <div className={styles.coinCell}>
-                <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
-                <span className={styles.coinInfo}>
-                  <Link
-                    to={`/catalog/${item.catalogItemId}`}
-                    className={`${styles.coinTitle} ${styles.rowLink}`}
-                  >
-                    {item.title}
-                  </Link>
-                  {/* The badge rides on the meta line rather than under it: a
-                   * line of its own made an archived position's row taller
-                   * than every other (docs/08-ui-map.md). */}
-                  <span className={styles.coinMeta}>
-                    {[String(item.year), item.denomination].filter(Boolean).join(' · ')}
-                    {isRecentRelease(item.issueDate) ? (
-                      <Badge tone="success">{t('catalog.badgeNew')}</Badge>
-                    ) : null}
-                    {item.isArchived ? (
-                      <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
-                    ) : null}
+        {items.map((item) => {
+          const supportingExpenses =
+            item.supportingExpensesUah !== null ? Number(item.supportingExpensesUah) : null;
+          const totalSpend =
+            includeSupportingExpenses && supportingExpenses !== null
+              ? Number(item.totalSpendUah) + supportingExpenses
+              : Number(item.totalSpendUah);
+          return (
+            <tr
+              key={item.catalogItemId}
+              className={item.isArchived ? styles.archivedRow : undefined}
+            >
+              <td>
+                <div className={styles.coinCell}>
+                  <CoinImage src={item.thumbnailUrl} alt="" className={styles.thumb} />
+                  <span className={styles.coinInfo}>
+                    <Link
+                      to={`/catalog/${item.catalogItemId}`}
+                      className={`${styles.coinTitle} ${styles.rowLink}`}
+                    >
+                      {item.title}
+                    </Link>
+                    {/* The badge rides on the meta line rather than under it: a
+                     * line of its own made an archived position's row taller
+                     * than every other (docs/08-ui-map.md). */}
+                    <span className={styles.coinMeta}>
+                      {[String(item.year), item.denomination].filter(Boolean).join(' · ')}
+                      {isRecentRelease(item.issueDate) ? (
+                        <Badge tone="success">{t('catalog.badgeNew')}</Badge>
+                      ) : null}
+                      {item.isArchived ? (
+                        <Badge tone="warning">{t('catalog.badgeArchived')}</Badge>
+                      ) : null}
+                    </span>
                   </span>
-                </span>
-              </div>
-            </td>
-            <td className={`${cellAlign.center} ${styles.secondary}`}>{item.country}</td>
-            <td className={`${cellAlign.center} ${styles.secondary}`}>
-              <span className={clampTwoLines}>{seriesLabel(item, t) ?? '—'}</span>
-            </td>
-            <td className={`${cellAlign.center} tabular`}>
-              {t('catalog.quantity', { count: item.totalQuantity })}
-            </td>
-            <td className={`${cellAlign.center} tabular`}>
-              {formatUah(item.totalSpendUah, locale)}
-            </td>
-            <td className={`${cellAlign.center} tabular`}>
-              {item.marketValueUah !== null ? (
-                formatUah(item.marketValueUah, locale)
-              ) : (
-                <span className={styles.muted}>{t('catalog.noPrice')}</span>
-              )}
-            </td>
-            <td className={`${cellAlign.center} tabular`}>
-              {item.lastAcquisitionDate ? formatDate(item.lastAcquisitionDate, locale) : '—'}
-            </td>
-            <td className={cellAlign.center}>
-              {item.grades.length > 0 ? <Badge>{item.grades.join(' · ')}</Badge> : '—'}
-            </td>
-          </tr>
-        ))}
+                </div>
+              </td>
+              <td className={`${cellAlign.center} ${styles.secondary}`}>{item.country}</td>
+              <td className={`${cellAlign.center} ${styles.secondary}`}>
+                <span className={clampTwoLines}>{seriesLabel(item, t) ?? '—'}</span>
+              </td>
+              <td className={`${cellAlign.center} tabular`}>
+                {t('catalog.quantity', { count: item.totalQuantity })}
+              </td>
+              <td className={`${cellAlign.center} tabular`}>{formatUah(totalSpend, locale)}</td>
+              <td className={`${cellAlign.center} tabular`}>
+                {item.marketValueUah !== null ? (
+                  formatUah(item.marketValueUah, locale)
+                ) : (
+                  <span className={styles.muted}>{t('catalog.noPrice')}</span>
+                )}
+              </td>
+              <td className={`${cellAlign.center} tabular`}>
+                {item.lastAcquisitionDate ? formatDate(item.lastAcquisitionDate, locale) : '—'}
+              </td>
+              <td className={cellAlign.center}>
+                {item.grades.length > 0 ? <Badge>{item.grades.join(' · ')}</Badge> : '—'}
+              </td>
+            </tr>
+          );
+        })}
       </tbody>
     </DataTable>
   );

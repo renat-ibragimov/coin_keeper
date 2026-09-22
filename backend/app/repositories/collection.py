@@ -56,21 +56,6 @@ class CollectionFilters:
 
 
 @dataclass
-class CollectionPositionRow:
-    """One catalog item, aggregated over every purchase the owner made of it."""
-
-    catalog_item: CatalogItem
-    country: str
-    series_name: str | None
-    denomination: Denomination | None
-    total_quantity: int
-    total_spend_uah: Decimal
-    market_value_uah: Decimal | None
-    last_acquisition_date: date | None
-    grades: list[str]
-
-
-@dataclass
 class CollectionRow:
     instance: CollectionItem
     catalog_item: CatalogItem
@@ -87,6 +72,22 @@ def _total_uah() -> ColumnElement[Any]:
         * func.coalesce(CollectionItem.purchase_rate_uah, 1)
         * CollectionItem.quantity
     )
+
+
+@dataclass
+class CollectionPositionRow:
+    """One catalog item, aggregated over every purchase the owner made of it."""
+
+    catalog_item: CatalogItem
+    country: str
+    series_name: str | None
+    denomination: Denomination | None
+    total_quantity: int
+    total_spend_uah: Decimal
+    supporting_expenses_uah: Decimal | None
+    market_value_uah: Decimal | None
+    last_acquisition_date: date | None
+    grades: list[str]
 
 
 class CollectionRepository:
@@ -164,6 +165,23 @@ class CollectionRepository:
             .lateral("position_agg")
         )
 
+    def _supporting_expenses_uah(self) -> Any:
+        """Delivery, holder, grading... summed for this position, converted at
+        each expense's own rate — the same figure the coin card shows
+        (`CatalogRepository._supporting_expenses_uah`), so "Мої монети" and
+        the coin card agree on what a position cost (docs/04-business-rules.md,
+        rule 4)."""
+        amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
+        return (
+            select(func.sum(amount_uah))
+            .where(
+                Expense.catalog_item_id == CatalogItem.id,
+                Expense.owner_id == self._owner_id,
+                Expense.category != ExpenseCategory.COIN_PURCHASE,
+            )
+            .scalar_subquery()
+        )
+
     async def list_positions(
         self, filters: CollectionFilters, *, limit: int, offset: int
     ) -> tuple[list[CollectionPositionRow], int]:
@@ -237,6 +255,7 @@ class CollectionRepository:
                 agg.c.last_acquisition_date,
                 agg.c.grades,
                 latest_price_uah_for(CatalogItem.id, self._owner_id).label("market_price_uah"),
+                self._supporting_expenses_uah().label("supporting_expenses_uah"),
             )
             .join(Country, Country.id == CatalogItem.country_id)
             .outerjoin(CoinSeries, CoinSeries.id == CatalogItem.series_id)
@@ -261,6 +280,7 @@ class CollectionRepository:
             denomination=row.Denomination,
             total_quantity=total_quantity,
             total_spend_uah=Decimal(row.total_spend_uah or 0),
+            supporting_expenses_uah=row.supporting_expenses_uah,
             market_value_uah=(None if market_price is None else market_price * total_quantity),
             last_acquisition_date=row.last_acquisition_date,
             grades=sorted(set(row.grades or [])),

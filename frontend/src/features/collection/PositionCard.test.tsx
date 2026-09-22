@@ -27,18 +27,19 @@ const BASE: CollectionPosition = {
   archiveReason: null,
   totalQuantity: 2,
   totalSpendUah: '1100.00',
+  supportingExpensesUah: null,
   marketValueUah: '1600.00',
   lastAcquisitionDate: '2024-03-05',
   grades: [],
   thumbnailUrl: null,
 };
 
-function renderCard(item: CollectionPosition) {
+function renderCard(item: CollectionPosition, includeSupportingExpenses = true) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <PositionCard item={item} />
+        <PositionCard item={item} includeSupportingExpenses={includeSupportingExpenses} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -55,6 +56,16 @@ describe('PositionCard', () => {
     expect(screen.getByText('1 100 ₴')).toBeInTheDocument();
     expect(screen.getByText('1 600 ₴')).toBeInTheDocument();
     expect(screen.getByText('05.03.2024')).toBeInTheDocument();
+  });
+
+  it('folds supporting expenses into "Витрачено" by default, and leaves them out when the viewer turned that off', () => {
+    const item = { ...BASE, supportingExpensesUah: '150.00' };
+    const included = renderCard(item, true);
+    expect(screen.getByText('1 250 ₴')).toBeInTheDocument();
+    included.unmount();
+
+    renderCard(item, false);
+    expect(screen.getByText('1 100 ₴')).toBeInTheDocument();
   });
 
   it('shows a dash for the valuation and the last purchase date when absent', () => {

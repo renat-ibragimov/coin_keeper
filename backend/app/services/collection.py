@@ -436,6 +436,7 @@ class CollectionService:
             archive_reason=item.archive_reason,
             total_quantity=row.total_quantity,
             total_spend_uah=row.total_spend_uah,
+            supporting_expenses_uah=row.supporting_expenses_uah,
             market_value_uah=row.market_value_uah,
             last_acquisition_date=row.last_acquisition_date,
             grades=row.grades,

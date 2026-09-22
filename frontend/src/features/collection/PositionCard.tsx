@@ -14,9 +14,13 @@ import styles from './PositionCard.module.css';
 
 interface PositionCardProps {
   item: CollectionPosition;
+  /** The viewer's own accounting preference (settings.includeSupportingExpenses,
+   *  default on) — whether delivery/holder/grading fold into "Витрачено", same
+   *  as "Куплено загалом" on the coin card. */
+  includeSupportingExpenses: boolean;
 }
 
-function PositionImages({ item }: PositionCardProps) {
+function PositionImages({ item }: { item: CollectionPosition }) {
   const cardQuery = useQuery({
     queryKey: ['catalog', 'card', item.catalogItemId],
     queryFn: () => fetchCard(item.catalogItemId),
@@ -40,7 +44,7 @@ function PositionImages({ item }: PositionCardProps) {
 }
 
 /** One catalog item's card in "Мої монети": every purchase of it, rolled up. */
-export function PositionCard({ item }: PositionCardProps) {
+export function PositionCard({ item, includeSupportingExpenses }: PositionCardProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const cardUrl = `/catalog/${item.catalogItemId}`;
@@ -48,6 +52,12 @@ export function PositionCard({ item }: PositionCardProps) {
   const meta = [String(item.year), item.denomination].filter(Boolean).join(' · ');
   const series = seriesLabel(item, t);
   const recent = isRecentRelease(item.issueDate);
+  const supportingExpenses =
+    item.supportingExpensesUah !== null ? Number(item.supportingExpensesUah) : null;
+  const totalSpend =
+    includeSupportingExpenses && supportingExpenses !== null
+      ? Number(item.totalSpendUah) + supportingExpenses
+      : Number(item.totalSpendUah);
 
   return (
     <article className={[styles.card, item.isArchived ? styles.archived : ''].join(' ')}>
@@ -88,7 +98,7 @@ export function PositionCard({ item }: PositionCardProps) {
           </div>
           <div className={styles.fact}>
             <dt>{t('collection.spent')}</dt>
-            <dd className="tabular">{formatUah(item.totalSpendUah, locale)}</dd>
+            <dd className="tabular">{formatUah(totalSpend, locale)}</dd>
           </div>
           <div className={styles.fact}>
             <dt>{t('collection.valuation')}</dt>

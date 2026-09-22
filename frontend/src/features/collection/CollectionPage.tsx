@@ -146,6 +146,7 @@ export function CollectionPage() {
   const pageCount = Math.max(1, Math.ceil(total / GRID_PAGE_SIZE));
   const shown = page ? page.items.length + (page.page - 1) * GRID_PAGE_SIZE : 0;
   const dashboard = bootstrapQuery.data?.dashboard;
+  const includeSupportingExpenses = bootstrapQuery.data?.settings.includeSupportingExpenses ?? true;
   const seriesStats = seriesProgressQuery.data
     ? {
         started: seriesProgressQuery.data.filter((row) => row.summary.owned > 0).length,
@@ -457,7 +458,11 @@ export function CollectionPage() {
             filters.view === 'cards' ? (
               <div className={styles.grid}>
                 {page.items.map((item) => (
-                  <PositionCard key={item.catalogItemId} item={item} />
+                  <PositionCard
+                    key={item.catalogItemId}
+                    item={item}
+                    includeSupportingExpenses={includeSupportingExpenses}
+                  />
                 ))}
               </div>
             ) : (
@@ -466,6 +471,7 @@ export function CollectionPage() {
                 sort={filters.sort}
                 order={filters.order}
                 onSort={(sort, order) => update({ sort, order })}
+                includeSupportingExpenses={includeSupportingExpenses}
               />
             )
           ) : null}

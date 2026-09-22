@@ -1719,6 +1719,8 @@ export interface components {
             totalQuantity: number;
             /** Totalspenduah */
             totalSpendUah: string;
+            /** Supportingexpensesuah */
+            supportingExpensesUah: string | null;
             /** Marketvalueuah */
             marketValueUah: string | null;
             /** Lastacquisitiondate */
