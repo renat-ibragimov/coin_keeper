@@ -111,7 +111,7 @@ export function PeriodFilter({
         </button>
 
         {open ? (
-          <div className={[selectStyles.menu, panelStyles.panel].join(' ')}>
+          <div className={panelStyles.panel}>
             <div className={selectStyles.list} role="listbox" aria-labelledby={labelId}>
               {MODES.map((mode) => (
                 <button

@@ -68,6 +68,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The browser's own calendar-icon button had no theming and no hover
+ * feedback at all, so it read as inert decoration rather than a working
+ * control (owner's report, 2026-09-22, the period filter's date range). */
+.input[type='date']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+
+.input[type='date']::-webkit-calendar-picker-indicator:hover {
+  background-color: var(--color-surface-hover);
+}
+
+/* The icon itself is a fixed dark glyph — invisible on a dark field without
+ * inverting it. */
+:root[data-theme='dark'] .input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+
 /* The trailing control sits over the input only — never over the hint. */
 .control {
   position: relative;
