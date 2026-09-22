@@ -173,9 +173,16 @@ export function InstancesList({
               const coinTotalApprox =
                 coinTotalSecondary !== null ? Number(coinTotalSecondary) : null;
               // No per-currency breakdown exists for a supporting expense
-              // (docs/03-api-contract.md) — an accurate ≈ figure exists only
-              // when there is nothing to merge in, coin-only or not.
-              const fullTotalApprox = extraExpenses === null ? coinTotalApprox : null;
+              // (docs/03-api-contract.md) — converted at today's live rate
+              // instead, same compromise as a row's current value.
+              const extraExpensesApprox =
+                extraExpenses !== null ? toSecondary(extraExpenses, secondaryRate) : null;
+              const fullTotalApprox =
+                extraExpenses === null
+                  ? coinTotalApprox
+                  : coinTotalApprox !== null && extraExpensesApprox !== null
+                    ? coinTotalApprox + extraExpensesApprox
+                    : null;
               const changeBasisApprox = includeSupportingExpenses
                 ? fullTotalApprox
                 : coinTotalApprox;
@@ -220,10 +227,22 @@ export function InstancesList({
                     ) : null}
                   </td>
                   <td className="tabular">
-                    {extraExpenses !== null ? formatUah(extraExpenses, locale) : '—'}
+                    {extraExpenses !== null ? (
+                      <>
+                        <span className={styles.price}>{formatUah(extraExpenses, locale)}</span>
+                        <span className={styles.secondary}>
+                          {approxText(formatSecondary(extraExpensesApprox, locale))}
+                        </span>
+                      </>
+                    ) : (
+                      '—'
+                    )}
                   </td>
                   <td className="tabular">
                     <span className={styles.price}>{formatUah(fullTotal, locale) ?? '—'}</span>
+                    <span className={styles.secondary}>
+                      {approxText(formatSecondary(fullTotalApprox, locale))}
+                    </span>
                   </td>
                   <td className="tabular">
                     {rowCurrentValue !== null ? (
@@ -258,15 +277,13 @@ export function InstancesList({
                             {formatSignedPercent(changePercent, locale)}
                           </span>
                         ) : null}
-                        {includeSupportingExpenses && extraExpenses !== null ? null : (
-                          <span className={styles.secondary}>
-                            {approxText(
-                              changeApprox !== null
-                                ? formatSecondarySigned(changeApprox, locale)
-                                : null,
-                            )}
-                          </span>
-                        )}
+                        <span className={styles.secondary}>
+                          {approxText(
+                            changeApprox !== null
+                              ? formatSecondarySigned(changeApprox, locale)
+                              : null,
+                          )}
+                        </span>
                       </>
                     ) : (
                       '—'

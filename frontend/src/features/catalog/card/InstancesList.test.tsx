@@ -116,8 +116,9 @@ describe('InstancesList', () => {
       expect(screen.getByText('1 рік')).toBeInTheDocument();
 
       // Purchased total: item.totalUsd (8.40) — the backend's historical-rate
-      // conversion, not a division by secondaryRate.
-      expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
+      // conversion, not a division by secondaryRate. Full price mirrors it
+      // (no supporting expense on this fixture), so it shows twice.
+      expect(screen.getAllByText('≈ 8,4 $').length).toBe(2);
       // Current value: 460 (quantity 1) at the live secondaryRate=41.5 -> 11.08.
       expect(screen.getByText('≈ 11,1 $')).toBeInTheDocument();
       // Change: 11.08 (current, live rate) − 8.40 (purchased, historical) = 2.68.
@@ -131,7 +132,8 @@ describe('InstancesList', () => {
     // secondaryRate feeds current value/change, not the purchased total (item.totalUsd) --
     // losing today's rate should not blank out what was already known historically.
     renderList({ secondaryRate: null });
-    expect(screen.getByText('≈ 8,4 $')).toBeInTheDocument();
+    // Full price mirrors the purchased total (no supporting expense here).
+    expect(screen.getAllByText('≈ 8,4 $').length).toBe(2);
     expect(screen.getAllByText('немає даних').length).toBe(2); // current value, change
   });
 
@@ -140,7 +142,8 @@ describe('InstancesList', () => {
     // Current value still resolves from the live rate; change needs both
     // sides of the subtraction, so it goes unknown along with the total.
     expect(screen.getByText('≈ 11,1 $')).toBeInTheDocument();
-    expect(screen.getAllByText('немає даних').length).toBe(2); // purchased total, change
+    // Full price mirrors the (now unknown) purchased total.
+    expect(screen.getAllByText('немає даних').length).toBe(3); // purchased total, full price, change
   });
 
   it('confirms and deletes a purchase, naming the coin in the confirmation', async () => {

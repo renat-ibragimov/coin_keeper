@@ -545,10 +545,15 @@ function ValueSummary({
   );
   const coinTotalApprox = coinTotalSecondary !== null ? Number(coinTotalSecondary) : null;
   // The backend gives supporting expenses as one lump UAH sum, not broken
-  // down by currency — there is no accurate ≈ figure for the merged total.
-  // Omitting the line beats silently showing the coin-only approx next to
-  // a UAH figure that already includes more than that.
-  const purchaseTotalApprox = mergeSupporting ? null : coinTotalApprox;
+  // down by currency — converted at today's live rate instead of the coin's
+  // own historical purchase-date one, same compromise as `currentValue`.
+  const supportingExpensesApprox =
+    supportingExpenses !== null ? toSecondary(supportingExpenses, secondaryRate) : null;
+  const purchaseTotalApprox = mergeSupporting
+    ? coinTotalApprox !== null && supportingExpensesApprox !== null
+      ? coinTotalApprox + supportingExpensesApprox
+      : null
+    : coinTotalApprox;
   const currentValueApprox =
     currentValue !== null ? toSecondary(currentValue, secondaryRate) : null;
   const changeApprox =
@@ -563,11 +568,9 @@ function ValueSummary({
           {t('card.purchasedTotal')} ({t('card.pieces', { count: card.quantityOwned })})
         </span>
         <p className={`${styles.valueBoxValue} tabular`}>{formatUah(purchaseTotal, locale)}</p>
-        {mergeSupporting ? null : (
-          <span className={styles.valueBoxUsd}>
-            {approxText(formatSecondary(purchaseTotalApprox, locale))}
-          </span>
-        )}
+        <span className={styles.valueBoxUsd}>
+          {approxText(formatSecondary(purchaseTotalApprox, locale))}
+        </span>
         {supportingExpenses !== null ? (
           <span className={styles.valueBoxUsd}>
             {t(mergeSupporting ? 'card.supportingExpensesIncluded' : 'card.supportingExpenses', {
