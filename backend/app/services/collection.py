@@ -385,11 +385,16 @@ class CollectionService:
     ) -> Expense:
         """A supporting expense of the purchase — as a plain manual expense.
 
-        Linked to the coin, deliberately not to the instance: `collection_item_id`
-        means "this row *is* the purchase" everywhere else (it is what the money
-        journal's icons act on, and what deleting a coin takes with it, rule 4).
-        A delivery is money that was spent whether or not the coin later leaves
-        the collection, and deleting the delivery must never touch the coin.
+        Linked to both the coin and this exact purchase (`collection_item_id`),
+        same as `coin_purchase` — the same catalog item bought more than once
+        would otherwise make it impossible to tell which delivery belongs to
+        which purchase (docs/04-business-rules.md, rule 4). Unlike
+        `coin_purchase`, the service never deletes this expense when the
+        instance goes away; `collection_item_id`'s `ON DELETE SET NULL` detaches
+        it on its own, and the expense stays in the money journal — the money
+        was spent whether or not the coin later leaves the collection.
+        `amount` is what the user entered for the purchase as a whole and is
+        never scaled by `quantity`, unlike `coin_purchase`.
         """
         return Expense(
             owner_id=self._user.id,
@@ -399,6 +404,7 @@ class CollectionService:
             rate_uah=rate,
             expense_date=instance.acquisition_date,
             catalog_item_id=instance.catalog_item_id,
+            collection_item_id=instance.id,
             vendor=instance.seller,
         )
 

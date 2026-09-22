@@ -106,9 +106,14 @@ async def test_delivery_is_written_with_the_purchase(
     assert delivery.expense_date.isoformat() == PURCHASE_DATE
     assert delivery.vendor == "Нумізматика UA"
     assert str(delivery.rate_uah) == "1.000000"
-    # Linked to the coin, not to the instance: `collection_item_id` is what
-    # marks a row as *being* the purchase, and a delivery is not one.
-    assert delivery.collection_item_id is None
+    # Linked to this exact purchase too, same as coin_purchase (2026-09-22) —
+    # a repeat purchase of the same coin must not mix up whose delivery it was.
+    purchase_row = (
+        await db_session.execute(
+            select(CollectionItem).where(CollectionItem.catalog_item_id == ctx.coin.id)
+        )
+    ).scalar_one()
+    assert delivery.collection_item_id == purchase_row.id
 
 
 async def test_extra_expense_keeps_its_own_currency(
@@ -218,6 +223,83 @@ async def test_deleting_an_extra_expense_leaves_the_coin(
     db_session.expire_all()
     remaining = await _expenses_of(db_session, ctx.coin.id)
     assert [e.category for e in remaining] == [ExpenseCategory.COIN_PURCHASE]
+
+
+async def test_repeat_purchase_keeps_its_own_delivery(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The whole reason `collection_item_id` exists on a supporting expense
+    (2026-09-22): the same coin bought twice, each time with its own
+    delivery, must not mix the two up. The item-level total still sums both,
+    but each purchase in `collection-items` only ever shows its own.
+    """
+    first = await client.post(
+        "/api/v1/collection",
+        json=purchase(
+            catalogItemId=ctx.coin.id,
+            extraExpenses=[{"category": "delivery", "amount": "60.00", "currency": "UAH"}],
+        ),
+        headers=auth(ctx.token),
+    )
+    second = await client.post(
+        "/api/v1/collection",
+        json=purchase(
+            catalogItemId=ctx.coin.id,
+            purchaseDate="2024-06-01",
+            extraExpenses=[{"category": "holder", "amount": "25.00", "currency": "UAH"}],
+        ),
+        headers=auth(ctx.token),
+    )
+    assert first.status_code == 201, first.text
+    assert second.status_code == 201, second.text
+    first_id, second_id = first.json()["id"], second.json()["id"]
+
+    expenses = await _expenses_of(db_session, ctx.coin.id)
+    by_category = {e.category: e for e in expenses if e.category != ExpenseCategory.COIN_PURCHASE}
+    assert by_category[ExpenseCategory.DELIVERY].collection_item_id == first_id
+    assert by_category[ExpenseCategory.HOLDER].collection_item_id == second_id
+
+    card = (await client.get(f"/api/v1/catalog/{ctx.coin.id}", headers=auth(ctx.token))).json()
+    assert card["supportingExpensesUah"] == "85.00"
+
+    instances = {
+        row["id"]: row["supportingExpensesUah"]
+        for row in (
+            await client.get(
+                f"/api/v1/catalog/{ctx.coin.id}/collection-items", headers=auth(ctx.token)
+            )
+        ).json()
+    }
+    assert instances[first_id] == "60.00"
+    assert instances[second_id] == "25.00"
+
+
+async def test_deleting_the_instance_detaches_but_keeps_the_delivery(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """Unlike `coin_purchase`, a supporting expense is never deleted by the
+    service — `collection_item_id`'s `ON DELETE SET NULL` detaches it on its
+    own, and the money stays in the journal (docs/04-business-rules.md,
+    rules 4 and 10)."""
+    created = await client.post(
+        "/api/v1/collection",
+        json=purchase(
+            catalogItemId=ctx.coin.id,
+            extraExpenses=[{"category": "delivery", "amount": "60.00", "currency": "UAH"}],
+        ),
+        headers=auth(ctx.token),
+    )
+    assert created.status_code == 201, created.text
+    instance_id = created.json()["id"]
+
+    deleted = await client.delete(f"/api/v1/collection/{instance_id}", headers=auth(ctx.token))
+    assert deleted.status_code == 204, deleted.text
+
+    db_session.expire_all()
+    remaining = await _expenses_of(db_session, ctx.coin.id)
+    assert [e.category for e in remaining] == [ExpenseCategory.DELIVERY]
+    assert remaining[0].collection_item_id is None
+    assert remaining[0].catalog_item_id == ctx.coin.id
 
 
 async def test_coin_purchase_cannot_be_listed_as_an_extra(

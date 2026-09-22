@@ -90,6 +90,10 @@ class CatalogListItem(CamelModel):
     purchase_total_uah: Money
     purchase_total_usd: Money | None
     purchase_total_eur: Money | None
+    # Delivery, holder, grading... — everything but coin_purchase, summed
+    # across all of the owner's purchases of this item. Never folded into
+    # purchase_total_uah (docs/03-api-contract.md).
+    supporting_expenses_uah: Money | None
     obverse_image: CoinImageOut | None
     reverse_image: CoinImageOut | None
     thumbnail_url: str | None
@@ -364,5 +368,9 @@ class CatalogCollectionItemOut(CamelModel):
     total_uah: Money
     total_usd: Money | None
     total_eur: Money | None
+    # Delivery, holder, grading... booked to this exact purchase via
+    # collection_item_id; null for a pre-backfill purchase with none linked,
+    # even if the item as a whole has some (docs/03-api-contract.md).
+    supporting_expenses_uah: Money | None
     storage_location: str | None
     notes: str | None

@@ -30,6 +30,7 @@ const INSTANCES: CatalogCollectionItem[] = [
     // prop doc).
     totalUsd: '8.40',
     totalEur: '7.70',
+    supportingExpensesUah: null,
     storageLocation: 'Вдома',
     notes: null,
   },

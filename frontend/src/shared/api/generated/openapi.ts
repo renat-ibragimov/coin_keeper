@@ -1170,6 +1170,8 @@ export interface components {
             purchaseTotalUsd: string | null;
             /** Purchasetotaleur */
             purchaseTotalEur: string | null;
+            /** Supportingexpensesuah */
+            supportingExpensesUah: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */
@@ -1266,6 +1268,8 @@ export interface components {
             totalUsd: string | null;
             /** Totaleur */
             totalEur: string | null;
+            /** Supportingexpensesuah */
+            supportingExpensesUah: string | null;
             /** Storagelocation */
             storageLocation: string | null;
             /** Notes */
@@ -1458,6 +1462,8 @@ export interface components {
             purchaseTotalUsd: string | null;
             /** Purchasetotaleur */
             purchaseTotalEur: string | null;
+            /** Supportingexpensesuah */
+            supportingExpensesUah: string | null;
             obverseImage: components["schemas"]["CoinImageOut"] | null;
             reverseImage: components["schemas"]["CoinImageOut"] | null;
             /** Thumbnailurl */

@@ -104,9 +104,10 @@ class ExtraExpenseIn(CamelModel):
     Delivery, a holder, a grading fee — money spent on this coin at the moment
     it was bought, and having to reopen the money journal to write it down is
     how it ends up never written down (owner's call, 2026-09-14). What comes
-    out is an ordinary manual expense linked to the coin: same category list,
-    same `catalogItemId` link, edited and deleted in «Гроші» like any other,
-    and deleting one leaves the coin alone.
+    out is an ordinary manual expense linked to the coin and to this exact
+    purchase: same category list, same `catalogItemId` and `collectionItemId`
+    link as `coin_purchase` (2026-09-22), edited and deleted in «Гроші» like
+    any other, and deleting one leaves the coin alone.
 
     Date and vendor are not fields here — they come from the purchase, which
     is the point of recording the two together.

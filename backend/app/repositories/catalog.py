@@ -52,7 +52,7 @@ from app.models import (
     PriceSourceLink,
     QualityType,
 )
-from app.models.enums import CollectionGroup, MetalKind
+from app.models.enums import CollectionGroup, ExpenseCategory, MetalKind
 from app.repositories.localization import localized, series_display_name
 
 
@@ -90,6 +90,7 @@ class CatalogRow:
     purchase_total_uah: Decimal
     purchase_total_usd: Decimal | None
     purchase_total_eur: Decimal | None
+    supporting_expenses_uah: Decimal | None
     market_price_uah: Decimal | None
     price_source: str | None
     price_observed_at: datetime | None
@@ -518,6 +519,23 @@ class CatalogRepository:
             .scalar_subquery()
         )
 
+    def _supporting_expenses_uah(self) -> Any:
+        """Delivery, holder, grading... summed for this item, converted at
+        each expense's own rate. By `catalog_item_id`, not `collection_item_id`
+        — this is the item's total across every purchase, regardless of
+        whether a given row has been backfilled onto its purchase
+        (docs/04-business-rules.md, rule 4; docs/03-api-contract.md)."""
+        amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
+        return (
+            select(func.sum(amount_uah))
+            .where(
+                Expense.catalog_item_id == CatalogItem.id,
+                Expense.owner_id == self._user_id,
+                Expense.category != ExpenseCategory.COIN_PURCHASE,
+            )
+            .scalar_subquery()
+        )
+
     def _order_by(self, filters: CatalogFilters, owned: Any, price: Any) -> list[Any]:
         descending = filters.order == "desc"
 
@@ -576,6 +594,7 @@ class CatalogRepository:
                 owned.c.purchase_total_uah,
                 owned.c.purchase_total_usd,
                 owned.c.purchase_total_eur,
+                self._supporting_expenses_uah().label("supporting_expenses_uah"),
                 price.c.price_uah,
                 price.c.price_source,
                 price.c.price_observed_at,
@@ -604,6 +623,7 @@ class CatalogRepository:
                 purchase_total_uah=Decimal(row.purchase_total_uah or 0),
                 purchase_total_usd=row.purchase_total_usd,
                 purchase_total_eur=row.purchase_total_eur,
+                supporting_expenses_uah=row.supporting_expenses_uah,
                 market_price_uah=row.price_uah,
                 price_source=row.price_source,
                 price_observed_at=row.price_observed_at,
@@ -636,6 +656,7 @@ class CatalogRepository:
                 owned.c.purchase_total_uah,
                 owned.c.purchase_total_usd,
                 owned.c.purchase_total_eur,
+                self._supporting_expenses_uah().label("supporting_expenses_uah"),
                 price.c.price_uah,
                 price.c.price_source,
                 price.c.price_observed_at,
@@ -673,6 +694,7 @@ class CatalogRepository:
             purchase_total_uah=Decimal(row.purchase_total_uah or 0),
             purchase_total_usd=row.purchase_total_usd,
             purchase_total_eur=row.purchase_total_eur,
+            supporting_expenses_uah=row.supporting_expenses_uah,
             market_price_uah=row.price_uah,
             price_source=row.price_source,
             price_observed_at=row.price_observed_at,

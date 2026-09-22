@@ -301,9 +301,13 @@ class CatalogService:
         row = await self._repo.get_row(item_id)
         if row is None:
             raise ItemNotFoundError
-        instances = await CollectionRepository(
+        collection_repo = CollectionRepository(
             self._session, owner_id=self._user.id, locale=self._locale
-        ).list_for_item(item_id)
+        )
+        instances = await collection_repo.list_for_item(item_id)
+        supporting_by_instance = await collection_repo.supporting_expenses_by_instance(
+            [instance.id for instance, _ in instances]
+        )
         out = []
         for instance, storage_location in instances:
             total_uah = (
@@ -336,6 +340,7 @@ class CatalogService:
                     total_uah=total_uah,
                     total_usd=total_uah / usd_rate if usd_rate else None,
                     total_eur=total_uah / eur_rate if eur_rate else None,
+                    supporting_expenses_uah=supporting_by_instance.get(instance.id),
                     storage_location=storage_location,
                     notes=instance.notes,
                 )
@@ -624,6 +629,7 @@ class CatalogService:
             "purchase_total_uah": row.purchase_total_uah,
             "purchase_total_usd": row.purchase_total_usd,
             "purchase_total_eur": row.purchase_total_eur,
+            "supporting_expenses_uah": row.supporting_expenses_uah,
             "obverse_image": image_out(images.obverse),
             "reverse_image": image_out(images.reverse),
             "thumbnail_url": images.thumbnail_url,

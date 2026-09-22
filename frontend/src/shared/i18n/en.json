@@ -282,6 +282,7 @@
     "pieces_one": "{{count}} instance",
     "pieces_other": "{{count}} instances",
     "purchasedTotal": "Total spent",
+    "supportingExpenses": "+ {{value}} supporting expenses",
     "currentValue": "Current collection value",
     "valueChange": "Value change",
     "addPurchase": "Add a purchase",

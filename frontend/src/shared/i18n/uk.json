@@ -284,6 +284,7 @@
     "pieces_many": "{{count}} екземплярів",
     "pieces_other": "{{count}} екземпляра",
     "purchasedTotal": "Куплено загалом",
+    "supportingExpenses": "+ {{value}} супутні витрати",
     "currentValue": "Поточна вартість колекції",
     "valueChange": "Зміна вартості",
     "addPurchase": "Додати покупку",

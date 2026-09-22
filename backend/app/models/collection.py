@@ -130,8 +130,12 @@ class Expense(Base):
     catalog_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("catalog_items.id", ondelete="SET NULL")
     )
-    # SET NULL is only a backstop against a dangling reference; the service
-    # layer deletes the coin_purchase expense explicitly. docs/04, rule 10.
+    # For coin_purchase, SET NULL is only a backstop against a dangling
+    # reference — the service layer deletes that expense explicitly. For a
+    # supporting expense (delivery, holder, grading...) SET NULL *is* the
+    # intended behavior: the service never deletes it, so this FK is how
+    # deleting the instance detaches it without losing the money spent.
+    # docs/04-business-rules.md, rules 4 and 10.
     collection_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("collection_items.id", ondelete="SET NULL")
     )

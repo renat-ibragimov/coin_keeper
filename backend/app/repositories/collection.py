@@ -431,6 +431,26 @@ class CollectionRepository:
         )
         return [(row.CollectionItem, row.storage_location) for row in result]
 
+    async def supporting_expenses_by_instance(
+        self, instance_ids: Sequence[int]
+    ) -> dict[int, Decimal]:
+        """Delivery, holder, grading... booked to each of these purchases via
+        collection_item_id — not the item-wide total (docs/03-api-contract.md).
+        A purchase not in the result has none linked."""
+        if not instance_ids:
+            return {}
+        amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
+        result = await self._session.execute(
+            select(Expense.collection_item_id, func.sum(amount_uah))
+            .where(
+                Expense.owner_id == self._owner_id,
+                Expense.collection_item_id.in_(instance_ids),
+                Expense.category != ExpenseCategory.COIN_PURCHASE,
+            )
+            .group_by(Expense.collection_item_id)
+        )
+        return {row[0]: row[1] for row in result}
+
     async def get(self, item_id: int) -> CollectionItem | None:
         result = await self._session.execute(
             select(CollectionItem).where(

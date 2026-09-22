@@ -91,6 +91,7 @@ class PublicCatalogRepository:
             purchase_total_uah=Decimal(0),
             purchase_total_usd=None,
             purchase_total_eur=None,
+            supporting_expenses_uah=None,
             market_price_uah=None,
             price_source=None,
             price_observed_at=None,

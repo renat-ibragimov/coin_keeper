@@ -58,7 +58,7 @@ async def test_upgrade_preserves_users_and_accepts_admin_records(
     migrated_connection: AsyncConnection,
 ) -> None:
     connection = migrated_connection
-    assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "0024"
+    assert await connection.scalar(text("SELECT version_num FROM alembic_version")) == "0025"
     user_id = await connection.scalar(
         text("SELECT id FROM users WHERE email = 'migration-admin@example.com'")
     )

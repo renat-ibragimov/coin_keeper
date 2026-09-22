@@ -517,6 +517,11 @@ function ValueSummary({
   const currentValue =
     card.marketPriceUah !== null ? Number(card.marketPriceUah) * card.quantityOwned : null;
   const purchaseTotal = Number(card.purchaseTotalUah);
+  // A separate, muted figure — never folded into purchaseTotal or into
+  // `change` below. Whether delivery counts as "cost" is exactly the
+  // question this line exists to sidestep (docs/03-api-contract.md).
+  const supportingExpenses =
+    card.supportingExpensesUah !== null ? Number(card.supportingExpensesUah) : null;
   const change = currentValue !== null ? currentValue - purchaseTotal : null;
   const changePercent =
     change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
@@ -548,6 +553,11 @@ function ValueSummary({
         <span className={styles.valueBoxUsd}>
           {approxText(formatSecondary(purchaseTotalApprox, locale))}
         </span>
+        {supportingExpenses !== null ? (
+          <span className={styles.valueBoxUsd}>
+            {t('card.supportingExpenses', { value: formatUah(supportingExpenses, locale) })}
+          </span>
+        ) : null}
       </div>
 
       <div className={styles.valueBox}>

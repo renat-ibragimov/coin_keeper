@@ -88,6 +88,7 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
     purchaseTotalUah: '250.00',
     purchaseTotalUsd: null,
     purchaseTotalEur: null,
+    supportingExpensesUah: null,
     obverseImage: null,
     reverseImage: null,
     thumbnailUrl: null,
