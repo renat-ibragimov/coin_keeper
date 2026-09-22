@@ -1,3 +1,5 @@
+import { format, isValid, parse } from 'date-fns';
+
 export type PeriodMode = 'year' | 'yearRange' | 'dateRange';
 
 export interface PeriodFilterValue {
@@ -80,4 +82,40 @@ export function hasPeriodValue(period: PeriodFilterValue): boolean {
     Boolean(period.dateFrom) ||
     Boolean(period.dateTo)
   );
+}
+
+const DATE_INPUT_FORMATS: Record<string, string> = { uk: 'dd.MM.yyyy' };
+const DEFAULT_DATE_FORMAT = 'MM/dd/yyyy';
+
+/** The date-range fields' own display/typing format, per app language — the
+ *  Ukrainian convention for `uk`, and the format the native `<input
+ *  type="date">` this replaced already showed for `en` (owner's report,
+ *  2026-09-22: the native picker's language followed the browser, not the
+ *  app's uk/en toggle, no matter what `lang` was set on it — react-day-picker
+ *  replaces it precisely so this can actually track the app's language). */
+export function periodDateFormat(lang: string): string {
+  return DATE_INPUT_FORMATS[lang] ?? DEFAULT_DATE_FORMAT;
+}
+
+/** Parses the `yyyy-MM-dd` shape `dateFrom`/`dateTo` are stored in (the
+ *  native `<input type="date">` value shape, kept as the wire format even
+ *  though the field itself no longer is one). `undefined` stays `undefined`. */
+export function parsePeriodDate(value: string | undefined): Date | undefined {
+  if (!value) return undefined;
+  const parsed = parse(value, 'yyyy-MM-dd', new Date());
+  return isValid(parsed) ? parsed : undefined;
+}
+
+export function formatPeriodDate(date: Date): string {
+  return format(date, 'yyyy-MM-dd');
+}
+
+/** `dateFrom`/`dateTo` rendered in the app's current language — shared by the
+ *  trigger's summary text and the removed-filter chip. */
+export function formatPeriodDateForDisplay(
+  value: string | undefined,
+  lang: string,
+): string | undefined {
+  const date = parsePeriodDate(value);
+  return date ? format(date, periodDateFormat(lang)) : undefined;
 }

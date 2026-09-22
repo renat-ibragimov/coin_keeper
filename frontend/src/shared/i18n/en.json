@@ -161,6 +161,8 @@
     "periodModeYearRange": "Year range",
     "periodModeDateRange": "Date range",
     "periodClear": "Clear",
+    "periodPickFrom": "Pick the start date",
+    "periodPickTo": "Pick the end date",
     "yearFrom": "from",
     "yearTo": "to",
     "denomination": "Denomination",

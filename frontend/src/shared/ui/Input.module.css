@@ -68,24 +68,28 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* The browser's own calendar-icon button had no theming and no hover
- * feedback at all, so it read as inert decoration rather than a working
- * control (owner's report, 2026-09-22, the period filter's date range). */
+/* Chrome's own calendar-icon glyph renders at very low contrast until the
+ * pointer actually lands on it — its own built-in behaviour, not something
+ * `filter` can fix — so on a dark field it read as no icon at all outside
+ * hover (owner's report, 2026-09-22, the period filter's date range).
+ * Hiding it and masking in our own glyph draws it the same way as Select's
+ * own `.arrow`/`.searchIcon`: always at full, themed contrast. */
 .input[type='date']::-webkit-calendar-picker-indicator {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
-  border-radius: var(--radius-sm);
-  padding: 2px;
+  background-color: var(--color-text-muted);
+  -webkit-mask: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect x='2' y='3.5' width='12' height='10.5' rx='1.5' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3Cpath stroke='%23000' stroke-width='1.4' stroke-linecap='round' d='M5 1.5v3M11 1.5v3M2.3 6.5h11.4'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+  mask: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Crect x='2' y='3.5' width='12' height='10.5' rx='1.5' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3Cpath stroke='%23000' stroke-width='1.4' stroke-linecap='round' d='M5 1.5v3M11 1.5v3M2.3 6.5h11.4'/%3E%3C/svg%3E")
+    center / contain no-repeat;
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
 
 .input[type='date']::-webkit-calendar-picker-indicator:hover {
-  background-color: var(--color-surface-hover);
-}
-
-/* The icon itself is a fixed dark glyph — invisible on a dark field without
- * inverting it. */
-:root[data-theme='dark'] .input[type='date']::-webkit-calendar-picker-indicator {
-  filter: invert(1);
+  background-color: var(--color-text);
 }
 
 /* The trailing control sits over the input only — never over the hint. */

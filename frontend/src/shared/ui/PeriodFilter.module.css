@@ -1,3 +1,15 @@
+/* Fixed, not shrink-to-fit: the trigger's own text is the mode name or its
+ * value, and both change length with the mode ("Рік" vs "Діапазон років") —
+ * at intrinsic width that resized this field, and with it the whole toolbar
+ * row, on every switch (owner's report, 2026-09-22). Wide enough for the
+ * longest realistic content in either locale: not the mode label ("Діапазон
+ * років" would fit well under 168px) but a full date range value
+ * ("06.09.2026–11.09.2026"), the widest thing the trigger ever shows. */
+.wrapper {
+  flex: 0 0 auto;
+  width: 210px;
+}
+
 /* Same look as Select's own `.menu` (raised card, same radius/border/shadow)
  * but NOT that class: its `overflow: hidden` (Select.module.css) exists to
  * clip a plain option list to the card's rounded corners, and it also clips
@@ -6,14 +18,16 @@
  * `.menu`, that inner dropdown was rendered but invisible, clipped away
  * before it ever reached the panel's edge (owner's report, 2026-09-22).
  * Wider than Select's own menu (min-width: 220px), sized for a single column
- * of text options — too narrow for the date-range field pair. */
+ * of text options — too narrow for the date-range field pair at a width
+ * that doesn't truncate their own "mm/dd/yyyy" placeholder (owner's report,
+ * 2026-09-22). */
 .panel {
   position: absolute;
   z-index: 30;
   top: calc(100% + var(--space-1));
   left: 0;
   right: 0;
-  min-width: 280px;
+  min-width: 320px;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   background: var(--color-surface-raised);
@@ -45,7 +59,89 @@
   min-width: 0;
 }
 
+/* The year fields' own numbers ("1995") fit fine at flex:1's natural width,
+ * but "mm/dd/yyyy" plus the calendar icon does not — it was truncating
+ * (owner's report, 2026-09-22). */
+.dateField {
+  flex: 1 1 132px;
+  min-width: 132px;
+}
+
 .dash {
   flex: 0 0 auto;
   color: var(--color-text-muted);
+}
+
+.calendar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+/* Which endpoint the calendar's next click will move ("від" or "до") — with
+ * no cue at all, that was only guessable from react-day-picker's own
+ * proximity heuristic (owner's report, 2026-09-22). */
+.calendarHint {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+/* react-day-picker (shared/ui/PeriodFilter.tsx, date-range mode) themed to
+ * this project's own tokens instead of its default macOS-inspired blue —
+ * :global() because DayPicker renders its own `.rdp-root` class name
+ * unscoped, not through this CSS module. Values reference our own custom
+ * properties rather than fixed colours, so light/dark both fall out of
+ * `tokens.css` the same way the rest of the app's components do — no
+ * separate `[data-theme='dark']` block needed here. */
+.calendar :global(.rdp-root) {
+  --rdp-accent-color: var(--color-accent-strong);
+  --rdp-accent-background-color: var(--color-selected);
+  --rdp-today-color: var(--color-accent);
+  --rdp-day-width: 34px;
+  --rdp-day-height: 34px;
+  --rdp-day_button-width: 32px;
+  --rdp-day_button-height: 32px;
+  --rdp-day_button-border-radius: var(--radius-sm);
+  --rdp-nav_button-width: 28px;
+  --rdp-nav_button-height: 28px;
+  --rdp-range_middle-background-color: var(--color-selected);
+  --rdp-range_middle-color: var(--color-text);
+  --rdp-range_start-color: var(--color-on-accent);
+  --rdp-range_end-color: var(--color-on-accent);
+  font-family: var(--font-body);
+  color: var(--color-text);
+}
+
+.calendar :global(.rdp-month_caption) {
+  font-size: 14px;
+}
+
+.calendar :global(.rdp-weekday) {
+  font-size: 12px;
+}
+
+.calendar :global(.rdp-button_next):hover:not(:disabled),
+.calendar :global(.rdp-button_previous):hover:not(:disabled) {
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+}
+
+.calendar :global(.rdp-day_button):hover:not(:disabled) {
+  background: var(--color-surface-hover);
+}
+
+/* Same reasoning as the rest of the toolbar's fields (FiltersPanel.module.css):
+ * a fixed 168px is right for a desktop row, but on the mobile drawer every
+ * field goes full width, so its own open menu (min-width: 320px here) is
+ * never wider than what it opens against. */
+@media (max-width: 900px) {
+  .wrapper {
+    width: auto;
+    flex-basis: 100%;
+  }
 }

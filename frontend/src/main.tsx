@@ -12,6 +12,10 @@ import { createRoot } from 'react-dom/client';
 
 import '@/shared/i18n';
 import '@/shared/theme/tokens.css';
+// Base chrome for the period filter's date-range calendar
+// (shared/ui/PeriodFilter.tsx); PeriodFilter.module.css overrides its
+// --rdp-* variables to match our own tokens, so this must load first.
+import 'react-day-picker/style.css';
 
 import { App } from './app/App';
 

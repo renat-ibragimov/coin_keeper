@@ -7,6 +7,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/features/auth/useAuth';
 import { ApiError } from '@/shared/api/client';
 import type { CollectionGroup } from '@/shared/api/types';
+import { formatPeriodDateForDisplay } from '@/shared/lib/periodFilter';
 import { useDismissable } from '@/shared/lib/useDismissable';
 import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
 import type { ActiveFilterChip } from '@/shared/ui';
@@ -76,7 +77,7 @@ function soleCountryId(countryIds: number[]): number | undefined {
 const GRID_PAGE_SIZE = 30;
 
 export function CatalogPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { filters, update, reset } = useCatalogFilters();
 
@@ -211,9 +212,11 @@ export function CatalogPage() {
         onRemove: () => apply({ period: { mode: period.mode } }),
       });
     } else if (period.dateFrom || period.dateTo) {
+      const from = formatPeriodDateForDisplay(period.dateFrom, i18n.language) ?? '…';
+      const to = formatPeriodDateForDisplay(period.dateTo, i18n.language) ?? '…';
       chips.push({
         key: 'period',
-        label: `${t('catalog.years')}: ${period.dateFrom ?? '…'}–${period.dateTo ?? '…'}`,
+        label: `${t('catalog.years')}: ${from}–${to}`,
         onRemove: () => apply({ period: { mode: period.mode } }),
       });
     }

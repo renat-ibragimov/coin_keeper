@@ -1,14 +1,25 @@
+import { isValid, parse } from 'date-fns';
 import { Check } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';
+import { DayPicker } from 'react-day-picker';
+import { enUS, uk } from 'react-day-picker/locale';
 import { useTranslation } from 'react-i18next';
 
 import type { PeriodFilterValue, PeriodMode } from '@/shared/lib/periodFilter';
-import { hasPeriodValue } from '@/shared/lib/periodFilter';
+import {
+  formatPeriodDate,
+  formatPeriodDateForDisplay,
+  hasPeriodValue,
+  parsePeriodDate,
+  periodDateFormat,
+} from '@/shared/lib/periodFilter';
 
 import { Combobox } from './Combobox';
 import { Input } from './Input';
 import panelStyles from './PeriodFilter.module.css';
 import selectStyles from './Select.module.css';
+
+const DAY_PICKER_LOCALES: Record<string, typeof enUS> = { uk, en: enUS };
 
 interface PeriodFilterProps {
   value: PeriodFilterValue;
@@ -43,13 +54,87 @@ export function PeriodFilter({
   yearFromOptions,
   yearToOptions,
 }: PeriodFilterProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const autoId = useId();
   const labelId = `${autoId}-label`;
 
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const dateFormat = periodDateFormat(i18n.language);
+  const rdpLocale = DAY_PICKER_LOCALES[i18n.language] ?? enUS;
+  // Same bounds the "year"/"year range" modes already narrow their own
+  // suggestion lists to for the selected country — `yearOptions` is that
+  // list, oldest first (shared/lib/yearRange.ts).
+  const calendarMinYear = Number(yearOptions[0] ?? 1900);
+  const calendarMaxYear = Number(yearOptions[yearOptions.length - 1] ?? new Date().getFullYear());
+
+  // A typed-text buffer per field, separate from the committed `yyyy-MM-dd`
+  // value: while the owner is still typing "22.09.202", that string doesn't
+  // parse yet and must not be thrown away, the same reasoning the search
+  // box's own debounce buffer follows elsewhere in this toolbar. Synced back
+  // from `value` on every external change (a calendar click, switching
+  // modes, "Очистити", the app's language toggle).
+  const [fromText, setFromText] = useState(
+    () => formatPeriodDateForDisplay(value.dateFrom, i18n.language) ?? '',
+  );
+  const [toText, setToText] = useState(
+    () => formatPeriodDateForDisplay(value.dateTo, i18n.language) ?? '',
+  );
+  useEffect(() => {
+    setFromText(formatPeriodDateForDisplay(value.dateFrom, i18n.language) ?? '');
+  }, [value.dateFrom, i18n.language]);
+  useEffect(() => {
+    setToText(formatPeriodDateForDisplay(value.dateTo, i18n.language) ?? '');
+  }, [value.dateTo, i18n.language]);
+
+  const commitTypedDate = (raw: string, field: 'dateFrom' | 'dateTo') => {
+    if (raw === '') {
+      onChange({ ...value, [field]: undefined });
+      return;
+    }
+    const parsed = parse(raw, dateFormat, new Date());
+    if (isValid(parsed)) onChange({ ...value, [field]: formatPeriodDate(parsed) });
+  };
+
+  // Which endpoint the calendar's own clicks currently move — react-day-picker's
+  // built-in `mode="range"` moves whichever endpoint is "closer" to the
+  // clicked day once a range is already complete, with no visible sign of
+  // which one that will be and no way to aim it at "від" specifically
+  // (owner's report, 2026-09-22). Clicking a text field claims it instead:
+  // predictable, and it's how the field itself already works for typing.
+  const [activeField, setActiveField] = useState<'dateFrom' | 'dateTo'>('dateFrom');
+  useEffect(() => {
+    if (!value.dateFrom && !value.dateTo) setActiveField('dateFrom');
+  }, [value.dateFrom, value.dateTo]);
+
+  const handleDayClick = (day: Date) => {
+    const clicked = formatPeriodDate(day);
+    if (activeField === 'dateTo') {
+      // A "to" before the current "from" reads as moving the start
+      // earlier, not as an error — swap rather than reject the click.
+      if (value.dateFrom && clicked < value.dateFrom) {
+        onChange({ ...value, dateFrom: clicked, dateTo: value.dateFrom });
+      } else {
+        onChange({ ...value, dateTo: clicked });
+      }
+      return;
+    }
+    const hadTo = value.dateTo !== undefined;
+    if (value.dateTo && clicked > value.dateTo) {
+      // A "from" past the current "to" starts a fresh range instead of
+      // producing an inverted one silently.
+      onChange({ ...value, dateFrom: clicked, dateTo: undefined });
+      setActiveField('dateTo');
+      return;
+    }
+    onChange({ ...value, dateFrom: clicked });
+    // Only the first click of a brand new range auto-advances — editing
+    // "від" on an already-complete range stays on "від" until the owner
+    // explicitly clicks into "до" (the whole point of tracking this).
+    if (!hadTo) setActiveField('dateTo');
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -86,11 +171,13 @@ export function PeriodFilter({
       return `${value.yearFrom ?? '…'}–${value.yearTo ?? '…'}`;
     }
     if (!value.dateFrom && !value.dateTo) return modeLabel('dateRange');
-    return `${value.dateFrom ?? '…'}–${value.dateTo ?? '…'}`;
+    const from = formatPeriodDateForDisplay(value.dateFrom, i18n.language) ?? '…';
+    const to = formatPeriodDateForDisplay(value.dateTo, i18n.language) ?? '…';
+    return `${from}–${to}`;
   })();
 
   return (
-    <div className={selectStyles.wrapper} ref={rootRef}>
+    <div className={[selectStyles.wrapper, panelStyles.wrapper].join(' ')} ref={rootRef}>
       <span className={[selectStyles.label, selectStyles.labelCenter].join(' ')} id={labelId}>
         {t('catalog.period')}
       </span>
@@ -180,28 +267,81 @@ export function PeriodFilter({
 
               {value.mode === 'dateRange' ? (
                 <>
-                  <Input
-                    type="date"
-                    value={value.dateFrom ?? ''}
-                    max={value.dateTo}
-                    onChange={(event) =>
-                      onChange({ ...value, dateFrom: event.target.value || undefined })
-                    }
-                    aria-label={t('catalog.yearFrom')}
-                  />
+                  {/* A wrapping div, not a className on Input itself: Input's
+                   * className lands on the <input>, one level below the box
+                   * that actually needs the min-width — the flex item
+                   * `.fields` sizes as its row (docs/08-ui-map.md). Plain
+                   * text, not the native `<input type="date">` these used to
+                   * be: its own calendar and placeholder followed the
+                   * browser's language, not the app's uk/en toggle, and no
+                   * amount of `lang` on the element changed that (owner's
+                   * report, 2026-09-22) — react-day-picker below replaces it
+                   * precisely so typing and the calendar both track
+                   * `i18n.language` for real. */}
+                  <div className={panelStyles.dateField}>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder={dateFormat}
+                      value={fromText}
+                      onChange={(event) => commitTypedDate(event.target.value, 'dateFrom')}
+                      onFocus={() => setActiveField('dateFrom')}
+                      aria-label={t('catalog.yearFrom')}
+                    />
+                  </div>
                   <span className={panelStyles.dash}>—</span>
-                  <Input
-                    type="date"
-                    value={value.dateTo ?? ''}
-                    min={value.dateFrom}
-                    onChange={(event) =>
-                      onChange({ ...value, dateTo: event.target.value || undefined })
-                    }
-                    aria-label={t('catalog.yearTo')}
-                  />
+                  <div className={panelStyles.dateField}>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder={dateFormat}
+                      value={toText}
+                      onChange={(event) => commitTypedDate(event.target.value, 'dateTo')}
+                      onFocus={() => setActiveField('dateTo')}
+                      aria-label={t('catalog.yearTo')}
+                    />
+                  </div>
                 </>
               ) : null}
             </div>
+
+            {value.mode === 'dateRange' ? (
+              <div className={panelStyles.calendar}>
+                <p className={panelStyles.calendarHint}>
+                  {activeField === 'dateFrom'
+                    ? t('catalog.periodPickFrom')
+                    : t('catalog.periodPickTo')}
+                </p>
+                <DayPicker
+                  mode="range"
+                  locale={rdpLocale}
+                  // Month/year dropdowns, not just prev/next arrows: the
+                  // catalog's own years reach back to 1900, and clicking
+                  // "previous month" a hundred years back is not a real way
+                  // to get there (owner's report, 2026-09-22). Bounded to
+                  // the same year range the "year"/"year range" modes
+                  // already narrow to for the selected country
+                  // (`yearOptions`, oldest first), so the dropdown never
+                  // offers a decade this country has no coins in.
+                  captionLayout="dropdown"
+                  navLayout="after"
+                  startMonth={new Date(calendarMinYear, 0)}
+                  endMonth={new Date(calendarMaxYear, 11)}
+                  defaultMonth={parsePeriodDate(value.dateFrom) ?? new Date()}
+                  selected={{
+                    from: parsePeriodDate(value.dateFrom),
+                    to: parsePeriodDate(value.dateTo),
+                  }}
+                  // Not `onSelect`: DayPicker's own range logic decides which
+                  // endpoint a click moves once a range is complete, by
+                  // proximity — invisible to the owner and not steerable
+                  // toward "від" specifically. `onDayClick` is the raw
+                  // per-day event, independent of that logic, so
+                  // `handleDayClick` above can apply `activeField` instead.
+                  onDayClick={handleDayClick}
+                />
+              </div>
+            ) : null}
 
             {hasPeriodValue(value) ? (
               <div
