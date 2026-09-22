@@ -170,6 +170,12 @@ class UserSettings(Base):
     secondary_currency: Mapped[str] = mapped_column(
         Text, nullable=False, default="USD", server_default="USD"
     )
+    # Whether delivery/holder/grading count toward "Куплено загалом" and the
+    # value-change figure, or stay a separate informational line next to
+    # them (docs/04-business-rules.md, rule 4). On by default.
+    include_supporting_expenses: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true"
+    )
     # Pre-fills the purchase form's storage location for a brand-new purchase,
     # same idea as default_grade. NULL until the owner sets one.
     default_storage_location_id: Mapped[int | None] = mapped_column(

@@ -116,6 +116,11 @@ export function SettingsPage() {
       void queryClient.invalidateQueries({ queryKey: ['catalog'] });
     },
   });
+  const includeSupportingExpensesMutation = useMutation({
+    mutationFn: (includeSupportingExpenses: boolean) =>
+      updateSettings({ includeSupportingExpenses }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['bootstrap'] }),
+  });
   const gradeMutation = useMutation({
     mutationFn: (defaultGrade: string) => updateSettings({ defaultGrade }),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['bootstrap'] }),
@@ -350,6 +355,18 @@ export function SettingsPage() {
                 disabled={!settings || packagingMutation.isPending}
                 onChange={(checked) => packagingMutation.mutate(checked)}
                 label={t('settings.showPackagingVariants')}
+              />
+            </FormStack>
+
+            <h3 className={`${styles.subsectionTitle} ${styles.spaced}`}>
+              {t('settings.valuationTitle')}
+            </h3>
+            <FormStack>
+              <Toggle
+                checked={settings?.includeSupportingExpenses ?? true}
+                disabled={!settings || includeSupportingExpensesMutation.isPending}
+                onChange={(checked) => includeSupportingExpensesMutation.mutate(checked)}
+                label={t('settings.includeSupportingExpenses')}
               />
             </FormStack>
 

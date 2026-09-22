@@ -393,3 +393,25 @@ async def test_update_settings_secondary_currency_default_and_persist(
         json={"secondaryCurrency": "GBP"},
     )
     assert rejected.status_code == 422
+
+
+async def test_update_settings_include_supporting_expenses_default_and_persist(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    fresh = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
+    assert fresh.json()["settings"]["includeSupportingExpenses"] is True
+
+    response = await client.patch(
+        "/api/v1/bootstrap/settings",
+        headers=auth(ctx.token_a),
+        json={"includeSupportingExpenses": False},
+    )
+    assert response.status_code == 200
+    assert response.json()["includeSupportingExpenses"] is False
+
+    refetched = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_a))
+    assert refetched.json()["settings"]["includeSupportingExpenses"] is False
+
+    # Untouched for user B: still the default, on.
+    body_b = await client.get("/api/v1/bootstrap", headers=auth(ctx.token_b))
+    assert body_b.json()["settings"]["includeSupportingExpenses"] is True

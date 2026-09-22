@@ -2420,6 +2420,8 @@ export interface components {
             secondaryCurrency: string;
             /** Defaultstoragelocation */
             defaultStorageLocation: string | null;
+            /** Includesupportingexpenses */
+            includeSupportingExpenses: boolean;
         };
         /**
          * SettingsUpdate
@@ -2440,6 +2442,8 @@ export interface components {
             defaultStorageLocation?: string | null;
             /** Secondarycurrency */
             secondaryCurrency?: ("USD" | "EUR") | null;
+            /** Includesupportingexpenses */
+            includeSupportingExpenses?: boolean | null;
         };
         /** StorageLocationCreate */
         StorageLocationCreate: {

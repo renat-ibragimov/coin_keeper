@@ -168,7 +168,13 @@ GET /bootstrap
   посчитанных полей (`purchaseTotalUsd`/`purchaseTotalEur` и аналоги) показать.
 - `defaultStorageLocation` (по умолчанию `null`) — имя, не id: сервер резолвит его через
   тот же get-or-create, что и `storageLocation` покупки (`04-business-rules.md`, п. 16).
-  Пустая строка/`null` очищает дефолт.
+  Пустая строка/`null` очищает дефолт;
+- `includeSupportingExpenses` (по умолчанию `true`, 2026-09-22) — считать ли сопутствующие
+  расходы частью `purchaseTotalUah`/«Зміни вартості» на карточке монеты (`supportingExpensesUah`
+  тогда сложен с `purchaseTotalUah` на фронте) или показывать их отдельной информационной
+  строкой без слияния. Само число `supportingExpensesUah` в ответе `GET /catalog/{id}` не
+  зависит от этой настройки — она только про то, как фронт две уже готовые суммы показывает
+  и что берёт за базу для расчёта изменения стоимости (`04-business-rules.md`, п. 4).
 
 ## Каталог
 

@@ -49,6 +49,7 @@ function renderList(overrides: Partial<Parameters<typeof InstancesList>[0]> = {}
           currentPriceUah="460.00"
           secondaryCurrency="USD"
           secondaryRate={41.5}
+          includeSupportingExpenses={true}
           {...overrides}
         />
       </MemoryRouter>
@@ -67,9 +68,35 @@ describe('InstancesList', () => {
 
   it('shows the purchase total, the historical rate, and the storage place', () => {
     renderList();
-    expect(screen.getByText('350 ₴')).toBeInTheDocument();
+    // Coin price and full price coincide (no supporting expense on this
+    // fixture), so the same figure appears in both narrow columns.
+    expect(screen.getAllByText('350 ₴').length).toBe(2);
     expect(screen.getByText('35 ₴ за 1 $')).toBeInTheDocument();
     expect(screen.getByText('Вдома')).toBeInTheDocument();
+  });
+
+  it('shows quantity as a plain number, not the pluralized label', () => {
+    renderList({ items: [{ ...INSTANCES[0]!, quantity: 3 }] });
+    expect(screen.getByRole('cell', { name: '3' })).toBeInTheDocument();
+    expect(screen.queryByText(/екземпляр/)).not.toBeInTheDocument();
+  });
+
+  it('breaks the price into coin price, extra expenses and full price', () => {
+    renderList({ items: [{ ...INSTANCES[0]!, supportingExpensesUah: '50.00' }] });
+    expect(screen.getByText('350 ₴')).toBeInTheDocument();
+    expect(screen.getByText('50 ₴')).toBeInTheDocument();
+    expect(screen.getByText('400 ₴')).toBeInTheDocument();
+  });
+
+  it('measures "Зміна" against the full price when supporting expenses count, and against the coin price when they do not', () => {
+    const items = [{ ...INSTANCES[0]!, supportingExpensesUah: '50.00' }];
+    // rowCurrentValue = currentPriceUah(460) * quantity(1) = 460.
+    const included = renderList({ items, includeSupportingExpenses: true });
+    expect(screen.getByText('+60 ₴')).toBeInTheDocument(); // 460 − (350 + 50)
+    included.unmount();
+
+    renderList({ items, includeSupportingExpenses: false });
+    expect(screen.getByText('+110 ₴')).toBeInTheDocument(); // 460 − 350
   });
 
   it('shows a dash when a purchase has no storage location', () => {

@@ -82,6 +82,7 @@ function makeBootstrap(usdRate: string | null = '41.5000'): BootstrapOut {
       collectionViewMode: 'cards',
       secondaryCurrency: 'USD',
       defaultStorageLocation: null,
+      includeSupportingExpenses: true,
     },
     dashboard: {
       catalogItems: 0,
@@ -471,6 +472,41 @@ describe('CoinCardPage', () => {
     const [firstRow, secondRow] = rows;
     expect(within(firstRow!).getByText('02.04.2025')).toBeInTheDocument();
     expect(within(secondRow!).getByText('15.11.2023')).toBeInTheDocument();
+  });
+
+  it('folds supporting expenses into "Куплено загалом" and the value change by default', async () => {
+    // settings.includeSupportingExpenses defaults to true (makeBootstrap).
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({ purchaseTotalUah: '640.00', supportingExpensesUah: '60.00' }),
+    );
+    vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Мої екземпляри' });
+    // 640 (coin) + 60 (supporting) = 700, merged into the headline by default.
+    expect(await screen.findByText('700 ₴')).toBeInTheDocument();
+    expect(screen.getByText('у т.ч. 60 ₴ супутні витрати')).toBeInTheDocument();
+    // change = 920 (current) − 700 (merged) = +220
+    expect(screen.getByText('+220 ₴')).toBeInTheDocument();
+  });
+
+  it('keeps supporting expenses out of "Куплено загалом" when the viewer turned that off', async () => {
+    const bootstrap = makeBootstrap();
+    vi.mocked(fetchBootstrap).mockResolvedValue({
+      ...bootstrap,
+      settings: { ...bootstrap.settings, includeSupportingExpenses: false },
+    });
+    vi.mocked(fetchCard).mockResolvedValue(
+      makeCard({ purchaseTotalUah: '640.00', supportingExpensesUah: '60.00' }),
+    );
+    vi.mocked(fetchOwnInstances).mockResolvedValue(INSTANCES);
+    renderPage();
+
+    await screen.findByRole('heading', { name: 'Мої екземпляри' });
+    expect(await screen.findByText('640 ₴')).toBeInTheDocument();
+    expect(screen.getByText('+ 60 ₴ супутні витрати')).toBeInTheDocument();
+    // change = 920 (current) − 640 (coin only) = +280
+    expect(screen.getByText('+280 ₴')).toBeInTheDocument();
   });
 
   it('skips the value-change percent when nothing was paid for the coin', async () => {

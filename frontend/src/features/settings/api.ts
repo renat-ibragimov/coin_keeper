@@ -16,6 +16,7 @@ export function updateSettings(body: {
   collectionViewMode?: 'cards' | 'table';
   secondaryCurrency?: 'USD' | 'EUR';
   defaultStorageLocation?: string;
+  includeSupportingExpenses?: boolean;
 }): Promise<SettingsOut> {
   return api<SettingsOut>('/bootstrap/settings', { method: 'PATCH', body });
 }

@@ -77,6 +77,7 @@ function makeBootstrap(): BootstrapOut {
       collectionViewMode: 'cards',
       secondaryCurrency: 'USD',
       defaultStorageLocation: null,
+      includeSupportingExpenses: true,
     },
     dashboard: {
       catalogItems: 0,

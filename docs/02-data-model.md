@@ -796,6 +796,7 @@ catalog_view_mode     text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
 collection_view_mode  text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
 secondary_currency    text NOT NULL DEFAULT 'USD'     -- 'USD' | 'EUR'
 default_storage_location_id  bigint FK storage_locations ON DELETE SET NULL
+include_supporting_expenses  boolean NOT NULL DEFAULT true
 updated_at  timestamptz
 ```
 
@@ -814,6 +815,13 @@ updated_at  timestamptz
 гривневой суммой («≈ …») в карточке монеты, в «Мої монети» и в «Гроші». Гривна остаётся
 основной осью расчётов всюду; вторичная валюта — только слой отображения. Только `USD`
 или `EUR`: история курсов НБУ (`exchange_rates`) покрывает лишь эти две.
+
+`include_supporting_expenses` (миграция 0026, решение владельца 2026-09-22) — считать ли
+сопутствующие расходы (доставка, холдер, грейдинг) частью «Куплено загалом» и «Зміни
+вартості» на карточці монеты, или показывать их отдельной информационной строкой рядом.
+По умолчанию `true`. Начинался как прототип на `localStorage` в тот же день, но не пережил
+даже одной сессии до переноса — таблица уже даёт готовый паттерн для настроек такого рода
+(`04-business-rules.md`, п. 4).
 
 `display_currency` де-факто мёртвое поле: всегда `'UAH'`, ни UI, ни PATCH-параметра для
 его изменения нет.

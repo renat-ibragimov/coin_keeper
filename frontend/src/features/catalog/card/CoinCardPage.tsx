@@ -122,6 +122,7 @@ function CardBody({ card }: { card: CatalogCard }) {
   const secondaryCurrency: SecondaryCurrency =
     bootstrapQuery.data?.settings.secondaryCurrency === 'EUR' ? 'EUR' : 'USD';
   const secondaryRate = secondaryRateFrom(bootstrapQuery.data?.exchangeRates, secondaryCurrency);
+  const includeSupportingExpenses = bootstrapQuery.data?.settings.includeSupportingExpenses ?? true;
 
   const title = coinTitle(card, locale);
   const addUrl = `/collection/add?catalogItemId=${card.id}`;
@@ -243,6 +244,7 @@ function CardBody({ card }: { card: CatalogCard }) {
           t={t}
           secondaryCurrency={secondaryCurrency}
           secondaryRate={secondaryRate}
+          includeSupportingExpenses={includeSupportingExpenses}
         />
       ) : null}
 
@@ -264,6 +266,7 @@ function CardBody({ card }: { card: CatalogCard }) {
               currentPriceUah={card.marketPriceUah}
               secondaryCurrency={secondaryCurrency}
               secondaryRate={secondaryRate}
+              includeSupportingExpenses={includeSupportingExpenses}
             />
           )}
         </Card>
@@ -507,21 +510,27 @@ function ValueSummary({
   t,
   secondaryCurrency,
   secondaryRate,
+  includeSupportingExpenses,
 }: {
   card: CatalogCard;
   locale: string;
   t: TFunction;
   secondaryCurrency: SecondaryCurrency;
   secondaryRate: number | null;
+  /** The viewer's own accounting preference (settings.includeSupportingExpenses,
+   *  default on) — whether delivery/holder/grading count toward "Куплено
+   *  загалом" and `change`, or stay a separate, informational figure. */
+  includeSupportingExpenses: boolean;
 }) {
   const currentValue =
     card.marketPriceUah !== null ? Number(card.marketPriceUah) * card.quantityOwned : null;
-  const purchaseTotal = Number(card.purchaseTotalUah);
-  // A separate, muted figure — never folded into purchaseTotal or into
-  // `change` below. Whether delivery counts as "cost" is exactly the
-  // question this line exists to sidestep (docs/03-api-contract.md).
+  const coinTotal = Number(card.purchaseTotalUah);
   const supportingExpenses =
     card.supportingExpensesUah !== null ? Number(card.supportingExpensesUah) : null;
+  const mergeSupporting = includeSupportingExpenses && supportingExpenses !== null;
+  // The headline figure, and the one `change` is computed against — coin
+  // price alone, or coin + supporting, per the viewer's own preference.
+  const purchaseTotal = mergeSupporting ? coinTotal + supportingExpenses : coinTotal;
   const change = currentValue !== null ? currentValue - purchaseTotal : null;
   const changePercent =
     change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
@@ -529,13 +538,17 @@ function ValueSummary({
   const approxText = (value: string | null) =>
     value !== null ? t('card.approxSecondary', { value, symbol }) : t('dashboard.rateMissing');
 
-  const purchaseTotalSecondary = pickSecondary(
+  const coinTotalSecondary = pickSecondary(
     card.purchaseTotalUsd,
     card.purchaseTotalEur,
     secondaryCurrency,
   );
-  const purchaseTotalApprox =
-    purchaseTotalSecondary !== null ? Number(purchaseTotalSecondary) : null;
+  const coinTotalApprox = coinTotalSecondary !== null ? Number(coinTotalSecondary) : null;
+  // The backend gives supporting expenses as one lump UAH sum, not broken
+  // down by currency — there is no accurate ≈ figure for the merged total.
+  // Omitting the line beats silently showing the coin-only approx next to
+  // a UAH figure that already includes more than that.
+  const purchaseTotalApprox = mergeSupporting ? null : coinTotalApprox;
   const currentValueApprox =
     currentValue !== null ? toSecondary(currentValue, secondaryRate) : null;
   const changeApprox =
@@ -550,12 +563,16 @@ function ValueSummary({
           {t('card.purchasedTotal')} ({t('card.pieces', { count: card.quantityOwned })})
         </span>
         <p className={`${styles.valueBoxValue} tabular`}>{formatUah(purchaseTotal, locale)}</p>
-        <span className={styles.valueBoxUsd}>
-          {approxText(formatSecondary(purchaseTotalApprox, locale))}
-        </span>
+        {mergeSupporting ? null : (
+          <span className={styles.valueBoxUsd}>
+            {approxText(formatSecondary(purchaseTotalApprox, locale))}
+          </span>
+        )}
         {supportingExpenses !== null ? (
           <span className={styles.valueBoxUsd}>
-            {t('card.supportingExpenses', { value: formatUah(supportingExpenses, locale) })}
+            {t(mergeSupporting ? 'card.supportingExpensesIncluded' : 'card.supportingExpenses', {
+              value: formatUah(supportingExpenses, locale),
+            })}
           </span>
         ) : null}
       </div>

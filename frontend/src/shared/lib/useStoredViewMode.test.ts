@@ -38,6 +38,7 @@ describe('useStoredViewMode', () => {
       collectionViewMode: 'cards',
       secondaryCurrency: 'USD',
       defaultStorageLocation: null,
+      includeSupportingExpenses: true,
     });
   });
 

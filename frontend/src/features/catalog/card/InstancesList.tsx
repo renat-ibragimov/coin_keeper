@@ -50,6 +50,11 @@ interface InstancesListProps {
    *  convert by. Its purchase total uses item.totalUsd/totalEur instead, the
    *  backend's own historical-rate conversion. null renders "no data". */
   secondaryRate: number | null;
+  /** The viewer's own accounting preference (settings.includeSupportingExpenses,
+   *  default on) — whether a row's "Зміна" is measured against its full price
+   *  (coin + supporting) or the coin price alone. The three price columns
+   *  themselves always show the same breakdown regardless. */
+  includeSupportingExpenses: boolean;
 }
 
 /** "Скільки часу монета вже в колекції" — the single largest whole unit, not
@@ -76,6 +81,7 @@ export function InstancesList({
   currentPriceUah,
   secondaryCurrency,
   secondaryRate,
+  includeSupportingExpenses,
 }: InstancesListProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
@@ -120,7 +126,13 @@ export function InstancesList({
               <th scope="col">{t('card.instanceGrade')}</th>
               <th scope="col">{t('card.quantity')}</th>
               <th scope="col">{t('card.instanceSeller')}</th>
-              <th scope="col">{t('card.instancePrice')}</th>
+              <th scope="col" className={styles.narrowHeader}>
+                {t('card.instancePrice')}
+              </th>
+              <th scope="col" className={styles.narrowHeader}>
+                {t('card.instanceExtraExpenses')}
+              </th>
+              <th scope="col">{t('card.instanceFullPrice')}</th>
               <th scope="col">{t('card.instanceCurrentPrice')}</th>
               <th scope="col">{t('card.instanceChange')}</th>
               <th scope="col">{t('card.instanceDate')}</th>
@@ -138,26 +150,40 @@ export function InstancesList({
             {items.map((item) => {
               const foreign = item.purchaseCurrency !== null && item.purchaseCurrency !== 'UAH';
               const rate = foreign ? formatNumber(item.purchaseRateUah, locale, 4) : null;
-              const purchaseTotal = Number(item.totalUah);
+              const coinTotal = Number(item.totalUah);
+              const extraExpenses =
+                item.supportingExpensesUah !== null ? Number(item.supportingExpensesUah) : null;
+              // "Повна ціна" is always coin + extra, a factual breakdown —
+              // unlike `changeBasis` below, it does not depend on the
+              // viewer's include/exclude preference.
+              const fullTotal = extraExpenses !== null ? coinTotal + extraExpenses : coinTotal;
+              const changeBasis = includeSupportingExpenses ? fullTotal : coinTotal;
               const rowCurrentValue = currentPrice !== null ? currentPrice * item.quantity : null;
-              const change = rowCurrentValue !== null ? rowCurrentValue - purchaseTotal : null;
+              const change = rowCurrentValue !== null ? rowCurrentValue - changeBasis : null;
               const changePercent =
-                change !== null && purchaseTotal > 0 ? (change / purchaseTotal) * 100 : null;
+                change !== null && changeBasis > 0 ? (change / changeBasis) * 100 : null;
               // The backend's own historical-rate conversion (item.totalUsd/
               // totalEur) for what was spent then; the live rate only for a
               // value with no purchase date of its own (see the prop doc above).
-              const purchaseTotalSecondary = pickSecondary(
+              const coinTotalSecondary = pickSecondary(
                 item.totalUsd,
                 item.totalEur,
                 secondaryCurrency,
               );
-              const purchaseTotalApprox =
-                purchaseTotalSecondary !== null ? Number(purchaseTotalSecondary) : null;
+              const coinTotalApprox =
+                coinTotalSecondary !== null ? Number(coinTotalSecondary) : null;
+              // No per-currency breakdown exists for a supporting expense
+              // (docs/03-api-contract.md) — an accurate ≈ figure exists only
+              // when there is nothing to merge in, coin-only or not.
+              const fullTotalApprox = extraExpenses === null ? coinTotalApprox : null;
+              const changeBasisApprox = includeSupportingExpenses
+                ? fullTotalApprox
+                : coinTotalApprox;
               const rowCurrentValueApprox =
                 rowCurrentValue !== null ? toSecondary(rowCurrentValue, secondaryRate) : null;
               const changeApprox =
-                rowCurrentValueApprox !== null && purchaseTotalApprox !== null
-                  ? rowCurrentValueApprox - purchaseTotalApprox
+                rowCurrentValueApprox !== null && changeBasisApprox !== null
+                  ? rowCurrentValueApprox - changeBasisApprox
                   : null;
               const editHref = `/collection/coins/${item.id}/edit`;
 
@@ -177,16 +203,12 @@ export function InstancesList({
                     />
                   </td>
                   <td>{item.grade ? <Badge>{item.grade}</Badge> : '—'}</td>
-                  <td className="tabular">
-                    <span className={styles.nowrap}>
-                      {t('card.pieces', { count: item.quantity })}
-                    </span>
-                  </td>
+                  <td className="tabular">{item.quantity}</td>
                   <td>{item.seller || '—'}</td>
                   <td className="tabular">
-                    <span className={styles.price}>{formatUah(purchaseTotal, locale) ?? '—'}</span>
+                    <span className={styles.price}>{formatUah(coinTotal, locale) ?? '—'}</span>
                     <span className={styles.secondary}>
-                      {approxText(formatSecondary(purchaseTotalApprox, locale))}
+                      {approxText(formatSecondary(coinTotalApprox, locale))}
                     </span>
                     {rate ? (
                       <span className={styles.secondary}>
@@ -196,6 +218,12 @@ export function InstancesList({
                         })}
                       </span>
                     ) : null}
+                  </td>
+                  <td className="tabular">
+                    {extraExpenses !== null ? formatUah(extraExpenses, locale) : '—'}
+                  </td>
+                  <td className="tabular">
+                    <span className={styles.price}>{formatUah(fullTotal, locale) ?? '—'}</span>
                   </td>
                   <td className="tabular">
                     {rowCurrentValue !== null ? (
@@ -230,13 +258,15 @@ export function InstancesList({
                             {formatSignedPercent(changePercent, locale)}
                           </span>
                         ) : null}
-                        <span className={styles.secondary}>
-                          {approxText(
-                            changeApprox !== null
-                              ? formatSecondarySigned(changeApprox, locale)
-                              : null,
-                          )}
-                        </span>
+                        {includeSupportingExpenses && extraExpenses !== null ? null : (
+                          <span className={styles.secondary}>
+                            {approxText(
+                              changeApprox !== null
+                                ? formatSecondarySigned(changeApprox, locale)
+                                : null,
+                            )}
+                          </span>
+                        )}
                       </>
                     ) : (
                       '—'

@@ -120,6 +120,7 @@ class BootstrapService:
                 collection_view_mode="cards",
                 secondary_currency="USD",
                 default_storage_location=None,
+                include_supporting_expenses=True,
             )
         return SettingsOut(
             locale=row.locale,
@@ -133,6 +134,7 @@ class BootstrapService:
             default_storage_location=await self._storage_locations.name_for(
                 row.default_storage_location_id
             ),
+            include_supporting_expenses=row.include_supporting_expenses,
         )
 
     async def update_settings(

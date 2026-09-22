@@ -85,8 +85,8 @@
   color: var(--color-text-secondary);
 }
 
-.nowrap {
-  white-space: nowrap;
+.narrowHeader {
+  width: 1%;
 }
 
 .notes {
