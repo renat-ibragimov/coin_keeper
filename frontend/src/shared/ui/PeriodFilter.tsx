@@ -1,3 +1,5 @@
+// Load calendar defaults before our token-based overrides, with the filter.
+import 'react-day-picker/style.css';
 import { isValid, parse } from 'date-fns';
 import { Check } from 'lucide-react';
 import { useEffect, useId, useRef, useState } from 'react';

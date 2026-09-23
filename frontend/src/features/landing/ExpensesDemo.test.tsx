@@ -27,7 +27,7 @@ describe('landing expenses preview', () => {
     const user = userEvent.setup();
     render(<ExpensesDemo c={landingCopy.uk} en={false} />);
     const journal = screen.getByRole('table').textContent;
-    expect(screen.getByTestId('chart')).toHaveTextContent('11050');
+    expect(await screen.findByTestId('chart')).toHaveTextContent('11050');
     await user.click(screen.getByRole('tab', { name: '1М' }));
     expect(screen.getByTestId('chart')).toHaveTextContent('4530');
     expect(screen.getByRole('table').textContent).toBe(journal);
@@ -42,7 +42,7 @@ describe('landing expenses preview', () => {
     const table = screen.getByRole('table');
     expect(within(table).getAllByText('Доставка')).toHaveLength(4);
     expect(within(table).queryByText('Покупка монети')).not.toBeInTheDocument();
-    expect(screen.getByTestId('chart')).toHaveTextContent('11050');
+    expect(await screen.findByTestId('chart')).toHaveTextContent('11050');
     expect(screen.getByRole('button', { name: 'Назад' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Вперед' })).toBeDisabled();
   });

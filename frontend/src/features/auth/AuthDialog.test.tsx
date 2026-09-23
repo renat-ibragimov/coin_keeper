@@ -53,7 +53,10 @@ describe('AuthDialog', () => {
   it('signs in on the current page and closes the dialog', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Open login' }));
-    await userEvent.type(screen.getByRole('textbox', { name: 'Email' }), 'guest@example.test');
+    await userEvent.type(
+      await screen.findByRole('textbox', { name: 'Email' }),
+      'guest@example.test',
+    );
     await userEvent.type(screen.getByLabelText('Пароль'), 'password1234');
     await userEvent.click(screen.getByRole('button', { name: 'Увійти' }));
     await waitFor(() =>
@@ -66,7 +69,7 @@ describe('AuthDialog', () => {
   it('keeps the page visible after registration and remembers it for email verification', async () => {
     show();
     await userEvent.click(screen.getByRole('button', { name: 'Open registration' }));
-    await userEvent.type(screen.getByRole('textbox', { name: 'Email' }), 'new@example.test');
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Email' }), 'new@example.test');
     await userEvent.click(screen.getByRole('button', { name: 'Зареєструватися' }));
     await waitFor(() => expect(authApi.register).toHaveBeenCalled());
     expect(screen.getByRole('dialog', { name: 'Перевірте пошту' })).toBeInTheDocument();

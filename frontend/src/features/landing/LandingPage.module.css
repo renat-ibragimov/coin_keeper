@@ -68,7 +68,7 @@
   transform: translateY(-50%);
   pointer-events: none;
   z-index: -1;
-  background-image: url('./assets/books-new.png');
+  background-image: url('./assets/books-new.webp');
   background-repeat: no-repeat;
   background-position: left center;
   background-size: auto 100%;
@@ -499,7 +499,9 @@
   --art-direction: 270deg;
   left: auto;
   right: 0;
-  background-image: url('./assets/album-new.png');
+}
+.collectionArt[data-visible='true'] {
+  background-image: url('./assets/album-new.webp');
 }
 .expensesArt {
   /* Give the enlarged image its full canvas so the book's bottom stays visible. */
@@ -511,7 +513,9 @@
   transform: translateY(-50%);
   background-position: right center;
   background-size: auto 100%;
-  background-image: url('./assets/expense-ledger.png');
+}
+.expensesArt[data-visible='true'] {
+  background-image: url('./assets/expense-ledger.webp');
 }
 :global([data-theme='dark']) .sectionArt {
   mix-blend-mode: screen;

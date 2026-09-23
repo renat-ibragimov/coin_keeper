@@ -1,8 +1,7 @@
 import { CalendarDays, Coins, Receipt, Wallet } from 'lucide-react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ExpensesByMonthChart } from '@/features/expenses/ExpensesByMonthChart';
 import { ExpensesPeriodPicker } from '@/features/expenses/ExpensesPeriodPicker';
 import { presetRange } from '@/features/expenses/period';
 import type { ExpensesPeriodPreset } from '@/features/expenses/period';
@@ -11,9 +10,17 @@ import { useChartPalette } from '@/shared/theme/useChartPalette';
 
 import type { LandingCopy } from './copy';
 import { expenseDemoChart, expenseDemoRows, expenseDemoToday } from './expenseDemoData';
+import { useNearViewport } from './useNearViewport';
 import styles from './LandingPage.module.css';
 
+const ExpensesByMonthChart = lazy(() =>
+  import('@/features/expenses/ExpensesByMonthChart').then((module) => ({
+    default: module.ExpensesByMonthChart,
+  })),
+);
+
 export function ExpensesDemo({ c, en }: { c: LandingCopy; en: boolean }) {
+  const { ref: chartRef, visible: chartVisible } = useNearViewport();
   const { t } = useTranslation();
   const locale = en ? 'en' : 'uk';
   const palette = useChartPalette();
@@ -97,18 +104,23 @@ export function ExpensesDemo({ c, en }: { c: LandingCopy; en: boolean }) {
       </div>
       <div className={styles.financeChart}>
         <h4>{t('expenses.chartByMonthTitle')}</h4>
-        {!invalidRange && chart.byCategory.length ? (
-          <ExpensesByMonthChart
-            data={chart.byPeriod}
-            granularity={chart.granularity}
-            locale={locale}
-            palette={palette}
-          />
-        ) : (
-          <p className={styles.financeChartEmpty}>
-            {invalidRange ? t('expenses.periodInvalid') : t('expenses.chartPeriodEmpty')}
-          </p>
-        )}
+        <div ref={chartRef} style={{ height: 260 }}>
+          <Suspense fallback={null}>
+            {chartVisible &&
+              (!invalidRange && chart.byCategory.length ? (
+                <ExpensesByMonthChart
+                  data={chart.byPeriod}
+                  granularity={chart.granularity}
+                  locale={locale}
+                  palette={palette}
+                />
+              ) : (
+                <p className={styles.financeChartEmpty}>
+                  {invalidRange ? t('expenses.periodInvalid') : t('expenses.chartPeriodEmpty')}
+                </p>
+              ))}
+          </Suspense>
+        </div>
       </div>
       <div className={styles.financeCategories} aria-label={t('expenses.category')}>
         {['', 'coin_purchase', 'delivery'].map((value) => (

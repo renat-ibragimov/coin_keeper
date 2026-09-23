@@ -25,6 +25,7 @@ import airAssaultReverse from './assets/air-assault-reverse.webp';
 import lesyaObverse from './assets/lesya-obverse.webp';
 import lesyaReverse from './assets/lesya-reverse.webp';
 import { landingCopy } from './copy';
+import { DeferredArt } from './DeferredArt';
 import { ExpensesDemo } from './ExpensesDemo';
 import type { LandingCopy } from './copy';
 import styles from './LandingPage.module.css';
@@ -580,7 +581,7 @@ export default function LandingPage() {
         })}
       </div>
       <section className={styles.sectionStage} id="collection" aria-labelledby="collection-title">
-        <div className={`${styles.sectionArt} ${styles.collectionArt}`} aria-hidden="true" />
+        <DeferredArt className={`${styles.sectionArt} ${styles.collectionArt}`} />
         <div className={`${styles.section} ${styles.collectionSection}`}>
           <div className={styles.collectionStory}>
             <div className={styles.sectionCopy}>
@@ -605,7 +606,7 @@ export default function LandingPage() {
       </section>
       <div className={styles.sectionDivider} />
       <section className={styles.sectionStage} id="analytics" aria-labelledby="expenses-title">
-        <div className={`${styles.sectionArt} ${styles.expensesArt}`} aria-hidden="true" />
+        <DeferredArt className={`${styles.sectionArt} ${styles.expensesArt}`} />
         <div className={`${styles.section} ${styles.expensesSection}`}>
           <div className={styles.sectionCopy}>
             <h2 id="expenses-title">{c.expensesTitle}</h2>

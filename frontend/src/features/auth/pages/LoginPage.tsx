@@ -78,6 +78,7 @@ export function LoginForm({
         <Input
           label={t('auth.email')}
           type="email"
+          autoFocus={!showHeading}
           autoComplete="email"
           required
           placeholder={t('auth.emailPlaceholder')}

@@ -29,7 +29,7 @@ describe('DonationDialog', () => {
     await act(() => i18n.changeLanguage('uk'));
   });
 
-  it('shows the Ukrainian donation options using the shared URL', () => {
+  it('shows the Ukrainian donation options using the shared URL', async () => {
     renderDialog();
 
     expect(screen.getByRole('heading', { name: 'Підтримати проєкт' })).toBeInTheDocument();
@@ -37,7 +37,7 @@ describe('DonationDialog', () => {
       'href',
       DONATION_URL,
     );
-    expect(screen.getByTitle('QR-код банки monobank').closest('svg')).toHaveAttribute(
+    expect((await screen.findByTitle('QR-код банки monobank')).closest('svg')).toHaveAttribute(
       'data-value',
       DONATION_URL,
     );

@@ -1,9 +1,11 @@
+import { Suspense } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Outlet } from 'react-router-dom';
 
 import { Brand } from '@/app/layout/Brand';
 import { LocaleSwitcher, ThemeSwitcher } from '@/app/layout/HeaderControls';
 import { SiteFooter } from '@/app/layout/SiteFooter';
+import { Spinner } from '@/shared/ui/Spinner';
 
 import styles from './AuthLayout.module.css';
 
@@ -46,7 +48,9 @@ export function AuthLayout() {
           </ul>
         </aside>
         <section className={styles.form}>
-          <Outlet />
+          <Suspense fallback={<Spinner />}>
+            <Outlet />
+          </Suspense>
         </section>
       </div>
       <SiteFooter />

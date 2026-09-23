@@ -14,13 +14,14 @@ import {
   User,
   Wallet,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 
 import { useAuthDialog } from '@/features/auth/authDialogContext';
 import { useAuth } from '@/features/auth/useAuth';
 import { useDismissable } from '@/shared/lib/useDismissable';
+import { Spinner } from '@/shared/ui/Spinner';
 
 import { Brand } from './Brand';
 import { useDonationDialog } from './donationDialogContext';
@@ -285,7 +286,9 @@ export function AppLayout() {
         ) : null}
 
         <main className={`${styles.main} ${isLanding ? styles.landingMain : ''}`}>
-          <Outlet />
+          <Suspense fallback={<Spinner />}>
+            <Outlet />
+          </Suspense>
         </main>
         <SiteFooter reserveMobileNav />
       </div>

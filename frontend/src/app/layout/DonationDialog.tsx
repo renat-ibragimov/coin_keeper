@@ -1,6 +1,5 @@
 import { ExternalLink } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,6 +8,10 @@ import { Modal } from '@/shared/ui';
 
 import styles from './DonationDialog.module.css';
 import { DonationDialogContext } from './donationDialogContext';
+
+const QRCodeSVG = lazy(() =>
+  import('qrcode.react').then((module) => ({ default: module.QRCodeSVG })),
+);
 
 interface DonationDialogProps {
   open: boolean;
@@ -53,14 +56,16 @@ export function DonationDialog({ open, onClose }: DonationDialogProps) {
         </div>
         <div className={styles.qrSection}>
           <div className={styles.qrFrame}>
-            <QRCodeSVG
-              value={DONATION_URL}
-              size={180}
-              bgColor="#ffffff"
-              fgColor="#000000"
-              level="M"
-              title={t('donation.qrTitle')}
-            />
+            <Suspense fallback={<div style={{ width: 180, height: 180 }} />}>
+              <QRCodeSVG
+                value={DONATION_URL}
+                size={180}
+                bgColor="#ffffff"
+                fgColor="#000000"
+                level="M"
+                title={t('donation.qrTitle')}
+              />
+            </Suspense>
           </div>
           <p className={styles.qrHint}>{t('donation.scanQr')}</p>
         </div>

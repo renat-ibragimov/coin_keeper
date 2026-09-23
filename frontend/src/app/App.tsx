@@ -3,30 +3,11 @@ import { lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 
-import { AdminPage } from '@/features/admin/AdminPage';
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { AuthDialogProvider } from '@/features/auth/AuthDialog';
 import { AuthLayout } from '@/features/auth/AuthLayout';
 import { useAuth } from '@/features/auth/useAuth';
-import { CheckEmailPage } from '@/features/auth/pages/CheckEmailPage';
-import { ForgotPasswordPage } from '@/features/auth/pages/ForgotPasswordPage';
-import { GoogleCompletePage } from '@/features/auth/pages/GoogleCompletePage';
-import { LoginPage } from '@/features/auth/pages/LoginPage';
-import { RegisterPage } from '@/features/auth/pages/RegisterPage';
-import { ResetPasswordPage } from '@/features/auth/pages/ResetPasswordPage';
-import { VerifyEmailPage } from '@/features/auth/pages/VerifyEmailPage';
-import { CoinCardPage } from '@/features/catalog/card/CoinCardPage';
-import { CatalogPage } from '@/features/catalog/CatalogPage';
-import { parseFilters, serializeFilters } from '@/features/catalog/useCatalogFilters';
-import { AddPage } from '@/features/collection/add/AddPage';
 import { GuestCollectionPage } from '@/features/collection/guest/GuestCollectionPage';
-import { CollectionPage } from '@/features/collection/CollectionPage';
-import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
-import { DashboardPage } from '@/features/dashboard/DashboardPage';
-import { CompletenessDetailPage } from '@/features/completeness/CompletenessDetailPage';
-import { CompletenessListPage } from '@/features/completeness/CompletenessListPage';
-import { ExpensesPage } from '@/features/expenses/ExpensesPage';
-import { SettingsPage } from '@/features/settings/SettingsPage';
 import { scrollPageToTop } from '@/shared/lib/pageScroll';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
 import { Spinner, ToastProvider } from '@/shared/ui';
@@ -35,9 +16,90 @@ import { AppLayout } from './layout/AppLayout';
 import { DonationDialogProvider } from './layout/DonationDialog';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ThemeSettingsSync } from './ThemeSettingsSync';
-import { LegalPage } from './legal/LegalPage';
 
+// Each route loads its own code and styles only when it is rendered.
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
+const AdminPage = lazy(() =>
+  import('@/features/admin/AdminPage').then((module) => ({ default: module.AdminPage })),
+);
+const CheckEmailPage = lazy(() =>
+  import('@/features/auth/pages/CheckEmailPage').then((module) => ({
+    default: module.CheckEmailPage,
+  })),
+);
+const ForgotPasswordPage = lazy(() =>
+  import('@/features/auth/pages/ForgotPasswordPage').then((module) => ({
+    default: module.ForgotPasswordPage,
+  })),
+);
+const GoogleCompletePage = lazy(() =>
+  import('@/features/auth/pages/GoogleCompletePage').then((module) => ({
+    default: module.GoogleCompletePage,
+  })),
+);
+const LoginPage = lazy(() =>
+  import('@/features/auth/pages/LoginPage').then((module) => ({ default: module.LoginPage })),
+);
+const RegisterPage = lazy(() =>
+  import('@/features/auth/pages/RegisterPage').then((module) => ({ default: module.RegisterPage })),
+);
+const ResetPasswordPage = lazy(() =>
+  import('@/features/auth/pages/ResetPasswordPage').then((module) => ({
+    default: module.ResetPasswordPage,
+  })),
+);
+const VerifyEmailPage = lazy(() =>
+  import('@/features/auth/pages/VerifyEmailPage').then((module) => ({
+    default: module.VerifyEmailPage,
+  })),
+);
+const CoinCardPage = lazy(() =>
+  import('@/features/catalog/card/CoinCardPage').then((module) => ({
+    default: module.CoinCardPage,
+  })),
+);
+const CatalogPage = lazy(() =>
+  import('@/features/catalog/CatalogPage').then((module) => ({ default: module.CatalogPage })),
+);
+const AddPage = lazy(() =>
+  import('@/features/collection/add/AddPage').then((module) => ({ default: module.AddPage })),
+);
+const CollectionPage = lazy(() =>
+  import('@/features/collection/CollectionPage').then((module) => ({
+    default: module.CollectionPage,
+  })),
+);
+const PurchaseFormPage = lazy(() =>
+  import('@/features/collection/PurchaseFormPage').then((module) => ({
+    default: module.PurchaseFormPage,
+  })),
+);
+const DashboardPage = lazy(() =>
+  import('@/features/dashboard/DashboardPage').then((module) => ({
+    default: module.DashboardPage,
+  })),
+);
+const CompletenessDetailPage = lazy(() =>
+  import('@/features/completeness/CompletenessDetailPage').then((module) => ({
+    default: module.CompletenessDetailPage,
+  })),
+);
+const CompletenessListPage = lazy(() =>
+  import('@/features/completeness/CompletenessListPage').then((module) => ({
+    default: module.CompletenessListPage,
+  })),
+);
+const ExpensesPage = lazy(() =>
+  import('@/features/expenses/ExpensesPage').then((module) => ({ default: module.ExpensesPage })),
+);
+const SettingsPage = lazy(() =>
+  import('@/features/settings/SettingsPage').then((module) => ({ default: module.SettingsPage })),
+);
+const LegalPage = lazy(() =>
+  import('./legal/LegalPage').then((module) => ({ default: module.LegalPage })),
+);
+
+const RedirectMissingToCatalog = lazy(() => import('./RedirectMissingToCatalog'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -181,28 +243,6 @@ function RedirectCollectionEdit() {
   );
 }
 
-/**
- * The "missing" page is retired: the catalog's own "немає в колекції"
- * filter takes its place (docs/08-ui-map.md). Any filters bookmarked on the
- * old page (country, series, years — the page used the catalog's own filter
- * hook) share the catalog's query param vocabulary, so they carry over as-is;
- * `owned` is forced through the catalog's own serializer rather than a
- * hardcoded string, so it can never drift from what the catalog itself writes.
- */
-function RedirectMissingToCatalog() {
-  const location = useLocation();
-  const params = serializeFilters({
-    ...parseFilters(new URLSearchParams(location.search)),
-    owned: false,
-  });
-  return (
-    <Navigate
-      to={{ pathname: '/catalog', search: `?${params.toString()}`, hash: location.hash }}
-      replace
-    />
-  );
-}
-
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -215,73 +255,78 @@ export function App() {
             <BrowserRouter>
               <ScrollToTop />
               <DonationDialogProvider>
-                <Routes>
-                  <Route path="/privacy" element={<LegalPage kind="privacy" />} />
-                  <Route path="/terms" element={<LegalPage kind="terms" />} />
-                  <Route element={<AuthLayout />}>
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/register" element={<RegisterPage />} />
-                    <Route path="/check-email" element={<CheckEmailPage />} />
-                    <Route path="/verify-email" element={<VerifyEmailPage />} />
-                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                    <Route path="/google-complete" element={<GoogleCompletePage />} />
-                    <Route path="/reset-password" element={<ResetPasswordPage />} />
-                  </Route>
-                  <Route element={<ReadyRoute />}>
-                    <Route path="/" element={<RootRoute />} />
-                    <Route path="/collection" element={<CollectionRoot />} />
-                    <Route
-                      path="/collection/coins"
-                      element={<CollectionSectionRoute section="coins" />}
-                    />
-                    <Route
-                      path="/collection/completeness"
-                      element={<CollectionSectionRoute section="completeness" />}
-                    />
-                    <Route
-                      path="/collection/money"
-                      element={<CollectionSectionRoute section="money" />}
-                    />
-                    <Route path="/catalog" element={<CatalogPage />} />
-                    <Route path="/catalog/:id" element={<CoinCardPage />} />
-                    <Route element={<ProtectedRoute />}>
-                      <Route path="/collection/add" element={<AddPage />} />
-                      <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
-                      <Route
-                        path="/collection/completeness/:groupBy/:value"
-                        element={<CompletenessDetailPage />}
-                      />
-                      <Route path="/settings" element={<SettingsPage />} />
-                      <Route path="/admin" element={<AdminRoute />} />
-
-                      {/* Retired paths, kept as redirects for old bookmarks and links. */}
-                      <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
-                      <Route
-                        path="/series"
-                        element={<Navigate to="/collection/completeness" replace />}
-                      />
-                      <Route path="/series/:id" element={<RedirectSeriesDetail />} />
-                      <Route
-                        path="/collection/series"
-                        element={<Navigate to="/collection/completeness" replace />}
-                      />
-                      <Route path="/collection/series/:id" element={<RedirectSeriesDetail />} />
-                      <Route path="/missing" element={<RedirectMissingToCatalog />} />
-                      <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
-                      <Route
-                        path="/expenses"
-                        element={<Navigate to="/collection/money" replace />}
-                      />
-                      <Route path="/collection/:id/edit" element={<RedirectCollectionEdit />} />
-                      <Route path="/collection/new" element={<RedirectTo to="/collection/add" />} />
-                      <Route
-                        path="/collection/coins/new"
-                        element={<RedirectTo to="/collection/add" />}
-                      />
+                <Suspense fallback={<Spinner />}>
+                  <Routes>
+                    <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+                    <Route path="/terms" element={<LegalPage kind="terms" />} />
+                    <Route element={<AuthLayout />}>
+                      <Route path="/login" element={<LoginPage />} />
+                      <Route path="/register" element={<RegisterPage />} />
+                      <Route path="/check-email" element={<CheckEmailPage />} />
+                      <Route path="/verify-email" element={<VerifyEmailPage />} />
+                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                      <Route path="/google-complete" element={<GoogleCompletePage />} />
+                      <Route path="/reset-password" element={<ResetPasswordPage />} />
                     </Route>
-                  </Route>
-                  <Route path="*" element={<Navigate to="/catalog" replace />} />
-                </Routes>
+                    <Route element={<ReadyRoute />}>
+                      <Route path="/" element={<RootRoute />} />
+                      <Route path="/collection" element={<CollectionRoot />} />
+                      <Route
+                        path="/collection/coins"
+                        element={<CollectionSectionRoute section="coins" />}
+                      />
+                      <Route
+                        path="/collection/completeness"
+                        element={<CollectionSectionRoute section="completeness" />}
+                      />
+                      <Route
+                        path="/collection/money"
+                        element={<CollectionSectionRoute section="money" />}
+                      />
+                      <Route path="/catalog" element={<CatalogPage />} />
+                      <Route path="/catalog/:id" element={<CoinCardPage />} />
+                      <Route element={<ProtectedRoute />}>
+                        <Route path="/collection/add" element={<AddPage />} />
+                        <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
+                        <Route
+                          path="/collection/completeness/:groupBy/:value"
+                          element={<CompletenessDetailPage />}
+                        />
+                        <Route path="/settings" element={<SettingsPage />} />
+                        <Route path="/admin" element={<AdminRoute />} />
+
+                        {/* Retired paths, kept as redirects for old bookmarks and links. */}
+                        <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
+                        <Route
+                          path="/series"
+                          element={<Navigate to="/collection/completeness" replace />}
+                        />
+                        <Route path="/series/:id" element={<RedirectSeriesDetail />} />
+                        <Route
+                          path="/collection/series"
+                          element={<Navigate to="/collection/completeness" replace />}
+                        />
+                        <Route path="/collection/series/:id" element={<RedirectSeriesDetail />} />
+                        <Route path="/missing" element={<RedirectMissingToCatalog />} />
+                        <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
+                        <Route
+                          path="/expenses"
+                          element={<Navigate to="/collection/money" replace />}
+                        />
+                        <Route path="/collection/:id/edit" element={<RedirectCollectionEdit />} />
+                        <Route
+                          path="/collection/new"
+                          element={<RedirectTo to="/collection/add" />}
+                        />
+                        <Route
+                          path="/collection/coins/new"
+                          element={<RedirectTo to="/collection/add" />}
+                        />
+                      </Route>
+                    </Route>
+                    <Route path="*" element={<Navigate to="/catalog" replace />} />
+                  </Routes>
+                </Suspense>
               </DonationDialogProvider>
             </BrowserRouter>
           </AuthProvider>

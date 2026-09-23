@@ -1,17 +1,22 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 
-import { Button, Modal } from '@/shared/ui';
+import { Button, Modal, Spinner } from '@/shared/ui';
 
 import * as authApi from './api';
 import { safeAuthReturn } from './authReturn';
 import { AuthDialogContext } from './authDialogContext';
 import type { AuthDialogMode, AuthDialogPurpose } from './authDialogContext';
-import { LoginForm } from './pages/LoginPage';
-import { RegisterForm } from './pages/RegisterPage';
 import styles from './pages/authForms.module.css';
+
+const LoginForm = lazy(() =>
+  import('./pages/LoginPage').then((module) => ({ default: module.LoginForm })),
+);
+const RegisterForm = lazy(() =>
+  import('./pages/RegisterPage').then((module) => ({ default: module.RegisterForm })),
+);
 
 type DialogState = {
   mode: AuthDialogMode | 'check-email';
@@ -73,46 +78,48 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
         size="sm"
         mobilePlacement="center"
       >
-        {dialog?.mode === 'login' ? (
-          <LoginForm
-            from={dialog.from}
-            showHeading={false}
-            onSuccess={() => setDialog(null)}
-            onSwitch={() => setDialog({ ...dialog, mode: 'register' })}
-          />
-        ) : dialog?.mode === 'register' ? (
-          <>
-            {dialog.purpose === 'collection' ? (
-              <p className={styles.subtitle}>{t('guest.addText')}</p>
-            ) : null}
-            <RegisterForm
+        <Suspense fallback={<Spinner />}>
+          {dialog?.mode === 'login' ? (
+            <LoginForm
               from={dialog.from}
               showHeading={false}
-              onSuccess={(email) => {
-                setCooldown(60);
-                setSentAgain(false);
-                setDialog({ ...dialog, mode: 'check-email', email });
-              }}
-              onGoogleSuccess={() => setDialog(null)}
-              onSwitch={() => setDialog({ ...dialog, mode: 'login' })}
+              onSuccess={() => setDialog(null)}
+              onSwitch={() => setDialog({ ...dialog, mode: 'register' })}
             />
-          </>
-        ) : dialog?.mode === 'check-email' ? (
-          <div className={styles.centered}>
-            <p className={styles.subtitle}>{t('auth.checkEmailText', { email: dialog.email })}</p>
-            {sentAgain ? <div className={styles.formInfo}>{t('auth.resendDone')}</div> : null}
-            <Button variant="secondary" disabled={cooldown > 0} onClick={() => void resend()}>
-              {cooldown > 0 ? t('auth.resendCountdown', { seconds: cooldown }) : t('auth.resend')}
-            </Button>
-            <button
-              type="button"
-              className={styles.textButton}
-              onClick={() => setDialog({ ...dialog, mode: 'login' })}
-            >
-              {t('auth.goToLogin')}
-            </button>
-          </div>
-        ) : null}
+          ) : dialog?.mode === 'register' ? (
+            <>
+              {dialog.purpose === 'collection' ? (
+                <p className={styles.subtitle}>{t('guest.addText')}</p>
+              ) : null}
+              <RegisterForm
+                from={dialog.from}
+                showHeading={false}
+                onSuccess={(email) => {
+                  setCooldown(60);
+                  setSentAgain(false);
+                  setDialog({ ...dialog, mode: 'check-email', email });
+                }}
+                onGoogleSuccess={() => setDialog(null)}
+                onSwitch={() => setDialog({ ...dialog, mode: 'login' })}
+              />
+            </>
+          ) : dialog?.mode === 'check-email' ? (
+            <div className={styles.centered}>
+              <p className={styles.subtitle}>{t('auth.checkEmailText', { email: dialog.email })}</p>
+              {sentAgain ? <div className={styles.formInfo}>{t('auth.resendDone')}</div> : null}
+              <Button variant="secondary" disabled={cooldown > 0} onClick={() => void resend()}>
+                {cooldown > 0 ? t('auth.resendCountdown', { seconds: cooldown }) : t('auth.resend')}
+              </Button>
+              <button
+                type="button"
+                className={styles.textButton}
+                onClick={() => setDialog({ ...dialog, mode: 'login' })}
+              >
+                {t('auth.goToLogin')}
+              </button>
+            </div>
+          ) : null}
+        </Suspense>
       </Modal>
     </AuthDialogContext.Provider>
   );
