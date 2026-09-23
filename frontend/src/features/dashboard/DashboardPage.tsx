@@ -1,17 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
-import {
-  ArrowRight,
-  CircleDashed,
-  Coins,
-  LayoutDashboard,
-  PieChart,
-  TrendingUp,
-} from 'lucide-react';
+import { ArrowRight, Coins, LayoutDashboard, Scale, TrendingUp, Wallet } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
-import { parseFilters, serializeFilters } from '@/features/catalog/useCatalogFilters';
 import { ApiError } from '@/shared/api/client';
 import type { BootstrapOut, BreakdownEntry, ExchangeRateOut } from '@/shared/api/types';
 import {
@@ -37,12 +29,6 @@ import {
 import { fetchBootstrap } from './api';
 import { myCollectionSeries, valueDelta } from './finance';
 import styles from './DashboardPage.module.css';
-
-// The "missing" page is gone (docs/08-ui-map.md): the catalog's own "немає
-// в колекції" filter replaces it. Built through the catalog's own filter
-// serializer so this never drifts from what that filter actually writes to
-// the URL.
-const MISSING_CATALOG_URL = `/catalog?${serializeFilters({ ...parseFilters(new URLSearchParams()), owned: false }).toString()}`;
 
 export function DashboardPage() {
   const { t } = useTranslation();
@@ -116,22 +102,13 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
             hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
           />
         </Link>
-        <Link to={MISSING_CATALOG_URL} className={styles.tileLink}>
+        <Link to="/collection/money" className={styles.tileLink}>
           <StatTile
-            icon={<CircleDashed strokeWidth={1.75} />}
-            label={t('dashboard.tileMissing')}
-            value={formatNumber(dashboard.missingItems, locale, 0)}
-            hint={t('dashboard.tileMissingHint', { count: dashboard.catalogItems })}
-          />
-        </Link>
-        <Link to="/collection/completeness" className={styles.tileLink}>
-          <StatTile
-            icon={<PieChart strokeWidth={1.75} />}
-            label={t('dashboard.tileCompletion')}
-            value={formatPercent(dashboard.completionPercent, locale, 1)}
-            hint={t('dashboard.progress', {
-              owned: dashboard.completedItems,
-              count: dashboard.catalogItems,
+            icon={<Wallet strokeWidth={1.75} />}
+            label={t('dashboard.spentTotal')}
+            value={formatUah(dashboard.totalSpendUah, locale)}
+            hint={t('dashboard.tileSpentHint', {
+              amount: formatUah(dashboard.relatedSpendUah, locale),
             })}
           />
         </Link>
@@ -140,18 +117,15 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
             icon={<TrendingUp strokeWidth={1.75} />}
             label={t('dashboard.marketValue')}
             value={formatUah(dashboard.marketValueUah, locale)}
-            hint={
-              delta.percent !== null ? (
-                <span className={styles[deltaTone]}>
-                  {formatSignedUah(delta.diffUah, locale)}{' '}
-                  <span className={styles.deltaPercent}>
-                    ({formatSignedPercent(delta.percent, locale)})
-                  </span>
-                </span>
-              ) : (
-                formatSignedUah(delta.diffUah, locale)
-              )
-            }
+          />
+        </Link>
+        <Link to="/collection/money" className={styles.tileLink}>
+          <StatTile
+            icon={<Scale strokeWidth={1.75} />}
+            label={t('dashboard.delta')}
+            value={formatSignedUah(delta.diffUah, locale)}
+            hint={delta.percent !== null ? formatSignedPercent(delta.percent, locale) : undefined}
+            tone={deltaTone}
           />
         </Link>
       </section>

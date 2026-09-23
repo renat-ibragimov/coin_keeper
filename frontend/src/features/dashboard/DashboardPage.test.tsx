@@ -110,15 +110,15 @@ describe('DashboardPage', () => {
       'href',
       '/collection/coins',
     );
-    expect(screen.getByRole('link', { name: /Не вистачає/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Разом витрачено/ })).toHaveAttribute(
       'href',
-      '/catalog?owned=false',
-    );
-    expect(screen.getByRole('link', { name: /Комплектність/ })).toHaveAttribute(
-      'href',
-      '/collection/completeness',
+      '/collection/money',
     );
     expect(screen.getByRole('link', { name: /Поточна оцінка/ })).toHaveAttribute(
+      'href',
+      '/collection/money',
+    );
+    expect(screen.getByRole('link', { name: /Різниця/ })).toHaveAttribute(
       'href',
       '/collection/money',
     );
@@ -139,7 +139,8 @@ describe('DashboardPage', () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap());
     renderPage();
 
-    expect(await screen.findByText('42 765,66 ₴')).toBeInTheDocument();
+    // Shows in both the new "Разом витрачено" KPI tile and the Фінанси card.
+    expect((await screen.findAllByText('42 765,66 ₴')).length).toBeGreaterThan(0);
     expect(screen.getByTestId('dashboard-delta')).toHaveTextContent('+7 234,34 ₴');
     expect(screen.getByTestId('dashboard-delta')).toHaveTextContent('+16,9 %');
     expect(screen.getByText('без ціни: 41')).toBeInTheDocument();
