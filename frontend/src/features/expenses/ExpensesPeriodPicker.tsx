@@ -46,7 +46,7 @@ export function ExpensesPeriodPicker({
         <div className={styles.dateField}>
           <Input
             type="date"
-            aria-label={t('expenses.periodFrom')}
+            label={t('expenses.periodFrom')}
             value={dateFrom}
             max={dateTo}
             onChange={(event) => onCustomRange(event.target.value, dateTo)}
@@ -58,7 +58,7 @@ export function ExpensesPeriodPicker({
         <div className={styles.dateField}>
           <Input
             type="date"
-            aria-label={t('expenses.periodTo')}
+            label={t('expenses.periodTo')}
             value={dateTo}
             min={dateFrom}
             onChange={(event) => onCustomRange(dateFrom, event.target.value)}

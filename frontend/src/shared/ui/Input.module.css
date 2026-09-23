@@ -1,6 +1,7 @@
 .wrapper {
   display: flex;
   flex-direction: column;
+  min-width: 0;
   gap: var(--space-1);
 }
 
@@ -14,7 +15,10 @@
  * a step below a raised card, the radius is smaller than a card's, and the
  * border is quiet but always visible. */
 .input {
+  box-sizing: border-box;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   padding: 10px 12px;
   min-height: 42px;
   border-radius: var(--radius-md);
@@ -66,6 +70,19 @@
 .input[type='number'],
 .input[type='date'] {
   font-variant-numeric: tabular-nums;
+}
+
+/* iOS gives date controls a native minimum size. Keep the field within its
+ * grid/flex cell while retaining the system date picker on tap. */
+.input[type='date'] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+}
+
+.input[type='date']::-webkit-date-and-time-value {
+  min-width: 0;
+  text-align: left;
 }
 
 /* Chrome's own calendar-icon glyph renders at very low contrast until the

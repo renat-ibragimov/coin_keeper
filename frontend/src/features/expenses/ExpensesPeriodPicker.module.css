@@ -6,16 +6,24 @@
 }
 
 .customRange {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-2);
+  width: 328px;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .dateField {
-  width: 152px;
+  min-width: 0;
 }
 
 .dash {
+  align-self: end;
+  display: grid;
+  place-items: center;
+  min-height: 44px;
   color: var(--color-text-muted);
 }
 
@@ -29,5 +37,16 @@
 @media (max-width: 700px) {
   .picker {
     justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .customRange {
+    width: 100%;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .dash {
+    display: none;
   }
 }
