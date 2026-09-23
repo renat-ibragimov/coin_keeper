@@ -42,7 +42,7 @@ describe('public routes', () => {
   });
   it.each([
     ['coins', 'У колекції ще немає монет'],
-    ['series', 'Серій ще немає'],
+    ['completeness', 'Тут поки порожньо'],
     ['money', 'Фінансової історії поки немає'],
   ] as const)('shows the %s guest section with a login action', (section, title) => {
     auth.user = null;

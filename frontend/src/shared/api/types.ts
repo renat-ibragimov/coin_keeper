@@ -73,6 +73,9 @@ export type NewCatalogItem = components['schemas']['NewCatalogItemIn'];
 export type SeriesProgress = components['schemas']['SeriesProgressOut'];
 export type SeriesSummary = components['schemas']['SeriesSummaryOut'];
 
+export type CompletenessGroup = components['schemas']['CompletenessGroupOut'];
+export type CompletenessSummary = components['schemas']['CompletenessSummaryOut'];
+
 export type ExpenseOut = components['schemas']['ExpenseOut'];
 export type ExpenseCreate = components['schemas']['ExpenseCreate'];
 export type ExpenseUpdate = components['schemas']['ExpenseUpdate'];

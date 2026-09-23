@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from types import SimpleNamespace
 
 import pytest
@@ -13,7 +12,6 @@ from app.core.mail.base import EmailMessage
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
-    add_snapshot,
     make_catalog_item,
     make_series,
     promote_to_admin,
@@ -79,105 +77,6 @@ async def test_create_series_is_admin_only(client: AsyncClient, ctx: SimpleNames
     assert bad_country.status_code == 422
 
 
-async def test_summary_completeness_rules(
-    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
-) -> None:
-    refs = ctx.refs
-    series = refs.fauna
-
-    owned_twice = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Дельфін", year=2018, series=series
-    )
-    missing_priced = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Сова", year=2017, series=series
-    )
-    missing_unpriced = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Рись", year=2016, series=series
-    )
-    archived_with_coin = await make_catalog_item(
-        db_session,
-        country=refs.ukraine,
-        title="Архівна",
-        year=2015,
-        series=series,
-        is_archived=True,
-        archive_reason="duplicate",
-    )
-    # Personal item of B in the same series: invisible to A entirely.
-    await make_catalog_item(
-        db_session,
-        country=refs.ukraine,
-        title="Особиста Б",
-        year=2014,
-        series=series,
-        created_by=ctx.id_b,
-    )
-
-    # Two instances of one item still count as one completed position.
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_twice, price="100")
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_twice, price="120")
-    # An instance of the archived item: money counts, completeness does not.
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=archived_with_coin, price="80")
-
-    await add_snapshot(db_session, owned_twice, "150.00")
-    await add_snapshot(db_session, missing_priced, "200.00")
-    await add_snapshot(db_session, archived_with_coin, "500.00")
-    # The only snapshot of the unpriced one is suspect: it stays unpriced.
-    await add_snapshot(db_session, missing_unpriced, "77777.00", is_suspect=True)
-
-    summary = (
-        await client.get(f"/api/v1/series/{series.id}/summary", headers=auth(ctx.token_a))
-    ).json()
-
-    # Active visible: owned_twice, missing_priced, missing_unpriced.
-    assert summary["total"] == 3
-    assert summary["owned"] == 1
-    assert summary["missing"] == 2
-    assert summary["completionPercent"] == 33.3
-    # Money: 100 + 120 for the dolphin, 80 for the archived instance.
-    assert summary["purchaseTotalUah"] == "300.00"
-    # Value: 2 dolphins x 150 plus the archived coin at 500.
-    assert summary["currentValueUah"] == "800.00"
-    assert summary["unpricedMissing"] == 1
-
-    # For B the same series counts their own personal item as collectable.
-    summary_b = (
-        await client.get(f"/api/v1/series/{series.id}/summary", headers=auth(ctx.token_b))
-    ).json()
-    assert summary_b["total"] == 4
-    assert summary_b["owned"] == 0
-    assert summary_b["purchaseTotalUah"] == "0.00"
-
-
-async def test_summary_percent_never_exceeds_100(
-    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
-) -> None:
-    """Instances on archived items must not inflate the numerator."""
-    refs = ctx.refs
-    series = refs.cities
-    active = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Київ", year=2020, series=series
-    )
-    archived = await make_catalog_item(
-        db_session,
-        country=refs.ukraine,
-        title="Львів",
-        year=2019,
-        series=series,
-        is_archived=True,
-        archive_reason="withdrawn",
-    )
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=active, price="10")
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=archived, price="10")
-
-    summary = (
-        await client.get(f"/api/v1/series/{series.id}/summary", headers=auth(ctx.token_a))
-    ).json()
-    assert summary["total"] == 1
-    assert summary["owned"] == 1
-    assert summary["completionPercent"] == 100.0
-
-
 async def test_progress_lists_every_series_with_its_summary(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
@@ -222,11 +121,6 @@ async def test_progress_lists_every_series_with_its_summary(
     assert refs.fauna.name_original not in {row["series"]["name"] for row in other_country}
 
 
-async def test_summary_unknown_series_404(client: AsyncClient, ctx: SimpleNamespace) -> None:
-    response = await client.get("/api/v1/series/999999/summary", headers=auth(ctx.token_a))
-    assert response.status_code == 404
-
-
 async def test_storefront_hides_series_of_deactivated_country(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
@@ -263,12 +157,6 @@ async def test_storefront_hides_series_of_deactivated_country(
     progress_b = (await client.get("/api/v1/series/summary", headers=headers_b)).json()
     assert series_usa.name_original not in {row["series"]["name"] for row in progress_b}
 
-    direct_a = await client.get(f"/api/v1/series/{series_usa.id}/summary", headers=headers_a)
-    assert direct_a.status_code == 200
-
-    direct_b = await client.get(f"/api/v1/series/{series_usa.id}/summary", headers=headers_b)
-    assert direct_b.status_code == 404
-
     _ = unowned_item
 
 
@@ -296,52 +184,6 @@ async def test_series_of_an_unconfirmed_country_still_shows(
     progress_a = (await client.get("/api/v1/series/summary", headers=headers_a)).json()
     assert series_usa.name_original in {row["series"]["name"] for row in progress_a}
 
-    direct_a = await client.get(f"/api/v1/series/{series_usa.id}/summary", headers=headers_a)
-    assert direct_a.status_code == 200
-
-
-async def test_series_items_of_an_unconfirmed_country_still_show(
-    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
-) -> None:
-    """The same rule as the summary/listing above (§13a), but for the series
-    detail screen's own tiles — the actual bug (owner-reported, 2026-09-13):
-    GET /catalog?seriesId= is the harder gate and stayed empty for a series
-    of an unconfirmed country however much of it the user owned."""
-    refs = ctx.refs
-    await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
-
-    series_usa = await make_series(db_session, country=refs.usa, name="50 State Quarters")
-    owned_item = await make_catalog_item(
-        db_session,
-        country=refs.usa,
-        title="Delaware",
-        year=1999,
-        series=series_usa,
-        created_by=ctx.id_a,
-    )
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_item, price="10")
-
-    headers_a = auth(ctx.token_a)
-
-    items = await client.get(f"/api/v1/series/{series_usa.id}/items", headers=headers_a)
-    assert items.status_code == 200
-    body = items.json()
-    assert body["total"] == 1
-    assert body["items"][0]["title"] == "Delaware"
-
-    # The bug this replaces: the catalogue's own gated endpoint still hides
-    # it -- proof the two are genuinely different visibility rules, not that
-    # the fix accidentally loosened GET /catalog itself.
-    via_catalog = await client.get(f"/api/v1/catalog?seriesId={series_usa.id}", headers=headers_a)
-    assert via_catalog.json()["total"] == 0
-
-
-async def test_series_items_404_for_an_unknown_series(
-    client: AsyncClient, ctx: SimpleNamespace
-) -> None:
-    response = await client.get("/api/v1/series/999999/items", headers=auth(ctx.token_a))
-    assert response.status_code == 404
-
 
 async def test_scope_catalog_is_the_confirmed_gate_for_the_series_filter(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
@@ -366,31 +208,6 @@ async def test_scope_catalog_is_the_confirmed_gate_for_the_series_filter(
     catalog_scope = await client.get("/api/v1/series?scope=catalog", headers=headers_a)
     assert series_usa.name_original not in {row["name"] for row in catalog_scope.json()}
     assert refs.fauna.name_original in {row["name"] for row in catalog_scope.json()}
-
-
-async def test_own_price_snapshot_feeds_value(
-    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
-) -> None:
-    refs = ctx.refs
-    item = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Дельфін", year=2018, series=refs.fauna
-    )
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=item, price="100")
-    await add_snapshot(db_session, item, "150.00", observed_at=datetime(2026, 1, 1, tzinfo=UTC))
-    # A's own newer snapshot overrides the shared one — for A only.
-    await add_snapshot(
-        db_session,
-        item,
-        "180.00",
-        observed_at=datetime(2026, 2, 1, tzinfo=UTC),
-        created_by=ctx.id_a,
-        source="Manual",
-    )
-
-    summary_a = (
-        await client.get(f"/api/v1/series/{refs.fauna.id}/summary", headers=auth(ctx.token_a))
-    ).json()
-    assert summary_a["currentValueUah"] == "180.00"
 
 
 async def test_is_official_marks_only_a_parser_maintained_series(

@@ -804,15 +804,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/series/{series_id}/summary": {
+    "/api/v1/completeness/summary": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Series Summary */
-        get: operations["series_summary_api_v1_series__series_id__summary_get"];
+        /** Completeness Summary */
+        get: operations["completeness_summary_api_v1_completeness_summary_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -821,22 +821,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/series/{series_id}/items": {
+    "/api/v1/completeness/group": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Series Items
-         * @description The series detail screen's own tiles -- shared or personal, regardless
-         *     of catalog_confirmed. Deliberately not `GET /catalog?seriesId=`: that
-         *     endpoint is the catalogue browse experience and its harder gate (§13a)
-         *     would hide a user's own coins of a country the catalogue project has not
-         *     confirmed yet, same bug as summary() below would have if it used it.
-         */
-        get: operations["series_items_api_v1_series__series_id__items_get"];
+        /** Completeness Group */
+        get: operations["completeness_group_api_v1_completeness_group_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/completeness/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Completeness Items */
+        get: operations["completeness_items_api_v1_completeness_items_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2382,6 +2392,55 @@ export interface components {
         };
         /** SeriesSummaryOut */
         SeriesSummaryOut: {
+            /** Total */
+            total: number;
+            /** Owned */
+            owned: number;
+            /** Missing */
+            missing: number;
+            /** Completionpercent */
+            completionPercent: number;
+            /** Purchasetotaluah */
+            purchaseTotalUah: string;
+            /** Currentvalueuah */
+            currentValueUah: string;
+            /** Unpricedmissing */
+            unpricedMissing: number;
+        };
+        /**
+         * CompletenessGroupOut
+         * @description One group of the chosen dimension. `label`/`country_id`/`description`/
+         *     `start_year`/`end_year`/`sort_order` are populated from the dimension's
+         *     own dictionary where it has one (series, denomination, material) and left
+         *     `None` where it does not (`year` needs no lookup, `unassigned` has no
+         *     label of its own — the frontend renders it from `unassigned` + `groupBy`).
+         */
+        CompletenessGroupOut: {
+            /**
+             * Groupby
+             * @enum {string}
+             */
+            groupBy: "series" | "year" | "denomination" | "material";
+            /** Value */
+            value: number | null;
+            /** Unassigned */
+            unassigned: boolean;
+            /** Label */
+            label: string | null;
+            /** Countryid */
+            countryId?: number | null;
+            /** Description */
+            description?: string | null;
+            /** Startyear */
+            startYear?: number | null;
+            /** Endyear */
+            endYear?: number | null;
+            /** Sortorder */
+            sortOrder?: number | null;
+            summary: components["schemas"]["CompletenessSummaryOut"];
+        };
+        /** CompletenessSummaryOut */
+        CompletenessSummaryOut: {
             /** Total */
             total: number;
             /** Owned */
@@ -4331,15 +4390,15 @@ export interface operations {
             };
         };
     };
-    series_summary_api_v1_series__series_id__summary_get: {
+    completeness_summary_api_v1_completeness_summary_get: {
         parameters: {
-            query?: {
+            query: {
+                groupBy: "series" | "year" | "denomination" | "material";
+                countryId?: number | null;
                 locale?: string | null;
             };
             header?: never;
-            path: {
-                series_id: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -4350,7 +4409,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["SeriesSummaryOut"];
+                    "application/json": components["schemas"]["CompletenessGroupOut"][];
                 };
             };
             /** @description Validation Error */
@@ -4364,17 +4423,54 @@ export interface operations {
             };
         };
     };
-    series_items_api_v1_series__series_id__items_get: {
+    completeness_group_api_v1_completeness_group_get: {
         parameters: {
-            query?: {
+            query: {
+                groupBy: "series" | "year" | "denomination" | "material";
+                value?: number | null;
+                unassigned?: boolean;
+                countryId?: number | null;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompletenessGroupOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    completeness_items_api_v1_completeness_items_get: {
+        parameters: {
+            query: {
+                groupBy: "series" | "year" | "denomination" | "material";
+                value?: number | null;
+                unassigned?: boolean;
+                countryId?: number | null;
                 locale?: string | null;
                 page?: number;
                 pageSize?: number;
             };
             header?: never;
-            path: {
-                series_id: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;

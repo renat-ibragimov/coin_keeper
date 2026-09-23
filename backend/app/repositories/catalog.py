@@ -70,6 +70,12 @@ class CatalogFilters:
     groups: list[CollectionGroup] | None = None
     material_ids: list[int] | None = None
     metal_kinds: list[MetalKind] | None = None
+    # The "без значення" bucket a completeness group (docs/03-api-contract.md,
+    # /completeness/items) asks for — a plain `*_ids` filter cannot express
+    # "this column IS NULL".
+    series_id_is_null: bool = False
+    denomination_id_is_null: bool = False
+    material_id_is_null: bool = False
     owned: bool | None = None
     scope: str = "all"  # all | shared | own
     archived: bool = False
@@ -374,6 +380,8 @@ class CatalogRepository:
             conditions.append(CatalogItem.country_id.in_(filters.country_ids))
         if filters.series_ids:
             conditions.append(CatalogItem.series_id.in_(filters.series_ids))
+        if filters.series_id_is_null:
+            conditions.append(CatalogItem.series_id.is_(None))
         if filters.year is not None:
             conditions.append(CatalogItem.issue_year == filters.year)
         if filters.year_from is not None:
@@ -385,10 +393,14 @@ class CatalogRepository:
             conditions.append(date_condition)
         if filters.denomination_ids:
             conditions.append(CatalogItem.denomination_id.in_(filters.denomination_ids))
+        if filters.denomination_id_is_null:
+            conditions.append(CatalogItem.denomination_id.is_(None))
         if filters.groups:
             conditions.append(CatalogItem.collection_group.in_(filters.groups))
         if filters.material_ids:
             conditions.append(CatalogItem.composition_id.in_(filters.material_ids))
+        if filters.material_id_is_null:
+            conditions.append(CatalogItem.composition_id.is_(None))
         if filters.metal_kinds:
             conditions.append(CatalogItem.metal_kind.in_(filters.metal_kinds))
         if filters.owned is True:

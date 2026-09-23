@@ -5,7 +5,7 @@ import { useAuthDialog } from '@/features/auth/authDialogContext';
 import { Button, EmptyState, PageHeader } from '@/shared/ui';
 import styles from './GuestCollectionPage.module.css';
 
-type Section = 'dashboard' | 'coins' | 'series' | 'money';
+type Section = 'dashboard' | 'coins' | 'completeness' | 'money';
 
 const sections = {
   dashboard: {
@@ -22,11 +22,11 @@ const sections = {
     description: 'collection.emptyText',
     icon: Coins,
   },
-  series: {
-    heading: 'series.title',
-    subtitle: 'series.subtitle',
-    title: 'series.emptyCollectionTitle',
-    description: 'series.emptyCollectionText',
+  completeness: {
+    heading: 'completeness.title',
+    subtitle: 'completeness.subtitle',
+    title: 'completeness.emptyCollectionTitle',
+    description: 'completeness.emptyCollectionText',
     icon: Layers,
   },
   money: {

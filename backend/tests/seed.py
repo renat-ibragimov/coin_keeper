@@ -28,6 +28,7 @@ from app.models import (
     ExchangeRate,
     Expense,
     MarketPriceSnapshot,
+    Material,
     User,
 )
 from app.models.enums import CollectionGroup, ExpenseCategory, UserRole
@@ -166,6 +167,16 @@ async def make_series(
     await session.commit()
     session.expunge(series)
     return series
+
+
+async def make_material(
+    session: AsyncSession, *, code: str, name_uk: str, name_en: str
+) -> Material:
+    material = Material(code=code, name_uk=name_uk, name_en=name_en)
+    session.add(material)
+    await session.commit()
+    session.expunge(material)
+    return material
 
 
 async def add_snapshot(

@@ -130,7 +130,7 @@ export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinC
             <Link
               to={
                 user
-                  ? `/collection/series/${seriesIdByName[item.seriesName]}`
+                  ? `/collection/completeness/series/${seriesIdByName[item.seriesName]}`
                   : `/catalog?seriesId=${seriesIdByName[item.seriesName]}`
               }
               className={styles.seriesLink}

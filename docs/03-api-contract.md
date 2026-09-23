@@ -664,29 +664,56 @@ DELETE /collection/storage-locations?name=
 ```
 GET  /series?countryId
 POST /series  {countryId, name, description?, startYear?, endYear?}
-GET  /series/{id}/summary
-  → {total, owned, missing, completionPercent, purchaseTotalUah, currentValueUah, unpricedMissing}
 GET  /series/summary?countryId
   → [{series: {...}, summary: {...}}]   — все серии (страны) со сводкой одним запросом
-GET  /series/{id}/items?page&pageSize
-  → Page<CatalogListItem>               — та же схема, что и у GET /catalog
 ```
 
 Серии — общий справочник, личных серий нет: серия описывает выпуск, а не коллекцию.
 `POST /series` доступен только администратору (`403` обычному пользователю), дубль имени
-в пределах страны — `409`. В `summary` обе части дроби комплектности считаются по активным
-видимым пользователю позициям; деньги (`purchaseTotalUah`, `currentValueUah`) — по его
-экземплярам, включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10).
+в пределах страны — `409`. `GET /series/summary` — источник дашбордного KPI «почато/завершено
+серій» (`features/collection/CollectionPage.tsx`); экран «Комплектність» на нём не завязан,
+он использует `/completeness/*` ниже.
 
-`/series/{id}/items` — плитки монет для экрана деталей серии, **не** `GET /catalog?seriesId=`
-(добавлено 2026-09-13, `04-business-rules.md` §13a). Разница принципиальная:
-`storefront_visible(require_confirmed=False)` вместо жёсткого гейта `GET /catalog` — экран
-серии про личную коллекцию пользователя, а не про витрину каталога, поэтому не прячет
-позиции страны без `catalog_confirmed`, даже если это единственный способ увидеть свои же
-монеты (найдено на живых данных: серия США «50 State Quarters», 56 личных позиций, каталог
-США не подтверждён — до фикса плитки были пустыми несмотря на 100% комплектности в
-`summary`). `CountryOut.catalogConfirmed` — сигнал для фронта: `true` → показываем «Відкрити
-в каталозі», `false` → вместо кнопки поясняющий текст, что показана только особиста колекція.
+## Комплектность
+
+```
+GET /completeness/summary?groupBy&countryId
+  → [CompletenessGroupOut]
+GET /completeness/group?groupBy&value|unassigned&countryId
+  → CompletenessGroupOut
+GET /completeness/items?groupBy&value|unassigned&countryId&page&pageSize
+  → Page<CatalogListItem>               — та же схема, что и у GET /catalog
+
+groupBy = series | year | denomination | material
+CompletenessGroupOut = {
+  groupBy, value, unassigned, label, countryId, description, startYear, endYear,
+  sortOrder, summary: {total, owned, missing, completionPercent, purchaseTotalUah,
+  currentValueUah, unpricedMissing}
+}
+```
+
+Комплектность по произвольному полю каталога — обобщение того, что раньше было только для
+серии (`GET /series/{id}/summary`/`GET /series/{id}/items`, оба эндпоинта удалены, заменены
+`/completeness/group`/`/completeness/items` с `groupBy=series`). `value`/`unassigned` —
+взаимоисключающие, ровно один обязателен: `value=<id>` адресует конкретную серию/номинал/
+материал (или конкретный год — число само является значением), `unassigned=true` — бакет
+«без значения» (`series_id`/`denomination_id`/`composition_id IS NULL`); `groupBy=year` не принимает
+`unassigned` (`issue_year` NOT NULL) — `422`. Обе части дроби комплектности считаются по
+активным видимым пользователю позициям; деньги (`purchaseTotalUah`, `currentValueUah`) — по
+его экземплярам, включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10) — то
+же правило, что раньше проверялось только для серий, теперь общее для всех четырёх измерений.
+
+`/completeness/items` — плитки монет для экрана деталей группы, **не** `GET /catalog?...=`
+(правило унаследовано от `/series/{id}/items`, добавлено 2026-09-13, `04-business-rules.md`
+§13a). Разница принципиальная: `storefront_visible(require_confirmed=False)` вместо жёсткого
+гейта `GET /catalog` — экран комплектности про личную коллекцию пользователя, а не про витрину
+каталога, поэтому не прячет позиции страны без `catalog_confirmed`, даже если это единственный
+способ увидеть свои же монеты (найдено на живых данных: серия США «50 State Quarters», 56
+личных позиций, каталог США не подтверждён — до фикса плитки были пустыми несмотря на 100%
+комплектности в `summary`). `CountryOut.catalogConfirmed` — сигнал для фронта, актуален только
+при `groupBy=series` (только у серии есть естественная привязка к одной стране): `true` →
+показываем «Відкрити в каталозі», `false` → вместо кнопки поясняющий текст, что показана только
+особиста колекція.
 
 ## Расходы
 

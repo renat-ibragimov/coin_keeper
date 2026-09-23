@@ -10,6 +10,7 @@ from app.api.v1 import (
     bootstrap,
     catalog,
     collection,
+    completeness,
     expenses,
     google_auth,
     health,
@@ -30,6 +31,7 @@ api_router.include_router(catalog.router)
 api_router.include_router(collection.router)
 api_router.include_router(expenses.router)
 api_router.include_router(series.router)
+api_router.include_router(completeness.router)
 api_router.include_router(reference.router)
 api_router.include_router(jobs.router)
 api_router.include_router(telegram.router)

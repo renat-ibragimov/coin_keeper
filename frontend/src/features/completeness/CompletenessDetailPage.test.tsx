@@ -5,17 +5,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => ({ user: { id: 1, role: 'user' } }) }));
-import type { CatalogListItem, CountryOut, SeriesOut } from '@/shared/api/types';
+import type { CatalogListItem, CompletenessGroup, CountryOut, SeriesOut } from '@/shared/api/types';
 
 import { fetchCountries, fetchSeries } from '../catalog/api';
-import { fetchSeriesItems, fetchSeriesSummary } from './api';
-import { SeriesDetailPage } from './SeriesDetailPage';
+import { fetchCompletenessGroup, fetchCompletenessItems } from './api';
+import { CompletenessDetailPage } from './CompletenessDetailPage';
 
 vi.mock('../catalog/api', async () => {
   const actual = await vi.importActual<typeof import('../catalog/api')>('../catalog/api');
   return { ...actual, fetchCountries: vi.fn(), fetchSeries: vi.fn() };
 });
-vi.mock('./api', () => ({ fetchSeriesItems: vi.fn(), fetchSeriesSummary: vi.fn() }));
+vi.mock('./api', () => ({ fetchCompletenessGroup: vi.fn(), fetchCompletenessItems: vi.fn() }));
 
 function makeSeries(overrides: Partial<SeriesOut> = {}): SeriesOut {
   return {
@@ -50,6 +50,30 @@ function makeCountry(overrides: Partial<CountryOut> = {}): CountryOut {
     sortOrder: 100,
     minYear: null,
     maxYear: null,
+    ...overrides,
+  };
+}
+
+function makeGroup(overrides: Partial<CompletenessGroup> = {}): CompletenessGroup {
+  return {
+    groupBy: 'series',
+    value: 5,
+    unassigned: false,
+    label: '50 State Quarters',
+    countryId: 1,
+    description: null,
+    startYear: 1999,
+    endYear: 2008,
+    sortOrder: null,
+    summary: {
+      total: 56,
+      owned: 56,
+      missing: 0,
+      completionPercent: 100,
+      purchaseTotalUah: '604.64',
+      currentValueUah: '1837.00',
+      unpricedMissing: 0,
+    },
     ...overrides,
   };
 }
@@ -100,32 +124,27 @@ function makeItem(overrides: Partial<CatalogListItem> = {}): CatalogListItem {
   };
 }
 
-function renderPage() {
+function renderPage(initialEntries: string[] = ['/collection/completeness/series/5']) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/collection/series/5']}>
+      <MemoryRouter initialEntries={initialEntries}>
         <Routes>
-          <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
+          <Route
+            path="/collection/completeness/:groupBy/:value"
+            element={<CompletenessDetailPage />}
+          />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe('SeriesDetailPage', () => {
+describe('CompletenessDetailPage', () => {
   beforeEach(() => {
     vi.mocked(fetchSeries).mockReset().mockResolvedValue([makeSeries()]);
-    vi.mocked(fetchSeriesSummary).mockReset().mockResolvedValue({
-      total: 56,
-      owned: 56,
-      missing: 0,
-      completionPercent: 100,
-      purchaseTotalUah: '604.64',
-      currentValueUah: '1837.00',
-      unpricedMissing: 0,
-    });
-    vi.mocked(fetchSeriesItems)
+    vi.mocked(fetchCompletenessGroup).mockReset().mockResolvedValue(makeGroup());
+    vi.mocked(fetchCompletenessItems)
       .mockReset()
       .mockResolvedValue({
         items: [makeItem()],
@@ -161,9 +180,53 @@ describe('SeriesDetailPage', () => {
     expect(await screen.findByText('Delaware')).toBeInTheDocument();
   });
 
-  it('fetches this series only from the ungated series-items endpoint, never GET /catalog', async () => {
+  it('fetches this group only from the ungated completeness-items endpoint, never GET /catalog', async () => {
     renderPage();
     await screen.findByText('Delaware');
-    expect(fetchSeriesItems).toHaveBeenCalledWith(5, 1, 24);
+    expect(fetchCompletenessItems).toHaveBeenCalledWith('series', { value: 5 }, undefined, 1, 24);
+  });
+
+  it('renders a generic header and no series-only chrome for a non-series grouping', async () => {
+    vi.mocked(fetchCompletenessGroup).mockResolvedValue(
+      makeGroup({
+        groupBy: 'year',
+        value: 2015,
+        label: '2015',
+        countryId: null,
+        description: null,
+        startYear: null,
+        endYear: null,
+      }),
+    );
+    renderPage(['/collection/completeness/year/2015']);
+
+    expect(await screen.findByRole('heading', { name: '2015' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Відкрити в каталозі' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/загального каталогу/)).not.toBeInTheDocument();
+    expect(fetchCompletenessItems).toHaveBeenCalledWith('year', { value: 2015 }, undefined, 1, 24);
+  });
+
+  it('resolves the "none" route segment to the unassigned bucket', async () => {
+    vi.mocked(fetchCompletenessGroup).mockResolvedValue(
+      makeGroup({
+        groupBy: 'material',
+        value: null,
+        unassigned: true,
+        label: null,
+        countryId: null,
+        startYear: null,
+        endYear: null,
+      }),
+    );
+    renderPage(['/collection/completeness/material/none']);
+
+    await screen.findByText('Delaware');
+    expect(fetchCompletenessItems).toHaveBeenCalledWith(
+      'material',
+      { unassigned: true },
+      undefined,
+      1,
+      24,
+    );
   });
 });

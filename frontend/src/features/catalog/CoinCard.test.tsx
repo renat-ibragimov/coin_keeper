@@ -198,7 +198,7 @@ describe('CoinCard series link', () => {
       />,
     );
     const link = screen.getByRole('link', { name: 'Видатні особистості України' });
-    expect(link).toHaveAttribute('href', '/collection/series/7');
+    expect(link).toHaveAttribute('href', '/collection/completeness/series/7');
   });
 
   it('falls back to plain text when there is no matching series id', () => {

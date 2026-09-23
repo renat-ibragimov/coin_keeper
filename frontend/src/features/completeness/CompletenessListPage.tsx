@@ -20,26 +20,29 @@ import {
   Tabs,
 } from '@/shared/ui';
 
-import { fetchSeriesProgress } from './api';
-import { sortSeries } from './sort';
-import type { SeriesSort } from './sort';
-import styles from './SeriesListPage.module.css';
+import { fetchCompletenessSummary } from './api';
+import { groupByOptions, groupLabel, groupRouteValue, parseGroupBy } from './groupBy';
+import type { CompletenessGroupBy } from './groupBy';
+import { sortGroups } from './sort';
+import type { CompletenessSort } from './sort';
+import styles from './CompletenessListPage.module.css';
 
-type SeriesScope = 'mine' | 'all';
+type CompletenessScope = 'mine' | 'all';
 
-export function SeriesListPage() {
+export function CompletenessListPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const [params, setParams] = useSearchParams();
   const countryId = Number.parseInt(params.get('countryId') ?? '', 10) || undefined;
-  const sort: SeriesSort = params.get('sort') === 'name' ? 'name' : 'completion';
-  const scope: SeriesScope = params.get('scope') === 'all' ? 'all' : 'mine';
+  const groupBy: CompletenessGroupBy = parseGroupBy(params.get('groupBy'));
+  const sort: CompletenessSort = params.get('sort') === 'value' ? 'value' : 'completion';
+  const scope: CompletenessScope = params.get('scope') === 'all' ? 'all' : 'mine';
 
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
-  const progressQuery = useQuery({
-    queryKey: ['series', 'progress', countryId],
-    queryFn: () => fetchSeriesProgress(countryId),
+  const summaryQuery = useQuery({
+    queryKey: ['completeness', 'summary', groupBy, countryId],
+    queryFn: () => fetchCompletenessSummary(groupBy, countryId),
   });
   const collectionEmpty = bootstrapQuery.data?.dashboard.isEmpty === true;
   const countryName = useMemo(() => {
@@ -56,11 +59,20 @@ export function SeriesListPage() {
     return () => clearTimeout(timer);
   }, [search]);
 
-  const update = (changes: { countryId?: number; sort?: SeriesSort; scope?: SeriesScope }) => {
+  const update = (changes: {
+    countryId?: number;
+    groupBy?: CompletenessGroupBy;
+    sort?: CompletenessSort;
+    scope?: CompletenessScope;
+  }) => {
     const next = new URLSearchParams(params);
     if ('countryId' in changes) {
       if (changes.countryId) next.set('countryId', String(changes.countryId));
       else next.delete('countryId');
+    }
+    if (changes.groupBy) {
+      if (changes.groupBy === 'series') next.delete('groupBy');
+      else next.set('groupBy', changes.groupBy);
     }
     if (changes.sort) {
       if (changes.sort === 'completion') next.delete('sort');
@@ -74,8 +86,8 @@ export function SeriesListPage() {
   };
 
   const allRows = useMemo(
-    () => (progressQuery.data ? sortSeries(progressQuery.data, sort) : []),
-    [progressQuery.data, sort],
+    () => (summaryQuery.data ? sortGroups(summaryQuery.data, sort) : []),
+    [summaryQuery.data, sort],
   );
   const scopedRows = useMemo(
     () => (scope === 'mine' ? allRows.filter((row) => row.summary.owned > 0) : allRows),
@@ -84,28 +96,30 @@ export function SeriesListPage() {
   const rows = useMemo(() => {
     const needle = debouncedSearch.trim().toLocaleLowerCase();
     if (!needle) return scopedRows;
-    return scopedRows.filter(
-      (row) =>
-        row.series.name.toLocaleLowerCase().includes(needle) ||
-        (countryName.get(row.series.countryId) ?? '').toLocaleLowerCase().includes(needle),
+    return scopedRows.filter((row) =>
+      groupLabel(t, groupBy, row).toLocaleLowerCase().includes(needle),
     );
-  }, [scopedRows, debouncedSearch, countryName]);
+  }, [scopedRows, debouncedSearch, groupBy, t]);
 
-  const noSeriesAtAll = progressQuery.data && allRows.length === 0;
+  const noRowsAtAll = summaryQuery.data && allRows.length === 0;
   const noneStarted =
-    progressQuery.data && !noSeriesAtAll && scope === 'mine' && scopedRows.length === 0;
-  const nothingFound = progressQuery.data && !noSeriesAtAll && !noneStarted && rows.length === 0;
+    summaryQuery.data && !noRowsAtAll && scope === 'mine' && scopedRows.length === 0;
+  const nothingFound = summaryQuery.data && !noRowsAtAll && !noneStarted && rows.length === 0;
 
   return (
     <div className={styles.page}>
-      <PageHeader align="center" title={t('series.title')} subtitle={t('series.subtitle')} />
+      <PageHeader
+        align="center"
+        title={t('completeness.title')}
+        subtitle={t('completeness.subtitle')}
+      />
 
       {collectionEmpty ? (
         <EmptyState
           variant="card"
           icon={<Layers strokeWidth={1.75} />}
-          title={t('series.emptyCollectionTitle')}
-          description={t('series.emptyCollectionText')}
+          title={t('completeness.emptyCollectionTitle')}
+          description={t('completeness.emptyCollectionText')}
           actions={
             <>
               <Link to="/catalog">
@@ -124,8 +138,8 @@ export function SeriesListPage() {
               <div className={styles.search}>
                 <Input
                   type="search"
-                  placeholder={t('series.searchPlaceholder')}
-                  aria-label={t('series.searchPlaceholder')}
+                  placeholder={t('completeness.searchPlaceholder')}
+                  aria-label={t('completeness.searchPlaceholder')}
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
@@ -144,19 +158,25 @@ export function SeriesListPage() {
               </Select>
             </div>
             <div className={styles.controls}>
-              <Tabs<SeriesScope>
+              <Tabs<CompletenessGroupBy>
+                aria-label={t('completeness.groupBySeries')}
+                options={groupByOptions(t)}
+                value={groupBy}
+                onChange={(value) => update({ groupBy: value })}
+              />
+              <Tabs<CompletenessScope>
                 options={[
-                  { value: 'mine', label: t('series.scopeMine') },
-                  { value: 'all', label: t('series.scopeAll') },
+                  { value: 'mine', label: t('completeness.scopeMine') },
+                  { value: 'all', label: t('completeness.scopeAll') },
                 ]}
                 value={scope}
                 onChange={(value) => update({ scope: value })}
               />
-              <Tabs<SeriesSort>
+              <Tabs<CompletenessSort>
                 aria-label={t('catalog.sort')}
                 options={[
-                  { value: 'completion', label: t('series.sortCompletion') },
-                  { value: 'name', label: t('series.sortName') },
+                  { value: 'completion', label: t('completeness.sortCompletion') },
+                  { value: 'value', label: t('completeness.sortValue') },
                 ]}
                 value={sort}
                 onChange={(value) => update({ sort: value })}
@@ -164,18 +184,18 @@ export function SeriesListPage() {
             </div>
           </div>
 
-          {progressQuery.isError ? (
+          {summaryQuery.isError ? (
             <ErrorState
               detail={
-                progressQuery.error instanceof ApiError && progressQuery.error.status === 0
+                summaryQuery.error instanceof ApiError && summaryQuery.error.status === 0
                   ? t('errors.network')
                   : undefined
               }
-              onRetry={() => void progressQuery.refetch()}
+              onRetry={() => void summaryQuery.refetch()}
             />
           ) : null}
 
-          {progressQuery.isPending ? (
+          {summaryQuery.isPending ? (
             <div className={styles.list}>
               {Array.from({ length: 6 }, (_, index) => (
                 <Skeleton key={index} height={88} />
@@ -183,18 +203,21 @@ export function SeriesListPage() {
             </div>
           ) : null}
 
-          {noSeriesAtAll ? (
-            <EmptyState title={t('series.emptyTitle')} description={t('series.emptyText')} />
+          {noRowsAtAll ? (
+            <EmptyState
+              title={t('completeness.emptyTitle')}
+              description={t('completeness.emptyText')}
+            />
           ) : null}
 
           {noneStarted ? (
             <EmptyState
               icon={<Layers strokeWidth={1.75} />}
-              title={t('series.emptyMineTitle')}
-              description={t('series.emptyMineText')}
+              title={t('completeness.emptyMineTitle')}
+              description={t('completeness.emptyMineText')}
               actions={
                 <Button variant="secondary" onClick={() => update({ scope: 'all' })}>
-                  {t('series.showAllSeries')}
+                  {t('completeness.showAll')}
                 </Button>
               }
             />
@@ -210,52 +233,58 @@ export function SeriesListPage() {
 
           {rows.length > 0 ? (
             <ul className={styles.list}>
-              {rows.map(({ series, summary }) => (
-                <li key={series.id} className={styles.row}>
+              {rows.map((row) => (
+                <li key={row.unassigned ? 'unassigned' : row.value} className={styles.row}>
                   <ProgressRing
-                    value={summary.total ? summary.owned / summary.total : 0}
-                    aria-label={formatPercent(summary.completionPercent, locale) ?? ''}
+                    value={row.summary.total ? row.summary.owned / row.summary.total : 0}
+                    aria-label={formatPercent(row.summary.completionPercent, locale) ?? ''}
                   >
-                    {formatPercent(summary.completionPercent, locale, 0)}
+                    {formatPercent(row.summary.completionPercent, locale, 0)}
                   </ProgressRing>
                   <div className={styles.rowBody}>
-                    <Link to={`/collection/series/${series.id}`} className={styles.name}>
-                      {series.name}
+                    <Link
+                      to={`/collection/completeness/${groupBy}/${groupRouteValue(row)}`}
+                      className={styles.name}
+                    >
+                      {groupLabel(t, groupBy, row)}
                     </Link>
                     <div className={styles.meta}>
-                      {countryName.get(series.countryId) ?? ''}
-                      {series.startYear ? (
+                      {row.countryId ? (countryName.get(row.countryId) ?? '') : ''}
+                      {row.startYear ? (
                         <span className="tabular">
                           {' '}
-                          · {series.startYear}
-                          {series.endYear ? `–${series.endYear}` : '–'}
+                          · {row.startYear}
+                          {row.endYear ? `–${row.endYear}` : '–'}
                         </span>
                       ) : null}
                     </div>
                   </div>
                   <dl className={styles.stats}>
                     <div>
-                      <dt>{t('series.collected')}</dt>
+                      <dt>{t('completeness.collected')}</dt>
                       <dd className="tabular">
-                        {t('dashboard.progress', { owned: summary.owned, count: summary.total })}
+                        {t('dashboard.progress', {
+                          owned: row.summary.owned,
+                          count: row.summary.total,
+                        })}
                       </dd>
                     </div>
                     <div>
-                      <dt>{t('series.spent')}</dt>
-                      <dd className="tabular">{formatUah(summary.purchaseTotalUah, locale)}</dd>
+                      <dt>{t('completeness.spent')}</dt>
+                      <dd className="tabular">{formatUah(row.summary.purchaseTotalUah, locale)}</dd>
                     </div>
                     <div>
-                      <dt>{t('series.value')}</dt>
-                      <dd className="tabular">{formatUah(summary.currentValueUah, locale)}</dd>
+                      <dt>{t('completeness.value')}</dt>
+                      <dd className="tabular">{formatUah(row.summary.currentValueUah, locale)}</dd>
                     </div>
                     <div>
-                      <dt>{t('series.missing')}</dt>
+                      <dt>{t('completeness.missing')}</dt>
                       <dd className="tabular">
-                        {summary.missing}
-                        {summary.unpricedMissing > 0 ? (
+                        {row.summary.missing}
+                        {row.summary.unpricedMissing > 0 ? (
                           <span className={styles.muted}>
                             {' '}
-                            · {t('dashboard.unpriced', { count: summary.unpricedMissing })}
+                            · {t('dashboard.unpriced', { count: row.summary.unpricedMissing })}
                           </span>
                         ) : null}
                       </dd>

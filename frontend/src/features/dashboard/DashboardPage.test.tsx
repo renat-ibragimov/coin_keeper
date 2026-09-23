@@ -116,7 +116,7 @@ describe('DashboardPage', () => {
     );
     expect(screen.getByRole('link', { name: /Комплектність/ })).toHaveAttribute(
       'href',
-      '/collection/series',
+      '/collection/completeness',
     );
     expect(screen.getByRole('link', { name: /Поточна оцінка/ })).toHaveAttribute(
       'href',
@@ -130,7 +130,7 @@ describe('DashboardPage', () => {
 
     expect(await screen.findByRole('link', { name: 'Флора і фауна' })).toHaveAttribute(
       'href',
-      '/collection/series/11',
+      '/collection/completeness/series/11',
     );
     expect(screen.queryByRole('link', { name: 'Переглянути відсутні' })).toBeNull();
   });

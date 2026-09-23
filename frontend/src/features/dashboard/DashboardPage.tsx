@@ -124,7 +124,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
             hint={t('dashboard.tileMissingHint', { count: dashboard.catalogItems })}
           />
         </Link>
-        <Link to="/collection/series" className={styles.tileLink}>
+        <Link to="/collection/completeness" className={styles.tileLink}>
           <StatTile
             icon={<PieChart strokeWidth={1.75} />}
             label={t('dashboard.tileCompletion')}
@@ -161,7 +161,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
           <Card variant="panel" className={styles.stackCardGrow}>
             <div className={styles.cardHeader}>
               <h2 className={styles.cardTitle}>{t('dashboard.nearestTitle')}</h2>
-              <Link to="/collection/series" className={styles.cardLink}>
+              <Link to="/collection/completeness" className={styles.cardLink}>
                 {t('dashboard.allSeries')}
                 <ArrowRight size={14} aria-hidden="true" />
               </Link>
@@ -182,7 +182,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                     </ProgressRing>
                     <div className={styles.seriesBody}>
                       <Link
-                        to={`/collection/series/${entry.id}`}
+                        to={`/collection/completeness/series/${entry.id}`}
                         className={`${styles.seriesName} ${styles.seriesNameStretched}`}
                       >
                         {entry.name}

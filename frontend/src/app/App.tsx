@@ -23,9 +23,9 @@ import { GuestCollectionPage } from '@/features/collection/guest/GuestCollection
 import { CollectionPage } from '@/features/collection/CollectionPage';
 import { PurchaseFormPage } from '@/features/collection/PurchaseFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
+import { CompletenessDetailPage } from '@/features/completeness/CompletenessDetailPage';
+import { CompletenessListPage } from '@/features/completeness/CompletenessListPage';
 import { ExpensesPage } from '@/features/expenses/ExpensesPage';
-import { SeriesDetailPage } from '@/features/series/SeriesDetailPage';
-import { SeriesListPage } from '@/features/series/SeriesListPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { scrollPageToTop } from '@/shared/lib/pageScroll';
 import { ThemeProvider } from '@/shared/theme/ThemeProvider';
@@ -111,11 +111,11 @@ export function CollectionRoot() {
   return user ? <DashboardPage /> : <GuestCollectionPage />;
 }
 
-function CollectionSectionRoute({ section }: { section: 'coins' | 'series' | 'money' }) {
+function CollectionSectionRoute({ section }: { section: 'coins' | 'completeness' | 'money' }) {
   const { user } = useAuth();
   if (!user) return <GuestCollectionPage section={section} />;
   if (section === 'coins') return <CollectionPage />;
-  if (section === 'series') return <SeriesListPage />;
+  if (section === 'completeness') return <CompletenessListPage />;
   return <ExpensesPage />;
 }
 
@@ -141,13 +141,18 @@ function RedirectTo({ to }: { to: string }) {
   return <Navigate to={{ pathname: to, search: location.search, hash: location.hash }} replace />;
 }
 
-/** `/series/:id` moved under the collection context. */
+/** `/series/:id` and the retired `/collection/series/:id` both land on the
+ *  "Комплектність" detail screen, grouped by series. */
 function RedirectSeriesDetail() {
   const { id } = useParams();
   const location = useLocation();
   return (
     <Navigate
-      to={{ pathname: `/collection/series/${id}`, search: location.search, hash: location.hash }}
+      to={{
+        pathname: `/collection/completeness/series/${id}`,
+        search: location.search,
+        hash: location.hash,
+      }}
       replace
     />
   );
@@ -222,8 +227,8 @@ export function App() {
                       element={<CollectionSectionRoute section="coins" />}
                     />
                     <Route
-                      path="/collection/series"
-                      element={<CollectionSectionRoute section="series" />}
+                      path="/collection/completeness"
+                      element={<CollectionSectionRoute section="completeness" />}
                     />
                     <Route
                       path="/collection/money"
@@ -235,7 +240,10 @@ export function App() {
                     <Route element={<ProtectedRoute />}>
                       <Route path="/collection/add" element={<AddPage />} />
                       <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
-                      <Route path="/collection/series/:id" element={<SeriesDetailPage />} />
+                      <Route
+                        path="/collection/completeness/:groupBy/:value"
+                        element={<CompletenessDetailPage />}
+                      />
                       <Route path="/settings" element={<SettingsPage />} />
                       <Route path="/admin" element={<AdminRoute />} />
 
@@ -243,9 +251,14 @@ export function App() {
                       <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
                       <Route
                         path="/series"
-                        element={<Navigate to="/collection/series" replace />}
+                        element={<Navigate to="/collection/completeness" replace />}
                       />
                       <Route path="/series/:id" element={<RedirectSeriesDetail />} />
+                      <Route
+                        path="/collection/series"
+                        element={<Navigate to="/collection/completeness" replace />}
+                      />
+                      <Route path="/collection/series/:id" element={<RedirectSeriesDetail />} />
                       <Route path="/missing" element={<RedirectMissingToCatalog />} />
                       <Route path="/collection/missing" element={<RedirectMissingToCatalog />} />
                       <Route

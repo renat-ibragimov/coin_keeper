@@ -5,17 +5,17 @@ import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 
 import '@/shared/i18n';
-import type { SeriesProgress } from '@/shared/api/types';
+import type { CompletenessGroup } from '@/shared/api/types';
 
 import { fetchCountries } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import type { BootstrapOut, CountryOut } from '@/shared/api/types';
 
-import { fetchSeriesProgress } from './api';
-import { SeriesListPage } from './SeriesListPage';
-import { sortSeries } from './sort';
+import { fetchCompletenessSummary } from './api';
+import { CompletenessListPage } from './CompletenessListPage';
+import { sortGroups } from './sort';
 
-vi.mock('./api', () => ({ fetchSeriesProgress: vi.fn(), fetchSeriesSummary: vi.fn() }));
+vi.mock('./api', () => ({ fetchCompletenessSummary: vi.fn() }));
 vi.mock('@/features/catalog/api', () => ({ fetchCountries: vi.fn() }));
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
 
@@ -85,22 +85,23 @@ const COUNTRY: CountryOut = {
   maxYear: null,
 };
 
-function progress(id: number, name: string, owned: number, total: number): SeriesProgress {
+function group(
+  value: number,
+  label: string,
+  owned: number,
+  total: number,
+  overrides: Partial<CompletenessGroup> = {},
+): CompletenessGroup {
   return {
-    series: {
-      id,
-      countryId: 1,
-      name,
-      nameOriginal: name,
-      originalLang: 'uk',
-      nameUk: null,
-      nameUkSource: null,
-      nameEn: null,
-      nameEnSource: null,
-      description: null,
-      startYear: null,
-      endYear: null,
-    },
+    groupBy: 'series',
+    value,
+    unassigned: false,
+    label,
+    countryId: 1,
+    description: null,
+    startYear: null,
+    endYear: null,
+    sortOrder: null,
     summary: {
       total,
       owned,
@@ -110,30 +111,41 @@ function progress(id: number, name: string, owned: number, total: number): Serie
       currentValueUah: '250.00',
       unpricedMissing: total - owned > 0 ? 1 : 0,
     },
+    ...overrides,
   };
 }
 
 const ROWS = [
-  progress(1, 'Half', 5, 10),
-  progress(2, 'Almost', 19, 20),
-  progress(3, 'Done', 3, 3),
-  progress(4, 'Empty', 0, 0),
+  group(1, 'Half', 5, 10),
+  group(2, 'Almost', 19, 20),
+  group(3, 'Done', 3, 3),
+  group(4, 'Empty', 0, 0),
 ];
 
-describe('sortSeries', () => {
-  it('puts the most complete series first and can sort by name', () => {
-    expect(sortSeries(ROWS, 'completion').map((row) => row.series.name)).toEqual([
+describe('sortGroups', () => {
+  it('puts the most complete group first and can sort by value', () => {
+    expect(sortGroups(ROWS, 'completion').map((row) => row.label)).toEqual([
       'Done',
       'Almost',
       'Half',
       'Empty',
     ]);
-    expect(sortSeries(ROWS, 'name').map((row) => row.series.name)).toEqual([
+    // None of these rows carry a sortOrder, so 'value' falls back to the label.
+    expect(sortGroups(ROWS, 'value').map((row) => row.label)).toEqual([
       'Almost',
       'Done',
       'Empty',
       'Half',
     ]);
+  });
+
+  it('sorts numerically by sortOrder when every row has one', () => {
+    const rows = [
+      group(2015, '2015', 1, 1, { sortOrder: 2015 }),
+      group(1999, '1999', 1, 1, { sortOrder: 1999 }),
+      group(2001, '2001', 1, 1, { sortOrder: 2001 }),
+    ];
+    expect(sortGroups(rows, 'value').map((row) => row.label)).toEqual(['1999', '2001', '2015']);
   });
 });
 
@@ -143,22 +155,22 @@ function renderPage(initialEntries: string[] = ['/']) {
       client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
     >
       <MemoryRouter initialEntries={initialEntries}>
-        <SeriesListPage />
+        <CompletenessListPage />
       </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-describe('SeriesListPage', () => {
-  it('defaults to "Мої": started series only, hiding the zeroed-out one', async () => {
-    vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
+describe('CompletenessListPage', () => {
+  it('defaults to "Мої": started groups only, hiding the zeroed-out one', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue(ROWS);
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
     vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
     renderPage();
 
     expect(await screen.findByRole('link', { name: 'Almost' })).toHaveAttribute(
       'href',
-      '/collection/series/2',
+      '/collection/completeness/series/2',
     );
     expect(screen.getByText('19 з 20')).toBeInTheDocument();
     expect(screen.getAllByText('100 ₴')).toHaveLength(3);
@@ -166,8 +178,8 @@ describe('SeriesListPage', () => {
     expect(screen.queryByText('Empty')).toBeNull();
   });
 
-  it('switches to "Усі" and shows every series, including unstarted ones', async () => {
-    vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
+  it('switches to "Усі" and shows every group, including unstarted ones', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue(ROWS);
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
     vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
     renderPage();
@@ -180,14 +192,14 @@ describe('SeriesListPage', () => {
     expect(screen.getAllByText('100 ₴')).toHaveLength(4);
   });
 
-  it('filters the visible series by name as the user types', async () => {
-    vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
+  it('filters the visible rows by label as the user types', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue(ROWS);
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
     vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
     renderPage();
 
     await screen.findByText('Almost');
-    await userEvent.type(screen.getByPlaceholderText('Пошук серії…'), 'alm');
+    await userEvent.type(screen.getByPlaceholderText('Пошук…'), 'alm');
 
     await waitFor(() => expect(screen.queryByText('Half')).toBeNull());
     expect(screen.getByText('Almost')).toBeInTheDocument();
@@ -195,27 +207,27 @@ describe('SeriesListPage', () => {
   });
 
   it('shows a placeholder with a scope switch when nothing is started yet', async () => {
-    const notStarted = [progress(1, 'Half', 0, 10), progress(2, 'Almost', 0, 20)];
-    vi.mocked(fetchSeriesProgress).mockResolvedValue(notStarted);
+    const notStarted = [group(1, 'Half', 0, 10), group(2, 'Almost', 0, 20)];
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue(notStarted);
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
     vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
     renderPage();
 
-    expect(await screen.findByText('Ще не почато жодної серії')).toBeInTheDocument();
+    expect(await screen.findByText('Ще нічого не почато')).toBeInTheDocument();
     expect(screen.queryByText('Half')).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Показати всі серії' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Показати всі' }));
     expect(await screen.findByText('Half')).toBeInTheDocument();
     expect(screen.getByText('Almost')).toBeInTheDocument();
   });
 
   it('shows an onboarding empty state instead of a zeroed-out list', async () => {
-    vi.mocked(fetchSeriesProgress).mockResolvedValue(ROWS);
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue(ROWS);
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(true));
     vi.mocked(fetchCountries).mockResolvedValue([]);
     renderPage();
 
-    expect(await screen.findByText('Серій ще немає')).toBeInTheDocument();
+    expect(await screen.findByText('Тут поки порожньо')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
       'href',
       '/catalog',
@@ -224,8 +236,38 @@ describe('SeriesListPage', () => {
       'href',
       '/collection/add',
     );
-    expect(screen.queryByText('Імпортувати з uCoin')).toBeNull();
     expect(screen.queryByText('Almost')).toBeNull();
     expect(screen.queryByText('0 %')).toBeNull();
+  });
+
+  it('lets the viewer switch the grouping field', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue(ROWS);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage();
+
+    await screen.findByText('Almost');
+    await userEvent.click(screen.getByRole('tab', { name: 'Рік' }));
+
+    await waitFor(() =>
+      expect(fetchCompletenessSummary).toHaveBeenLastCalledWith('year', undefined),
+    );
+  });
+
+  it('shows the "без значення" label for the unassigned bucket', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue([
+      group(1, 'Мідь', 2, 5, { groupBy: 'material' }),
+      {
+        ...group(0, '', 1, 3, { groupBy: 'material' }),
+        unassigned: true,
+        value: null,
+        label: null,
+      },
+    ]);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage(['/?groupBy=material']);
+
+    expect(await screen.findByText('Без металу')).toBeInTheDocument();
   });
 });

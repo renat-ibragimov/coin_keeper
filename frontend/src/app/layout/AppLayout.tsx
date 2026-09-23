@@ -31,7 +31,7 @@ import styles from './AppLayout.module.css';
 const COLLECTION_TABS = [
   { to: '/collection', key: 'nav.dashboard', end: true },
   { to: '/collection/coins', key: 'nav.coins', end: false },
-  { to: '/collection/series', key: 'nav.series', end: false },
+  { to: '/collection/completeness', key: 'nav.completeness', end: false },
   { to: '/collection/money', key: 'nav.expenses', end: false },
 ] as const;
 
@@ -48,7 +48,7 @@ const MOBILE_COLLECTION = [
   { to: '/catalog', key: 'nav.catalog', end: false, icon: LayoutGrid },
   { to: '/collection', key: 'nav.dashboard', end: true, icon: BarChart3 },
   { to: '/collection/coins', key: 'nav.coins', end: false, icon: Coins },
-  { to: '/collection/series', key: 'nav.series', end: false, icon: Layers },
+  { to: '/collection/completeness', key: 'nav.completeness', end: false, icon: Layers },
   { to: '/collection/money', key: 'nav.expenses', end: false, icon: Wallet },
 ] as const;
 

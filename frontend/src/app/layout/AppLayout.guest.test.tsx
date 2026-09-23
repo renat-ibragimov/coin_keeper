@@ -64,7 +64,7 @@ describe('AppLayout account state', () => {
     show('/collection/coins');
     expect(screen.getByText('Guest coins content')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: 'Монети' }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: 'Серії' }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: 'Комплектність' }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: 'Гроші' }).length).toBeGreaterThan(0);
   });
 

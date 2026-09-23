@@ -11,18 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.locale import DEFAULT_LOCALE, pick_name
 from app.models import CoinSeries, Country, User
 from app.models.enums import UserRole
-from app.repositories.catalog import CatalogFilters
 from app.repositories.series import SeriesRepository
-from app.schemas.catalog import CatalogListItem
 from app.schemas.series import SeriesCreate, SeriesOut, SeriesProgressOut, SeriesSummaryOut
-from app.services.catalog import CatalogService
 
 
 class SeriesError(Exception):
-    pass
-
-
-class SeriesNotFoundError(SeriesError):
     pass
 
 
@@ -90,26 +83,6 @@ class SeriesService:
         )
         await self._repo.add(series)
         return _out(series, self._locale)
-
-    async def summary(self, series_id: int) -> SeriesSummaryOut:
-        if await self._repo.get_visible(series_id) is None:
-            raise SeriesNotFoundError
-        return await self._summary_of(series_id)
-
-    async def list_items(
-        self, series_id: int, *, limit: int, offset: int
-    ) -> tuple[list[CatalogListItem], int]:
-        """Every item of the series visible to the user -- shared or
-        personal, regardless of catalog_confirmed. A series screen is about
-        the user's own collection, not the catalogue browse experience
-        (docs/04-business-rules.md §13a; storefront_visible(),
-        app/repositories/catalog.py)."""
-        if await self._repo.get_visible(series_id) is None:
-            raise SeriesNotFoundError
-        filters = CatalogFilters(series_ids=[series_id], sort="year", order="asc")
-        return await CatalogService(self._session, self._user, self._locale).list_catalog(
-            filters, limit=limit, offset=offset, require_confirmed=False
-        )
 
     async def list_progress(self, country_id: int | None) -> list[SeriesProgressOut]:
         """Every series (of a country) with its summary; the list is small,
