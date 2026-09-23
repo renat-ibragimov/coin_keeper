@@ -10,10 +10,13 @@ import { ProtectedRoute } from './ProtectedRoute';
 
 const auth = vi.hoisted(() => ({ user: null as null | { id: number; role: string }, ready: true }));
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => auth }));
+vi.mock('@/features/landing/LandingPage', () => ({
+  default: () => <h1>Collection landing page</h1>,
+}));
 const openAuth = vi.fn();
 
 describe('public routes', () => {
-  it('sends anonymous root visitors to the catalog', () => {
+  it('shows the landing page to anonymous root visitors', async () => {
     auth.user = null;
     render(
       <MemoryRouter initialEntries={['/']}>
@@ -23,7 +26,10 @@ describe('public routes', () => {
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Public catalog')).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Collection landing page' }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Public catalog')).not.toBeInTheDocument();
   });
 
   it('shows the collection preview without account data', () => {

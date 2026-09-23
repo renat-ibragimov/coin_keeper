@@ -367,6 +367,11 @@
   display: none;
 }
 
+.main.landingMain {
+  max-width: none;
+  padding: 0;
+}
+
 @media (max-width: 900px) {
   /* The document scrolls on the phone: an inner scroller would keep the
    * browser's URL bar from collapsing, and there is nothing to fix anyway —

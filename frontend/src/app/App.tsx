@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 
@@ -36,6 +36,8 @@ import { DonationDialogProvider } from './layout/DonationDialog';
 import { ProtectedRoute } from './ProtectedRoute';
 import { ThemeSettingsSync } from './ThemeSettingsSync';
 import { LegalPage } from './legal/LegalPage';
+
+const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,7 +105,12 @@ function ReadyRoute() {
 
 export function RootRoute() {
   const { user } = useAuth();
-  return <Navigate to={user ? '/collection' : '/catalog'} replace />;
+  if (user) return <Navigate to="/collection" replace />;
+  return (
+    <Suspense fallback={<Spinner />}>
+      <LandingPage />
+    </Suspense>
+  );
 }
 
 export function CollectionRoot() {
@@ -221,6 +228,7 @@ export function App() {
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                   </Route>
                   <Route element={<ReadyRoute />}>
+                    <Route path="/" element={<RootRoute />} />
                     <Route path="/collection" element={<CollectionRoot />} />
                     <Route
                       path="/collection/coins"
@@ -236,7 +244,6 @@ export function App() {
                     />
                     <Route path="/catalog" element={<CatalogPage />} />
                     <Route path="/catalog/:id" element={<CoinCardPage />} />
-                    <Route path="/" element={<RootRoute />} />
                     <Route element={<ProtectedRoute />}>
                       <Route path="/collection/add" element={<AddPage />} />
                       <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />

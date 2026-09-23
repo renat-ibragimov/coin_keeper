@@ -21,6 +21,8 @@
     "scanQr": "Scan the QR code with another device"
   },
   "nav": {
+    "features": "Features",
+    "analytics": "Analytics",
     "label": "Main navigation",
     "collectionLabel": "Collection navigation",
     "dashboard": "Overview",

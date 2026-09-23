@@ -10,6 +10,7 @@ import {
   LogOut,
   Settings,
   Shield,
+  SlidersHorizontal,
   User,
   Wallet,
 } from 'lucide-react';
@@ -41,6 +42,11 @@ const MOBILE_PLAIN = [
   { to: '/collection', key: 'nav.myCollection', end: false, icon: Heart },
 ] as const;
 
+const LANDING_SECTIONS = [
+  { href: '#collection', key: 'nav.features', icon: SlidersHorizontal },
+  { href: '#analytics', key: 'nav.analytics', icon: BarChart3 },
+] as const;
+
 /** Inside "Моя колекція": its own four sections plus the catalog, all one
  *  tap away — settings and admin moved into the account menu, so nothing
  *  here needs a "more" sheet to hold them any more. */
@@ -62,6 +68,7 @@ export function AppLayout() {
   const { user, signOut } = useAuth();
   const openAuth = useAuthDialog();
   const isAdmin = user?.role === 'admin';
+  const isLanding = location.pathname === '/';
   const inCollection =
     location.pathname === '/collection' || location.pathname.startsWith('/collection/');
   const mobileLinks = inCollection ? MOBILE_COLLECTION : MOBILE_PLAIN;
@@ -79,14 +86,22 @@ export function AppLayout() {
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
-        <Brand to={user ? '/collection' : '/catalog'} />
+        <Brand to={user ? '/collection' : '/'} />
         <nav className={styles.nav} aria-label={t('nav.label')}>
+          {isLanding &&
+            LANDING_SECTIONS.map((section) => (
+              <a key={section.href} href={section.href} className={styles.navLink}>
+                {t(section.key)}
+              </a>
+            ))}
           <NavLink to="/catalog" className={navClass(styles.navLink, styles.navLinkActive)}>
             {t('nav.catalog')}
           </NavLink>
-          <NavLink to="/collection" className={navClass(styles.navLink, styles.navLinkActive)}>
-            {t('nav.myCollection')}
-          </NavLink>
+          {!isLanding && (
+            <NavLink to="/collection" className={navClass(styles.navLink, styles.navLinkActive)}>
+              {t('nav.myCollection')}
+            </NavLink>
+          )}
           {isAdmin ? (
             <>
               <span className={styles.navDivider} aria-hidden="true" />
@@ -269,14 +284,21 @@ export function AppLayout() {
           </nav>
         ) : null}
 
-        <main className={styles.main}>
+        <main className={`${styles.main} ${isLanding ? styles.landingMain : ''}`}>
           <Outlet />
         </main>
         <SiteFooter reserveMobileNav />
       </div>
 
       <nav className={styles.bottomNav} aria-label={t('nav.label')}>
-        {mobileLinks.map((section) => (
+        {isLanding &&
+          LANDING_SECTIONS.map((section) => (
+            <a key={section.href} href={section.href} className={styles.bottomLink}>
+              <section.icon size={19} aria-hidden="true" />
+              {t(section.key)}
+            </a>
+          ))}
+        {(isLanding ? MOBILE_PLAIN.slice(0, 1) : mobileLinks).map((section) => (
           <NavLink
             key={section.to}
             to={section.to}
