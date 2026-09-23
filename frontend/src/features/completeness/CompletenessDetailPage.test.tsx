@@ -229,28 +229,4 @@ describe('CompletenessDetailPage', () => {
       24,
     );
   });
-
-  it('resolves a metal-kind code from the route, not a numeric id', async () => {
-    vi.mocked(fetchCompletenessGroup).mockResolvedValue(
-      makeGroup({
-        groupBy: 'metal',
-        value: 'precious',
-        label: null,
-        countryId: null,
-        startYear: null,
-        endYear: null,
-      }),
-    );
-    renderPage(['/collection/completeness/metal/precious']);
-
-    expect(await screen.findByRole('heading', { name: 'Дорогоцінні' })).toBeInTheDocument();
-    expect(fetchCompletenessGroup).toHaveBeenCalledWith('metal', { value: 'precious' }, undefined);
-    expect(fetchCompletenessItems).toHaveBeenCalledWith(
-      'metal',
-      { value: 'precious' },
-      undefined,
-      1,
-      24,
-    );
-  });
 });

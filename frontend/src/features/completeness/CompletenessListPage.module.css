@@ -22,6 +22,7 @@
 .search {
   flex: 1 1 160px;
   min-width: 140px;
+  max-width: 360px;
 }
 
 .controls {
@@ -31,7 +32,7 @@
   flex-wrap: wrap;
 }
 
-/* The groupBy switch grew from 4 to 7 options -- on a narrow toolbar it gets
+/* The groupBy switch grew from 4 to 6 options -- on a narrow toolbar it gets
  * its own line rather than fighting scope/sort for the leftover width. */
 @media (max-width: 900px) {
   .controls > :first-child {

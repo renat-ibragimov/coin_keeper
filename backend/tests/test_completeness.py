@@ -1,6 +1,6 @@
 """Completeness grouped by an arbitrary catalog field: series, year,
-denomination, material, edge, quality, metal — generalizing the retired
-per-series summary/items routes (see tests/test_series.py for what stayed
+denomination, material, edge, quality — generalizing the retired per-series
+summary/items routes (see tests/test_series.py for what stayed
 series-only)."""
 
 from __future__ import annotations
@@ -258,6 +258,38 @@ async def test_summary_groups_by_year(
     assert by_value[2021]["summary"]["owned"] == 0
 
 
+async def test_summary_metal_kind_filter_applies_to_every_dimension(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The metalKind filter narrows any dimension's counts, not only the
+    "metal" groupBy tab itself (docs/08-ui-map.md: Комплектність toolbar)."""
+    refs = ctx.refs
+    gold_2020 = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Gold",
+        year=2020,
+        metal_kind=MetalKind.PRECIOUS,
+    )
+    steel_2020 = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Steel", year=2020, metal_kind=MetalKind.BASE
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=gold_2020, price="1000")
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=steel_2020, price="5")
+
+    summary = (
+        await client.get(
+            f"/api/v1/completeness/summary?groupBy=year&countryId={refs.ukraine.id}"
+            "&metalKind=precious",
+            headers=auth(ctx.token_a),
+        )
+    ).json()
+    by_value = {row["value"]: row for row in summary}
+    assert by_value[2020]["summary"]["total"] == 1
+    assert by_value[2020]["summary"]["owned"] == 1
+    assert by_value[2020]["summary"]["purchaseTotalUah"] == "1000.00"
+
+
 async def test_unassigned_bucket_for_denomination_and_material(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
@@ -421,93 +453,8 @@ async def test_unassigned_bucket_for_edge_and_quality(
     _ = with_edge, with_quality
 
 
-async def test_summary_groups_by_metal_kind(
-    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
-) -> None:
-    """`metal_kind` is a NOT NULL StrEnum, not an int FK: three fixed groups,
-    no unassigned bucket, and no server-side label -- the frontend already
-    translates the enum code itself."""
-    refs = ctx.refs
-    gold = await make_catalog_item(
-        db_session,
-        country=refs.ukraine,
-        title="Gold",
-        year=2020,
-        metal_kind=MetalKind.PRECIOUS,
-    )
-    steel = await make_catalog_item(
-        db_session, country=refs.ukraine, title="Steel", year=2020, metal_kind=MetalKind.BASE
-    )
-    await make_catalog_item(
-        db_session,
-        country=refs.ukraine,
-        title="Mystery",
-        year=2020,
-        metal_kind=MetalKind.UNKNOWN,
-    )
-    await add_collection_item(db_session, owner_id=ctx.id_a, item=gold, price="1000")
-
-    summary = (
-        await client.get(
-            f"/api/v1/completeness/summary?groupBy=metal&countryId={refs.ukraine.id}",
-            headers=auth(ctx.token_a),
-        )
-    ).json()
-    by_value = {row["value"]: row for row in summary}
-    assert set(by_value) == {"precious", "base", "unknown"}
-    assert by_value["precious"]["unassigned"] is False
-    assert by_value["precious"]["label"] is None
-    assert by_value["precious"]["summary"]["total"] == 1
-    assert by_value["precious"]["summary"]["owned"] == 1
-    assert by_value["base"]["summary"]["owned"] == 0
-
-    group = (
-        await client.get(
-            "/api/v1/completeness/group?groupBy=metal&value=base", headers=auth(ctx.token_a)
-        )
-    ).json()
-    assert group["summary"]["total"] == 1
-
-    items = (
-        await client.get(
-            "/api/v1/completeness/items?groupBy=metal&value=precious", headers=auth(ctx.token_a)
-        )
-    ).json()
-    assert {item["title"] for item in items["items"]} == {"Gold"}
-
-    _ = steel
-
-
-async def test_unassigned_is_rejected_for_metal(client: AsyncClient, ctx: SimpleNamespace) -> None:
-    group = await client.get(
-        "/api/v1/completeness/group?groupBy=metal&unassigned=true", headers=auth(ctx.token_a)
-    )
-    assert group.status_code == 422
-
-    items = await client.get(
-        "/api/v1/completeness/items?groupBy=metal&unassigned=true", headers=auth(ctx.token_a)
-    )
-    assert items.status_code == 422
-
-
-async def test_group_value_must_be_an_integer_for_int_dimensions(
-    client: AsyncClient, ctx: SimpleNamespace
-) -> None:
+async def test_group_value_must_be_an_integer(client: AsyncClient, ctx: SimpleNamespace) -> None:
     response = await client.get(
         "/api/v1/completeness/group?groupBy=series&value=not-a-number", headers=auth(ctx.token_a)
     )
     assert response.status_code == 422
-
-
-async def test_group_value_must_be_a_known_metal_kind_code(
-    client: AsyncClient, ctx: SimpleNamespace
-) -> None:
-    group = await client.get(
-        "/api/v1/completeness/group?groupBy=metal&value=gold", headers=auth(ctx.token_a)
-    )
-    assert group.status_code == 422
-
-    items = await client.get(
-        "/api/v1/completeness/items?groupBy=metal&value=gold", headers=auth(ctx.token_a)
-    )
-    assert items.status_code == 422

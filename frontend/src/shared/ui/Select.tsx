@@ -26,6 +26,12 @@ interface SelectProps {
   searchPlaceholder?: string;
   /** Centers the field label over the control, for a toolbar of narrow columns (catalog filters). */
   centerLabel?: boolean;
+  /** Shows this instead of the selected option's own content -- a menu-button
+   *  style trigger whose text names the filter itself and never changes with
+   *  the pick, only the checkmark in the open list does (Комплектність's
+   *  metal-kind filter, docs/08-ui-map.md: owner's call, 2026-09-23, also
+   *  keeps the trigger's width constant across every option). */
+  triggerLabel?: ReactNode;
   children: ReactNode;
 }
 
@@ -67,6 +73,7 @@ export function Select({
   searchable,
   searchPlaceholder,
   centerLabel,
+  triggerLabel,
   children,
   ...rest
 }: SelectProps) {
@@ -233,7 +240,9 @@ export function Select({
           onClick={() => setOpen((current) => !current)}
           onKeyDown={handleTriggerKeyDown}
         >
-          <span className={styles.triggerText}>{selected ? selected.content : ''}</span>
+          <span className={styles.triggerText}>
+            {triggerLabel ?? (selected ? selected.content : '')}
+          </span>
           <span className={styles.arrow} aria-hidden="true" />
         </button>
 

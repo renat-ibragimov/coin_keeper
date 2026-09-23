@@ -30,13 +30,12 @@ from app.models import (
     Material,
     QualityType,
 )
+from app.models.enums import MetalKind
 from app.reference_data.denominations import render_label
 from app.repositories.catalog import has_visible_price, latest_price_uah_for
 from app.repositories.series import SeriesRepository
 
-CompletenessGroupBy = Literal[
-    "series", "year", "denomination", "material", "edge", "quality", "metal"
-]
+CompletenessGroupBy = Literal["series", "year", "denomination", "material", "edge", "quality"]
 
 # InstrumentedAttribute isn't accepted as ColumnElement[int | None] by mypy in
 # a dict literal even though it is one at runtime -- Any keeps the mapping
@@ -48,15 +47,12 @@ GROUP_BY_COLUMNS: dict[CompletenessGroupBy, Any] = {
     "material": CatalogItem.composition_id,
     "edge": CatalogItem.edge_type_id,
     "quality": CatalogItem.quality_type_id,
-    # A StrEnum column, not an int FK -- the only dimension whose group
-    # value is a string ("precious"/"base"/"unknown"), never NULL.
-    "metal": CatalogItem.metal_kind,
 }
 
 
 @dataclass
 class CompletenessGroupData:
-    value: int | str | None
+    value: int | None
     total: int
     owned: int
     purchase_total_uah: Decimal
@@ -88,7 +84,11 @@ class CompletenessRepository:
     # -------------------------------------------------------------- summary
 
     async def aggregate(
-        self, group_by: CompletenessGroupBy, *, country_id: int | None = None
+        self,
+        group_by: CompletenessGroupBy,
+        *,
+        country_id: int | None = None,
+        metal_kind: MetalKind | None = None,
     ) -> list[CompletenessGroupData]:
         column = GROUP_BY_COLUMNS[group_by]
 
@@ -98,6 +98,8 @@ class CompletenessRepository:
         ]
         if country_id is not None:
             active_conditions.append(CatalogItem.country_id == country_id)
+        if metal_kind is not None:
+            active_conditions.append(CatalogItem.metal_kind == metal_kind)
 
         counts_query = (
             select(
@@ -114,7 +116,7 @@ class CompletenessRepository:
             .where(*active_conditions)
             .group_by(column)
         )
-        data: dict[int | str | None, CompletenessGroupData] = {}
+        data: dict[int | None, CompletenessGroupData] = {}
         for count_row in (await self._session.execute(counts_query)).all():
             data[count_row.value] = CompletenessGroupData(
                 value=count_row.value,
@@ -130,6 +132,8 @@ class CompletenessRepository:
         any_state_conditions: list[ColumnElement[bool]] = [self._visible()]
         if country_id is not None:
             any_state_conditions.append(CatalogItem.country_id == country_id)
+        if metal_kind is not None:
+            any_state_conditions.append(CatalogItem.metal_kind == metal_kind)
         money_query = (
             select(
                 column.label("value"),
@@ -214,7 +218,7 @@ class CompletenessRepository:
         self,
         group_by: CompletenessGroupBy,
         *,
-        value: int | str | None,
+        value: int | None,
         unassigned: bool,
         country_id: int | None = None,
     ) -> CompletenessGroupData:
@@ -305,17 +309,9 @@ class CompletenessRepository:
     # --------------------------------------------------------------- labels
 
     async def labels(
-        self, group_by: CompletenessGroupBy, values: list[int | str | None]
-    ) -> dict[int | str, CompletenessLabel]:
+        self, group_by: CompletenessGroupBy, values: list[int | None]
+    ) -> dict[int, CompletenessLabel]:
         """Human labels and metadata for the given non-null group values."""
-        if group_by == "metal":
-            # A fixed, non-localized StrEnum, not a database dictionary -- the
-            # frontend already has its own translations for these codes
-            # (catalog.metalPrecious/metalBase), so the backend has nothing
-            # to add here.
-            return {}
-        # Every remaining dimension is an int FK/year -- `metal` (the one
-        # string-valued dimension) already returned above.
         ids = sorted({int(value) for value in values if value is not None})
         if not ids:
             return {}

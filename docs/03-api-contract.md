@@ -677,14 +677,14 @@ GET  /series/summary?countryId
 ## Комплектность
 
 ```
-GET /completeness/summary?groupBy&countryId
+GET /completeness/summary?groupBy&countryId&metalKind
   → [CompletenessGroupOut]
 GET /completeness/group?groupBy&value|unassigned&countryId
   → CompletenessGroupOut
 GET /completeness/items?groupBy&value|unassigned&countryId&page&pageSize
   → Page<CatalogListItem>               — та же схема, что и у GET /catalog
 
-groupBy = series | year | denomination | material | edge | quality | metal
+groupBy = series | year | denomination | material | edge | quality
 CompletenessGroupOut = {
   groupBy, value, unassigned, label, countryId, description, startYear, endYear,
   sortOrder, summary: {total, owned, missing, completionPercent, purchaseTotalUah,
@@ -704,14 +704,11 @@ CompletenessGroupOut = {
 включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10) — то же правило, что
 раньше проверялось только для серий, теперь общее для всех измерений.
 
-`groupBy=metal` — особый случай: `value` тут не целочисленный id, а код `MetalKind`
-(`precious`/`base`/`unknown`, строка), потому что `catalog_items.metal_kind` — не FK на
-справочник, а enum-колонка. Как и `year`, `metal_kind` NOT NULL (дефолт `unknown`), поэтому
-`unassigned=true` тоже даёт `422` — «немає значення» тут в принципе невозможно, `unknown` уже
-покрывает этот случай как обычная группа. `label` для этого измерения бэкенд всегда отдаёт
-`null` — локализацию кода (`precious` → «Дорогоцінні» и т. д.) делает фронт по уже
-существующим ключам фильтра каталога по металу, заводить для этого отдельный словарь на
-бэкенде избыточно.
+`metalKind` (`precious`/`base`, необязательный) на `/completeness/summary` — фильтр по
+`catalog_items.metal_kind`, независимый от `groupBy`: применяется одинаково к любому измерению
+(«тільки дорогоцінні по роках», «тільки недорогоцінні по серіях»), а не только к выбору
+конкретного значения. Без него — все монеты, вне зависимости от цінності металу (UI-контрол —
+`08-ui-map.md`, тулбар «Комплектність»).
 
 `/completeness/items` — плитки монет для экрана деталей группы, **не** `GET /catalog?...=`
 (правило унаследовано от `/series/{id}/items`, добавлено 2026-09-13, `04-business-rules.md`

@@ -8,9 +8,7 @@ from typing import Literal
 from app.schemas.base import CamelModel
 from app.schemas.common import Money
 
-CompletenessGroupBy = Literal[
-    "series", "year", "denomination", "material", "edge", "quality", "metal"
-]
+CompletenessGroupBy = Literal["series", "year", "denomination", "material", "edge", "quality"]
 
 
 class CompletenessSummaryOut(CamelModel):
@@ -32,7 +30,7 @@ class CompletenessGroupOut(CamelModel):
     """
 
     group_by: CompletenessGroupBy
-    value: int | str | None
+    value: int | None
     unassigned: bool
     label: str | None
     country_id: int | None = None

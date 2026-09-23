@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { Layers, SearchX } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -7,6 +7,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { fetchCountries } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
+import type { MetalKind } from '@/shared/api/types';
 import { formatPercent, formatUah } from '@/shared/lib/format';
 import {
   Button,
@@ -29,11 +30,19 @@ import styles from './CompletenessListPage.module.css';
 
 type CompletenessScope = 'mine' | 'all';
 
+// Only these two are ever a filterable choice -- 'unknown' is a display/
+// groupBy bucket elsewhere (groupBy.ts), never something a user picks
+// (same whitelist as the catalog's own metal-kind filter, useCatalogFilters.ts).
+function parseMetalKind(value: string | null): MetalKind | undefined {
+  return value === 'precious' || value === 'base' ? value : undefined;
+}
+
 export function CompletenessListPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const [params, setParams] = useSearchParams();
   const countryId = Number.parseInt(params.get('countryId') ?? '', 10) || undefined;
+  const metalKind = parseMetalKind(params.get('metalKind'));
   const groupBy: CompletenessGroupBy = parseGroupBy(params.get('groupBy'));
   const sort: CompletenessSort = params.get('sort') === 'value' ? 'value' : 'completion';
   const scope: CompletenessScope = params.get('scope') === 'all' ? 'all' : 'mine';
@@ -41,8 +50,9 @@ export function CompletenessListPage() {
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
   const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
   const summaryQuery = useQuery({
-    queryKey: ['completeness', 'summary', groupBy, countryId],
-    queryFn: () => fetchCompletenessSummary(groupBy, countryId),
+    queryKey: ['completeness', 'summary', groupBy, countryId, metalKind],
+    queryFn: () => fetchCompletenessSummary(groupBy, countryId, metalKind),
+    placeholderData: keepPreviousData,
   });
   const collectionEmpty = bootstrapQuery.data?.dashboard.isEmpty === true;
   const countryName = useMemo(() => {
@@ -61,6 +71,7 @@ export function CompletenessListPage() {
 
   const update = (changes: {
     countryId?: number;
+    metalKind?: MetalKind | null;
     groupBy?: CompletenessGroupBy;
     sort?: CompletenessSort;
     scope?: CompletenessScope;
@@ -69,6 +80,10 @@ export function CompletenessListPage() {
     if ('countryId' in changes) {
       if (changes.countryId) next.set('countryId', String(changes.countryId));
       else next.delete('countryId');
+    }
+    if ('metalKind' in changes) {
+      if (changes.metalKind) next.set('metalKind', changes.metalKind);
+      else next.delete('metalKind');
     }
     if (changes.groupBy) {
       if (changes.groupBy === 'series') next.delete('groupBy');
@@ -164,6 +179,18 @@ export function CompletenessListPage() {
                 value={groupBy}
                 onChange={(value) => update({ groupBy: value })}
               />
+              <Select
+                aria-label={t('catalog.metalKind')}
+                triggerLabel={t('catalog.metalKind')}
+                value={metalKind ?? ''}
+                onChange={(event) =>
+                  update({ metalKind: (event.target.value as MetalKind) || null })
+                }
+              >
+                <option value="">{t('catalog.all')}</option>
+                <option value="precious">{t('catalog.metalPrecious')}</option>
+                <option value="base">{t('catalog.metalBase')}</option>
+              </Select>
               <Tabs<CompletenessScope>
                 options={[
                   { value: 'mine', label: t('completeness.scopeMine') },

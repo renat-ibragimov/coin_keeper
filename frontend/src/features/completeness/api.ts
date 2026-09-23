@@ -1,13 +1,11 @@
 import { api, toQuery } from '@/shared/api/client';
-import type { CatalogPage, CompletenessGroup } from '@/shared/api/types';
+import type { CatalogPage, CompletenessGroup, MetalKind } from '@/shared/api/types';
 
 import type { CompletenessGroupBy } from './groupBy';
 
 /** Either `value` (a real group) or `unassigned` (the "без значення" bucket)
- *  identifies a group -- exactly one of the two, never both. `value` is a
- *  number for every dimension but `metal`, whose groups are MetalKind codes
- *  ("precious"/"base"/"unknown") rather than a dictionary id. */
-export type GroupSelector = { value: number | string } | { unassigned: true };
+ *  identifies a group -- exactly one of the two, never both. */
+export type GroupSelector = { value: number } | { unassigned: true };
 
 function selectorQuery(selector: GroupSelector) {
   return 'value' in selector ? { value: selector.value } : { unassigned: selector.unassigned };
@@ -18,8 +16,11 @@ function selectorQuery(selector: GroupSelector) {
 export function fetchCompletenessSummary(
   groupBy: CompletenessGroupBy,
   countryId: number | undefined,
+  metalKind: MetalKind | undefined,
 ): Promise<CompletenessGroup[]> {
-  return api<CompletenessGroup[]>(`/completeness/summary${toQuery({ groupBy, countryId })}`);
+  return api<CompletenessGroup[]>(
+    `/completeness/summary${toQuery({ groupBy, countryId, metalKind })}`,
+  );
 }
 
 /** One group's summary, for the detail screen's header -- works from a
