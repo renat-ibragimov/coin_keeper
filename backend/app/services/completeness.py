@@ -1,6 +1,6 @@
 """Completeness use cases: completeness grouped by an arbitrary catalog field
-(year, denomination, material, series), generalizing the per-series summary
-(docs/03-api-contract.md)."""
+(series, year, denomination, material, edge, quality, metal), generalizing
+the per-series summary (docs/03-api-contract.md)."""
 
 from __future__ import annotations
 
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
 from app.models import User
+from app.models.enums import MetalKind
 from app.repositories.catalog import CatalogFilters
 from app.repositories.completeness import (
     CompletenessGroupBy,
@@ -56,9 +57,9 @@ class CompletenessService:
 
     @staticmethod
     def _check_unassigned(group_by: CompletenessGroupBy, unassigned: bool) -> None:
-        if unassigned and group_by == "year":
+        if unassigned and group_by in ("year", "metal"):
             raise CompletenessInvalidRequestError(
-                "The 'year' dimension is never NULL and has no unassigned bucket."
+                f"The '{group_by}' dimension is never NULL and has no unassigned bucket."
             )
 
     async def summary(
@@ -75,7 +76,7 @@ class CompletenessService:
         self,
         group_by: CompletenessGroupBy,
         *,
-        value: int | None,
+        value: int | str | None,
         unassigned: bool,
         country_id: int | None,
     ) -> CompletenessGroupOut:
@@ -95,7 +96,7 @@ class CompletenessService:
         self,
         group_by: CompletenessGroupBy,
         *,
-        value: int | None,
+        value: int | str | None,
         unassigned: bool,
         country_id: int | None,
         limit: int,
@@ -108,17 +109,27 @@ class CompletenessService:
         if group_by == "series":
             filters.series_id_is_null = unassigned
             if not unassigned:
-                filters.series_ids = [value] if value is not None else []
+                filters.series_ids = [int(value)] if value is not None else []
         elif group_by == "year":
-            filters.year = value
+            filters.year = int(value) if value is not None else None
         elif group_by == "denomination":
             filters.denomination_id_is_null = unassigned
             if not unassigned:
-                filters.denomination_ids = [value] if value is not None else []
+                filters.denomination_ids = [int(value)] if value is not None else []
         elif group_by == "material":
             filters.material_id_is_null = unassigned
             if not unassigned:
-                filters.material_ids = [value] if value is not None else []
+                filters.material_ids = [int(value)] if value is not None else []
+        elif group_by == "edge":
+            filters.edge_type_id_is_null = unassigned
+            if not unassigned:
+                filters.edge_type_ids = [int(value)] if value is not None else []
+        elif group_by == "quality":
+            filters.quality_type_id_is_null = unassigned
+            if not unassigned:
+                filters.quality_type_ids = [int(value)] if value is not None else []
+        elif group_by == "metal":
+            filters.metal_kinds = [MetalKind(str(value))] if value is not None else []
         return await CatalogService(self._session, self._user, self._locale).list_catalog(
             filters, limit=limit, offset=offset, require_confirmed=False
         )

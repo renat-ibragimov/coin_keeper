@@ -2420,9 +2420,9 @@ export interface components {
              * Groupby
              * @enum {string}
              */
-            groupBy: "series" | "year" | "denomination" | "material";
+            groupBy: "series" | "year" | "denomination" | "material" | "edge" | "quality" | "metal";
             /** Value */
-            value: number | null;
+            value: number | string | null;
             /** Unassigned */
             unassigned: boolean;
             /** Label */
@@ -4393,7 +4393,7 @@ export interface operations {
     completeness_summary_api_v1_completeness_summary_get: {
         parameters: {
             query: {
-                groupBy: "series" | "year" | "denomination" | "material";
+                groupBy: "series" | "year" | "denomination" | "material" | "edge" | "quality" | "metal";
                 countryId?: number | null;
                 locale?: string | null;
             };
@@ -4426,8 +4426,8 @@ export interface operations {
     completeness_group_api_v1_completeness_group_get: {
         parameters: {
             query: {
-                groupBy: "series" | "year" | "denomination" | "material";
-                value?: number | null;
+                groupBy: "series" | "year" | "denomination" | "material" | "edge" | "quality" | "metal";
+                value?: string | null;
                 unassigned?: boolean;
                 countryId?: number | null;
                 locale?: string | null;
@@ -4461,8 +4461,8 @@ export interface operations {
     completeness_items_api_v1_completeness_items_get: {
         parameters: {
             query: {
-                groupBy: "series" | "year" | "denomination" | "material";
-                value?: number | null;
+                groupBy: "series" | "year" | "denomination" | "material" | "edge" | "quality" | "metal";
+                value?: string | null;
                 unassigned?: boolean;
                 countryId?: number | null;
                 locale?: string | null;

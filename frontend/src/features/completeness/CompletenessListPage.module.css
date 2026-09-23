@@ -20,8 +20,8 @@
 }
 
 .search {
-  flex: 1 1 220px;
-  min-width: 180px;
+  flex: 1 1 160px;
+  min-width: 140px;
 }
 
 .controls {
@@ -29,6 +29,14 @@
   align-items: center;
   gap: var(--space-3);
   flex-wrap: wrap;
+}
+
+/* The groupBy switch grew from 4 to 7 options -- on a narrow toolbar it gets
+ * its own line rather than fighting scope/sort for the leftover width. */
+@media (max-width: 900px) {
+  .controls > :first-child {
+    flex-basis: 100%;
+  }
 }
 
 .list {
@@ -44,6 +52,7 @@
  * left, the name and metrics align tightly against it, and the whole thing
  * lifts by a single pixel on hover (docs/08-ui-map.md). */
 .row {
+  position: relative;
   display: grid;
   grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 2fr);
   align-items: center;
@@ -85,6 +94,15 @@
 
 .name {
   transition: color var(--duration-fast) var(--ease-standard);
+}
+
+/* Stretched-link pattern, same as the catalog cards: the pseudo-element
+ * covers the whole row so a click anywhere opens it, while the real anchor
+ * keeps keyboard, middle-click and the context menu working. */
+.name::after {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
 
 .name:hover {

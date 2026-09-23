@@ -70,12 +70,16 @@ class CatalogFilters:
     groups: list[CollectionGroup] | None = None
     material_ids: list[int] | None = None
     metal_kinds: list[MetalKind] | None = None
+    edge_type_ids: list[int] | None = None
+    quality_type_ids: list[int] | None = None
     # The "без значення" bucket a completeness group (docs/03-api-contract.md,
     # /completeness/items) asks for — a plain `*_ids` filter cannot express
     # "this column IS NULL".
     series_id_is_null: bool = False
     denomination_id_is_null: bool = False
     material_id_is_null: bool = False
+    edge_type_id_is_null: bool = False
+    quality_type_id_is_null: bool = False
     owned: bool | None = None
     scope: str = "all"  # all | shared | own
     archived: bool = False
@@ -403,6 +407,14 @@ class CatalogRepository:
             conditions.append(CatalogItem.composition_id.is_(None))
         if filters.metal_kinds:
             conditions.append(CatalogItem.metal_kind.in_(filters.metal_kinds))
+        if filters.edge_type_ids:
+            conditions.append(CatalogItem.edge_type_id.in_(filters.edge_type_ids))
+        if filters.edge_type_id_is_null:
+            conditions.append(CatalogItem.edge_type_id.is_(None))
+        if filters.quality_type_ids:
+            conditions.append(CatalogItem.quality_type_id.in_(filters.quality_type_ids))
+        if filters.quality_type_id_is_null:
+            conditions.append(CatalogItem.quality_type_id.is_(None))
         if filters.owned is True:
             conditions.append(self._own_instance_exists())
         elif filters.owned is False:

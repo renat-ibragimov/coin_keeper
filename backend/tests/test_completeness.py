@@ -1,6 +1,7 @@
 """Completeness grouped by an arbitrary catalog field: series, year,
-denomination, material — generalizing the retired per-series summary/items
-routes (see tests/test_series.py for what stayed series-only)."""
+denomination, material, edge, quality, metal — generalizing the retired
+per-series summary/items routes (see tests/test_series.py for what stayed
+series-only)."""
 
 from __future__ import annotations
 
@@ -12,12 +13,15 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.mail.base import EmailMessage
+from app.models.enums import MetalKind
 from tests.helpers import register_and_verify
 from tests.seed import (
     add_collection_item,
     add_snapshot,
     make_catalog_item,
+    make_edge_type,
     make_material,
+    make_quality_type,
     make_series,
     promote_to_admin,
     seed_reference,
@@ -348,3 +352,162 @@ async def test_group_requires_exactly_one_of_value_or_unassigned(
         headers=auth(ctx.token_a),
     )
     assert both.status_code == 422
+
+
+async def test_unassigned_bucket_for_edge_and_quality(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    refs = ctx.refs
+    # Codes distinct from the app's own seeded edge/quality dictionaries
+    # (app/reference_data/{edge_types,quality_types}.py) -- those already
+    # populate this table, so "reeded"/"proof" would collide.
+    reeded = await make_edge_type(
+        db_session, code="test-reeded", name_uk="Рифлений", name_en="Reeded"
+    )
+    proof = await make_quality_type(db_session, code="test-proof", name_uk="Пруф", name_en="Proof")
+
+    with_edge = await make_catalog_item(
+        db_session, country=refs.ukraine, title="A", year=2020, edge_type_id=reeded.id
+    )
+    without_edge = await make_catalog_item(db_session, country=refs.ukraine, title="B", year=2020)
+    with_quality = await make_catalog_item(
+        db_session, country=refs.ukraine, title="C", year=2020, quality_type_id=proof.id
+    )
+    without_quality = await make_catalog_item(
+        db_session, country=refs.ukraine, title="D", year=2020
+    )
+
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=without_edge, price="5")
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=without_quality, price="5")
+
+    edge_summary = (
+        await client.get(
+            f"/api/v1/completeness/summary?groupBy=edge&countryId={refs.ukraine.id}",
+            headers=auth(ctx.token_a),
+        )
+    ).json()
+    edge_unassigned = next(row for row in edge_summary if row["unassigned"])
+    assert edge_unassigned["value"] is None
+    assert edge_unassigned["label"] is None
+    edge_assigned = next(row for row in edge_summary if row["value"] == reeded.id)
+    assert edge_assigned["label"] == "Рифлений"
+    assert edge_assigned["summary"]["total"] == 1
+
+    unassigned_edge_items = (
+        await client.get(
+            "/api/v1/completeness/items?groupBy=edge&unassigned=true", headers=auth(ctx.token_a)
+        )
+    ).json()
+    assert {item["title"] for item in unassigned_edge_items["items"]} == {"B", "C", "D"}
+
+    quality_summary = (
+        await client.get(
+            f"/api/v1/completeness/summary?groupBy=quality&countryId={refs.ukraine.id}",
+            headers=auth(ctx.token_a),
+        )
+    ).json()
+    quality_assigned = next(row for row in quality_summary if row["value"] == proof.id)
+    assert quality_assigned["label"] == "Пруф"
+    assert quality_assigned["summary"]["total"] == 1
+
+    quality_group = (
+        await client.get(
+            f"/api/v1/completeness/group?groupBy=quality&value={proof.id}",
+            headers=auth(ctx.token_a),
+        )
+    ).json()
+    assert quality_group["summary"]["total"] == 1
+
+    _ = with_edge, with_quality
+
+
+async def test_summary_groups_by_metal_kind(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """`metal_kind` is a NOT NULL StrEnum, not an int FK: three fixed groups,
+    no unassigned bucket, and no server-side label -- the frontend already
+    translates the enum code itself."""
+    refs = ctx.refs
+    gold = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Gold",
+        year=2020,
+        metal_kind=MetalKind.PRECIOUS,
+    )
+    steel = await make_catalog_item(
+        db_session, country=refs.ukraine, title="Steel", year=2020, metal_kind=MetalKind.BASE
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Mystery",
+        year=2020,
+        metal_kind=MetalKind.UNKNOWN,
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=gold, price="1000")
+
+    summary = (
+        await client.get(
+            f"/api/v1/completeness/summary?groupBy=metal&countryId={refs.ukraine.id}",
+            headers=auth(ctx.token_a),
+        )
+    ).json()
+    by_value = {row["value"]: row for row in summary}
+    assert set(by_value) == {"precious", "base", "unknown"}
+    assert by_value["precious"]["unassigned"] is False
+    assert by_value["precious"]["label"] is None
+    assert by_value["precious"]["summary"]["total"] == 1
+    assert by_value["precious"]["summary"]["owned"] == 1
+    assert by_value["base"]["summary"]["owned"] == 0
+
+    group = (
+        await client.get(
+            "/api/v1/completeness/group?groupBy=metal&value=base", headers=auth(ctx.token_a)
+        )
+    ).json()
+    assert group["summary"]["total"] == 1
+
+    items = (
+        await client.get(
+            "/api/v1/completeness/items?groupBy=metal&value=precious", headers=auth(ctx.token_a)
+        )
+    ).json()
+    assert {item["title"] for item in items["items"]} == {"Gold"}
+
+    _ = steel
+
+
+async def test_unassigned_is_rejected_for_metal(client: AsyncClient, ctx: SimpleNamespace) -> None:
+    group = await client.get(
+        "/api/v1/completeness/group?groupBy=metal&unassigned=true", headers=auth(ctx.token_a)
+    )
+    assert group.status_code == 422
+
+    items = await client.get(
+        "/api/v1/completeness/items?groupBy=metal&unassigned=true", headers=auth(ctx.token_a)
+    )
+    assert items.status_code == 422
+
+
+async def test_group_value_must_be_an_integer_for_int_dimensions(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    response = await client.get(
+        "/api/v1/completeness/group?groupBy=series&value=not-a-number", headers=auth(ctx.token_a)
+    )
+    assert response.status_code == 422
+
+
+async def test_group_value_must_be_a_known_metal_kind_code(
+    client: AsyncClient, ctx: SimpleNamespace
+) -> None:
+    group = await client.get(
+        "/api/v1/completeness/group?groupBy=metal&value=gold", headers=auth(ctx.token_a)
+    )
+    assert group.status_code == 422
+
+    items = await client.get(
+        "/api/v1/completeness/items?groupBy=metal&value=gold", headers=auth(ctx.token_a)
+    )
+    assert items.status_code == 422

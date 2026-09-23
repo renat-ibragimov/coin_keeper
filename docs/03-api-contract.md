@@ -684,7 +684,7 @@ GET /completeness/group?groupBy&value|unassigned&countryId
 GET /completeness/items?groupBy&value|unassigned&countryId&page&pageSize
   → Page<CatalogListItem>               — та же схема, что и у GET /catalog
 
-groupBy = series | year | denomination | material
+groupBy = series | year | denomination | material | edge | quality | metal
 CompletenessGroupOut = {
   groupBy, value, unassigned, label, countryId, description, startYear, endYear,
   sortOrder, summary: {total, owned, missing, completionPercent, purchaseTotalUah,
@@ -696,12 +696,22 @@ CompletenessGroupOut = {
 серии (`GET /series/{id}/summary`/`GET /series/{id}/items`, оба эндпоинта удалены, заменены
 `/completeness/group`/`/completeness/items` с `groupBy=series`). `value`/`unassigned` —
 взаимоисключающие, ровно один обязателен: `value=<id>` адресует конкретную серию/номинал/
-материал (или конкретный год — число само является значением), `unassigned=true` — бакет
-«без значения» (`series_id`/`denomination_id`/`composition_id IS NULL`); `groupBy=year` не принимает
-`unassigned` (`issue_year` NOT NULL) — `422`. Обе части дроби комплектности считаются по
-активным видимым пользователю позициям; деньги (`purchaseTotalUah`, `currentValueUah`) — по
-его экземплярам, включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10) — то
-же правило, что раньше проверялось только для серий, теперь общее для всех четырёх измерений.
+материал/гурт/якість карбування (или конкретный год — число само является значением),
+`unassigned=true` — бакет «без значения» (`series_id`/`denomination_id`/`composition_id`/
+`edge_type_id`/`quality_type_id IS NULL`); `groupBy=year` не принимает `unassigned`
+(`issue_year` NOT NULL) — `422`. Обе части дроби комплектности считаются по активным видимым
+пользователю позициям; деньги (`purchaseTotalUah`, `currentValueUah`) — по его экземплярам,
+включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10) — то же правило, что
+раньше проверялось только для серий, теперь общее для всех измерений.
+
+`groupBy=metal` — особый случай: `value` тут не целочисленный id, а код `MetalKind`
+(`precious`/`base`/`unknown`, строка), потому что `catalog_items.metal_kind` — не FK на
+справочник, а enum-колонка. Как и `year`, `metal_kind` NOT NULL (дефолт `unknown`), поэтому
+`unassigned=true` тоже даёт `422` — «немає значення» тут в принципе невозможно, `unknown` уже
+покрывает этот случай как обычная группа. `label` для этого измерения бэкенд всегда отдаёт
+`null` — локализацию кода (`precious` → «Дорогоцінні» и т. д.) делает фронт по уже
+существующим ключам фильтра каталога по металу, заводить для этого отдельный словарь на
+бэкенде избыточно.
 
 `/completeness/items` — плитки монет для экрана деталей группы, **не** `GET /catalog?...=`
 (правило унаследовано от `/series/{id}/items`, добавлено 2026-09-13, `04-business-rules.md`

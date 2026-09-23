@@ -25,10 +25,12 @@ from app.models import (
     Country,
     Currency,
     Denomination,
+    EdgeType,
     ExchangeRate,
     Expense,
     MarketPriceSnapshot,
     Material,
+    QualityType,
     User,
 )
 from app.models.enums import CollectionGroup, ExpenseCategory, UserRole
@@ -177,6 +179,26 @@ async def make_material(
     await session.commit()
     session.expunge(material)
     return material
+
+
+async def make_edge_type(
+    session: AsyncSession, *, code: str, name_uk: str, name_en: str
+) -> EdgeType:
+    edge_type = EdgeType(code=code, name_uk=name_uk, name_en=name_en)
+    session.add(edge_type)
+    await session.commit()
+    session.expunge(edge_type)
+    return edge_type
+
+
+async def make_quality_type(
+    session: AsyncSession, *, code: str, name_uk: str, name_en: str
+) -> QualityType:
+    quality_type = QualityType(code=code, name_uk=name_uk, name_en=name_en)
+    session.add(quality_type)
+    await session.commit()
+    session.expunge(quality_type)
+    return quality_type
 
 
 async def add_snapshot(

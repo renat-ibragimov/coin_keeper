@@ -270,4 +270,46 @@ describe('CompletenessListPage', () => {
 
     expect(await screen.findByText('Без металу')).toBeInTheDocument();
   });
+
+  it('shows the "без значення" label for edge/quality, same as denomination/material', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue([
+      group(1, 'Рифлений', 2, 5, { groupBy: 'edge' }),
+      { ...group(0, '', 1, 3, { groupBy: 'edge' }), unassigned: true, value: null, label: null },
+    ]);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage(['/?groupBy=edge']);
+
+    expect(await screen.findByText('Рифлений')).toBeInTheDocument();
+    expect(screen.getByText('Без гурту')).toBeInTheDocument();
+  });
+
+  it('lets the viewer switch to the metal-kind grouping', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue(ROWS);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage();
+
+    await screen.findByText('Almost');
+    await userEvent.click(screen.getByRole('tab', { name: 'Цінність металу' }));
+
+    await waitFor(() =>
+      expect(fetchCompletenessSummary).toHaveBeenLastCalledWith('metal', undefined),
+    );
+  });
+
+  it('renders a metal group from its raw value, not the (always null) backend label', async () => {
+    vi.mocked(fetchCompletenessSummary).mockResolvedValue([
+      { ...group(1, '', 4, 4, { groupBy: 'metal' }), value: 'precious', label: null },
+      { ...group(2, '', 1, 2, { groupBy: 'metal' }), value: 'base', label: null },
+    ]);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCountries).mockResolvedValue([COUNTRY]);
+    renderPage(['/?groupBy=metal']);
+
+    expect(await screen.findByText('Дорогоцінні')).toBeInTheDocument();
+    expect(screen.getByText('Недорогоцінні')).toBeInTheDocument();
+    // "metal" has no unassigned bucket at all -- unlike material/edge/quality.
+    expect(screen.queryByText('Без металу')).toBeNull();
+  });
 });

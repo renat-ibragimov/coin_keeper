@@ -21,12 +21,22 @@ from sqlalchemy import ColumnElement, func, not_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE, LOCALE_UK, pick_name
-from app.models import CatalogItem, CoinSeries, CollectionItem, Denomination, Material
+from app.models import (
+    CatalogItem,
+    CoinSeries,
+    CollectionItem,
+    Denomination,
+    EdgeType,
+    Material,
+    QualityType,
+)
 from app.reference_data.denominations import render_label
 from app.repositories.catalog import has_visible_price, latest_price_uah_for
 from app.repositories.series import SeriesRepository
 
-CompletenessGroupBy = Literal["series", "year", "denomination", "material"]
+CompletenessGroupBy = Literal[
+    "series", "year", "denomination", "material", "edge", "quality", "metal"
+]
 
 # InstrumentedAttribute isn't accepted as ColumnElement[int | None] by mypy in
 # a dict literal even though it is one at runtime -- Any keeps the mapping
@@ -36,12 +46,17 @@ GROUP_BY_COLUMNS: dict[CompletenessGroupBy, Any] = {
     "year": CatalogItem.issue_year,
     "denomination": CatalogItem.denomination_id,
     "material": CatalogItem.composition_id,
+    "edge": CatalogItem.edge_type_id,
+    "quality": CatalogItem.quality_type_id,
+    # A StrEnum column, not an int FK -- the only dimension whose group
+    # value is a string ("precious"/"base"/"unknown"), never NULL.
+    "metal": CatalogItem.metal_kind,
 }
 
 
 @dataclass
 class CompletenessGroupData:
-    value: int | None
+    value: int | str | None
     total: int
     owned: int
     purchase_total_uah: Decimal
@@ -99,7 +114,7 @@ class CompletenessRepository:
             .where(*active_conditions)
             .group_by(column)
         )
-        data: dict[int | None, CompletenessGroupData] = {}
+        data: dict[int | str | None, CompletenessGroupData] = {}
         for count_row in (await self._session.execute(counts_query)).all():
             data[count_row.value] = CompletenessGroupData(
                 value=count_row.value,
@@ -199,7 +214,7 @@ class CompletenessRepository:
         self,
         group_by: CompletenessGroupBy,
         *,
-        value: int | None,
+        value: int | str | None,
         unassigned: bool,
         country_id: int | None = None,
     ) -> CompletenessGroupData:
@@ -290,10 +305,18 @@ class CompletenessRepository:
     # --------------------------------------------------------------- labels
 
     async def labels(
-        self, group_by: CompletenessGroupBy, values: list[int | None]
-    ) -> dict[int, CompletenessLabel]:
+        self, group_by: CompletenessGroupBy, values: list[int | str | None]
+    ) -> dict[int | str, CompletenessLabel]:
         """Human labels and metadata for the given non-null group values."""
-        ids = sorted({value for value in values if value is not None})
+        if group_by == "metal":
+            # A fixed, non-localized StrEnum, not a database dictionary -- the
+            # frontend already has its own translations for these codes
+            # (catalog.metalPrecious/metalBase), so the backend has nothing
+            # to add here.
+            return {}
+        # Every remaining dimension is an int FK/year -- `metal` (the one
+        # string-valued dimension) already returned above.
+        ids = sorted({int(value) for value in values if value is not None})
         if not ids:
             return {}
         if group_by == "series":
@@ -336,6 +359,24 @@ class CompletenessRepository:
                     label=material.name_uk if self._locale == LOCALE_UK else material.name_en
                 )
                 for material in material_result.scalars()
+            }
+        if group_by == "edge":
+            edge_result = await self._session.execute(select(EdgeType).where(EdgeType.id.in_(ids)))
+            return {
+                edge.id: CompletenessLabel(
+                    label=edge.name_uk if self._locale == LOCALE_UK else edge.name_en
+                )
+                for edge in edge_result.scalars()
+            }
+        if group_by == "quality":
+            quality_result = await self._session.execute(
+                select(QualityType).where(QualityType.id.in_(ids))
+            )
+            return {
+                quality.id: CompletenessLabel(
+                    label=quality.name_uk if self._locale == LOCALE_UK else quality.name_en
+                )
+                for quality in quality_result.scalars()
             }
         # "year": the value itself is the label, no dictionary lookup needed.
         return {year: CompletenessLabel(label=str(year), sort_order=year) for year in ids}

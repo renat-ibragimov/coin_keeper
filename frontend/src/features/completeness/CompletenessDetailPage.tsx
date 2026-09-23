@@ -28,13 +28,19 @@ export function CompletenessDetailPage() {
   const { groupBy: groupByParam, value: valueParam } = useParams();
   const groupBy = parseGroupBy(groupByParam);
   const unassigned = valueParam === 'none';
+  // "metal" addresses a group by its MetalKind code ("precious"/"base"/
+  // "unknown"), not a dictionary id -- every other dimension is numeric.
   const numericValue = Number.parseInt(valueParam ?? '', 10);
-  const valid = unassigned || (Number.isFinite(numericValue) && numericValue > 0);
+  const valid =
+    unassigned ||
+    (groupBy === 'metal'
+      ? valueParam === 'precious' || valueParam === 'base' || valueParam === 'unknown'
+      : Number.isFinite(numericValue) && numericValue > 0);
   const selector: GroupSelector | undefined = !valid
     ? undefined
     : unassigned
       ? { unassigned: true }
-      : { value: numericValue };
+      : { value: groupBy === 'metal' ? (valueParam as string) : numericValue };
   const [page, setPage] = useState(1);
 
   // Every series' id, for `CoinCard`'s own series link -- a group of any

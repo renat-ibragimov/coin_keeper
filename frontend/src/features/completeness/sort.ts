@@ -2,8 +2,12 @@ import type { CompletenessGroup } from '@/shared/api/types';
 
 export type CompletenessSort = 'completion' | 'value';
 
+// A group without a backend-supplied label (the "без значення" bucket, or
+// every "metal" group -- the backend deliberately never localizes a
+// MetalKind code) still needs a stable sort key: its raw value reads better
+// than an empty string tying every such row together.
 function label(row: CompletenessGroup): string {
-  return row.label ?? '';
+  return row.label ?? (row.value != null ? String(row.value) : '');
 }
 
 /** Most complete first (ties: larger group, then label) -- or by the
