@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import Row, Select, func, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -107,24 +108,41 @@ class PublicCatalogRepository:
                 .where(*conditions)
             )
         ).scalar_one()
-        sort_columns = {
-            "title": _display_title(self.locale),
-            "country": localized(
-                self.locale, uk=Country.name_uk, en=Country.name_en, original=Country.name_original
-            ),
-            "series": series_display_name(self.locale),
-            "year": CatalogItem.issue_year,
-            "denomination": Denomination.value,
-            "material": localized(
-                self.locale, uk=Material.name_uk, en=Material.name_en, original=Material.name_uk
-            ),
+        # Mirrors CatalogRepository._order_by's column lists (catalog.py) so a
+        # guest sees the same order an authenticated visitor does -- "year"
+        # and "denomination" each need their tiebreaker column too, not just
+        # the primary one, or same-year/same-denomination rows fall back to
+        # insertion order instead of a stable one.
+        sort_columns: dict[str, list[Any]] = {
+            "title": [_display_title(self.locale)],
+            "country": [
+                localized(
+                    self.locale,
+                    uk=Country.name_uk,
+                    en=Country.name_en,
+                    original=Country.name_original,
+                )
+            ],
+            "series": [series_display_name(self.locale)],
+            "year": [CatalogItem.issue_year, CatalogItem.issue_date],
+            "denomination": [Denomination.sort_order, Denomination.value],
+            "material": [
+                localized(
+                    self.locale, uk=Material.name_uk, en=Material.name_en, original=Material.name_uk
+                )
+            ],
         }
-        column = sort_columns.get(filters.sort, sort_columns["title"])
-        ordering = column.desc() if filters.order == "desc" else column.asc()
+        columns = sort_columns.get(filters.sort, sort_columns["title"])
+        descending = filters.order == "desc"
+
+        def direction(column: Any) -> Any:
+            return column.desc().nulls_last() if descending else column.asc().nulls_last()
+
+        ordering = [direction(column) for column in columns]
         result = await self.session.execute(
             self.query()
             .where(*conditions)
-            .order_by(ordering, CatalogItem.id)
+            .order_by(*ordering, CatalogItem.id)
             .limit(limit)
             .offset(offset)
         )

@@ -124,6 +124,49 @@ async def test_default_sort_uses_exact_release_date_and_survives_filters(
     ]
 
 
+async def test_guest_sort_uses_exact_release_date_too(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """A guest goes through PublicCatalogRepository, not CatalogRepository --
+    it must break ties within a year the same way the authenticated path
+    does (test_default_sort_uses_exact_release_date_and_survives_filters),
+    or same-year coins fall back to insertion order for a signed-out
+    visitor only."""
+    refs = ctx.refs
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Рання",
+        year=2025,
+        issue_date=date(2025, 2, 1),
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Пізня",
+        year=2025,
+        issue_date=date(2025, 11, 1),
+    )
+    await make_catalog_item(db_session, country=refs.ukraine, title="Без дати", year=2025)
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Торішня",
+        year=2024,
+        issue_date=date(2024, 12, 1),
+    )
+
+    response = await client.get(f"/api/v1/catalog?countryId={refs.ukraine.id}&group=commemorative")
+
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()["items"]] == [
+        "Пізня",
+        "Рання",
+        "Без дати",
+        "Торішня",
+    ]
+
+
 async def test_personal_items_are_isolated(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
