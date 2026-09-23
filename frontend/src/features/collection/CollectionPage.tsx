@@ -118,6 +118,7 @@ export function CollectionPage() {
   const summaryQuery = useQuery({
     queryKey: ['collection', 'summary', filters],
     queryFn: () => fetchCollectionSummary(filters),
+    placeholderData: keepPreviousData,
   });
   // Scoped to what the user actually owns — not the catalog-wide reference
   // lists (docs/03-api-contract.md), so the key namespace differs from the

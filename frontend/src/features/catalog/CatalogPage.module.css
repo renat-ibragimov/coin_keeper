@@ -11,6 +11,19 @@
   min-width: 0;
 }
 
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+@media (max-width: 900px) {
+  .tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-3);
+  }
+}
+
 /* Fixed column counts (1/2/3/5) rather than an auto-fill fluid grid: each one
    divides GRID_PAGE_SIZE (30, see CatalogPage.tsx) evenly, so every page
    fills complete rows instead of stranding a short one before the pager. */

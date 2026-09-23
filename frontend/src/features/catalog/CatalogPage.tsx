@@ -171,6 +171,7 @@ export function CatalogPage() {
     queryKey: ['catalog', 'summary', filters],
     queryFn: () => fetchCatalogSummary(filters),
     enabled: tilesShown,
+    placeholderData: keepPreviousData,
   });
 
   // The same series list already fetched for the "Серія" filter, keyed by
@@ -340,7 +341,17 @@ export function CatalogPage() {
     <div className={styles.page}>
       <PageHeader align="center" title={t('catalog.title')} subtitle={t('catalog.subtitle')} />
 
-      {tilesShown && summaryQuery.data ? <CatalogSummaryTiles data={summaryQuery.data} /> : null}
+      {tilesShown ? (
+        summaryQuery.data ? (
+          <CatalogSummaryTiles data={summaryQuery.data} />
+        ) : (
+          <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
+            {Array.from({ length: 4 }, (_, index) => (
+              <Skeleton key={index} height={96} />
+            ))}
+          </section>
+        )
+      ) : null}
 
       <div className={styles.filtersBar}>{filtersPanel}</div>
 
