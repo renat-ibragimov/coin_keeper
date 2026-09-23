@@ -11,11 +11,13 @@ import type {
   BootstrapOut,
   CollectionPosition,
   CollectionPage as CollectionPageOut,
+  CollectionSummary,
   CountryOut,
 } from '@/shared/api/types';
 
 import {
   fetchCollection,
+  fetchCollectionSummary,
   fetchOwnedCountries,
   fetchOwnedDenominations,
   fetchOwnedMaterials,
@@ -25,6 +27,7 @@ import { CollectionPage } from './CollectionPage';
 
 vi.mock('./api', () => ({
   fetchCollection: vi.fn(),
+  fetchCollectionSummary: vi.fn(),
   fetchOwnedCountries: vi.fn(),
   fetchOwnedSeries: vi.fn(),
   fetchOwnedDenominations: vi.fn(),
@@ -120,6 +123,18 @@ const OWNED_COUNTRY: CountryOut = {
 
 const EMPTY_PAGE: CollectionPageOut = { items: [], total: 0, page: 1, pageSize: 24 };
 
+function makeSummary(overrides: Partial<CollectionSummary> = {}): CollectionSummary {
+  return {
+    collectionItems: 0,
+    completedItems: 0,
+    coinSpendUah: '0.00',
+    relatedSpendUah: '0.00',
+    totalSpendUah: '0.00',
+    marketValueUah: '0.00',
+    ...overrides,
+  };
+}
+
 function renderPage() {
   return render(
     <QueryClientProvider
@@ -134,6 +149,7 @@ function renderPage() {
 
 function mockCommonQueries(isEmpty: boolean) {
   vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(isEmpty));
+  vi.mocked(fetchCollectionSummary).mockResolvedValue(makeSummary());
   vi.mocked(fetchOwnedCountries).mockResolvedValue([]);
   vi.mocked(fetchOwnedSeries).mockResolvedValue([]);
   vi.mocked(fetchOwnedDenominations).mockResolvedValue([]);
@@ -151,15 +167,15 @@ describe('CollectionPage', () => {
       'href',
       '/catalog',
     );
-    expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Додати монету' })).toHaveAttribute(
       'href',
       '/collection/add',
     );
     expect(screen.queryByText('Імпортувати з uCoin')).toBeNull();
     expect(screen.queryByPlaceholderText('Пошук у колекції…')).toBeNull();
-    // No header actions ("+ Додати покупку" would collide with the card's
-    // own "Додати покупку" link if it rendered — this one has no "+").
-    expect(screen.queryByRole('link', { name: '+ Додати покупку' })).toBeNull();
+    // No header actions ("+ Додати монету" would collide with the card's
+    // own "Додати монету" link if it rendered — this one has no "+").
+    expect(screen.queryByRole('link', { name: '+ Додати монету' })).toBeNull();
     // No zero-value KPI tiles or filters above the empty state.
     expect(screen.queryByText('Монет у колекції')).toBeNull();
     expect(screen.queryByText('Поточна оцінка')).toBeNull();
@@ -184,7 +200,7 @@ describe('CollectionPage', () => {
 
     expect(await screen.findByPlaceholderText('Пошук у колекції…')).toBeInTheDocument();
     expect(screen.queryByText('У колекції ще немає монет')).toBeNull();
-    expect(screen.getByRole('link', { name: '+ Додати покупку' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '+ Додати монету' })).toHaveAttribute(
       'href',
       '/collection/add',
     );
@@ -215,5 +231,30 @@ describe('CollectionPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Країна' }));
     expect(await screen.findByRole('option', { name: 'Україна' })).toBeInTheDocument();
+  });
+
+  it("requests the KPI tiles' summary scoped to whatever filters are already in the URL", async () => {
+    vi.mocked(fetchCollection).mockResolvedValue(EMPTY_PAGE);
+    vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(false));
+    vi.mocked(fetchCollectionSummary).mockResolvedValue(makeSummary({ collectionItems: 12 }));
+    vi.mocked(fetchOwnedCountries).mockResolvedValue([]);
+    vi.mocked(fetchOwnedSeries).mockResolvedValue([]);
+    vi.mocked(fetchOwnedDenominations).mockResolvedValue([]);
+    vi.mocked(fetchOwnedMaterials).mockResolvedValue([]);
+
+    render(
+      <QueryClientProvider
+        client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+      >
+        <MemoryRouter initialEntries={['/collection/coins?countryId=3']}>
+          <CollectionPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await screen.findByText('12');
+    expect(fetchCollectionSummary).toHaveBeenCalledWith(
+      expect.objectContaining({ countryIds: [3] }),
+    );
   });
 });

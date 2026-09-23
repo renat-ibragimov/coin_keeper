@@ -42,6 +42,7 @@ from app.schemas.catalog import (
     CatalogItemCreate,
     CatalogItemUpdate,
     CatalogListItem,
+    CatalogSummaryOut,
     CoinDenomination,
     CoinDescriptions,
     CoinEdgeType,
@@ -263,6 +264,23 @@ class CatalogService:
             self._list_item(row, images.get(row.item.id, CatalogImages())) for row in page.rows
         ]
         return items, page.total
+
+    async def summary(self, filters: CatalogFilters) -> CatalogSummaryOut:
+        """The "Каталог" KPI tiles for the filters currently applied, always
+        under the catalogue's own `require_confirmed` gate (§13a) -- the same
+        gate `list_catalog` uses, so the tiles never report a coverage the
+        list below could not possibly show."""
+        settings = await self._users.get_settings(self._user.id)
+        filters.show_packaging_variants = settings is None or settings.show_packaging_variants
+        data = await self._repo.summary(filters)
+        return CatalogSummaryOut(
+            total=data.total,
+            owned=data.owned,
+            missing=data.missing,
+            purchase_total_uah=data.purchase_total_uah,
+            missing_budget_uah=data.missing_budget_uah,
+            unpriced_missing=data.unpriced_missing,
+        )
 
     async def list_confirmed_materials(self, country_id: int | None) -> list[CoinMaterial]:
         materials = await self._repo.list_confirmed_materials(country_id)

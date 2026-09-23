@@ -42,6 +42,7 @@ from app.schemas.collection import (
     CollectionItemOut,
     CollectionItemUpdate,
     CollectionPositionOut,
+    CollectionSummaryOut,
     ExtraExpenseIn,
     StorageLocationOut,
 )
@@ -188,6 +189,19 @@ class CollectionService:
             self._position_out(row, images.get(row.catalog_item.id, CatalogImages()))
             for row in rows
         ], total
+
+    async def summary(self, filters: CollectionFilters) -> CollectionSummaryOut:
+        """The "Мої монети" KPI tiles for the filters currently applied
+        (docs/08-ui-map.md)."""
+        data = await self._repo.summary(filters)
+        return CollectionSummaryOut(
+            collection_items=data.collection_items,
+            completed_items=data.completed_items,
+            coin_spend_uah=data.coin_spend_uah,
+            related_spend_uah=data.related_spend_uah,
+            total_spend_uah=data.coin_spend_uah + data.related_spend_uah,
+            market_value_uah=data.market_value_uah,
+        )
 
     async def list_owned_countries(self) -> list[CountryOut]:
         countries = await self._repo.list_owned_countries()

@@ -132,6 +132,18 @@ class CatalogCard(CatalogListItem):
     updated_at: datetime
 
 
+class CatalogSummaryOut(CamelModel):
+    """The "Каталог" KPI tiles, scoped to whatever filters the browse screen
+    currently carries (docs/08-ui-map.md)."""
+
+    total: int
+    owned: int
+    missing: int
+    purchase_total_uah: Money
+    missing_budget_uah: Money
+    unpriced_missing: int
+
+
 class PublicCatalogListItem(CamelModel):
     """Allowlisted anonymous catalog data; private and price fields cannot serialize."""
 

@@ -47,7 +47,7 @@ describe('PurchaseForm', () => {
     await userEvent.type(screen.getByLabelText('Кількість'), '0');
     // The price starts at 0 and is valid; emptying it is what the check is for.
     await userEvent.clear(screen.getByLabelText(/Ціна за шт/));
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getByText('Кількість — ціле число від 1.')).toBeInTheDocument();
@@ -59,7 +59,7 @@ describe('PurchaseForm', () => {
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '1 250,50');
     await userEvent.type(screen.getByLabelText('Продавець'), '  Violity  ');
     await userEvent.type(screen.getByLabelText('Місце зберігання'), '  Вдома  ');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     expect(onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -126,7 +126,7 @@ describe('PurchaseForm price default', () => {
 
   it('submits that zero without complaining', async () => {
     const onSubmit = renderForm();
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ price: '0' }));
   });
 
@@ -149,7 +149,7 @@ describe('PurchaseForm price entry', () => {
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '250');
 
     expect(screen.getByLabelText(/Ціна за шт/)).toHaveValue('250');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ price: '250' }));
   });
 

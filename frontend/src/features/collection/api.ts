@@ -7,6 +7,7 @@ import type {
   CollectionItemPhotos,
   CollectionItemUpdate,
   CollectionPage,
+  CollectionSummary,
   CountryOut,
   DenominationOut,
   SeriesOut,
@@ -43,6 +44,28 @@ export function fetchCollection(
     order: filters.order,
   });
   return api<CollectionPage>(`/collection${query}`);
+}
+
+/** The "Мої монети" KPI tiles, scoped to whatever `filters` the page's own
+ *  toolbar currently carries — same query shape as `fetchCollection`, minus
+ *  pagination/sort, since this is one aggregate, not a page of rows. */
+export function fetchCollectionSummary(filters: CollectionFilters): Promise<CollectionSummary> {
+  const { yearFrom, yearTo, dateFrom, dateTo } = periodToApiParams(filters.period);
+  const query = toQuery({
+    q: filters.q,
+    countryId: filters.countryIds,
+    seriesId: filters.seriesIds,
+    yearFrom,
+    yearTo,
+    dateFrom,
+    dateTo,
+    denominationId: filters.denominationIds,
+    group: filters.groups,
+    materialId: filters.materialIds,
+    metalKind: filters.metalKinds,
+    grade: filters.grade,
+  });
+  return api<CollectionSummary>(`/collection/summary${query}`);
 }
 
 /** Countries the user actually owns a coin from — narrower than the

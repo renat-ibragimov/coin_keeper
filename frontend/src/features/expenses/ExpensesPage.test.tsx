@@ -208,7 +208,7 @@ describe('ExpensesPage', () => {
       'href',
       '/catalog',
     );
-    expect(screen.getByRole('link', { name: 'Додати покупку' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Додати монету' })).toHaveAttribute(
       'href',
       '/collection/add',
     );

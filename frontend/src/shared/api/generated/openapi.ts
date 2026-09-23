@@ -804,6 +804,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Catalog Summary */
+        get: operations["catalog_summary_api_v1_catalog_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/collection/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collection Summary */
+        get: operations["collection_summary_api_v1_collection_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/completeness/summary": {
         parameters: {
             query?: never;
@@ -2438,6 +2472,36 @@ export interface components {
             /** Sortorder */
             sortOrder?: number | null;
             summary: components["schemas"]["CompletenessSummaryOut"];
+        };
+        /** CatalogSummaryOut */
+        CatalogSummaryOut: {
+            /** Total */
+            total: number;
+            /** Owned */
+            owned: number;
+            /** Missing */
+            missing: number;
+            /** Purchasetotaluah */
+            purchaseTotalUah: string;
+            /** Missingbudgetuah */
+            missingBudgetUah: string;
+            /** Unpricedmissing */
+            unpricedMissing: number;
+        };
+        /** CollectionSummaryOut */
+        CollectionSummaryOut: {
+            /** Collectionitems */
+            collectionItems: number;
+            /** Completeditems */
+            completedItems: number;
+            /** Coinspenduah */
+            coinSpendUah: string;
+            /** Relatedspenduah */
+            relatedSpendUah: string;
+            /** Totalspenduah */
+            totalSpendUah: string;
+            /** Marketvalueuah */
+            marketValueUah: string;
         };
         /** CompletenessSummaryOut */
         CompletenessSummaryOut: {
@@ -4377,6 +4441,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SeriesProgressOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    catalog_summary_api_v1_catalog_summary_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                countryId?: number[] | null;
+                seriesId?: number[] | null;
+                year?: number | null;
+                yearFrom?: number | null;
+                yearTo?: number | null;
+                dateFrom?: string | null;
+                dateTo?: string | null;
+                denominationId?: number[] | null;
+                group?: ("circulation" | "commemorative" | "collector" | "other")[] | null;
+                materialId?: number[] | null;
+                metalKind?: ("precious" | "base" | "unknown")[] | null;
+                owned?: boolean | null;
+                scope?: "all" | "shared" | "own";
+                archived?: boolean;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CatalogSummaryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    collection_summary_api_v1_collection_summary_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                countryId?: number[] | null;
+                seriesId?: number[] | null;
+                year?: number | null;
+                yearFrom?: number | null;
+                yearTo?: number | null;
+                dateFrom?: string | null;
+                dateTo?: string | null;
+                denominationId?: number[] | null;
+                group?: ("circulation" | "commemorative" | "collector" | "other")[] | null;
+                materialId?: number[] | null;
+                metalKind?: ("precious" | "base" | "unknown")[] | null;
+                grade?: string | null;
+                locale?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CollectionSummaryOut"];
                 };
             };
             /** @description Validation Error */

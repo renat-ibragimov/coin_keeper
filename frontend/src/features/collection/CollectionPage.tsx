@@ -26,6 +26,7 @@ import {
 
 import {
   fetchCollection,
+  fetchCollectionSummary,
   fetchOwnedCountries,
   fetchOwnedDenominations,
   fetchOwnedMaterials,
@@ -110,6 +111,14 @@ export function CollectionPage() {
     placeholderData: keepPreviousData,
   });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
+  // The KPI tiles' own numbers, scoped to the page's live filters — separate
+  // from `bootstrapQuery` above, which now only supplies `isEmpty` for the
+  // onboarding empty state (owner's call, 2026-09-23: the tiles react to
+  // filters instead of always showing the whole collection).
+  const summaryQuery = useQuery({
+    queryKey: ['collection', 'summary', filters],
+    queryFn: () => fetchCollectionSummary(filters),
+  });
   // Scoped to what the user actually owns — not the catalog-wide reference
   // lists (docs/03-api-contract.md), so the key namespace differs from the
   // catalog's own ['countries']/['series', ...]/['denominations', ...].
@@ -326,8 +335,8 @@ export function CollectionPage() {
         />
       ) : (
         <>
-          {dashboard ? (
-            <CollectionSummaryTiles dashboard={dashboard} />
+          {summaryQuery.data ? (
+            <CollectionSummaryTiles data={summaryQuery.data} />
           ) : (
             <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
               {Array.from({ length: 4 }, (_, index) => (

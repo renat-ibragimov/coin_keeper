@@ -18,6 +18,7 @@ export type CatalogListItem = components['schemas']['CatalogListItem'] & {
 };
 export type CatalogCard = components['schemas']['CatalogCard'];
 export type CatalogPage = components['schemas']['Page_CatalogListItem_'];
+export type CatalogSummary = components['schemas']['CatalogSummaryOut'];
 export type CoinMaterial = components['schemas']['CoinMaterial'];
 export type CoinEdgeType = components['schemas']['CoinEdgeType'];
 export type CoinQualityType = components['schemas']['CoinQualityType'];
@@ -60,6 +61,7 @@ export type CollectionPosition = components['schemas']['CollectionPositionOut'] 
   issueDate?: string | null;
 };
 export type CollectionPage = components['schemas']['Page_CollectionPositionOut_'];
+export type CollectionSummary = components['schemas']['CollectionSummaryOut'];
 export type StorageLocation = components['schemas']['StorageLocationOut'];
 
 export type CatalogItemCreate = components['schemas']['CatalogItemCreate'];

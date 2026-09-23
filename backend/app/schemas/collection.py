@@ -26,6 +26,19 @@ class StorageLocationCreate(CamelModel):
     name: str = Field(min_length=1, max_length=200)
 
 
+class CollectionSummaryOut(CamelModel):
+    """The "Мої монети" KPI tiles, scoped to the page's own filters
+    (docs/08-ui-map.md) — same shape as the dashboard's unfiltered snapshot,
+    narrowed by whatever `CollectionFilters` the caller passed."""
+
+    collection_items: int
+    completed_items: int
+    coin_spend_uah: Money
+    related_spend_uah: Money
+    total_spend_uah: Money
+    market_value_uah: Money
+
+
 class CollectionPositionOut(CamelModel):
     """One catalog item grouped from all of the owner's purchases of it.
 

@@ -93,7 +93,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
 
   return (
     <>
-      <CollectionSummaryTiles dashboard={dashboard} />
+      <CollectionSummaryTiles data={dashboard} />
 
       <div className={styles.columns}>
         <div className={styles.stack}>

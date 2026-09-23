@@ -12,7 +12,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import ColumnElement, and_, exists, func, select, true
+from sqlalchemy import ColumnElement, and_, case, exists, func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE, LOCALE_UK
@@ -90,6 +90,15 @@ class CollectionPositionRow:
     grades: list[str]
 
 
+@dataclass
+class CollectionSummaryData:
+    collection_items: int
+    completed_items: int
+    coin_spend_uah: Decimal
+    related_spend_uah: Decimal
+    market_value_uah: Decimal
+
+
 class CollectionRepository:
     def __init__(
         self, session: AsyncSession, *, owner_id: int, locale: str = DEFAULT_LOCALE
@@ -107,7 +116,11 @@ class CollectionRepository:
         ]
         if grade is not None:
             conditions.append(CollectionItem.grade == grade)
-        return exists(select(CollectionItem.id).where(*conditions))
+        # Explicit correlation: summary()'s money aggregates join straight to
+        # CollectionItem, and without this the auto-correlate default would
+        # strip it out of this subquery too, leaving it with no FROM at all
+        # (same fix as CatalogRepository._own_instance_exists()).
+        return exists(select(CollectionItem.id).where(*conditions).correlate(CatalogItem))
 
     def _position_filter_conditions(self, filters: CollectionFilters) -> list[ColumnElement[bool]]:
         # A position is a catalog item the owner holds at least one purchase
@@ -284,6 +297,91 @@ class CollectionRepository:
             market_value_uah=(None if market_price is None else market_price * total_quantity),
             last_acquisition_date=row.last_acquisition_date,
             grades=sorted(set(row.grades or [])),
+        )
+
+    async def summary(self, filters: CollectionFilters) -> CollectionSummaryData:
+        """The KPI tiles on "Мої монети" (docs/08-ui-map.md), scoped to the
+        page's own filters — the same conditions `list_positions` uses, just
+        aggregated instead of paginated. With no filters at all these
+        conditions match the whole collection, so the numbers agree with
+        `GET /bootstrap`'s unfiltered dashboard snapshot."""
+        conditions = self._position_filter_conditions(filters)
+
+        collection_items = (
+            await self._session.execute(
+                select(func.coalesce(func.sum(CollectionItem.quantity), 0))
+                .select_from(CollectionItem)
+                .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+                .where(CollectionItem.owner_id == self._owner_id, *conditions)
+            )
+        ).scalar_one()
+
+        completed_items = (
+            await self._session.execute(
+                select(func.count(CatalogItem.id.distinct()))
+                .select_from(CollectionItem)
+                .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+                .where(CollectionItem.owner_id == self._owner_id, *conditions)
+            )
+        ).scalar_one()
+
+        amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
+        spend = (
+            await self._session.execute(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (Expense.category == ExpenseCategory.COIN_PURCHASE, amount_uah),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
+                    func.coalesce(
+                        func.sum(
+                            case(
+                                (Expense.category != ExpenseCategory.COIN_PURCHASE, amount_uah),
+                                else_=0,
+                            )
+                        ),
+                        0,
+                    ),
+                )
+                .select_from(Expense)
+                .join(CatalogItem, CatalogItem.id == Expense.catalog_item_id)
+                .where(Expense.owner_id == self._owner_id, *conditions)
+            )
+        ).one()
+
+        market_value = (
+            await self._session.execute(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            CollectionItem.quantity
+                            * func.coalesce(
+                                latest_price_uah_for(
+                                    CollectionItem.catalog_item_id, self._owner_id
+                                ),
+                                0,
+                            )
+                        ),
+                        0,
+                    )
+                )
+                .select_from(CollectionItem)
+                .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+                .where(CollectionItem.owner_id == self._owner_id, *conditions)
+            )
+        ).scalar_one()
+
+        return CollectionSummaryData(
+            collection_items=int(collection_items),
+            completed_items=int(completed_items),
+            coin_spend_uah=Decimal(spend[0]),
+            related_spend_uah=Decimal(spend[1]),
+            market_value_uah=Decimal(market_value),
         )
 
     # ------------------------------------------------- owned reference lists

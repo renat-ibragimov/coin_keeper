@@ -6,7 +6,6 @@ import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
 import { fetchBootstrap } from '@/features/dashboard/api';
-import { CollectionSummaryTiles } from '@/features/dashboard/CollectionSummaryTiles';
 import { ApiError } from '@/shared/api/client';
 import type { CollectionGroup } from '@/shared/api/types';
 import { formatPeriodDateForDisplay } from '@/shared/lib/periodFilter';
@@ -28,10 +27,12 @@ import {
 import {
   fetchCatalog,
   fetchCatalogMaterials,
+  fetchCatalogSummary,
   fetchCountries,
   fetchDenominations,
   fetchSeries,
 } from './api';
+import { CatalogSummaryTiles } from './CatalogSummaryTiles';
 import { CatalogTable } from './CatalogTable';
 import { CoinCard } from './CoinCard';
 import { FiltersPanel } from './FiltersPanel';
@@ -161,6 +162,16 @@ export function CatalogPage() {
     enabled: Boolean(user),
   });
   const dashboard = bootstrapQuery.data?.dashboard;
+  const tilesShown = Boolean(user) && (dashboard?.collectionItems ?? 0) > 0;
+  // The tiles' own numbers, scoped to the page's live filters — `owned`
+  // never narrows them (fetchCatalogSummary's docstring). Only fetched once
+  // the gate above is actually satisfied: a guest or an empty collection
+  // never needs this request.
+  const summaryQuery = useQuery({
+    queryKey: ['catalog', 'summary', filters],
+    queryFn: () => fetchCatalogSummary(filters),
+    enabled: tilesShown,
+  });
 
   // The same series list already fetched for the "Серія" filter, keyed by
   // its display name so the card's series line can link to it without a
@@ -329,9 +340,7 @@ export function CatalogPage() {
     <div className={styles.page}>
       <PageHeader align="center" title={t('catalog.title')} subtitle={t('catalog.subtitle')} />
 
-      {user && dashboard && dashboard.collectionItems > 0 ? (
-        <CollectionSummaryTiles dashboard={dashboard} />
-      ) : null}
+      {tilesShown && summaryQuery.data ? <CatalogSummaryTiles data={summaryQuery.data} /> : null}
 
       <div className={styles.filtersBar}>{filtersPanel}</div>
 

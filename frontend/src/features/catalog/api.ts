@@ -5,6 +5,7 @@ import type {
   CatalogCollectionItem,
   CatalogListItem,
   CatalogPage,
+  CatalogSummary,
   CoinEdgeType,
   CoinMaterial,
   CoinQualityType,
@@ -45,6 +46,32 @@ export function fetchCatalog(
     order: filters.order,
   });
   return api<CatalogPage>(`/catalog${query}`);
+}
+
+/** The "Каталог" KPI tiles, scoped to whatever `filters` the browse screen
+ *  currently carries — same query shape as `fetchCatalog`, minus pagination/
+ *  sort, since this is one aggregate, not a page of rows. `owned` is passed
+ *  along for signature symmetry but the backend ignores it (see
+ *  `CatalogRepository.summary`'s docstring). */
+export function fetchCatalogSummary(filters: CatalogFilters): Promise<CatalogSummary> {
+  const { yearFrom, yearTo, dateFrom, dateTo } = periodToApiParams(filters.period);
+  const query = toQuery({
+    q: filters.q,
+    countryId: filters.countryIds,
+    seriesId: filters.seriesIds,
+    yearFrom,
+    yearTo,
+    dateFrom,
+    dateTo,
+    denominationId: filters.denominationIds,
+    group: filters.groups,
+    materialId: filters.materialIds,
+    metalKind: filters.metalKinds,
+    owned: filters.owned,
+    scope: filters.scope === 'all' ? undefined : filters.scope,
+    archived: filters.archived ? true : undefined,
+  });
+  return api<CatalogSummary>(`/catalog/summary${query}`);
 }
 
 /** `confirmed` is the catalog's own filter panel (only a `catalog_confirmed`

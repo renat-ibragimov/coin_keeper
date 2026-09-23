@@ -25,6 +25,7 @@ from app.schemas.collection import (
     CollectionItemPhotosOut,
     CollectionItemUpdate,
     CollectionPositionOut,
+    CollectionSummaryOut,
     StorageLocationCreate,
     StorageLocationOut,
 )
@@ -130,6 +131,46 @@ async def list_collection(
         filters, limit=pagination.page_size, offset=pagination.offset
     )
     return Page(items=items, total=total, page=pagination.page, page_size=pagination.page_size)
+
+
+# Must stay registered before /{item_id} — otherwise FastAPI tries to parse
+# "summary" as item_id and 404s instead of matching this route.
+@router.get("/summary")
+async def collection_summary(
+    session: DbSession,
+    user: CurrentUser,
+    locale: RequestLocale,
+    q: Annotated[str | None, Query(max_length=200)] = None,
+    country_id: Annotated[list[int] | None, Query(alias="countryId")] = None,
+    series_id: Annotated[list[int] | None, Query(alias="seriesId")] = None,
+    year: Annotated[int | None, Query()] = None,
+    year_from: Annotated[int | None, Query(alias="yearFrom")] = None,
+    year_to: Annotated[int | None, Query(alias="yearTo")] = None,
+    date_from: Annotated[date | None, Query(alias="dateFrom")] = None,
+    date_to: Annotated[date | None, Query(alias="dateTo")] = None,
+    denomination_id: Annotated[list[int] | None, Query(alias="denominationId")] = None,
+    group: Annotated[list[CollectionGroup] | None, Query()] = None,
+    material_id: Annotated[list[int] | None, Query(alias="materialId")] = None,
+    metal_kind: Annotated[list[MetalKind] | None, Query(alias="metalKind")] = None,
+    grade: Annotated[str | None, Query(max_length=50)] = None,
+) -> CollectionSummaryOut:
+    """The "Мої монети" KPI tiles for the filters currently applied."""
+    filters = CollectionFilters(
+        q=q,
+        country_ids=country_id,
+        series_ids=series_id,
+        year=year,
+        year_from=year_from,
+        year_to=year_to,
+        date_from=date_from,
+        date_to=date_to,
+        denomination_ids=denomination_id,
+        groups=group,
+        material_ids=material_id,
+        metal_kinds=metal_kind,
+        grade=grade,
+    )
+    return await CollectionService(session, user, locale).summary(filters)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
@@ -114,6 +114,16 @@ class CatalogRow:
 class CatalogPage:
     rows: list[CatalogRow] = field(default_factory=list)
     total: int = 0
+
+
+@dataclass
+class CatalogSummaryData:
+    total: int
+    owned: int
+    missing: int
+    purchase_total_uah: Decimal
+    missing_budget_uah: Decimal
+    unpriced_missing: int
 
 
 def _display_title(locale: str) -> ColumnElement[str]:
@@ -352,11 +362,20 @@ class CatalogRepository:
         return and_(CatalogItem.is_archived, self._own_instance_exists())
 
     def _own_instance_exists(self) -> ColumnElement[bool]:
+        # Explicit correlation, not the implicit auto-correlate default: a
+        # caller whose own FROM already includes CollectionItem (summary()'s
+        # money aggregates, joined straight to it) would otherwise strip
+        # CollectionItem out of this subquery too, leaving it with no FROM at
+        # all. Pinning it to CatalogItem alone is what every caller actually
+        # wants -- "does this catalog item have an instance" -- and changes
+        # nothing for callers whose FROM never had CollectionItem in it.
         return exists(
-            select(CollectionItem.id).where(
+            select(CollectionItem.id)
+            .where(
                 CollectionItem.catalog_item_id == CatalogItem.id,
                 CollectionItem.owner_id == self._user_id,
             )
+            .correlate(CatalogItem)
         )
 
     # --------------------------------------------------------------- listing
@@ -656,6 +675,91 @@ class CatalogRepository:
             for row in result
         ]
         return CatalogPage(rows=rows, total=total)
+
+    async def summary(
+        self, filters: CatalogFilters, *, require_confirmed: bool = True
+    ) -> CatalogSummaryData:
+        """Completeness of the catalog's own KPI tiles (docs/08-ui-map.md):
+        the same filters as `list_items`, but `owned` is deliberately
+        dropped -- the tiles show both sides of the coverage ratio
+        regardless of which availability toggle currently narrows the list
+        below them (owner's call, 2026-09-23), so the owned/missing pair
+        never trivially zeroes out just because the visible list only shows
+        one side of it.
+        """
+        conditions = self._filter_conditions(
+            replace(filters, owned=None), require_confirmed=require_confirmed
+        )
+
+        counts = (
+            await self._session.execute(
+                select(
+                    func.count(CatalogItem.id.distinct()),
+                    func.count(case((self._own_instance_exists(), CatalogItem.id)).distinct()),
+                )
+                .select_from(CatalogItem)
+                .join(Country, Country.id == CatalogItem.country_id)
+                .where(*conditions)
+            )
+        ).one()
+        total, owned = int(counts[0] or 0), int(counts[1] or 0)
+
+        purchase_total = (
+            await self._session.execute(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            CollectionItem.quantity
+                            * func.coalesce(CollectionItem.purchase_price, 0)
+                            * func.coalesce(CollectionItem.purchase_rate_uah, 1)
+                        ),
+                        0,
+                    )
+                )
+                .select_from(CollectionItem)
+                .join(CatalogItem, CatalogItem.id == CollectionItem.catalog_item_id)
+                .join(Country, Country.id == CatalogItem.country_id)
+                .where(CollectionItem.owner_id == self._user_id, *conditions)
+            )
+        ).scalar_one()
+
+        missing_budget = (
+            await self._session.execute(
+                select(
+                    func.coalesce(
+                        func.sum(
+                            func.coalesce(latest_price_uah_for(CatalogItem.id, self._user_id), 0)
+                        ),
+                        0,
+                    )
+                )
+                .select_from(CatalogItem)
+                .join(Country, Country.id == CatalogItem.country_id)
+                .where(*conditions, not_(self._own_instance_exists()))
+            )
+        ).scalar_one()
+
+        unpriced_missing = (
+            await self._session.execute(
+                select(func.count(CatalogItem.id))
+                .select_from(CatalogItem)
+                .join(Country, Country.id == CatalogItem.country_id)
+                .where(
+                    *conditions,
+                    not_(self._own_instance_exists()),
+                    not_(has_visible_price(CatalogItem.id, self._user_id)),
+                )
+            )
+        ).scalar_one()
+
+        return CatalogSummaryData(
+            total=total,
+            owned=owned,
+            missing=total - owned,
+            purchase_total_uah=Decimal(purchase_total),
+            missing_budget_uah=Decimal(missing_budget),
+            unpriced_missing=int(unpriced_missing),
+        )
 
     # ----------------------------------------------------------------- cards
 

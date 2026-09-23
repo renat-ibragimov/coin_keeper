@@ -246,7 +246,7 @@ describe('AddPage', () => {
     await userEvent.type(screen.getByLabelText('Рік випуску'), '2021');
     await userEvent.type(screen.getByLabelText('Матеріал'), 'Нейзильбер');
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '120');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
@@ -269,7 +269,7 @@ describe('AddPage', () => {
     await userEvent.type(await screen.findByLabelText('Рік випуску'), '2021');
     await userEvent.type(screen.getByLabelText('Матеріал'), 'Срібло');
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '120');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
@@ -281,7 +281,7 @@ describe('AddPage', () => {
     renderPage();
     await userEvent.type(await screen.findByLabelText('Назва монети'), 'Моя монета');
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '120');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     expect(createCollectionItem).not.toHaveBeenCalled();
     expect(screen.getByText('Вкажіть рік числом, від 1 до 2200.')).toBeInTheDocument();
@@ -342,7 +342,7 @@ describe('AddPage', () => {
     await userEvent.click(screen.getByRole('button', { name: "Пов'язані витрати" }));
     // Opening the block offers a row rather than an empty section.
     await userEvent.type(await screen.findByLabelText(/Сума/), '60');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
@@ -357,7 +357,7 @@ describe('AddPage', () => {
 
     await userEvent.type(await screen.findByLabelText(/Ціна за шт/), '250');
     expect(screen.queryByLabelText(/Сума/)).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]!.extraExpenses).toEqual([]);
@@ -371,14 +371,14 @@ describe('AddPage', () => {
     // Zero is a real answer for a coin and a mistake for a delivery.
     await userEvent.type(await screen.findByLabelText(/Сума/), '0');
     await userEvent.click(screen.getByRole('button', { name: 'Додати ще витрату' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     expect(createCollectionItem).not.toHaveBeenCalled();
     expect(screen.getByText('Вкажіть суму, більшу за 0')).toBeInTheDocument();
 
     // With the bad row gone, the one left untouched is simply ignored.
     await userEvent.clear(screen.getAllByLabelText(/Сума/)[0]!);
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]!.extraExpenses).toEqual([]);
   });
@@ -407,7 +407,7 @@ describe('AddPage — "Про монету" dictionaries', () => {
     await userEvent.type(screen.getByLabelText('Серія'), 'Австрійські казки');
     await userEvent.type(screen.getByLabelText('Матеріал'), 'Срібло 900');
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '900');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
@@ -460,7 +460,7 @@ describe('AddPage — "Про монету" dictionaries', () => {
     await userEvent.type(screen.getByLabelText('Серія'), 'Флора і фауна України');
     await userEvent.type(screen.getByLabelText('Матеріал'), 'Срібло');
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '120');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
@@ -506,7 +506,7 @@ describe('AddPage — "Більше деталей"', () => {
     await userEvent.type(screen.getByLabelText('Опис аверса'), 'Портрет праворуч');
     await userEvent.type(screen.getByLabelText('Опис реверса'), 'Двоглавий орел');
     await userEvent.type(screen.getByLabelText(/Ціна за шт/), '500');
-    await userEvent.click(screen.getByRole('button', { name: 'Додати покупку' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Додати монету' }));
 
     await waitFor(() => expect(createCollectionItem).toHaveBeenCalled());
     expect(vi.mocked(createCollectionItem).mock.calls[0]![0]).toMatchObject({
