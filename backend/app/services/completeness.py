@@ -67,9 +67,7 @@ class CompletenessService:
         rows = await self._repo.aggregate(group_by, country_id=country_id)
         labels = await self._repo.labels(group_by, [row.value for row in rows])
         return [
-            self._group_out(
-                group_by, row, labels.get(row.value) if row.value is not None else None
-            )
+            self._group_out(group_by, row, labels.get(row.value) if row.value is not None else None)
             for row in rows
         ]
 
