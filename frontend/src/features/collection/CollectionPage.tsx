@@ -1,15 +1,14 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Coins, Layers, SearchX, TrendingUp, Wallet, X } from 'lucide-react';
+import { Coins, SearchX, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { fetchBootstrap } from '@/features/dashboard/api';
-import { fetchSeriesProgress } from '@/features/series/api';
+import { CollectionSummaryTiles } from '@/features/dashboard/CollectionSummaryTiles';
 import { ApiError } from '@/shared/api/client';
 import type { CollectionGroup } from '@/shared/api/types';
 import { useDismissable } from '@/shared/lib/useDismissable';
-import { formatNumber, formatPercent, formatUah } from '@/shared/lib/format';
 import { formatPeriodDateForDisplay } from '@/shared/lib/periodFilter';
 import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
 import type { ActiveFilterChip } from '@/shared/ui';
@@ -22,7 +21,6 @@ import {
   PageHeader,
   Pagination,
   Skeleton,
-  StatTile,
   TableIcon,
 } from '@/shared/ui';
 
@@ -78,7 +76,6 @@ const GROUP_LABELS: Record<CollectionGroup, string> = {
 
 export function CollectionPage() {
   const { t, i18n } = useTranslation();
-  const locale = i18n.language;
   const { filters, update, reset } = useCollectionFilters();
 
   // The phone's filters drawer edits this instead of the real, applied
@@ -113,10 +110,6 @@ export function CollectionPage() {
     placeholderData: keepPreviousData,
   });
   const bootstrapQuery = useQuery({ queryKey: ['bootstrap'], queryFn: fetchBootstrap });
-  const seriesProgressQuery = useQuery({
-    queryKey: ['series', 'progress', undefined],
-    queryFn: () => fetchSeriesProgress(undefined),
-  });
   // Scoped to what the user actually owns — not the catalog-wide reference
   // lists (docs/03-api-contract.md), so the key namespace differs from the
   // catalog's own ['countries']/['series', ...]/['denominations', ...].
@@ -147,14 +140,6 @@ export function CollectionPage() {
   const shown = page ? page.items.length + (page.page - 1) * GRID_PAGE_SIZE : 0;
   const dashboard = bootstrapQuery.data?.dashboard;
   const includeSupportingExpenses = bootstrapQuery.data?.settings.includeSupportingExpenses ?? true;
-  const seriesStats = seriesProgressQuery.data
-    ? {
-        started: seriesProgressQuery.data.filter((row) => row.summary.owned > 0).length,
-        completed: seriesProgressQuery.data.filter(
-          (row) => row.summary.total > 0 && row.summary.owned === row.summary.total,
-        ).length,
-      }
-    : null;
   // docs/03-api-contract.md: emptiness is the server's isEmpty from bootstrap
   // (no coins and no personal items), not a locally derived "zero rows" guess.
   const collectionEmpty = dashboard?.isEmpty === true && !hasActiveFilters(filters);
@@ -341,50 +326,15 @@ export function CollectionPage() {
         />
       ) : (
         <>
-          <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
-            {dashboard ? (
-              <>
-                <StatTile
-                  icon={<Coins strokeWidth={1.75} />}
-                  label={t('collection.tileCoins')}
-                  value={formatNumber(dashboard.collectionItems, locale, 0)}
-                  hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
-                />
-                <StatTile
-                  icon={<Wallet strokeWidth={1.75} />}
-                  label={t('collection.tileSpent')}
-                  value={formatUah(dashboard.coinSpendUah, locale)}
-                  hint={t('collection.tileSpentHint', {
-                    total: formatUah(dashboard.totalSpendUah, locale),
-                  })}
-                />
-                <StatTile
-                  icon={<TrendingUp strokeWidth={1.75} />}
-                  label={t('collection.tileValue')}
-                  value={formatUah(dashboard.marketValueUah, locale)}
-                  hint={t('collection.tileValueHint')}
-                />
-                <StatTile
-                  icon={<Layers strokeWidth={1.75} />}
-                  label={t('collection.tileSeries')}
-                  value={
-                    seriesStats ? (
-                      `${seriesStats.completed} / ${seriesStats.started}`
-                    ) : (
-                      <Skeleton width={60} />
-                    )
-                  }
-                  hint={
-                    seriesStats && seriesStats.started > 0
-                      ? formatPercent((seriesStats.completed / seriesStats.started) * 100, locale)
-                      : t('collection.tileSeriesHint')
-                  }
-                />
-              </>
-            ) : (
-              Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={96} />)
-            )}
-          </section>
+          {dashboard ? (
+            <CollectionSummaryTiles dashboard={dashboard} />
+          ) : (
+            <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
+              {Array.from({ length: 4 }, (_, index) => (
+                <Skeleton key={index} height={96} />
+              ))}
+            </section>
+          )}
 
           <div className={styles.filtersBar}>{filtersPanel}</div>
 

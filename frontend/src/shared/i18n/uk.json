@@ -386,13 +386,6 @@
   "collection": {
     "title": "Мої монети",
     "subtitle": "Мої екземпляри, покупки та поточна оцінка.",
-    "tileCoins": "Монет у колекції",
-    "tileSpent": "Витрачено на монети",
-    "tileSpentHint": "разом із супутніми: {{total}}",
-    "tileValue": "Поточна оцінка",
-    "tileValueHint": "за видимими вам цінами",
-    "tileSeries": "Серій зібрано",
-    "tileSeriesHint": "повністю / розпочато",
     "searchPlaceholder": "Пошук у колекції…",
     "allSeries": "Усі серії",
     "sortDate": "За останньою покупкою",

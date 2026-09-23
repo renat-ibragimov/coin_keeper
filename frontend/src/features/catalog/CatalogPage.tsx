@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 
 import { useAuth } from '@/features/auth/useAuth';
+import { fetchBootstrap } from '@/features/dashboard/api';
+import { CollectionSummaryTiles } from '@/features/dashboard/CollectionSummaryTiles';
 import { ApiError } from '@/shared/api/client';
 import type { CollectionGroup } from '@/shared/api/types';
 import { formatPeriodDateForDisplay } from '@/shared/lib/periodFilter';
@@ -150,6 +152,15 @@ export function CatalogPage() {
     queryKey: ['catalog', 'materials', narrowCountryId],
     queryFn: () => fetchCatalogMaterials(narrowCountryId),
   });
+  // The same four Огляд/Мої монети tiles, only for a signed-in owner who has
+  // at least one coin -- a guest, or a fresh account with nothing yet, has
+  // nothing here worth summarizing (owner's call, 2026-09-23).
+  const bootstrapQuery = useQuery({
+    queryKey: ['bootstrap'],
+    queryFn: fetchBootstrap,
+    enabled: Boolean(user),
+  });
+  const dashboard = bootstrapQuery.data?.dashboard;
 
   // The same series list already fetched for the "Серія" filter, keyed by
   // its display name so the card's series line can link to it without a
@@ -317,6 +328,10 @@ export function CatalogPage() {
   return (
     <div className={styles.page}>
       <PageHeader align="center" title={t('catalog.title')} subtitle={t('catalog.subtitle')} />
+
+      {user && dashboard && dashboard.collectionItems > 0 ? (
+        <CollectionSummaryTiles dashboard={dashboard} />
+      ) : null}
 
       <div className={styles.filtersBar}>{filtersPanel}</div>
 

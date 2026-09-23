@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from 'vitest';
 import '@/shared/i18n';
 vi.mock('@/features/auth/useAuth', () => ({ useAuth: () => ({ user: { id: 1, role: 'user' } }) }));
 import { fetchBootstrap } from '@/features/dashboard/api';
-import { fetchSeriesProgress } from '@/features/series/api';
 import type {
   BootstrapOut,
   CollectionPosition,
@@ -32,7 +31,6 @@ vi.mock('./api', () => ({
   fetchOwnedMaterials: vi.fn(),
 }));
 vi.mock('@/features/dashboard/api', () => ({ fetchBootstrap: vi.fn() }));
-vi.mock('@/features/series/api', () => ({ fetchSeriesProgress: vi.fn() }));
 
 function makeBootstrap(isEmpty: boolean): BootstrapOut {
   return {
@@ -136,7 +134,6 @@ function renderPage() {
 
 function mockCommonQueries(isEmpty: boolean) {
   vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap(isEmpty));
-  vi.mocked(fetchSeriesProgress).mockResolvedValue([]);
   vi.mocked(fetchOwnedCountries).mockResolvedValue([]);
   vi.mocked(fetchOwnedSeries).mockResolvedValue([]);
   vi.mocked(fetchOwnedDenominations).mockResolvedValue([]);

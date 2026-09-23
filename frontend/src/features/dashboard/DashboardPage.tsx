@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Coins, LayoutDashboard, Scale, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowRight, LayoutDashboard } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
@@ -23,10 +23,10 @@ import {
   PageHeader,
   ProgressRing,
   Skeleton,
-  StatTile,
 } from '@/shared/ui';
 
 import { fetchBootstrap } from './api';
+import { CollectionSummaryTiles } from './CollectionSummaryTiles';
 import { myCollectionSeries, valueDelta } from './finance';
 import styles from './DashboardPage.module.css';
 
@@ -93,42 +93,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
 
   return (
     <>
-      <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
-        <Link to="/collection/coins" className={styles.tileLink}>
-          <StatTile
-            icon={<Coins strokeWidth={1.75} />}
-            label={t('dashboard.tileCoins')}
-            value={formatNumber(dashboard.collectionItems, locale, 0)}
-            hint={t('dashboard.tileCoinsHint', { count: dashboard.completedItems })}
-          />
-        </Link>
-        <Link to="/collection/money" className={styles.tileLink}>
-          <StatTile
-            icon={<Wallet strokeWidth={1.75} />}
-            label={t('dashboard.spentTotal')}
-            value={formatUah(dashboard.totalSpendUah, locale)}
-            hint={t('dashboard.tileSpentHint', {
-              amount: formatUah(dashboard.relatedSpendUah, locale),
-            })}
-          />
-        </Link>
-        <Link to="/collection/money" className={styles.tileLink}>
-          <StatTile
-            icon={<TrendingUp strokeWidth={1.75} />}
-            label={t('dashboard.marketValue')}
-            value={formatUah(dashboard.marketValueUah, locale)}
-          />
-        </Link>
-        <Link to="/collection/money" className={styles.tileLink}>
-          <StatTile
-            icon={<Scale strokeWidth={1.75} />}
-            label={t('dashboard.delta')}
-            value={formatSignedUah(delta.diffUah, locale)}
-            hint={delta.percent !== null ? formatSignedPercent(delta.percent, locale) : undefined}
-            tone={deltaTone}
-          />
-        </Link>
-      </section>
+      <CollectionSummaryTiles dashboard={dashboard} />
 
       <div className={styles.columns}>
         <div className={styles.stack}>

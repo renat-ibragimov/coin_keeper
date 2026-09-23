@@ -378,13 +378,6 @@
   "collection": {
     "title": "My coins",
     "subtitle": "My instances, purchases and the current valuation.",
-    "tileCoins": "Coins in collection",
-    "tileSpent": "Spent on coins",
-    "tileSpentHint": "with related expenses: {{total}}",
-    "tileValue": "Current valuation",
-    "tileValueHint": "by the prices visible to you",
-    "tileSeries": "Series collected",
-    "tileSeriesHint": "complete / started",
     "searchPlaceholder": "Search the collection…",
     "allSeries": "All series",
     "sortDate": "By last purchase",
