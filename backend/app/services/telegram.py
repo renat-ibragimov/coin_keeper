@@ -12,6 +12,7 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from fastapi import BackgroundTasks
 from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +22,7 @@ from app.core.telegram import TelegramMessage, TelegramSender
 from app.core.telegram.messages import (
     job_run_message,
     link_confirmed_message,
+    new_user_message,
     no_runs_message,
 )
 from app.models import AuthToken, User
@@ -164,11 +166,30 @@ def admin_url(settings: Settings) -> str | None:
     return f"{base}/admin" if base else None
 
 
-async def notify_job_run(sender: TelegramSender, chat_ids: list[int], text: str) -> None:
-    """Fan a finished run out to every linked chat.
+async def broadcast_admin_message(sender: TelegramSender, chat_ids: list[int], text: str) -> None:
+    """Fan one piece of text out to every linked admin chat.
 
-    Called after the response has gone back to the reporting job, so a slow
-    or unreachable telegram never holds up a night's work.
+    Used both for a finished job run and for a new-user notice. Called after
+    the response has gone back to the caller (as a background task), so a
+    slow or unreachable telegram never holds up a night's work or a sign-up.
     """
     for chat_id in chat_ids:
         await sender.send(TelegramMessage(chat_id=chat_id, text=text))
+
+
+async def queue_new_user_notification(
+    background: BackgroundTasks,
+    session: AsyncSession,
+    sender: TelegramSender,
+    email: str,
+) -> None:
+    """Tell every linked admin chat that an account just became real.
+
+    Fired once, at verification (docs/13-admin.md, part 3) -- not at
+    registration, which an unconfirmed or bot-filled address would reach too
+    easily and turn the chat into noise.
+    """
+    chat_ids = await TelegramRecipientRepository(session).all_chat_ids()
+    if not chat_ids:
+        return
+    background.add_task(broadcast_admin_message, sender, chat_ids, new_user_message(email))

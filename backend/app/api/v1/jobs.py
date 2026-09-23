@@ -17,7 +17,7 @@ from app.models.jobs import JobRun
 from app.repositories.telegram import TelegramRecipientRepository
 from app.schemas.jobs import JobRunFinishIn, JobRunIn, JobRunOut
 from app.services.jobs import JobRunNotFoundError, JobRunService
-from app.services.telegram import admin_url, notify_job_run
+from app.services.telegram import admin_url, broadcast_admin_message
 
 router = APIRouter(prefix="/internal/job-runs", tags=["jobs"])
 
@@ -41,7 +41,7 @@ async def _queue_report(
     if not chat_ids:
         return
     text = job_run_message(run, admin_url=admin_url(settings))
-    background.add_task(notify_job_run, sender, chat_ids, text)
+    background.add_task(broadcast_admin_message, sender, chat_ids, text)
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Request, Response, status
 
 from app.api.deps import (
     AppSettings,
@@ -10,6 +10,8 @@ from app.api.deps import (
     AvatarServiceDep,
     ClientIp,
     CurrentUser,
+    DbSession,
+    Telegram,
     UserAgent,
 )
 from app.api.errors import ProblemError
@@ -41,6 +43,7 @@ from app.services.auth import (
     WeakPasswordError,
 )
 from app.services.avatars import user_out
+from app.services.telegram import queue_new_user_notification
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -146,12 +149,15 @@ async def verify_email(
     response: Response,
     service: AuthServiceDep,
     settings: AppSettings,
+    session: DbSession,
+    sender: Telegram,
+    background: BackgroundTasks,
     ip: ClientIp,
     agent: UserAgent,
 ) -> SessionOut:
     """Confirming the address activates the account and signs the user in."""
     try:
-        session = await service.verify_email(
+        issued = await service.verify_email(
             token=payload.token,
             new_password=payload.new_password,
             user_agent=agent,
@@ -173,8 +179,9 @@ async def verify_email(
             "Bad request",
             "This confirmation link is invalid or has already been used.",
         ) from exc
-    _set_refresh_cookie(response, session, settings)
-    return _session_payload(session)
+    _set_refresh_cookie(response, issued, settings)
+    await queue_new_user_notification(background, session, sender, issued.user.email)
+    return _session_payload(issued)
 
 
 @router.post("/login")

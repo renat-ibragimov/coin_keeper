@@ -11,6 +11,7 @@ went badly explains itself.
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from app.models.jobs import JobRun
@@ -19,6 +20,7 @@ from app.models.jobs import JobRun
 # under its own technical name.
 JOB_LABELS = {
     "update-prices": "Оновлення цін",
+    "update-rates": "Оновлення курсів",
     "nbu-catalog-sync": "Оновлення каталогу",
 }
 
@@ -140,6 +142,24 @@ def job_run_message(run: JobRun, admin_url: str | None = None) -> str:
             lines.append(f"Подробиці: {admin_url}")
 
     return "\n".join([head, *lines])
+
+
+def new_user_message(email: str) -> str:
+    return f"🆕 Новий користувач: {email}"
+
+
+def watchdog_message(stale: list[tuple[str, datetime | None]]) -> str:
+    """One alert for every job that has gone quiet (docs/13-admin.md, 2.7).
+
+    A job with no run at all reads "ще жодного разу" rather than a made-up
+    date -- that is the exact case the watchdog exists to catch.
+    """
+    lines = ["⚠️ Сторож: немає свіжого прогону"]
+    for job, last_run in stale:
+        label = JOB_LABELS.get(job, job)
+        when = "ще жодного разу" if last_run is None else last_run.strftime("%Y-%m-%d %H:%M UTC")
+        lines.append(f"— {label}: востаннє {when}")
+    return "\n".join(lines)
 
 
 def link_confirmed_message() -> str:

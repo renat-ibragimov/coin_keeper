@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Request, Response
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from app.api.deps import AppSettings, ClientIp, CurrentUser, DbSession, Mail, UserAgent
+from app.api.deps import AppSettings, ClientIp, CurrentUser, DbSession, Mail, Telegram, UserAgent
 from app.api.errors import ProblemError
 from app.api.v1.auth import _enforce, _set_refresh_cookie
 from app.core import rate_limit
@@ -14,6 +14,7 @@ from app.models.enums import UserRole
 from app.repositories.users import AuthIdentityRepository, UserRepository
 from app.services.auth import AuthService
 from app.services.google_auth import STATE_COOKIE, GoogleOAuth, GoogleOAuthError
+from app.services.telegram import queue_new_user_notification
 
 router = APIRouter(prefix="/auth/google", tags=["auth"])
 
@@ -83,6 +84,8 @@ async def callback(
     settings: AppSettings,
     session: DbSession,
     mail: Mail,
+    sender: Telegram,
+    background: BackgroundTasks,
     ip: ClientIp,
     agent: UserAgent,
     state: str = "",
@@ -170,6 +173,7 @@ async def callback(
                 response = _return_to_app(settings, "/google-complete")
                 _set_refresh_cookie(response, issued, settings)
                 _clear_state_cookie(response, settings)
+                await queue_new_user_notification(background, session, sender, user.email)
                 return response
 
     response = _return_to_app(settings, destination)
