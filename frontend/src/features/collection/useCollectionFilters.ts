@@ -49,7 +49,7 @@ function intParam(params: URLSearchParams, key: string): number | undefined {
 
 /** Every occurrence of a repeated query key (`countryId=1&countryId=2`),
  *  parsed and de-duplicated — the same shape the catalog's own multi-select
- *  filters use (docs/api.md, 2026-09-12). */
+ *  filters use (docs/api.md, "Multi-value filters"). */
 function intListParam(params: URLSearchParams, key: string): number[] {
   const seen = new Set<number>();
   for (const raw of params.getAll(key)) {

@@ -2578,8 +2578,8 @@ export interface components {
         /**
          * StorageLocationOut
          * @description A name, not an id: the client never tracks storage-location ids
-         *     (docs/business-rules.md). `custom` is true for the owner's own entry —
-         *     only those can be deleted; the four system presets cannot.
+         *     (docs/business-rules.md, BR-16). `custom` is true for the owner's own
+         *     entry — only those can be deleted; the system preset cannot.
          */
         StorageLocationOut: {
             /** Name */

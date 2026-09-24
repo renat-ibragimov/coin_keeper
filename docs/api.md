@@ -1,121 +1,140 @@
-# 03. Контракт API
+# API
 
-REST + JSON. Префикс `/api/v1`. Аутентификация — Bearer-токен в заголовке `Authorization`.
+REST + JSON under `/api/v1`. OpenAPI at `/api/v1/openapi.json`, Swagger UI at
+`/api/v1/docs`. Routes live in `backend/app/api/v1/`, bodies in `backend/app/schemas/`.
+The frontend's types are generated from the deployed OpenAPI (`npm run gen:api`).
 
-## Общие правила
+This document is the contract: what each endpoint accepts, returns and refuses. The
+rules behind the numbers are in `business-rules.md` (cited as BR-N); access rules in
+`auth.md`.
 
-- Ответы — camelCase (фронт на TypeScript), Pydantic-модели с `alias_generator = to_camel`.
-- Списки — всегда постранично: `?page=1&pageSize=50`, ответ `{items, total, page, pageSize}`.
-  3063 позиции каталога одним куском не отдаём никогда.
-- Ошибки — RFC 7807 (`application/problem+json`): `{type, title, status, detail}`.
-- Даты — ISO 8601. Дата без времени — `YYYY-MM-DD`, момент — с таймзоной.
-- Деньги — строка, не число: `"1923.00"`. Иначе JS-фронт потеряет точность.
-- Долгие операции (импорт каталога, массовое обновление цен) не выполняются в HTTP-запросе:
-  возвращают `jobId`, статус читается отдельно. См. «Фоновые задачи».
+---
 
-## Маппинг старого IPC на REST
+## Conventions
 
-В десктопной версии интерфейс общался с бэкендом через 35 методов `window.coinKeeper.*`.
-Соответствие:
+- **Casing.** JSON is camelCase (`CamelModel`, `alias_generator = to_camel`); query
+  parameters are camelCase too (`countryId`, `pageSize`).
+- **Auth.** `Authorization: Bearer <access token>`. The refresh token lives only in an
+  httpOnly cookie (see "Authentication"). An endpoint marked *guest* also answers without
+  a token; everything else returns `401 not-authenticated` without one.
+- **Pagination.** Every list is paged: `?page=1&pageSize=50` (`pageSize` 1–200), response
+  `{items, total, page, pageSize}` (`Page[T]`). Exceptions: small dictionaries and
+  `/catalog/lookup`.
+- **Errors.** RFC 7807, `application/problem+json`:
+  `{type, title, status, detail}`, where `type` is
+  `https://coinkeeper.app/problems/<slug>` and the slug is stable (`catalog-item-not-found`,
+  `shared-catalog-read-only`…). Validation errors are `422 validation-error` with an
+  `errors` array. Handlers: `backend/app/api/errors.py`.
+- **Money** is a string with two decimals (`"1923.00"`, `Money`); rates are decimal strings
+  (`Rate`). Never floats.
+- **Dates.** ISO 8601: `YYYY-MM-DD` for dates, timezone-aware timestamps for moments.
+- **Locale.** Localized fields follow `?locale=uk|en`, else `Accept-Language`, else `uk`
+  (BR-12).
+- **Route order.** Literal sub-paths (`/catalog/summary`, `/collection/countries`…) are
+  registered before `/{id}` routes; otherwise FastAPI tries to parse them as ids.
 
-| Старый метод | REST |
+### Multi-value filters
+
+Filters that select from a list repeat the key: `?countryId=1&countryId=2`. The backend
+reads them as `list[int]` (or a list of enum values); the frontend's `client.ts` and
+filter hooks produce the same shape. Applies to `countryId`, `seriesId`,
+`denominationId`, `group`, `materialId`, `metalKind` on `/catalog`, `/catalog/summary`,
+`/collection` and `/collection/summary`.
+
+### Guest access and rate limits
+
+Anonymous visitors can browse the public catalog:
+
+| Endpoint | Guest behavior |
 |---|---|
-| `getBootstrap` | `GET /bootstrap` |
-| `listCatalog` | `GET /catalog` |
-| `createCoin` | `POST /catalog` — создаёт **личную** позицию |
-| `updateCoin` | `PATCH /catalog/{id}` — своя позиция; общая только для admin |
-| `deleteCoin` | `DELETE /catalog/{id}` — своя позиция; общая только для admin |
-| `refreshCoinPrice` | `POST /catalog/{id}/price-refresh` — только по **личным** позициям |
-| `listPriceHistory` | `GET /catalog/{id}/prices` |
-| `refreshCoinImage` | `POST /catalog/{id}/image-refresh` — только по **личным** позициям |
-| `deleteCatalogImage` | `DELETE /catalog/{id}/images/{role}` |
-| `addPurchase` | `POST /collection` |
-| `updatePurchase` | `PATCH /collection/{id}` |
-| `deletePurchase` | `DELETE /collection/{id}` |
-| `listPurchases` | `GET /catalog/{id}/collection-items` |
-| `listSeriesOptions` | `GET /series` |
-| `createSeriesOption` | `POST /series` |
-| `addSale`, `deleteSale`, `getSalesOverview` | `POST/DELETE /sales`, `GET /sales/overview` — отложено |
-| `addOffer`, `deleteOffer`, `listOffers` | `/offers` — отложено |
-| `selectExcelFiles` + `importExcel` | `POST /imports/excel` (multipart) |
-| `previewUcoinCoin` | `POST /imports/ucoin/preview` |
-| `importUcoinUrl` | `POST /imports/ucoin` |
-| `listUcoinCatalogSources` | `GET /imports/ucoin/sources` |
-| `saveUcoinCatalogSource` | `POST /imports/ucoin/sources` |
-| `cancelUcoinPriceRefresh` | `POST /jobs/{jobId}/cancel` |
-| `openUcoinSession`, `openUcoinUnblock`, `resetUcoinSession` | в MVP не переносим: ручное прохождение Cloudflare на сервере невозможно, см. `integrations.md` |
-| `exportCatalog` | `POST /exports/excel` |
-| `createBackup`, `listBackups` | не нужны — бэкапы на уровне сервера, см. `infra.md` |
-| `openExternalUrl` | не нужен — в вебе это обычная ссылка |
+| `GET /catalog` | shared, active, published records of active **and** confirmed countries only; no prices, ownership or personal fields (`PublicCatalogListItem`). `owned`, `scope=own`, `archived=true` and sorts `owned`/`purchase`/`price` → `422 private-catalog-filter` |
+| `GET /catalog/{id}` | `PublicCatalogCard` — the same allowlist, no prices |
+| `GET /catalog/materials`, `GET /countries`, `GET /denominations` | as for users |
+| `GET /series` | only `scope=catalog`; `scope=mine` → `422 private-series-filter` |
+| `GET /support/telegram`, `GET /health`, the auth endpoints | public by nature |
 
-`selectExcelFiles` и `openExternalUrl` были обёртками над диалогами Electron. В вебе исчезают.
-`createBackup`/`listBackups` в вебе не пользовательская функция — переносим в инфраструктуру.
+Guests are rate-limited per IP (`app/core/rate_limit.py`): catalog and card 300/min,
+catalog search (`q` set) 90/min, reference lists 300/min. Over the limit →
+`429 rate-limit-exceeded` with `Retry-After`. Signed-in users are not limited here.
 
-## Аутентификация
+---
+
+## Authentication
 
 ```
-POST   /auth/register        {email, displayName?, website?}   → 202
-POST   /auth/verify-email    {token, newPassword?}             → {user, tokens}
-POST   /auth/resend-verification {email}                      → 202
-POST   /auth/login           {email, password}                → {user, tokens}
-POST   /auth/refresh         —                                → {tokens}
-POST   /auth/logout          —                                → 204
-POST   /auth/forgot-password {email}                          → 202
-POST   /auth/reset-password  {token, newPassword}             → 204
-GET    /auth/me                                               → {user}
-PATCH  /auth/me              {displayName?, locale?}          → {user}
-PUT    /auth/me/avatar       <сырые байты изображения>        → {user}
-DELETE /auth/me/avatar       —                                → {user}
-POST   /auth/change-password {currentPassword, newPassword}   → 204
-POST   /auth/set-password    {newPassword}                    → 204 (только без пароля)
-GET    /auth/google/status   —                                → {enabled}
-GET    /auth/google/start    —                                → 302 в Google
-POST   /auth/google/link/start —                              → {url} (Bearer)
-GET    /auth/google/callback {state, code}                    → 303 в приложение
+POST   /auth/register            {email, displayName?, website?}      → 202 {status: "accepted"}
+POST   /auth/resend-verification {email}                              → 202
+POST   /auth/verify-email        {token, newPassword?}                → {user, tokens}
+POST   /auth/login               {email, password}                    → {user, tokens}
+POST   /auth/refresh             — (cookie)                           → {user, tokens}
+POST   /auth/logout              — (cookie)                           → 204
+POST   /auth/forgot-password     {email}                              → 202
+POST   /auth/reset-password      {token, newPassword}                 → 204
+GET    /auth/me                                                       → user
+PATCH  /auth/me                  {displayName?, locale?}              → user
+PUT    /auth/me/avatar           <raw image bytes>                    → user
+DELETE /auth/me/avatar                                                → user
+POST   /auth/change-password     {currentPassword, newPassword}       → 204
+POST   /auth/set-password        {newPassword}                        → 204
+GET    /auth/google/status                                            → {enabled}
+GET    /auth/google/start                                             → 302 to Google
+POST   /auth/google/link/start   (signed in)                          → {url}
+GET    /auth/google/callback     ?state&code&error                    → 303 to the app
 ```
 
-`tokens` — `{accessToken, expiresIn}`. **Refresh-токен в теле не передаётся ни в запросе,
-ни в ответе**: он живёт только в httpOnly Secure SameSite=Lax cookie, которую сервер
-выставляет сам и сам же читает в `/auth/refresh` и `/auth/logout`. Поэтому у этих двух
-эндпоинтов тела запроса нет. Решение и обоснование — `auth.md`.
+- **Tokens.** `tokens = {accessToken, expiresIn}`. The refresh token is **never** in a
+  body: login, verify, refresh and the Google callback set it as an httpOnly, Secure,
+  SameSite=Lax cookie scoped to `/api/v1/auth`; `/auth/refresh` and `/auth/logout` read
+  it from there and take no body. Refresh rotates the cookie; an invalid one is cleared
+  (`401 invalid-refresh-token`).
+- **`user`** (`UserOut`): `id, email, displayName, role, locale, emailVerified,
+  hasPassword, googleLinked, avatarUrl`. `avatarUrl` is a signed short-lived URL or
+  `null`, never a storage key (`media.md`), built in one place so it's identical here and
+  in `/bootstrap`.
+- **Registration** answers `202` whether or not the address is taken, and creates no
+  tokens: the account is inactive until the email is confirmed. The password is chosen at
+  `/auth/verify-email` (`422 password-required` if missing, except for Google-created
+  accounts). A legacy `password` field in `/auth/register` is accepted and ignored.
+  `website` is a honeypot: filled → the same `202`, nothing created.
+  `ALLOW_REGISTRATION=false` → `403 registration-closed`.
+- **Always 202:** `/auth/resend-verification` and `/auth/forgot-password`, so they can't
+  be used to probe addresses.
+- **Errors.** Login: `401 invalid-credentials`, `403 email-not-verified`,
+  `403 account-disabled`. Tokens in links: `400 invalid-verification-token`,
+  `400 invalid-reset-token`. Passwords: `422 weak-password`.
+  `/auth/change-password` with a wrong current password → `400 invalid-credentials`; on
+  success every session is revoked and the cookie cleared. `/auth/set-password` when a
+  password already exists → `409 password-already-set` (it's for Google-only accounts).
+- **Rate limits** (per IP and per email where there is one): login 5 / 15 min (reset on
+  success), register 3/h, forgot-password 3/h, resend 3/h, reset 5/h, refresh 30/h,
+  Google start 10/h → `429 rate-limit-exceeded` with `Retry-After`. Rationale: `auth.md`.
+- **Avatar.** `PUT /auth/me/avatar` takes the image as the whole body, no multipart:
+  JPEG, PNG or WebP, ≤ 12 MB, ≤ 4000 px wide, else `422 invalid-image` (an oversized
+  `Content-Length` is refused before reading the body). Same bytes → same key, so a
+  repeat is a no-op. `DELETE` returns `200` with the profile (the caller needs the empty
+  `avatarUrl`); deleting a missing avatar isn't an error.
+- **Google.** `/status` tells the frontend whether to show the button. `/start` redirects
+  to Google (`503 google-disabled` when not configured). `/link/start` (signed in) returns
+  the URL to link Google to the current account; already linked → `409
+  google-already-linked`. The callback redirects back to the app:
+  `/google-complete` after a successful sign-in (the frontend then calls `/auth/refresh`),
+  `/google-complete?mode=link&google=linked|conflict|error` for linking,
+  `/login?google=error|link-required|registration-closed` and
+  `/check-email?google=verify` otherwise. A Google sign-in for an email that already has
+  an account doesn't merge silently — the user signs in the existing way and links from
+  settings. Flow and conflict rules: `auth.md`.
 
-Регистрация возвращает `202`, а не токены: аккаунт неактивен до подтверждения адреса.
-Пароль задаётся при `/auth/verify-email` владельцем почты; только для аккаунта,
-созданного через Google, `newPassword` можно опустить. Старое поле `password` в
-`/auth/register` принимается для совместимости, но игнорируется.
-Токены выдаёт `/auth/verify-email`. `website` — honeypot-поле формы регистрации
-(`auth.md`): заполнено — ответ тот же `202`, пользователь не создаётся.
-
-`/auth/resend-verification` и `/auth/forgot-password` всегда отвечают `202`, существует
-адрес или нет. Ограничения частоты по всем этим эндпоинтам — в `auth.md`.
-
-`locale` в `PATCH /auth/me` — `'uk' | 'en'`, по умолчанию `'uk'`.
-
-`user` также содержит `hasPassword` и `googleLinked`. Google callback выставляет
-обычную refresh-cookie и ведёт на `/google-complete`, где фронт вызывает `/auth/refresh`.
-`link/start` доступен только вошедшему пользователю; при совпадении email привязка
-сохраняет его `user.id` и коллекцию. При конфликте callback ведёт на страницу входа
-с предложением сначала войти существующим способом.
-
-`user` везде содержит `avatarUrl` — подписанная ссылка на час или `null`, не ключ в
-бакете (`media.md`). Она собирается в одном месте на бэкенде, поэтому приходит
-одинаково и здесь, и в `/bootstrap`.
-
-`PUT /auth/me/avatar` принимает **тело-изображение целиком, без multipart**: один файл без
-сопутствующих полей в конверте не нуждается. JPEG, PNG или WebP до 12 МБ и не шире 4000 px;
-всё остальное — `422 invalid-image`. Операция идемпотентна: те же байты дают тот же ключ.
-`DELETE` отвечает `200` с профилем, а не `204`, — вызывающему нужен уже пустой `avatarUrl`;
-удаление отсутствующей аватарки ошибкой не считается.
+---
 
 ## Bootstrap
 
-Один запрос при загрузке приложения — заменяет пачку мелких. Так было в legacy и это удобно.
+One request feeds the app shell and the overview.
 
 ```
 GET /bootstrap
 → {
-    user: {...},
-    settings: {...},
+    user: UserOut,
+    settings: SettingsOut,
     dashboard: {
       catalogItems, collectionItems, countries,
       completedItems, missingItems, completionPercent,
@@ -125,7 +144,7 @@ GET /bootstrap
       seriesBreakdown:  [{id, name, country, count, owned}],
       isEmpty
     },
-    exchangeRates: [{code, rate, effectiveDate}],
+    exchangeRates: [{code, rate, effectiveDate}],     // latest USD and EUR
     finance: {
       coinSpendUah, coinSpendUsdAtPurchase, coinSpendEurAtPurchase,
       purchasesWithoutHistoricalUsdRate, purchasesWithoutHistoricalEurRate
@@ -133,171 +152,131 @@ GET /bootstrap
   }
 ```
 
-Структура взята из legacy `BootstrapPayload` — она проверена практикой и покрывает
-весь дашборд.
+- Calculations: BR-8 (finances), BR-9 (breakdowns), BR-13/BR-13a (the aggregates use the
+  storefront rule with `require_confirmed=False`).
+- `seriesBreakdown[].id` lets the overview link a series row to its completeness page.
+- `isEmpty` means the user has nothing yet — no collection items and no personal
+  positions. The shared catalog alone doesn't make the dashboard "full".
 
-`seriesBreakdown[].id` — id серии (`coin_series.id`), аддитивное поле: фронт использует
-его, чтобы сделать строку серии на Огляді ссылкой на `/collection/series/{id}` вместо
-общего списка серій.
+### Settings
 
-`isEmpty` в вебе означает «у пользователя ещё ничего нет»: ни экземпляров, ни личных
-позиций. Общий каталог сам по себе дашборд не «наполняет» — новый пользователь видит
-пустое состояние. В legacy флаг считался по каталогу, но там каталог и был коллекцией
-владельца.
+```
+PATCH /bootstrap/settings   {any subset of the fields below}   → SettingsOut
+```
 
-`PATCH /bootstrap/settings` — частичное обновление: тело присылает только те поля
-`user_settings`, которые меняются, остальные не трогает (`SettingsUpdate.model_dump(exclude_unset=True)`
-идёт прямиком в `UserRepository.update_settings(**fields)` — общий метод на все поля
-настроек, а не отдельный сеттер под каждое). Все поля, кроме `locale` (тот меняется
-`PATCH /auth/me`), проходят через этот эндпоинт:
+Partial update: only the fields sent are changed. `locale` is changed through
+`PATCH /auth/me`, not here.
 
-- `showPackagingVariants` (по умолчанию `true`) — включает показ монет в сувенирной
-  упаковке отдельной карточкой в `GET /catalog`, подробности — `business-rules.md`,
-  BR-15;
-- `defaultGrade` (по умолчанию `UNC`) — состояние, которым предзаполняется форма покупки
-  для любой монеты; свободная строка, как и `grade` самого экземпляра, без валидации по
-  списку — фронт предлагает фиксированный `GRADES`, но сервер его не навязывает;
-- `theme` (`'light' | 'dark' | 'system'`, по умолчанию `'system'`), `catalogViewMode` и
-  `collectionViewMode` (`'cards' | 'table'`, по умолчанию `'cards'`) — кросс-девайсные
-  версии того, что раньше жило только в localStorage; сервер валидирует по `Literal`.
-  Фронт держит localStorage-копию как быстрый кэш до ответа `GET /bootstrap`, не как
-  источник истины;
-- `secondaryCurrency` (`'USD' | 'EUR'`, по умолчанию `'USD'`) — какая валюта показывается
-  вторым числом («≈ …») рядом с гривневой суммой в карточке монеты, «Мої монети» и «Гроші».
-  Гривна остаётся основной осью расчётов — вторичная валюта только выбирает, какое из уже
-  посчитанных полей (`purchaseTotalUsd`/`purchaseTotalEur` и аналоги) показать.
-- `defaultStorageLocation` (по умолчанию `null`) — имя, не id: сервер резолвит его через
-  тот же get-or-create, что и `storageLocation` покупки (`business-rules.md`, BR-16).
-  Пустая строка/`null` очищает дефолт;
-- `includeSupportingExpenses` (по умолчанию `true`, 2026-09-22) — считать ли сопутствующие
-  расходы частью `purchaseTotalUah`/«Зміни вартості» на карточке монеты (`supportingExpensesUah`
-  тогда сложен с `purchaseTotalUah` на фронте) или показывать их отдельной информационной
-  строкой без слияния. Само число `supportingExpensesUah` в ответе `GET /catalog/{id}` не
-  зависит от этой настройки — она только про то, как фронт две уже готовые суммы показывает
-  и что берёт за базу для расчёта изменения стоимости (`business-rules.md`, BR-4).
+| Field | Values, default | Meaning |
+|---|---|---|
+| `showPackagingVariants` | bool, `true` | show souvenir-packaging cards in `GET /catalog` (BR-15) |
+| `defaultGrade` | string ≤ 50, `UNC` | pre-fills the purchase form; free text, not validated against a list (BR-7) |
+| `theme` | `light \| dark \| system`, `system` | |
+| `catalogViewMode`, `collectionViewMode` | `cards \| table`, `cards` | the frontend keeps a localStorage copy only as a cache |
+| `secondaryCurrency` | `USD \| EUR`, `USD` | which already-computed conversion to show next to UAH (BR-6) |
+| `defaultStorageLocation` | name or `null` | resolved by name through get-or-create (BR-16); `""`/`null` clears it |
+| `includeSupportingExpenses` | bool, `true` | whether the coin card adds supporting expenses to "bought for" (BR-4) |
 
-## Каталог
+`SettingsOut` also carries `locale` and `displayCurrency`.
+
+---
+
+## Catalog
+
+```
+GET    /catalog                          guest   list (filters below)
+GET    /catalog/summary                          KPI tiles for the same filters
+GET    /catalog/lookup                           typeahead for the purchase form
+GET    /catalog/materials                guest   materials the catalog filter offers
+GET    /catalog/{id}                     guest   card
+GET    /catalog/{id}/prices                      price history visible to the user
+GET    /catalog/{id}/collection-items            the user's own purchases of this item
+POST   /catalog                                  create a record
+PATCH  /catalog/{id}                             edit
+DELETE /catalog/{id}                             delete
+POST   /catalog/{id}/archive     {reason}        archive a shared record (admin)
+POST   /catalog/{id}/unarchive                   unarchive (admin)
+```
+
+Every read is limited to records the user may see — shared plus their own personal ones
+(`created_by IS NULL OR created_by = :user`) — by the repository, not the route. Drafts
+(`status = 'draft'`) are invisible to everyone but admins (BR-2).
+
+### Catalog filters
 
 ```
 GET /catalog
   ?page, pageSize
-  &q               — поиск по названию, стране, году, каталожному номеру
-  &countryId
-  &seriesId
-  &year, yearFrom, yearTo
-  &dateFrom, dateTo — диапазон issue_date (ISO-дата); монета без issue_date всё равно
-                      попадает в выдачу, если её issue_year — в границах лет dateFrom..dateTo
-  &denominationId
-  &group           — circulation | commemorative | collector | other
-  &metalKind       — precious | base | unknown
-  &owned           — true (есть в коллекции) | false (не хватает)
-  &scope           — all (по умолчанию) | shared (только общий каталог) | own (только личные)
-  &archived        — false (по умолчанию) | true (только архивные)
-  &sort            — title | country | series | year | denomination | material
-                     | owned | purchase | price
-  &order           — asc | desc
+  &q               ≤ 200 chars: original and translated titles, catalog numbers (BR-12)
+  &countryId*  &seriesId*  &denominationId*  &materialId*
+  &group*          circulation | commemorative | collector | other
+  &metalKind*      precious | base | unknown
+  &year | yearFrom, yearTo
+  &dateFrom, dateTo  ISO dates on issue_date; a coin with no issue_date matches by
+                     issue_year within the same years
+  &owned           true (have) | false (missing)
+  &scope           all (default) | shared | own
+  &archived        false (default) | true
+  &sort            title | country | series | year (default) | denomination | material
+                   | owned | purchase | price
+  &order           asc | desc (default)
+  * repeatable, see "Multi-value filters"
 ```
 
-```
-GET /catalog/lookup
-  ?q          — обязателен, 1…200 символов
-  &countryId
-  &limit      — 1…20, по умолчанию 8
-  → [CatalogListItem]   — без пагинации, это не листинг
-```
+- The storefront rule (BR-13) and the confirmed-country gate (BR-13a) apply;
+  souvenir-packaging cards are hidden when the user's setting is off (BR-15).
+- `archived=true`: admins see every archived record; a user sees only archived records
+  they own an instance of — so they can still find their coin (BR-10).
+- `sort=material` sorts by what the column shows: the dictionary name in the request
+  locale, else the free-text `material`.
+- `sort=owned|purchase|price` sort by per-user aggregates (quantity owned, purchase
+  total, latest visible price) computed in SQL over the whole result, not per page.
 
-Поиск для живых подсказок в форме «Додати» (`ui.md`). Отдаёт те же элементы, что
-`GET /catalog`, и с той же видимостью слоёв (общие + личные текущего пользователя,
-неархивные), но **вообще без витринного правила** — ни `is_active`, ни `catalog_confirmed`
-(`business-rules.md`, BR-13 and BR-13а). Причина: выпадашка стран в форме предлагает всех
-эмитентов, какие были, а каталог показывает только подтверждённые страны — если не видеть
-дальше каталога, пользователь заведёт личный дубль монеты, которая в общем каталоге уже
-есть (решение владельца 2026-09-14). Сам `GET /catalog` при этом не меняется. Маршрут
-зарегистрирован до `/catalog/{id}`.
+`GET /catalog/summary` takes the same filters without paging/sorting and returns
+`{total, owned, missing, purchaseTotalUah, missingBudgetUah, unpricedMissing}` — the
+"Каталог" KPI tiles, always consistent with the list below them. `owned` is accepted for
+symmetry but ignored: choosing "missing" must not zero the tile that shows both sides.
 
-`sort=material` — по тому, что показано в колонке «Матеріал»: название из справочника
-`materials` на языке запроса, а где его нет — свободный текст `catalog_items.material`
-(`ui.md`).
+`GET /catalog/lookup?q&countryId&limit` (`q` 1–200 chars, `limit` 1–20, default 8)
+returns up to `limit` `CatalogListItem`s, unpaged. Same layer visibility and archive rule
+as `/catalog`, but **no** storefront rule or confirmed gate: the user has explicitly
+chosen the country, and hiding a shared record would push them into a personal
+duplicate (BR-13a).
 
-```
-GET /catalog/summary
-  — те же query-параметры, что у GET /catalog (без page/pageSize/sort/order)
-  → CatalogSummaryOut = {total, owned, missing, purchaseTotalUah, missingBudgetUah,
-                          unpricedMissing}
-```
+`GET /catalog/materials?countryId` returns only materials actually used by confirmed-
+country records — the catalog's material filter. The full dictionary for forms is
+`GET /materials` ("Reference data").
 
-KPI-плитки экрана «Каталог» (є / не вистачає / витрачено на монети / треба докупити),
-посчитанные с теми же фильтрами, что применены к списку — чтобы числа на плитках всегда
-совпадали с тем, что показано под ними (`ui.md`, §«Каталог»). Параметр `owned`
-принимается для симметрии сигнатуры с `GET /catalog`, но намеренно игнорируется: иначе выбор
-«не вистачає» обнулил бы саму плитку, которая должна показать обе стороны этого соотношения.
-Маршрут зарегистрирован до `/catalog/{id}`.
+### Catalog list item
 
-Выдача всегда ограничена видимыми позициями: общий каталог плюс личные позиции текущего
-пользователя (`created_by IS NULL OR created_by = :userId`). Фильтр ставит репозиторий, а не
-роут — `auth.md`.
-
-**`archived`** по умолчанию `false` — витрина показывает только активные позиции
-(`NOT is_archived` в запросе, `business-rules.md`, BR-10). При `archived=true`:
-
-| Кто спрашивает | Что видит |
-|---|---|
-| admin | все архивные записи |
-| обычный пользователь | только те архивные, где у него есть экземпляр |
-
-Второе — не декорация: пользователь должен иметь возможность найти свою монету, даже если
-позицию убрали из каталога. Архивных позиций, к которым он не имеет отношения, он не видит
-вовсе.
-
-**Сортировки `owned`, `purchase`, `price` — это агрегаты per-user**, а не колонки
-`catalog_items`: количество экземпляров пользователя, сумма его покупок, последняя видимая ему
-цена. Запрос проектируется под них сразу — `LATERAL`-подзапросы или предагрегированные CTE,
-подключаемые к основному запросу, а не постобработка страницы в Python. Иначе сортировка
-будет верна в пределах страницы и неверна по всей выборке. Видимость цен при этом та же:
-`created_by IS NULL OR created_by = :userId`.
-
-Элемент списка:
+`CatalogListItem` (list, lookup, completeness tiles):
 
 ```json
 {
   "id": 1,
   "country": "Україна",
   "seriesName": "Флора і фауна України",
-  "denomination": {
-    "id": 4,
-    "value": "2.000",
-    "unit": "hryvnia",
-    "currencyCode": "UAH",
-    "label": "2 гривні"
-  },
+  "denomination": {"id": 4, "value": "2.000", "unit": "hryvnia", "currencyCode": "UAH", "label": "2 гривні"},
+  "denominationText": null,
   "year": 2018,
+  "issueDate": null,
   "title": "Дельфін",
-  "titleOriginal": "Дельфін",
-  "originalLang": "uk",
-  "titleUk": "Дельфін",
-  "titleUkSource": "official",
-  "titleEn": "Dolphin",
-  "titleEnSource": "official",
+  "titleOriginal": "Дельфін", "originalLang": "uk",
+  "titleUk": "Дельфін", "titleUkSource": "official",
+  "titleEn": "Dolphin", "titleEnSource": "official",
   "variety": null,
   "catalogNumber": "KM# 123",
   "collectionGroup": "commemorative",
   "metalKind": "base",
-  "composition": { "id": 13, "code": "nickel_silver", "name": "Нейзильбер" },
+  "composition": {"id": 13, "code": "nickel_silver", "name": "Нейзильбер"},
   "material": null,
-  "marketPriceUah": "666.00",
-  "priceSource": "UA-Coins",
-  "priceObservedAt": "2026-08-06T12:20:27Z",
+  "marketPriceUah": "666.00", "priceSource": "UA-Coins", "priceObservedAt": "2026-08-06T12:20:27Z",
   "quantityOwned": 1,
-  "purchaseTotalUah": "666.00",
+  "purchaseTotalUah": "666.00", "purchaseTotalUsd": "16.20", "purchaseTotalEur": "15.10",
   "supportingExpensesUah": "60.00",
-  "obverseImage": {
-    "preview": "https://cdn.../obverse_300.webp",
-    "medium": "https://cdn.../obverse_600.webp",
-    "large": "https://cdn.../obverse_1200.webp",
-    "attribution": "Національний банк України"
-  },
-  "reverseImage": { "...": "то же для реверса" },
-  "thumbnailUrl": "https://cdn.../obverse_300.webp",
+  "obverseImage": {"preview": "…_300.webp", "medium": "…_600.webp", "large": "…_1200.webp", "attribution": "Національний банк України"},
+  "reverseImage": {"…": "same shape"},
+  "thumbnailUrl": "…_300.webp",
   "isOwn": false,
   "isArchived": false,
   "archiveReason": null,
@@ -305,755 +284,554 @@ KPI-плитки экрана «Каталог» (є / не вистачає / �
 }
 ```
 
-`title` — готовое к показу название по правилу `title_{локаль} → title_original`
-(`data-model.md`). Локаль ответа: `?locale=uk|en`, иначе `Accept-Language`, иначе `uk`.
-По той же локали приходят `country`, `seriesName`, `denomination.label` и
-`composition.name`. Слоты отдаются как есть — для формы редактирования и для строки
-«Оригінал: …» в карточке.
+- `title` is the display name (`title_<locale>` → `title_original`); `country`,
+  `seriesName`, `denomination.label` and `composition.name` follow the same locale. The
+  raw slots are included for edit forms and the "original: …" line (BR-12).
+- `denomination` is structure plus a ready label; `denominationText` is the typed-in value
+  for countries without a dictionary, shown when `denomination` is `null`. `seriesName`
+  already falls back to `series_text`. `composition` is the dictionary row; `material`
+  holds text only where no row fits (BR-14).
+- Images: three stored sizes plus the credit line; the page uses `preview` in lists,
+  `medium` on the card, `large` in the lightbox. A missing larger size repeats the
+  largest one available (`media.md`).
+- Per-user fields: `quantityOwned`, `purchaseTotalUah/Usd/Eur` (USD/EUR at each
+  purchase's date rate, `null` without a rate — BR-6), `marketPriceUah` (latest visible,
+  non-suspect snapshot — BR-7), `supportingExpensesUah` (all non-`coin_purchase` expenses
+  on this item, by `catalog_item_id`, `null` if none; never folded into
+  `purchaseTotalUah` — BR-4).
+- `isOwn` — a personal position of the current user; the frontend shows edit actions by
+  it. `isArchived`/`archiveReason` drive the archived banner.
+- `sourceUrl` — the "source" link: from `price_source_links`, preferring UA-Coins (its
+  `external_id` is the page URL). An NBU row yields `null` on purpose — it ranks second
+  only to outvote leftover uCoin rows. No suitable link → `null`, and the block is hidden.
 
-`denomination` — структура плюс готовая подпись; `composition` — ряд справочника
-материалов, а `material` остаётся заполненным только там, где исходную строку разобрать
-не удалось.
+### Catalog card
 
-`obverseImage` / `reverseImage` — три хранимых размера одного снимка и подпись
-первоисточника. Страница берёт `preview` в списке, `medium` в карточке, `large` в
-лайтбоксе и предлагает следующий размер на 2x. У снимка, которого нет в большем размере,
-поля повторяют наибольший имеющийся (`media.md`).
+`GET /catalog/{id}` → `CatalogCard` = the list item plus: `countryId, seriesId,
+denominationId, itemType, subtype, mintageAnnounced, mintageActual, weightGrams,
+diameterMm, thicknessMm, shape, edgeType, edge, orientation, qualityType, quality,
+catalogKm, catalogUc, catalogNumista, notes, description {general, obverse, reverse},
+designers[], sculptors[], archivedAt, createdAt, updatedAt`.
 
-`quantityOwned`, `purchaseTotalUah` и `marketPriceUah` считаются для текущего пользователя.
-`isOwn` — `true` у личной позиции (`created_by` = текущий пользователь), `false` у общей;
-фронт по нему решает, показывать ли кнопки правки.
+The card ignores the storefront rule and the confirmed gate: a record of an inactive or
+unconfirmed country opens by direct link (BR-13).
 
-`supportingExpensesUah` (2026-09-22) — сумма всех расходов пользователя по этой каталожной
-позиции с категорией, отличной от `coin_purchase` (доставка, холдер, грейдинг и т. п.),
-сконвертированная в гривню по курсу на дату каждого расхода; `null`, если таких расходов
-нет. Считается по `catalog_item_id`, не по `collection_item_id` — это сумма **за всю
-позицию**, а не за конкретную покупку, поэтому не зависит от того, проставлен ли
-`collection_item_id` у старых расходов (см. бэкфилл, `business-rules.md`, BR-4). В
-основную сумму `purchaseTotalUah` не входит и в «Зміна вартості» не участвует — карточка
-показывает её отдельной приглушённой строкой, без слияния с ценой покупки.
+`GET /catalog/{id}/prices` → `[{id, source, grade, price, currencyCode, priceUah,
+observedAt, sourceUrl, isOwn, isSuspect}]` — snapshots visible to the user (BR-7);
+`isOwn` marks the user's own points on the chart.
 
-`purchaseTotalUsd` / `purchaseTotalEur` — тот же куплено-итог, конвертированный курсом НБУ
-на дату КАЖДОЙ покупки (не сегодняшним), `null` там, где курса на ту дату ещё нет. Оба
-считаются всегда, независимо от `user_settings.secondary_currency` — какой из двух
-показать, решает фронт. То же самое для `CatalogCollectionItemOut.totalUsd/totalEur` (по
-экземплярам) и `ExpenseOut.amountUsd/amountEur` (по строкам «Гроші»).
+`GET /catalog/{id}/collection-items` → the user's own purchases of this item
+(`CatalogCollectionItemOut`: `id, catalogItemId, quantity, grade, acquisitionDate,
+seller, purchasePrice, purchaseCurrency, purchaseRateUah, totalUah, totalUsd, totalEur,
+supportingExpensesUah, storageLocation, notes`). Here `supportingExpensesUah` counts
+only expenses linked to that exact purchase by `collection_item_id`; an old purchase
+not covered by the backfill shows `null` even if the item has extras overall (BR-4).
 
-`isArchived` и `archiveReason` есть и в элементе списка, и в карточке. По ним фронт рисует
-плашку «Позиция архивирована: <причина>» (`ui.md`). У активной позиции
-`archiveReason` — `null`.
+### Creating and editing catalog records
 
-`sourceUrl` — ссылка «джерело» на странице монеты. Берётся из `price_source_links` с
-приоритетом UA-Coins → НБУ → прочее. Кликабельный адрес отдаёт только UA-Coins: у неё в
-`external_id` лежит URL страницы монеты. У НБУ там id карточки, URL из него не строится, и
-строка НБУ намеренно отдаёт `null` — она стоит выше прочих только чтобы перебить
-унаследованные строки uCoin, половина которых помечена не тем источником. Лучше без
-ссылки, чем ссылка на uCoin. Позиция без подходящей ссылки отдаёт `null`, и фронт прячет
-блок «Джерело».
-
-```
-GET    /catalog/{id}                    → карточка с полными характеристиками
-POST   /catalog                         → создать личную позицию (created_by = текущий)
-PATCH  /catalog/{id}
-POST   /catalog/{id}/archive    {reason} → архивировать общую позицию (admin)
-POST   /catalog/{id}/unarchive           → вернуть в витрину (admin)
-DELETE /catalog/{id}                     → см. таблицу ниже
-GET    /catalog/{id}/prices             → история цен, видимая пользователю
-GET    /catalog/{id}/collection-items   → экземпляры текущего пользователя
-```
-
-Права (`auth.md`):
-
-| Запрос | Общая позиция | Своя личная | Чужая личная |
+| Request | Shared record | Own personal | Someone else's personal |
 |---|---|---|---|
 | `GET` | 200 | 200 | 404 |
-| `POST /catalog` | всегда создаёт личную; общую — только admin | — | — |
-| `PATCH` | 403 (admin — 200) | 200 | 404 |
-| `POST .../archive`, `.../unarchive` | 403 (admin — 200) | 400 — к личным неприменимо | 404 |
-| `DELETE` | 403 (admin — см. ниже) | 200 | 404 |
+| `PATCH` | 403 `shared-catalog-read-only` (admin: 200) | 200 | 404 |
+| `POST …/archive`, `…/unarchive` | 403 (admin: 200) | 400 `archive-not-applicable` | 404 |
+| `DELETE` | 403 (admin: see "Deleting catalog records") | 204 | 404 |
 
-`POST /catalog` создаёт запись с `created_by` = текущий пользователь. Общую запись
-(`created_by = NULL`) может создать только администратор — тем же эндпоинтом, передав
-`shared: true` в теле. Флаг обязателен, потому что администратор — тоже коллекционер:
-без явного флага и его записи создаются как личные. У обычного пользователя
-`shared: true` даёт `403`.
+`POST /catalog` (`CatalogItemCreate`) creates a **personal** record
+(`created_by` = current user). An admin creates a shared record only by sending
+`shared: true` — admins collect too, so without the flag their records are personal.
+`shared: true` from a regular user → `403 admin-required`. Unknown `countryId`,
+`seriesId` (or one from another country), `denominationId`, `compositionId`,
+`edgeTypeId`, `qualityTypeId` → `422 invalid-reference`. In the UI personal positions
+are created through `POST /collection` instead ("Buying a coin not in the catalog").
 
-### Правка названий (`titleOriginal` / `titleUk` / `titleEn`)
+`PATCH /catalog/{id}` (`CatalogItemUpdate`) accepts any subset of the create fields plus
+`description`, `descriptionObverse`, `descriptionReverse`.
 
-Отдельного эндпоинта нет — это обычный `PATCH /catalog/{id}` с теми же правами: своя
-личная позиция правится автором, общая — только admin (`docs/integrations.md`,
-раздел 11). Особое поведение только у `titleUk`/`titleEn`:
+### Editing names
 
-- значение непустое — пустая строка (`""`) отклоняется как `422`, слот либо не трогают
-  (поле отсутствует в теле), либо заменяют настоящим текстом;
-- переданное значение всегда помечает `titleUk_source`/`titleEn_source` как `manual` —
-  ручная правка перекрывает и `official`, и `llm`, кем бы её ни делали.
+There is no separate endpoint: titles are edited with `PATCH /catalog/{id}` under the
+same permissions.
 
-`titleOriginal` правится тем же PATCH без пометки источника — у оригинала его нет
-(`docs/data-model.md`).
-
-```json
-PATCH /catalog/{id}   { "titleUk": "Різдво Христове" }
-→ 200, titleUk = "Різдво Христове", titleUkSource = "manual"
-
-PATCH /catalog/{id}   { "titleUk": "" }
-→ 422 — пустая строка
-```
-
-Фронт: правка трёх названий в admin-режиме карточки записи (по образцу существующих
-admin-форм каталога) в `docs/backlog.md` — контракт готов, экрана ещё нет.
-
-### Архивация
+- `titleUk` / `titleEn` must be non-empty (`""` → `422`); omit the field to leave the
+  slot alone.
+- Any value sent stamps `titleUkSource` / `titleEnSource` as `manual`, overriding
+  `official` and `llm`.
+- `titleOriginal` is edited the same way; it has no source marker.
 
 ```
-POST /catalog/{id}/archive    {reason}   → 200, {isArchived: true, archivedAt, archiveReason}
-     400 — reason пустой
-     400 — позиция личная: архивация только для общих записей
-     403 — не admin
-     409 — уже архивирована
-
-POST /catalog/{id}/unarchive             → 200, {isArchived: false}
-     403 — не admin
-     409 — не была архивирована
+PATCH /catalog/{id}  {"titleUk": "Різдво Христове"}  → 200, titleUkSource = "manual"
+PATCH /catalog/{id}  {"titleUk": ""}                 → 422
 ```
 
-`reason` обязателен и непустой — иначе через полгода никто не вспомнит, почему позиции нет
-в каталоге. Эндпоинты переключают `is_archived` и заполняют либо обнуляют `archived_at`
-и `archive_reason` (`data-model.md`). Обе операции пишутся в `audit_log`. Экземпляры, покупки, расходы, фотографии и
-история цен при архивации **не трогаются** — семантика в `business-rules.md`, BR-10.
+There is no admin screen for this yet (`backlog.md`).
 
-### Удаление
+### Archiving
 
 ```
-DELETE /catalog/{id}
+POST /catalog/{id}/archive  {reason}  → 200 {isArchived: true, archivedAt, archiveReason}
+POST /catalog/{id}/unarchive          → 200 {isArchived: false, archivedAt: null, archiveReason: null}
 ```
 
-**Личная позиция:** удаляется автором физически, вместе с его экземплярами на ней и их
-расходами `coin_purchase` — сервисным слоем, одной транзакцией. Позиция видна только
-автору, поэтому каскад не может задеть чужие данные; правило удаления расхода вместе с
-экземпляром — `business-rules.md`, BR-10.
+- Admin only (`403 shared-catalog-read-only`); personal records → `400
+  archive-not-applicable`.
+- `reason` is required and non-empty after trimming (≤ 1000 chars) → else `400
+  archive-reason-required`.
+- Already archived / not archived → `409 archive-state`.
+- Both actions are written to `audit_log`. Instances, purchases, expenses, photos and
+  price history are untouched — semantics in BR-10.
 
-**Общая позиция:** только admin и только «прибраться за опечаткой». `409` с указанием
-причины, если не выполнено хотя бы одно условие:
+### Deleting catalog records
 
-- позиция **не архивирована** — сначала `POST /catalog/{id}/archive`;
-- на неё есть ссылки из `collection_items` или `expenses` у любого пользователя.
+`DELETE /catalog/{id}` → `204`.
 
-`media_files` и `market_price_snapshots` удалению не мешают — уходят каскадом.
-Штатный способ убрать позицию из каталога — архивация, а не это.
+- **Personal record:** deleted by its author together with the author's collection
+  items on it and their `coin_purchase` expenses, in one transaction (BR-10).
+- **Shared record:** admin only, and only as a clean-up. `409
+  catalog-item-delete-conflict` if it isn't archived yet or any `collection_items` /
+  `expenses` reference it. Its media and price snapshots go by cascade. The normal way to
+  remove a record from the catalog is archiving.
 
-`GET /catalog/{id}/prices` отдаёт снимки с `created_by IS NULL OR created_by = :userId`;
-у каждого снимка в ответе есть `isOwn`, чтобы в графике было видно, где своя цена, а где
-общая.
+---
 
-## Коллекция
-
-```
-GET    /collection?page&pageSize&countryId&seriesId&year&yearFrom&yearTo&dateFrom&dateTo
-                   &denominationId&group&metalKind&grade&q&sort&order
-GET    /collection/{id}
-POST   /collection    {catalogItemId, quantity, price, currency, purchaseDate, seller?, notes?, grade?}
-PATCH  /collection/{id}
-DELETE /collection/{id}
-```
-
-`sort` — `date` (по умолчанию) | `title` | `country` | `series` | `quantity` | `total` |
-`valuation` | `grade`, `order` — `asc` | `desc`. По колонке таблицы «Мої монети»
-(`ui.md`); `valuation` — по произведению «цена монеты × количество», то есть по тому
-же числу, что показано в колонке, `grade` — по массиву состояний позиции.
-
-`GET /collection` — список позиций: одна строка на каталожную монету,
-все покупки этой монеты пользователем схлопнуты в одну позицию. Детали отдельных покупок —
-только через `GET/PATCH/DELETE /collection/{id}` (id покупки, `CollectionItem`) и
-`GET /catalog/{id}/collection-items` («Мої екземпляри» на карточке монеты).
-
-Фильтры `countryId`, `seriesId`, `year`, `yearFrom`, `yearTo`, `dateFrom`, `dateTo`,
-`denominationId`, `group`, `metalKind`, `q` — зеркально `GET /catalog`, работают по
-атрибутам каталожной монеты. `dateFrom`/`dateTo` фильтруют по `issue_date`, а не по
-`acquisition_date` покупки (у последней своего фильтра пока нет) — с тем же фолбэком
-на `issue_year`, что у `GET /catalog`, когда точная дата выпуска не указана.
-`grade` — свой для коллекции: позиция попадает в выдачу, если **хотя бы одна** её покупка
-имеет такой стан; агрегаты при этом считаются по **всем** покупкам позиции, не только по
-совпавшей — грейд-фильтр показывает позицию целиком, а не отфильтрованный кусок.
+## Collection
 
 ```
-GET /collection/summary
-  — те же фильтры, что у GET /collection (без page/pageSize/sort/order)
-  → CollectionSummaryOut = {collectionItems, completedItems, coinSpendUah, relatedSpendUah,
-                             totalSpendUah, marketValueUah}
+GET    /collection                     positions (filters below)
+GET    /collection/summary             KPI tiles for the same filters
+POST   /collection                     buy a coin
+GET    /collection/{id}                one purchase
+PATCH  /collection/{id}                edit a purchase
+DELETE /collection/{id}                delete a purchase
+PUT    /collection/{id}/photos/{role}  upload the owner's photo
+DELETE /collection/{id}/photos/{role}  remove it
+GET    /collection/countries | /series | /denominations | /materials   filter lists
+GET    /collection/storage-locations   storage locations
+POST   /collection/storage-locations
+DELETE /collection/storage-locations?name=
 ```
 
-KPI-плитки экрана «Мої монети», посчитанные с активными фильтрами страницы — та же форма,
-что у дашбордного снимка без фильтров (`11-roadmap.md`), но суженная под то, что сейчас видит
-пользователь; без фильтров числа совпадают с бутстрапом (`ui.md`, §«Мої монети»).
+Everything is scoped by `owner_id`; another user's purchase → `404`.
 
-Форма позиции — контекст каталожной монеты (как сейчас) плюс агрегаты по покупкам:
+### Positions
 
-- `totalQuantity` — сумма `quantity` всех покупок;
-- `totalSpendUah` — сумма покупок в гривне (по курсу на дату каждой), только цена монет —
-  сопутствующі витрати сюди не входят независимо от настройки `includeSupportingExpenses`;
-- `supportingExpensesUah` (2026-09-22) — сумма расходов позиции (доставка, холдер,
-  грейдинг), по `catalogItemId`, как на карточке монеты; `null`, если их нет. Фронт сам
-  решает, сливать ли это с `totalSpendUah`, по той же настройке, что и карточка монеты
-  (`includeSupportingExpenses`);
-- `marketValueUah` — последняя видимая пользователю неподозрительная цена монеты ×
-  `totalQuantity` (`null`, если цены нет);
-- `lastAcquisitionDate` — максимальная дата покупки (`null`, если ни у одной нет даты);
-- `grades` — отсортированный список различных станов покупок, без `null`;
-- `thumbnailUrl` — как раньше, по тем же правилам видимости, что в каталоге.
+`GET /collection` returns **positions**: one row per catalog item, all of the user's
+purchases of it folded together. Paging is by position. Individual purchases are
+`GET/PATCH/DELETE /collection/{id}` (a `CollectionItem` id) and
+`GET /catalog/{id}/collection-items`.
 
-Каждая покупка в списке (`CatalogCollectionItemOut`, одна строка = одна покупка, не
-экземпляр) несёт `supportingExpensesUah` (2026-09-22) — сумму расходов, привязанных именно к
-этой покупке через `collection_item_id` (не ко всей каталожной позиции), `null` при их
-отсутствии. У покупок, сделанных до правила о `collection_item_id` (п. 4) и не покрытых
-бэкфиллом, поле `null`, даже если у позиции в целом есть сопутствующие расходы, — они видны
-только в общем `supportingExpensesUah` карточки, а не в конкретной строке.
+Filters mirror `/catalog` on the coin's attributes — `q`, `countryId*`, `seriesId*`,
+`denominationId*`, `materialId*`, `group*`, `metalKind*`, `year`, `yearFrom`, `yearTo`,
+`dateFrom`, `dateTo` (on `issue_date`, not the purchase date, with the same year
+fallback) — plus `grade`: a position matches if **any** of its purchases has that grade,
+and its aggregates still cover **all** its purchases (grade filtering shows the whole
+position).
 
-Сортировки: `date` — по `lastAcquisitionDate`, `title` — по названию, `total` — по
-`totalSpendUah`. Пагинация — по позициям, не по покупкам.
+`sort`: `release` (default; issue year, then issue date) | `date` (last purchase) |
+`title` | `country` | `series` | `quantity` | `total` | `valuation` (latest price ×
+quantity, the number shown) | `grade`; `order` `asc | desc` (default `desc`).
 
-При создании покупки (`POST /collection`): сервер подтягивает курс НБУ на `purchaseDate`,
-пишет `purchase_rate_uah` и в той же транзакции создаёт расход категории `coin_purchase`.
-См. `business-rules.md`. `GET/PATCH/DELETE /collection/{id}` и ответ `POST /collection`
-остаются в форме одной покупки (`CollectionItemOut`) — не позиции.
+`CollectionPositionOut`: `catalogItemId, title, country, seriesName, collectionGroup,
+denomination` (ready label), `year, issueDate, isArchived, archiveReason,
+totalQuantity, totalSpendUah` (coin prices only, at each purchase's rate — never
+extras), `supportingExpensesUah` (by catalog item, `null` if none; the frontend adds it
+per `includeSupportingExpenses`), `marketValueUah` (latest visible non-suspect price ×
+quantity, `null` without a price), `lastAcquisitionDate, grades[]` (distinct, sorted,
+no nulls), `thumbnailUrl`.
 
-До этапа 5 курсы берутся только из таблицы `exchange_rates` (HTTP-клиента НБУ ещё нет):
-покупка не в гривне с датой, на которую нет курса ≤ `purchaseDate`, отклоняется с `422`.
+`GET /collection/summary` (same filters, no paging) → `{collectionItems,
+completedItems, coinSpendUah, relatedSpendUah, totalSpendUah, marketValueUah}` — the
+"Мої монети" tiles; without filters the numbers match `/bootstrap`.
 
-### Покупка монеты, которой ещё нет в каталоге
+### Buying a coin
 
-Решение владельца 2026-09-14. В теле `POST /collection` вместо `catalogItemId` может прийти
-вложенный объект `newCatalogItem` — описание монеты, которую пользователь заводит сам.
-**Ровно одно** из двух полей должно присутствовать: и пустое тело, и оба сразу — `422`.
-
-```json
+```
 POST /collection
 {
-  "newCatalogItem": {
-    "countryId": 230,
-    "titleOriginal": "Львівський оперний театр",
-    "issueYear": 2021,
-    "collectionGroup": "commemorative",
-    "material": "Нейзильбер",
-    "seriesId": null, "denominationId": null, "compositionId": null,
-    "metalKind": "unknown", "issueDate": null, "mintageAnnounced": null,
-    "weightGrams": null, "diameterMm": null, "thicknessMm": null,
-    "shape": null, "edgeTypeId": null, "qualityTypeId": null,
-    "catalogNumber": null,
-    "description": null, "descriptionObverse": null, "descriptionReverse": null
-  },
-  "quantity": 1, "price": "120.00", "currency": "UAH", "purchaseDate": "2026-09-14"
+  "catalogItemId": 812,            // or "newCatalogItem": {...} — exactly one
+  "quantity": 1,                   // ≥ 1
+  "price": "250.00",               // ≥ 0: a gift or unknown price is legitimate
+  "currency": "UAH",
+  "purchaseDate": "2026-09-14",
+  "seller": "Violity", "notes": null, "grade": "UNC",
+  "storageLocation": "Вдома",      // a name, resolved by get-or-create (BR-16)
+  "extraExpenses": []              // see "Supporting expenses in a purchase"
 }
-→ 201, CollectionItemOut
+→ 201 CollectionItemOut
 ```
 
-`newCatalogItem` — подмножество `CatalogItemCreate` с тремя отличиями:
+- Neither or both of `catalogItemId` / `newCatalogItem` → `422`. Unknown or invisible
+  `catalogItemId` → `404 catalog-item-not-found`.
+- The server takes the NBU rate for `purchaseDate` (BR-6), stores `purchase_rate_uah` and
+  writes the `coin_purchase` expense in the same transaction (BR-4). No rate on or before
+  the date → `422 exchange-rate-missing`; unknown currency → `422 unknown-currency`.
+- `CollectionItemOut` (also returned by `GET/PATCH /collection/{id}`) is one purchase:
+  `id, catalogItemId, title, country, seriesName, denomination, year, isArchived,
+  archiveReason, quantity, grade, purchaseDate, seller, price, currency, rateUah,
+  totalUah, storageLocation, notes, thumbnailUrl, marketPriceUah, obverseImage,
+  reverseImage, obversePhotoIsOwn, reversePhotoIsOwn`. The images are this purchase's own
+  photo where uploaded, the catalog's otherwise (`media.md`).
 
-- **нет `shared`.** Запись всегда личная (`created_by` = текущий пользователь). Общий
-  каталог остаётся read-only, через эту дверь в него не попасть;
-- **нет `originalLang`, `titleUk`, `titleEn`.** Оба переводных слота при создании держат
-  введённый текст с пометкой `manual` — ровно как у нового места хранения, — а фоновая
-  задача заменяет тот из них, который является переводом, и помечает его `llm` (см. ниже).
-  Клиент не может выдать свой текст за `official`;
-- **материал обязателен** в одном из двух видов: `compositionId` из словаря `GET /materials`
-  **или** свободный текст `material`. Ни того ни другого — `422`. Словарь заполнен тем, что
-  реально есть в каталоге, и для большинства эмитентов пуст, поэтому свободный текст — не
-  запасной, а равноправный путь. Так же устроены **номинал** (`denominationId` или
-  `denominationText`) и **серия** (`seriesId` или `seriesText`), только они необязательны;
-  гурт и якість, наоборот, форма шлёт только словарными половинами (`edgeTypeId`,
-  `qualityTypeId`). Подробности — `business-rules.md`, BR-14.
+`PATCH /collection/{id}` accepts `quantity, price, currency, purchaseDate, seller,
+notes, grade, storageLocation`; same rate errors. `DELETE /collection/{id}` → `204`,
+also deletes its `coin_purchase` expense; supporting expenses stay (BR-10).
 
-Ещё три отличия от `CatalogItemCreate`, добавленные 2026-09-14 по скриншоту владельца:
+### Buying a coin not in the catalog
 
-- **один `catalogNumber` вместо `catalogKm`/`catalogUc`/`catalogNumista`.** Те три колонки
-  никуда не делись — их заполняет конвейер из источника, который знает систему нумерации, —
-  но у человека номер один, и спрашивать, чей он, бессмысленно. Пишется в новую колонку
-  `catalog_items.catalog_number` (миграция `0019`) и стоит последним в цепочке, которую
-  `CatalogListItem.catalogNumber` и так читал;
-- **`description`, `descriptionObverse`, `descriptionReverse` вместо `notes`.** Складываются
-  в `descriptions` под локаль запроса, в форму, зафиксированную `data-model.md` (обе
-  локали, три ключа, `null` где текста нет); пусто во всех трёх — колонка остаётся `NULL`.
-  `notes` этот эндпоинт не пишет вовсе: это заметка о записи, а не описание монеты.
-
-Обязательны, кроме материала: `countryId`, `titleOriginal`, `issueYear`, `collectionGroup`.
-Год обязателен, потому что `catalog_items.issue_year` — `NOT NULL`, и на нём держатся
-комплектность серий и фильтры по годам (решение владельца 2026-09-14). Остальное —
-опционально.
-
-**Одна транзакция.** Позиция каталога, экземпляр и расход `coin_purchase` создаются вместе
-(`business-rules.md`, BR-4). Курс, валюта и место хранения разрешаются **до** первой
-записи, поэтому покупка, отклонённая с `exchange-rate-missing` или `unknown-currency`, не
-оставляет за собой осиротевшую позицию каталога. Плохие
-`countryId`/`seriesId`/`denominationId`/`compositionId`/`edgeTypeId`/`qualityTypeId` дают
-`422 invalid-reference` — тоже до записи. Транзакция коммитится **явно, внутри
-запроса**: FastAPI выполняет `BackgroundTasks` раньше, чем закрывающий коммит сессии
-запроса (доказано на местах хранения 2026-09-13), а фоновая задача перевода открывает свою
-сессию — она бы не увидела монету. Атомарность при этом не страдает: это по-прежнему один
-коммит на все три строки.
-
-### Сопутствующие расходы одной покупкой
-
-Решение владельца 2026-09-14, обратная сторона «Пов'язаної монети» в ветке расходов. В теле
-`POST /collection` может прийти массив `extraExpenses` — доставка, холдер, грейдинг: деньги,
-потраченные на эту монету в момент покупки. Работает с обеими формами тела, и с
-`catalogItemId`, и с `newCatalogItem`.
+Instead of `catalogItemId` the body carries `newCatalogItem` — the coin the user
+describes. The personal position, the purchase and the `coin_purchase` expense are
+created in **one transaction** (BR-2, BR-4).
 
 ```json
-POST /collection
-{
-  "catalogItemId": 812,
-  "quantity": 1, "price": "250.00", "currency": "UAH", "purchaseDate": "2026-09-14",
-  "seller": "Violity",
-  "extraExpenses": [
-    {"category": "delivery", "amount": "60.00", "currency": "UAH"},
-    {"category": "holder",   "amount": "25.00", "currency": "UAH"}
-  ]
+"newCatalogItem": {
+  "countryId": 230, "titleOriginal": "Львівський оперний театр", "issueYear": 2021,
+  "collectionGroup": "commemorative",
+  "compositionId": null, "material": "Нейзильбер",
+  "seriesId": null, "seriesText": null, "denominationId": null, "denominationText": null,
+  "metalKind": "unknown", "issueDate": null, "mintageAnnounced": null,
+  "weightGrams": null, "diameterMm": null, "thicknessMm": null, "shape": null,
+  "edgeTypeId": null, "edge": null, "qualityTypeId": null, "quality": null,
+  "catalogNumber": null,
+  "description": null, "descriptionObverse": null, "descriptionReverse": null
 }
-→ 201, CollectionItemOut
 ```
 
-- поля ровно три: `category`, `amount`, `currency`. **Дата и продавец не спрашиваются
-  второй раз** — расход берёт `purchaseDate` и `seller` покупки, ради чего всё и затевалось;
-- `amount` строго больше нуля (`gt=0`), как и в `POST /expenses`. Монета может честно
-  достаться даром, доставка — нет: ноль здесь означает незаполненное поле;
-- `category` — любая ручная категория, кроме `coin_purchase`: эту строку пишет сама покупка,
-  вторая такая удвоила бы расходы на монеты во всех сводках. Попытка — `422`;
-- не больше 10 элементов в массиве; отсутствие поля и пустой массив равнозначны.
+`NewCatalogItemIn` differs from `CatalogItemCreate` on purpose:
 
-**`collection_item_id` (уточнено 2026-09-22).** Каждая строка `extraExpenses` пишется с
-`catalog_item_id` **и** `collection_item_id` только что созданной покупки — так же, как
-`coin_purchase`. `amount` кладётся как пришло, без домножения на `quantity`: это сумма за
-покупку целиком, а не за экземпляр (`business-rules.md`, BR-4). Подробности удаления —
-там же, п. 10.
+- **No `shared`.** The record is always personal; the purchase form is not a door into
+  the shared catalog.
+- **No `originalLang`, `titleUk`, `titleEn`.** Both translated slots start as the typed
+  text marked `manual`; a background task detects the language and replaces the slot
+  that is a translation, marked `llm` (`app/services/translation.py`). On any error, or
+  without `ANTHROPIC_API_KEY`, the typed text stays. A client can't claim `official`.
+- **Material is required** as `compositionId` or free `material` text — else `422`.
+  Denomination and series are optional in the same two shapes (`denominationId` /
+  `denominationText`, `seriesId` / `seriesText`) (BR-14).
+- **One `catalogNumber`** instead of KM / UC / Numista: a collector has a number, not
+  its catalogue's name.
+- **`description*`** fields instead of `notes`: stored in `descriptions` under the
+  request locale (`data-model.md`).
+- **Required:** `countryId`, `titleOriginal`, `issueYear` (the column is `NOT NULL` and
+  completeness and year filters depend on it), `collectionGroup`, and the material.
 
-**Курсы всех валют разрешаются до первой записи.** Доставка в валюте, на дату которой нет
-курса НБУ, отклоняет запрос целиком: ни монеты, ни экземпляра, ни расхода `coin_purchase`.
-Это то же правило, что и для самой покупки, распространённое на весь запрос.
+Rates, currency and storage location are resolved **before** the first insert, and bad
+references (`countryId`, `seriesId`, `denominationId`, `compositionId`, `edgeTypeId`,
+`qualityTypeId`) → `422 invalid-reference` before anything is written, so a rejected
+purchase never leaves an orphan position. The transaction is committed explicitly
+inside the request, before the translation task is scheduled (BR-4).
 
-**Что получается на выходе — обычный ручной расход**, привязанный к монете через
-`catalog_item_id`; `collection_item_id` остаётся пустым. Это не оговорка: `collection_item_id`
-во всём остальном приложении значит «эта строка *и есть* покупка» — на неё смотрят иконки в
-журнале «Гроші», её удаляет удаление экземпляра (`business-rules.md`, BR-4). Доставка
-покупкой не является, поэтому:
+### Supporting expenses in a purchase
 
-- **удаление доставки монету не трогает** — это просто удаление расхода;
-- **удаление монеты из коллекции доставку не удаляет** — деньги были потрачены независимо
-  от того, осталась ли монета в коллекции.
+`extraExpenses` records shipping, holders, grading together with the purchase — with
+either body shape.
 
-**Фоновый перевод названия.** Ответ ничего не ждёт. Задача просит Haiku перевести название,
-определяет язык оригинала и заменяет только тот слот, который является переводом; слот на
-языке оригинала остаётся посимвольной копией введённого текста с пометкой `manual`. Промпт
-свой, не общий с местами хранения (`app/services/translation.py`). При любой ошибке
-остаётся оригинал. Без `ANTHROPIC_API_KEY` задача — no-op с предупреждением в лог.
+```json
+"extraExpenses": [
+  {"category": "delivery", "amount": "60.00", "currency": "UAH"},
+  {"category": "holder",   "amount": "25.00", "currency": "UAH"}
+]
+```
 
-### Справочники, отфильтрованные по своей коллекции
+- Exactly three fields. Date and vendor come from the purchase (`purchaseDate`,
+  `seller`).
+- `amount > 0`; `category` is any manual category except `coin_purchase` (`422`); at most
+  10 items; absent and `[]` are the same.
+- Each row is stored with the new purchase's `catalog_item_id` **and**
+  `collection_item_id`, with `amount` as sent — per purchase, never multiplied by
+  `quantity` (BR-4).
+- Rates for every currency in the request are resolved before the first insert: an
+  extra without a rate rejects the whole purchase.
+- The result is an ordinary expense, edited and deleted in "Гроші". Deleting it leaves
+  the coin alone; deleting the coin keeps it (BR-10).
+
+### Collection filter lists
 
 ```
 GET /collection/countries
 GET /collection/series?countryId
 GET /collection/denominations?countryId
+GET /collection/materials?countryId
 ```
 
-Те же схемы, что у общих `GET /countries` / `GET /series` / `GET /denominations`
-(`CountryOut` / `SeriesOut` / `DenominationOut`), но список — только те страны/серії/
-номінали, по которым у пользователя есть хотя бы одна покупка. Панель фільтрів
-«Мої монети» использует именно их (не общий каталожный список): не имеет смысла
-предлагать выбрать страну, монет которой у пользователя нет. Каталог продолжает
-дёргать общие `/countries`, `/series`, `/denominations` — эти ручки его не касаются.
-`CountryOut.minYear`/`maxYear` здесь — границы по монетам ПОЗИЦИЙ самого пользователя в этой
-стране (не по общему каталогу): своя пара границ для «Рік від/до» на этой панели.
-Порядок регистрации маршрутов важен: `/collection/countries` и соседние объявлены
-раньше `/collection/{id}`, иначе FastAPI пытается распарсить `"countries"` как id.
+The same shapes as `GET /countries`, `/series`, `/denominations`, `/materials`
+(`CountryOut`, `SeriesOut`, `DenominationOut`, `CoinMaterial`), narrowed to values the
+user has at least one purchase of — the "Мої монети" filter panel doesn't offer a
+country with no coins. `CountryOut.minYear/maxYear` here are the bounds of the user's
+own positions in that country.
 
-### Місце зберігання
+### Storage locations
 
 ```
-GET    /collection/storage-locations              → [{name, custom}]
-POST   /collection/storage-locations  {name}       → {name, custom}
-DELETE /collection/storage-locations?name=
+GET    /collection/storage-locations          → [{name, custom}]
+POST   /collection/storage-locations  {name}  → 201 {name, custom}
+DELETE /collection/storage-locations?name=    → 204
 ```
 
-Ресурс адресуется по имени, не по id — сервер резолвит имя в `storage_locations.id`
-прозрачно (`business-rules.md`, BR-16). `custom` — `true`, если запись принадлежит
-текущему владельцу (можно удалить), `false` — системный пресет («Вдома», единственный).
-`storageLocation` в `CollectionItemCreate`/`CollectionItemUpdate`/`CollectionItemOut` и
-`defaultStorageLocation` в `SettingsOut`/`SettingsUpdate` — тем же именем: набирая текст
-в форме покупки или в настройках, отдельно создавать место через `POST` не обязательно,
-первое же использование текста заводит личную запись сама.
+Addressed by name; ids never leave the server (BR-16). `custom = true` for the user's
+own entries (deletable), `false` for the preset. `POST` is the same get-or-create a
+purchase's `storageLocation` uses — an existing name is confirmed, not duplicated.
+`DELETE`: the preset → `403 storage-location-shared`; a name this user can't see,
+including someone else's → `404 storage-location-not-found`.
 
-`DELETE` — `204` при успехе, `403` при попытке удалить пресет, `404`, если имя не видно
-этому владельцу вовсе (включая чужую личную запись — не подтверждаем её существование).
-
-## Серии
+### Collection photos
 
 ```
-GET  /series?countryId
-POST /series  {countryId, name, description?, startYear?, endYear?}
-GET  /series/summary?countryId
-  → [{series: {...}, summary: {...}}]   — все серии (страны) со сводкой одним запросом
+PUT    /collection/{id}/photos/{role}   <raw image bytes>   → {obverse, reverse}
+DELETE /collection/{id}/photos/{role}                       → {obverse, reverse}
 ```
 
-Серии — общий справочник, личных серий нет: серия описывает выпуск, а не коллекцию.
-`POST /series` доступен только администратору (`403` обычному пользователю), дубль имени
-в пределах страны — `409`. `GET /series/summary` — источник дашбордного KPI «почато/завершено
-серій» (`features/collection/CollectionPage.tsx`); экран «Комплектність» на нём не завязан,
-он использует `/completeness/*` ниже.
+`role` is `obverse` or `reverse` (else `422`). Same upload rules as the avatar: whole
+body, JPEG/PNG/WebP ≤ 12 MB, ≤ 4000 px, oversized `Content-Length` refused before
+reading → `422 invalid-image`. Always writes a new `media_files` row bound to the
+**collection item** with `source = 'user_upload'`, never to the catalog record. The
+answer is both sides already resolved (own photo or catalog default), so the page
+repaints without a second request. Someone else's purchase → `404`. Selection and
+visibility: `media.md`.
 
-## Комплектность
+---
+
+## Series
 
 ```
-GET /completeness/summary?groupBy&countryId&metalKind
-  → [CompletenessGroupOut]
-GET /completeness/group?groupBy&value|unassigned&countryId&metalKind
-  → CompletenessGroupOut
-GET /completeness/items?groupBy&value|unassigned&countryId&metalKind&owned&page&pageSize
-  → Page<CatalogListItem>               — та же схема, что и у GET /catalog
+GET  /series?countryId&scope=mine|catalog      guest (scope=catalog only)
+POST /series   {countryId, name, description?, startYear?, endYear?}
+GET  /series/summary?countryId                → [{series: SeriesOut, summary}]
+```
+
+- Series are shared reference data; there are no personal series (BR-2).
+- `scope=mine` (default): series of the user's own collection, not gated by confirmed
+  countries. `scope=catalog`: the catalog's series filter — confirmed countries only
+  (BR-13a).
+- `SeriesOut`: `id, countryId, name` (locale), `nameOriginal, originalLang, nameUk,
+  nameUkSource, nameEn, nameEnSource, description, startYear, endYear`.
+- `POST /series`: admin only (`403 admin-required`); unknown country → `422
+  invalid-reference`; duplicate name in the country → `409 series-exists`.
+- `summary` = `{total, owned, missing, completionPercent, purchaseTotalUah,
+  currentValueUah, unpricedMissing}` (BR-5). Used for the started/finished series KPI;
+  the completeness screen uses `/completeness/*`.
+
+---
+
+## Completeness
+
+```
+GET /completeness/summary?groupBy&countryId&metalKind                       → [CompletenessGroupOut]
+GET /completeness/group?groupBy&(value|unassigned)&countryId&metalKind      → CompletenessGroupOut
+GET /completeness/items?groupBy&(value|unassigned)&countryId&metalKind&owned&page&pageSize
+                                                                            → Page<CatalogListItem>
 
 groupBy = series | year | denomination | material | edge | quality
-CompletenessGroupOut = {
-  groupBy, value, unassigned, label, countryId, description, startYear, endYear,
-  sortOrder, summary: {total, owned, missing, completionPercent, purchaseTotalUah,
-  currentValueUah, unpricedMissing}
-}
+CompletenessGroupOut = {groupBy, value, unassigned, label, countryId, description,
+                        startYear, endYear, sortOrder,
+                        summary: {total, owned, missing, completionPercent,
+                                  purchaseTotalUah, currentValueUah, unpricedMissing}}
 ```
 
-Комплектность по произвольному полю каталога — обобщение того, что раньше было только для
-серии (`GET /series/{id}/summary`/`GET /series/{id}/items`, оба эндпоинта удалены, заменены
-`/completeness/group`/`/completeness/items` с `groupBy=series`). `value`/`unassigned` —
-взаимоисключающие, ровно один обязателен: `value=<id>` адресует конкретную серию/номинал/
-материал/гурт/якість карбування (или конкретный год — число само является значением),
-`unassigned=true` — бакет «без значения» (`series_id`/`denomination_id`/`composition_id`/
-`edge_type_id`/`quality_type_id IS NULL`); `groupBy=year` не принимает `unassigned`
-(`issue_year` NOT NULL) — `422`. Обе части дроби комплектности считаются по активным видимым
-пользователю позициям; деньги (`purchaseTotalUah`, `currentValueUah`) — по его экземплярам,
-включая экземпляры архивных позиций (`business-rules.md`, BR-5 and BR-10) — то же правило, что
-раньше проверялось только для серий, теперь общее для всех измерений.
+- Completeness by any catalog dimension (BR-5). Numerator and denominator count active
+  items visible to the user; money counts all the user's instances, including those of
+  archived items (BR-5, BR-10).
+- A group is addressed by exactly one of `value=<id>` (for `year`, the year itself) or
+  `unassigned=true` (the "no value" bucket: the column `IS NULL`). Both →
+  `422 completeness-ambiguous-group`; neither → `422 completeness-missing-group`.
+  `groupBy=year` has no unassigned bucket (`issue_year` is `NOT NULL`) → `422
+  completeness-invalid-request`. An empty group → `404 completeness-group-not-found`.
+- `label`, `countryId`, `description`, `startYear`, `endYear`, `sortOrder` come from
+  the dimension's dictionary where it has one; `null` for `year` and `unassigned`.
+- `metalKind` (`precious | base`) filters every dimension and every endpoint, so the
+  filter carries from the list into the detail screen. `owned` (items only) narrows the
+  tiles to have / missing.
+- `/completeness/items` is the tile grid of a group — **not** `GET /catalog`. It uses
+  `require_confirmed=False`, so a user's coins of an unconfirmed country appear (BR-13a).
+  The frontend shows "open in catalog" only for `groupBy=series` with
+  `CountryOut.catalogConfirmed = true`.
 
-`metalKind` (`precious`/`base`, необязательный) — фильтр по `catalog_items.metal_kind`,
-независимый от `groupBy`: применяется одинаково к любому измерению («тільки дорогоцінні по
-роках», «тільки недорогоцінні по серіях»), а не только к выбору конкретного значения. Без
-него — все монеты, вне зависимости от цінності металу (UI-контрол — `ui.md`, тулбар
-«Комплектність»). Изначально был только на `/summary`; с 2026-09-24 (карточка группы получила
-свой тулбар) — также на `/group` и `/items`, чтобы клик по строке списка переносил активный
-фильтр в детальный экран, а не сбрасывал его.
+---
 
-`owned` (bool, необязательный) — только на `/completeness/items`: сужает плитки до
-«тільки наявні»/«тільки відсутні» в детальном экране группы, независимо от `groupBy` и
-`metalKind`.
-
-`/completeness/items` — плитки монет для экрана деталей группы, **не** `GET /catalog?...=`
-(правило унаследовано от `/series/{id}/items`, добавлено 2026-09-13, `business-rules.md`
-§13a). Разница принципиальная: `storefront_visible(require_confirmed=False)` вместо жёсткого
-гейта `GET /catalog` — экран комплектности про личную коллекцию пользователя, а не про витрину
-каталога, поэтому не прячет позиции страны без `catalog_confirmed`, даже если это единственный
-способ увидеть свои же монеты (найдено на живых данных: серия США «50 State Quarters», 56
-личных позиций, каталог США не подтверждён — до фикса плитки были пустыми несмотря на 100%
-комплектности в `summary`). `CountryOut.catalogConfirmed` — сигнал для фронта, актуален только
-при `groupBy=series` (только у серии есть естественная привязка к одной стране): `true` →
-показываем «Відкрити в каталозі», `false` → вместо кнопки поясняющий текст, что показана только
-особиста колекція.
-
-## Расходы
+## Expenses
 
 ```
-GET    /expenses?category&dateFrom&dateTo&page&pageSize&sort&order
-POST   /expenses
-PATCH  /expenses/{id}
-DELETE /expenses/{id}
-GET    /expenses/summary
-GET    /expenses/chart-summary?dateFrom&dateTo
+GET    /expenses?category&dateFrom&dateTo&page&pageSize&sort&order   → Page<ExpenseOut>
+POST   /expenses                                                     → 201 ExpenseOut
+PATCH  /expenses/{id}                                                → ExpenseOut
+DELETE /expenses/{id}                                                → 204
+GET    /expenses/summary                                             → ExpensesSummaryOut
+GET    /expenses/chart-summary?dateFrom&dateTo                       → ExpensesChartOut
 ```
 
-`sort` — `date` (по умолчанию) | `category` | `description` | `vendor` | `amount`,
-`order` — `asc` | `desc` (по умолчанию). Сортировка по колонкам журнала (`ui.md`):
-`description` — по тому, что показано в колонке «Опис» (название монеты для покупки, свой
-текст для остального), `amount` — по сумме в гривне, `category` — в порядке объявления
-таксономии, а не по алфавиту: смысл этой сортировки — сгруппировать журнал по видам.
+- `sort`: `date` (default) | `category` (taxonomy order, to group the journal) |
+  `description` (what the column shows: coin title for purchases, own text otherwise) |
+  `vendor` | `amount` (in UAH); `order` default `desc`.
+- Body (`ExpenseCreate` / `ExpenseUpdate`): `category, amount, currency, expenseDate,
+  catalogItemId?, seriesId?, vendor?, description?`. `amount > 0` → else `422` (a free
+  shipping is a typo; a free coin is not — hence the purchase price allows `0`).
+  `catalogItemId` optionally links the expense to an existing visible item; unknown →
+  `422 invalid-reference`. Rate errors as in "Buying a coin".
+- `coin_purchase` rows are managed by the purchase: creating, editing or deleting one
+  here → `409 coin-purchase-managed`.
+- `ExpenseOut`: `id, category, amount, currencyCode, rateUah, amountUah, amountUsd,
+  amountEur` (USD/EUR at the expense date's rate, BR-6), `expenseDate, catalogItemId,
+  collectionItemId, seriesId, vendor, description, coinTitle` (localized title of the
+  linked coin for any expense that has one, else `null`).
+- `ExpensesSummaryOut`: `categories` / `byCategory` (same list: `{category, count,
+  totalUah}` for categories with spending), `totalUah, coinSpendUah, relatedSpendUah`,
+  `byMonth` — the last 12 calendar months, oldest first, zero-filled
+  (`{month: "YYYY-MM", coinsUah, supportingUah}`), `thisMonthUah, prevMonthUah`.
+- `ExpensesChartOut` for a user-picked range (both params required; `dateFrom >
+  dateTo` → `422 invalid-date-range`): `granularity` (`day` up to 31 days, else
+  `month`), `byPeriod` (`{period, coinsUah, supportingUah}`, zero-filled, oldest first),
+  `byCategory` for that range only.
 
-`amount` в `POST`/`PATCH /expenses` — строго больше нуля (`422` на ноль и на минус,
-приведено к фронту 2026-09-14). Это отличие от цены покупки, где `0` законен — подарок или
-неизвестная цена; доставка или альбом за ноль — опечатка. `CHECK` в самой таблице остаётся
-`amount >= 0`: он сторожит и строки `coin_purchase`, которые эти эндпоинты не пишут.
+---
 
-`catalogItemId` в теле — необязательная привязка сопутствующей траты к монете (грейдинг,
-холдер для конкретного экземпляра). Ссылается на **существующую** позицию, видимую
-пользователю, — общую или свою личную; ничего не создаёт. Неизвестный id — `422`.
-
-`CatalogListItem.denominationText` и `CatalogCard.denominationText` — номинал словами у
-записи, для страны которой справочника нет; показывается вместо `denomination`, когда тот
-`null` (`data-model.md`). `seriesName` отдельного текстового поля не получил: он и так
-строка, и подставляет `series_text`, когда `series_id` пуст. В `CollectionPositionOut` /
-`CollectionItemOut` то же самое делает уже готовая строка `denomination`.
-
-`coinTitle` в `ExpenseOut` — локализованное (`?locale`/`Accept-Language`) название монеты,
-джойном через `catalogItemId`, для **любой** траты, у которой этот id задан, а не только
-для покупок (расширено 2026-09-14: иначе прив'язку, которую человек сделал в форме, негде
-увидеть). У траты без монеты — `null`.
-
-`GET /expenses/summary` (`ExpensesSummaryOut`):
-
-- `categories` / `total_uah` / `coin_spend_uah` / `related_spend_uah` — как раньше;
-- `byCategory` — тот же список, что `categories` (по каждой категории с ненулевой суммой:
-  `category`, `count`, `totalUah`);
-- `byMonth` — последние 12 календарных месяцев по дате сервера, от самого старого к
-  текущему, каждый — `{month: "YYYY-MM", coinsUah, supportingUah}`; месяцы без трат идут
-  нулями, а не пропускаются, чтобы ось графика была сплошной;
-- `thisMonthUah` / `prevMonthUah` — сумма (монеты + сопутствующие) за текущий и
-  предыдущий календарный месяц; равны последним двум точкам `byMonth`.
-
-`GET /expenses/chart-summary?dateFrom&dateTo` (`ExpensesChartOut`, оба параметра обязательны,
-`dateFrom > dateTo` — `422`) — те же два виджета графика на странице «Гроші», но за диапазон,
-который выбирает сам пользователь (плашки «1М/3М/6М/1Р» и произвольные даты на фронте), в
-отличие от фиксированных окон `ExpensesSummaryOut`:
-
-- `granularity` — `day`, если диапазон не длиннее 31 дня, иначе `month`;
-- `byPeriod` — точки графика, от старой к новой, нулями там, где трат не было; `period` —
-  `"YYYY-MM-DD"` при дневной группировке, `"YYYY-MM"` при месячной;
-- `byCategory` — разбивка по категориям **только за этот диапазон** (не тот же список, что
-  `categories`/`byCategory` в `ExpensesSummaryOut`, которые всегда за всё время).
-
-## Цены и курсы
-
-Цены общего каталога обновляет системная суточная задача — пользовательского запуска для них
-нет (`business-rules.md`, BR-7). Эндпоинты ниже работают **только по личным позициям**.
+## Reference data
 
 ```
-POST /catalog/{id}/price-refresh  → {source, status, previousPriceUah, priceUah, observedAt, message}
-     status: updated | not-found | rejected | needs-api-key
-     403 — позиция общая: её цены обновляет системная задача
-     404 — позиция чужая
-
-POST /prices/refresh-batch  {filter: {...те же параметры, что у GET /catalog}}
-     → {jobId}
-     обходит только личные позиции пользователя: к фильтру принудительно
-     добавляется created_by = :userId, независимо от переданного scope
-
-POST /prices/manual  {catalogItemId, price, currency, grade?, observedAt?}
-     → снимок с created_by = текущий пользователь; работает и по общей позиции
-
-GET  /rates                → текущие курсы
-GET  /rates?date=2018-03-24 → курс на дату
-POST /rates/refresh        → принудительное обновление (только admin)
-```
-
-Снимки, созданные этими эндпоинтами, пишутся с `created_by` = текущий пользователь и видны
-только ему. Ручной ввод (`/prices/manual`) — единственный способ поставить свою цену общей
-позиции: сама общая запись при этом не меняется.
-
-`status: rejected` — новое по сравнению с legacy: цена получена, но не прошла валидацию.
-Валидация одинакова для всех путей, включая ручной ввод. Обязательно логируем в
-`raw_payload`. См. `integrations.md`.
-
-## Импорт
-
-Импорт **создаёт только личные позиции** (`created_by` = текущий пользователь). Если
-совпадение нашлось в общем каталоге, новая запись не создаётся — экземпляры привязываются
-к общей. Правила дедупликации — `business-rules.md`, BR-3.
-
-```
-POST /imports/excel            multipart, файл .xlsx
-     → {jobId}
-GET  /imports/excel/{jobId}    → {status, scanned, matchedShared, inserted, updated,
-                                  skipped, countries, warnings[]}
-     matchedShared — сколько строк совпало с общим каталогом и не создало личной позиции
-
-POST /imports/ucoin/preview    {url}   → черновик позиции, без записи в БД
-POST /imports/ucoin            {url}   → {jobId}   (одна монета или раздел каталога)
-
-GET    /imports/ucoin/sources
-POST   /imports/ucoin/sources  {title, url, country, collectionGroup}
-DELETE /imports/ucoin/sources/{id}
-```
-
-## Экспорт
-
-```
-POST /exports/excel  {filter: {...}}  → {jobId}
-GET  /exports/{jobId}                 → {status, downloadUrl}
-```
-
-Ссылка — presigned URL на S3 со сроком жизни, файл не отдаём потоком из приложения.
-
-## Фото
-
-```
-PUT    /collection/{id}/photos/{role}     сырые байты (image/jpeg|png|webp) → CollectionItemPhotosOut
-DELETE /collection/{id}/photos/{role}                                      → CollectionItemPhotosOut
-```
-
-`role` — `obverse` или `reverse`, в пути; что-то ещё — `422`. Как `PUT/DELETE /auth/me/avatar`
-(`ui.md`, часть 8): один файл без multipart-конверта, `Content-Length` сверх лимита
-отбивается `422` до чтения тела. Ответ — уже подписанные `CoinImageOut` на обе стороны этого
-**экземпляра** (`{obverse, reverse}`), чтобы страница перерисовалась без второго запроса.
-Всегда пишет новую строку `media_files` с `collectionItemId` (не `catalogItemId`) и
-`source = 'user_upload'`; своя позиция чужого пользователя — `404`.
-
-`GET /collection/{id}` и списки коллекции/каталога подмешивают этот же приоритет на чтение —
-подробности выбора и происхождения см. `media.md`.
-
-Загрузка фото для **каталожных** записей (`/catalog/{id}/images`, редактирование общей
-позиции администратором) в MVP не реализована — отложено за пределы этого этапа.
-
-## Фоновые задачи
-
-Любая операция, которая может идти дольше нескольких секунд, ставится в очередь.
-
-```
-GET  /jobs/{jobId}
-  → {
-      jobId, type, status,          // queued | running | done | failed | cancelled
-      progress: {current, total},
-      result: {...},                 // при done
-      error: {...}                   // при failed
-    }
-POST /jobs/{jobId}/cancel  → 202
-```
-
-Типы задач: `excel-import`, `ucoin-import`, `price-refresh-batch`, `excel-export`,
-`rates-sync`.
-
-Системные задачи — `prices-daily-sync` (суточное обновление цен общего каталога по UA-Coins)
-и `nbu-catalog-sync` (еженедельная пересборка украинской части каталога) — запускаются по
-расписанию, а не из API. Их статус виден администратору тем же `GET /jobs/{jobId}`.
-
-Отмена нужна обязательно: в legacy массовое обновление цен было длинным и имело кнопку
-«Остановить» — соответствующие строки интерфейса сохранились
-(`Останавливаем обновление цен…`, `Обновление цен остановлено.`).
-
-Прогресс на фронт — обычным polling каждые 1–2 секунды. WebSocket на этом этапе избыточен.
-
-### Отчёты о прогонах задач по расписанию
-
-Всё выше — про очередь внутри приложения (этап 5). Задача по расписанию живёт иначе: она
-запускается снаружи, своим контейнером, и отчитывается о себе сама (`admin.md`).
-
-```
-POST  /internal/job-runs         → 201 {id, job, status, startedAt, ...}
-PATCH /internal/job-runs/{id}    → 200 {…, status, finishedAt, summary, stats, exitCode}
-```
-
-Заголовок `X-Job-Token` с общим секретом (`JOB_REPORT_TOKEN`); ни пользователя, ни сессии
-здесь нет — вызывает контейнер внутри docker-сети. Сравнение постоянное по времени, пустой
-секрет в конфигурации **выключает** эндпоинт (`503`), а не открывает его.
-
-`POST` открывает прогон перед работой, `PATCH` закрывает исходом. Два послабления сделаны
-намеренно, потому что вызывающий — cron, а не человек: `POST` принимает и сразу
-завершённый прогон (если открыть не удалось, но работа прошла — отчёт не должен пропасть),
-а повторный `PATCH` по тому же прогону разрешён (повтор после сетевой ошибки).
-
-Чтение — под ролью admin, обычный `403` всем остальным:
-
-```
-GET /admin/jobs?job=&page=&pageSize=
-  → {
-      items: [{id, job, status, startedAt, finishedAt, runDate,
-               summary, stats, details, exitCode}],
-      total, page, pageSize,
-      jobs: ["update-prices", ...]   // имена задач, которые уже отчитывались
-    }
-GET /admin/jobs/{id}  → одна такая запись, 404 если нет
-```
-
-`jobs` в ответе списка — чтобы экран показал фильтр по задачам, не делая второго запроса.
-Сортировка всегда «сначала свежие»: список отвечает на вопрос «как прошла эта ночь».
-
-### Админский бот
-
-```
-GET    /admin/telegram        → {connected, chats}          // роль admin
-POST   /admin/telegram/link   → {url, expiresAt}            // t.me/<бот>?start=<код>
-DELETE /admin/telegram        → 204
-POST   /telegram/webhook      → 200 всегда
-```
-
-Код привязки — обычный одноразовый токен `auth_tokens` (вид `telegram_link`, 15 минут),
-выдача нового гасит предыдущий. `503`, если бот на сервере не настроен.
-
-Вебхук — единственный публичный маршрут без аутентификации пользователя. Секрет
-проверяется из заголовка `X-Telegram-Bot-Api-Secret-Token` **до** разбора тела; чужой
-секрет — `403`, незаданный на сервере — `404`, как будто маршрута нет. Ответ всегда `200`:
-любой другой код заставляет телеграм часами повторять тот же апдейт. Обрабатываются
-только `/start <код>` и `/last`, остальное молча игнорируется — ответ подтвердил бы
-постороннему, что бот жив.
-
-### Бот підтримки (публічний, `/support/telegram`)
-
-Окремий бот від адмінського: тут — саппорт-чат для будь-якого користувача (ідеї, питання,
-зв'язок з адмінами), а не сповіщення адмінів про прогони. Посилання на нього — у футері
-(`ui.md`).
-
-```
-GET  /support/telegram         → {url}                       // публічний, без входу
-POST /support/telegram/link    {sourcePath?} → {url}          // за логіном
-POST /support/telegram/webhook → 200 завжди
-```
-
-`GET` — статична публічна ланка для гостя. `POST` (авторизований) підмішує в ланку контекст
-користувача, `sourcePath` — необов'язкова позначка, зі скількох екрана прийшов запит.
-`503`, якщо бот не налаштований на сервері (`SUPPORT_TELEGRAM_*` відсутні). Вебхук — та сама
-схема секрету й завжди-200, що й у адмінського бота вище, окремий токен
-(`support_telegram_webhook_secret`), окремий обробник (`services/support.py`).
-
-### Користувачі (`/admin/users`)
-
-```
-GET   /admin/users?page&pageSize
-  → { items: [{id, email, displayName, role, isActive, emailVerified, createdAt, coinCount}],
-      total, page, pageSize,
-      summary: {totalUsers, collectors} }        // collectors — з хоча б однією монетою
-PATCH /admin/users/{id}/role  {role: "user" | "admin"}
-  → AdminUserOut (той самий один рядок, coinCount тут завжди 0 — не перераховується на PATCH)
-```
-
-Обидва — тільки роль admin, `403` іншим. `PATCH` — зі стандартними запобіжниками
-(`business-rules.md`): `409 cannot-demote-self` — собі роль не знімають, `409 last-admin`
-— останнього адміна в системі не знімають, `409 admin-user-ineligible` — підвищити можна
-тільки активного користувача з підтвердженим email.
-
-### Ревью чернеток каталогу (`/admin/proposals`)
-
-```
-GET    /admin/proposals?page&pageSize
-  → { items: [{status, card: CatalogCard}], total, page, pageSize }
-GET    /admin/proposals/{id}    → {status, card}         // 404, якщо не draft
-PUT    /admin/proposals/{id}/photos/{role}    (raw image body, ≤12 МБ)  → CatalogCard
-DELETE /admin/proposals/{id}/photos/{role}    → CatalogCard
-POST   /admin/proposals/{id}/approve          → CatalogCard        // draft → active
-POST   /admin/proposals/{id}/reject   {reason} → ArchiveStateOut   // draft → archived
-```
-
-Тільки роль admin. Список і картка бачать записи виключно зі `status = draft`
-(`repositories/catalog.py`, той самий фільтр, що ховає чернетки від публічної вітрини й
-пошуку — `business-rules.md`). `role` у шляху фото — `obverse`/`reverse`, той самий
-формат, що у звичайного завантаження фото каталогу. `approve`/`reject` — `409
-proposal-not-draft`, якщо запис уже не чернетка (повторний клік, паралельна дія іншого
-адміна); `reject` без непорожньої причини — `400`. Джерело чернеток — щоденний
-`nbu-catalog-sync` у coin-parser: нові випуски й оновлені офіційні дані потрапляють сюди
-`status = draft`, а не одразу у вітрину (`11-roadmap.md`, `admin.md`).
-
-## Справочники
-
-```
-GET /countries?scope=active|all|confirmed
-GET /denominations?countryId
+GET /countries?scope=active|all|confirmed      guest
+GET /denominations?countryId&scope=all|confirmed  guest
 GET /materials
 GET /edge-types
 GET /quality-types
 GET /currencies
 ```
 
-`GET /countries` — `scope=active` (по умолчанию) отдаёт витрину: только активные страны,
-`scope=all` — весь справочник, для формы личной позиции, куда можно вписать монету любого
-когда-либо существовавшего эмитента.
+- `GET /countries`: `active` (default) — the storefront; `all` — every issuer, for the
+  purchase form; `confirmed` — the catalog's filter panel (BR-13a). `CountryOut`: `id,
+  code, name` (locale), `nameOriginal, originalLang, nameUk, nameEn, collectVariants,
+  isActive, catalogConfirmed, sortOrder, minYear, maxYear`. `minYear/maxYear` are the
+  issue-year bounds of catalog items visible to this user in that country (`null` when
+  none) — the year dropdowns' range.
+- `GET /denominations`: `DenominationOut` = `id, countryId, currencyCode, value, unit,
+  label, sortOrder`. `scope=confirmed` narrows to confirmed countries' denominations
+  still used by a visible item.
+- `GET /materials`, `/edge-types`, `/quality-types`: the **full** dictionaries
+  (`{id, code, name}`) for the purchase form. Not to be confused with
+  `GET /catalog/materials`, which narrows the filter to values present.
+- `GET /currencies`: `{code, name, symbol, decimalPlaces}`.
 
-`GET /materials`, `GET /edge-types`, `GET /quality-types` — **полные** словари состава,
-гурта и качества чеканки (`CoinMaterial` / `CoinEdgeType` / `CoinQualityType`: `id`, `code`,
-`name` на языке запроса, по алфавиту). Их читает форма «Додати», где монета ещё не
-существует. Не путать с `GET /catalog/materials`: тот отдаёт только материалы, которые
-реально встречаются у подтверждённых записей, — он сужает фильтр до того, что можно найти.
+---
 
-`CountryOut.minYear`/`maxYear` — границы `issue_year` по каталожным монетам страны, видимым
-текущему пользователю (тот же скоуп видимости, что у `GET /catalog`: общий каталог плюс личные
-позиции, без архивных). `null`/`null` у страны без ни одной видимой монеты. Используются
-фронтом как границы выпадашек «Рік від/до» (`ui.md`) — отдельной ручки для глобальных
-границ нет, фронт берёт min/max по уже загруженному списку стран.
+## Admin
+
+All `/admin/*` endpoints require the admin role → else `403 admin-required`.
+Background and decisions: `admin.md`.
+
+### Users
+
+```
+GET   /admin/users?page&pageSize
+  → {items: [{id, email, displayName, role, isActive, emailVerified, createdAt, coinCount}],
+     total, page, pageSize, summary: {totalUsers, collectors}}
+PATCH /admin/users/{id}/role  {role: "user" | "admin"}  → AdminUserOut
+```
+
+`collectors` = users with at least one coin. `PATCH` returns the single row with
+`coinCount: 0` (not recomputed). Refusals: `404 admin-user-not-found`,
+`409 cannot-demote-self`, `409 last-admin`, `409 admin-user-ineligible` (only an active
+user with a verified email can be promoted).
+
+### Draft review
+
+```
+GET    /admin/proposals?page&pageSize            → {items: [{status, card: CatalogCard}], total, page, pageSize}
+GET    /admin/proposals/{id}                     → {status, card}
+PUT    /admin/proposals/{id}/photos/{role}       <raw image ≤ 12 MB> → CatalogCard
+DELETE /admin/proposals/{id}/photos/{role}       → CatalogCard
+POST   /admin/proposals/{id}/approve             → CatalogCard       // draft → active
+POST   /admin/proposals/{id}/reject  {reason}    → ArchiveStateOut   // draft → archived
+```
+
+- Only records with `status = 'draft'`; anything else → `404 proposal-not-found`.
+  Drafts come from the daily NBU catalog sync in `coin-parser` (BR-2).
+- Photo upload writes a catalog photo (`source = 'manual'`); `role` is
+  `obverse | reverse`; bad image → `422 invalid-image`.
+- `approve` / `reject` on a record that's no longer a draft (double click, another
+  admin) → `409 proposal-not-draft`. `reject` without a non-empty reason → `400
+  archive-reason-required`. Both are audited.
+
+### Job runs
+
+```
+GET /admin/jobs?job&page&pageSize
+  → {items: [{id, job, status, startedAt, finishedAt, runDate, summary, stats, details, exitCode}],
+     total, page, pageSize, jobs: ["update-prices", …]}
+GET /admin/jobs/{id}   → one run, 404 job-run-not-found
+```
+
+Newest first. `jobs` lists job names seen so far, so the screen can filter without a
+second request.
+
+### Admin Telegram bot
+
+```
+GET    /admin/telegram        → {connected, chats}
+POST   /admin/telegram/link   → {url, expiresAt}     // t.me/<bot>?start=<code>
+DELETE /admin/telegram        → 204
+```
+
+The link carries a one-time `auth_tokens` code (kind `telegram_link`, 15 minutes); a new
+one revokes the previous. Bot not configured → `503 telegram-not-configured`. The chat
+id itself is never sent to the frontend.
+
+---
+
+## Integrations
+
+### Job reporting
+
+Scheduled jobs (in `coin-parser`) report their runs; there is no user or session.
+
+```
+POST  /internal/job-runs        {job, status?, startedAt?, runDate?, summary?, stats?, details?, exitCode?}
+                                → 201 JobRunOut
+PATCH /internal/job-runs/{id}   {status: ok|partial|failed, runDate?, summary?, stats?, details?, exitCode?}
+                                → 200 JobRunOut
+```
+
+- Header `X-Job-Token` with the shared secret `JOB_REPORT_TOKEN`, compared in constant
+  time. Wrong or missing → `401 invalid-job-token`; secret unset on the server → `503
+  job-reporting-disabled` (unset disables, never opens).
+- `job` matches `^[a-z][a-z0-9-]{1,63}$`. `POST` opens a run (`status` default
+  `running`) but also accepts an already finished one, so a report isn't lost when
+  opening failed. `PATCH` may be repeated (retry after a network error). Unknown run →
+  `404 job-run-not-found`.
+- A finished run is sent to every linked admin chat in the background (`admin.md`).
+
+### Telegram webhooks
+
+```
+POST /telegram/webhook            admin bot
+POST /support/telegram/webhook    support bot
+```
+
+The secret is checked from `X-Telegram-Bot-Api-Secret-Token` **before** the body is
+handled: bot not configured → `404` (as if the route didn't exist), wrong secret →
+`403`, otherwise always `200` — any other code makes Telegram retry the same update for
+hours. The admin bot handles only `/start <code>` and `/last` from private chats and
+ignores everything else silently. Support-bot behavior: `telegram-support.md`.
+
+### Support links
+
+```
+GET  /support/telegram                         guest   → {url}
+POST /support/telegram/link  {sourcePath?}             → {url}
+```
+
+`GET` is the plain public link. `POST` (signed in) returns a link that ties the chat to
+the user, with `sourcePath` (≤ 500 chars kept) noting which screen they came from. Bot
+not configured → `503 support-not-configured`.
+
+### Health
+
+`GET /health` → `{status: ok|degraded, database, redis, storage}`, each
+`{status: ok|error, detail?}`. Any failing component → `503` with `degraded`. Used by the
+deploy smoke check (`infra.md`).
+
+---
+
+## Not implemented
+
+These exist only as deferred plans (`product.md`, "Out of scope"); there are no endpoints
+for them:
+user-triggered price refresh and manual price entry for personal positions, uCoin and
+Excel import (dedup rules are specified in BR-3), Excel export, an in-app job queue,
+catalog photo upload outside draft review, and a rates endpoint (current rates come with
+`/bootstrap`; history is loaded by `coin-parser`).

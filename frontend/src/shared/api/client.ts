@@ -171,7 +171,7 @@ export function toQuery(
     if (Array.isArray(value)) {
       // Repeated keys (?countryId=1&countryId=2) — the shape a multi-select
       // filter sends and the backend's list[int] query params read
-      // (docs/api.md, 2026-09-12).
+      // (docs/api.md, "Multi-value filters").
       for (const item of value) search.append(key, String(item));
       continue;
     }

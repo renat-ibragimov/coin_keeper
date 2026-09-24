@@ -314,7 +314,7 @@ class CatalogItemUpdate(CamelModel):
     original_lang: str | None = Field(default=None, min_length=2, max_length=8)
     # min_length=1 rather than the create schema's "may be absent": a translated
     # slot is either untouched (field omitted) or replaced with real text, never
-    # set to an empty string (docs/api.md, admin title editing).
+    # set to an empty string (docs/api.md, "Editing names").
     title_uk: str | None = Field(default=None, min_length=1, max_length=500)
     title_en: str | None = Field(default=None, min_length=1, max_length=500)
     issue_year: int | None = Field(default=None, ge=1, le=2200)

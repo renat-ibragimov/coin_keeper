@@ -1,4 +1,4 @@
-"""GET /bootstrap payload (docs/api.md, legacy BootstrapPayload)."""
+"""GET /bootstrap payload (docs/api.md, "Bootstrap")."""
 
 from __future__ import annotations
 
