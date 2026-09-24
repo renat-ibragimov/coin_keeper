@@ -8,8 +8,7 @@ system, in English. History lives in git, not here. Rules for agents and contrib
 
 | Document | What it covers | Read before |
 |---|---|---|
-| [product.md](product.md) | What the app does, in plain language | explaining the project to anyone |
-| [scope.md](scope.md) | What's in, what's deliberately out | planning any feature |
+| [product.md](product.md) | What the app does and what's out of scope, in plain language | explaining the project; planning any feature |
 | [data-model.md](data-model.md) | PostgreSQL schema, constraints, data origins | models, migrations |
 | [api.md](api.md) | REST endpoints and their contracts | routes, Pydantic schemas, frontend API calls |
 | [business-rules.md](business-rules.md) | Completeness, currencies, cost, visibility, deduplication | services, repositories |
@@ -40,7 +39,7 @@ A change that alters behavior updates the matching document **in the same commit
 | `api/v1/support.py`, `core/support_telegram.py`, `services/support.py` | `telegram-support.md` |
 | `docker-compose*.yml`, `Caddyfile`, `.github/workflows/`, `.env.example`, `core/config.py` | `infra.md` |
 | dev tooling, test setup, CI check list | `development.md` |
-| user-visible capability added or removed | `product.md`, `scope.md` |
+| user-visible capability added or removed | `product.md` |
 | a backlog item done (or found done) | remove it from `backlog.md` |
 
 ## Writing docs

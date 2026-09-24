@@ -394,7 +394,7 @@ export function ExpensesPage() {
                   ))}
                   {/* By the NBU rate on the expense's own date, so the spending
                       reads in a currency that does not move under your feet
-                      (docs/backlog.md). Nothing sorts by it yet. */}
+                      (docs/business-rules.md, BR-6). Nothing sorts by it yet. */}
                   <th className={styles.usdColumn}>
                     {t('expenses.amountSecondaryHeader', {
                       currency: t(`common.currencyNames.${secondaryCurrency}`),

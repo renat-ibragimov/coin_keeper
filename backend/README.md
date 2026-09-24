@@ -210,9 +210,9 @@ and left alone, so a second `--trim --apply` over the same rows applies nothing.
 Admin title editing (`titleUk`/`titleEn`/`titleOriginal` on a shared record)
 is the existing `PATCH /catalog/{id}` — see `../docs/api.md`,
 "Editing names": it now always stamps `*_source = 'manual'` and rejects an
-empty string. No new endpoint, no new screen — the admin-mode edit form on
-the record page is a backlog item (`../docs/backlog.md`), the API contract
-is already there.
+empty string. No new endpoint, no new screen — the admin edit form is part
+of the deferred shared-catalog editor (`../docs/product.md`, "Out of scope");
+the API contract is already there.
 
 ## Layout
 
@@ -221,7 +221,7 @@ app/api/           routes, dependencies, RFC 7807 problem responses
 app/services/      use cases (authentication)
 app/repositories/  data access
 app/models/        SQLAlchemy models — the whole schema, including tables the
-                   MVP does not use yet (docs/scope.md)
+                   app does not use yet (docs/product.md, "Out of scope")
 app/schemas/       Pydantic v2, camelCase on the wire
 app/core/          settings, security, rate limiting, mail backends, logging
 app/reference_data/ countries, denomination units, materials — data and parsers,

@@ -453,7 +453,7 @@ class CatalogRepository:
 
         # The rate on each instance's OWN acquisition date, not today's --
         # this is what was spent then, not a mix of purchase cost and a
-        # live rate (docs/backlog.md, NBU rates follow-up). Division by
+        # live rate (docs/business-rules.md, BR-6). Division by
         # NULL (no rate that far back) yields NULL, which SUM simply skips
         # rather than propagating -- a handful of missing rates cannot
         # blank out an otherwise-known total.

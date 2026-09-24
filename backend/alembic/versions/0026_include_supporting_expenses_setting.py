@@ -8,7 +8,7 @@ default — most collectors already think of what they paid the courier as
 part of what the coin cost them (docs/business-rules.md, BR-4).
 
 Promoted from a browser-local (`localStorage`) prototype the same day it was
-tried, per the batching rule in `docs/backlog.md` for user preferences.
+tried, per the rule that user preferences live on the server, not in localStorage.
 
 Revision ID: 0026
 Revises: 0025

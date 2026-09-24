@@ -2,7 +2,7 @@
 
 Tables the MVP does not use yet (sales, purchase_offers, collection_goals,
 catalog_variants, audit_log) are created up front on purpose, so later stages
-do not have to rewrite migrations. See docs/scope.md.
+do not have to rewrite migrations. See docs/product.md, "Out of scope".
 """
 
 from app.models.base import Base

@@ -58,7 +58,7 @@ Price updates never create positions in any layer: no match → `not-found`.
 
 ## BR-3. Import deduplication (not implemented — import is deferred)
 
-Import (uCoin Excel export, uCoin page by URL) is post-MVP (`scope.md`). When it's built,
+Import (uCoin Excel export, uCoin page by URL) is post-MVP (`product.md`, "Out of scope"). When it's built,
 it must follow this rule:
 
 Import creates **personal positions only** and looks for an existing record in two
@@ -161,7 +161,7 @@ percent   = ROUND(collected / total × 100, 1)      -- 0 when total = 0
   "21 of 20". An instance of an archived item stays in the collection, spend and value,
   but not in completeness (BR-10).
 - **Varieties.** `countries.collect_variants` would make each variety its own required
-  item. The flag exists; the mode is not implemented (`scope.md`).
+  item. The flag exists; the mode is not implemented (`product.md`, "Out of scope").
 
 ## BR-6. Exchange rates
 
@@ -193,7 +193,7 @@ already-computed numbers the UI shows next to UAH — the API always returns bot
 | Records | Updated by | How often |
 |---|---|---|
 | Shared catalog | the central job in `coin-parser`, source UA-Coins | daily |
-| Personal positions | nobody yet — manual entry and per-position refresh are deferred (`scope.md`) | — |
+| Personal positions | nobody yet — manual entry and per-position refresh are deferred (`product.md`, "Out of scope") | — |
 
 The daily job visits **active** records only; an archived record's price history
 freezes at archiving. There is no "update price" button for shared records, and no
@@ -281,7 +281,7 @@ purchases, expenses, photos and price history hang off it.
 Archiving is reversible: `unarchive` clears the flag, `archived_at` and
 `archive_reason`. Only admins archive and unarchive shared records (`auth.md`); both
 actions go to `audit_log`. Duplicates are archived with a "duplicate" reason — merging
-with re-pointing of instances is deferred (`scope.md`).
+with re-pointing of instances is deferred (`product.md`, "Out of scope").
 
 ### Physical deletion of a shared record
 

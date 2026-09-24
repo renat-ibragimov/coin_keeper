@@ -360,7 +360,7 @@ class CatalogItem(Base):
 
 
 class CatalogVariant(Base):
-    """Created now, unused in the MVP (docs/scope.md)."""
+    """Created now, not used yet (docs/product.md, "Out of scope")."""
 
     __tablename__ = "catalog_variants"
 

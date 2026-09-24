@@ -1,7 +1,7 @@
 """Initial schema — the whole model from docs/data-model.md.
 
 Includes tables the MVP does not use yet, on purpose: creating them now means
-later stages add features instead of rewriting migrations (docs/scope.md).
+later stages add features instead of rewriting migrations (docs/product.md, "Out of scope").
 
 Revision ID: 0001
 Revises:

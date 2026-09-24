@@ -1,295 +1,223 @@
-# 12. Что умеет приложение — простыми словами
+# Product
 
-Этот документ описывает MVP так, как его увидит человек, который не читал остальные
-одиннадцать. Без схемы базы, эндпоинтов и названий таблиц. Если нужно объяснить кому-то,
-что за приложение, — объяснять надо отсюда.
-
-Технические подробности каждого правила — в `scope.md`, `business-rules.md`
-и `auth.md`.
+What Bakost Numismatics does, in plain language — no schema, endpoints or table names.
+Start here when explaining the app to someone. Exact rules: `business-rules.md`,
+`auth.md`, `media.md`.
 
 ---
 
-## Коротко
+## In short
 
-Bakost Numismatics — приложение для нумизмата. Оно отвечает на четыре вопроса:
+An app for coin collectors. It answers four questions:
 
-1. **Какие монеты вообще существуют?** — общий каталог выпусков.
-2. **Какие из них у меня есть?** — личная коллекция.
-3. **Сколько я на это потратил?** — покупки, расходы, курсы валют на дату покупки.
-4. **Сколько это стоит сейчас?** — рыночные цены и оценка коллекции.
+1. **Which coins exist?** — a shared catalog of issues.
+2. **Which of them do I have?** — a personal collection.
+3. **How much did I spend?** — purchases, related expenses, exchange rates on the
+   purchase date.
+4. **What is it worth now?** — market prices and a valuation of the collection.
 
-Работает в браузере, в том числе с телефона. Регистрация открыта: аккаунт заводится
-самостоятельно, по email и паролю или через Google (решение владельца 2026-09-15).
+It runs in the browser, phone included. Registration is open: anyone signs up with
+email and password or with Google. The interface is in Ukrainian (default) and English.
 
-Каталог выпусков можно смотреть и без регистрации — правда, без цен и без отметок
-«есть в коллекции». Гость может открыть карточку монеты и заглянуть в четыре раздела
-коллекции — там его встречают обучающие примеры и кнопка входа вместо реальных данных.
-
-Главная страница (`/`) — публичный лендинг: коротко объясняет, что за приложение, даёт
-покрутить демо коллекции и расходов на примерах монет (без входа), и ведёт либо в каталог,
-либо на регистрацию.
+Without an account you can browse the catalog and open any coin card — without prices
+and without "in my collection" marks. The collection sections show a guest guided
+examples and a sign-in button instead of real data. The home page (`/`) is a public
+landing page with a hands-on demo of the collection and expenses screens.
 
 ---
 
-## Три слоя данных
+## Three layers of data
 
-Самое важное для понимания. Данные лежат в трёх слоях, и они ведут себя по-разному.
+The most important idea: data lives in three layers that behave differently.
 
-### 1. Общий каталог — справочник для всех
+### 1. The shared catalog — a reference for everyone
 
-Список выпусков монет: год, номинал, металл, тираж, каталожные номера, фотографии.
-Позиция существует независимо от того, есть ли такая монета у кого-нибудь.
+Coin issues: year, denomination, metal, mintage, catalog numbers, photos. An entry exists
+whether or not anyone owns the coin.
 
-- Виден **всем** зарегистрированным пользователям, у всех одинаковый.
-- Пользователь **не может** его изменить: ни добавить позицию, ни исправить, ни удалить.
-- Наполняется двумя способами: администратором вручную и автоматической задачей, которая
-  раз в неделю обходит официальный каталог нумизматической продукции Национального банка
-  Украины.
-- Новые украинские выпуски появляются там сами, без чьего-либо участия.
+- The same for everyone; visible to guests too.
+- Users **cannot change it** — not add, edit or delete.
+- Maintained by administrators and by a daily job that reads the official numismatic
+  catalog of the National Bank of Ukraine (NBU). New Ukrainian issues arrive as drafts;
+  an administrator reviews and publishes them.
+- Only Ukraine's catalog is built and verified. Coins of other countries appear only in
+  the collections of people who own them.
 
-Почему пользователю не дают править общий каталог: он общий. Ошибка одного человека —
-у всех, и разбираться, кто из тысячи позиций поменял тираж, некому. Это правило пришло ещё
-из исходного техзадания, где оно касалось внешних сайтов; теперь оно распространяется
-и на людей.
+Why users can't edit it: it's shared. One person's mistake would be everyone's.
 
-### 2. Личные позиции каталога — то, чего в общем нет
+### 2. Personal positions — what the shared catalog lacks
 
-Нашли монету, которой нет в общем каталоге, — заводите свою позицию. Это **штатный путь**,
-а не костыль: приложение прямо предлагает его, когда поиск ничего не нашёл.
+If a coin isn't in the shared catalog, you add it yourself as a **personal position**.
+It's a normal path, not a workaround.
 
-- Видна **только вам**. Никто другой её не увидит.
-- Правится и удаляется вами полностью.
-- Свои фотографии.
-- Ведёт себя **как обычная позиция каталога**: попадает в фильтры, поиск, серии, счётчик
-  «собрано / осталось» и в оценку стоимости коллекции.
+- Visible **only to you**; you edit and delete it freely; it has your own photos.
+- Behaves like any catalog entry: filters, search, completeness, valuation.
 
-**Прямо на странице «Додати»**, когда вы записываете покупку, — единственный способ в
-MVP. Выбираете страну, начинаете набирать название; если монета нашлась в каталоге —
-записываем покупку к ней, если нет — тут же под названием появляются поля «Про монету», и
-монета вместе с покупкой сохраняются одним действием. Отдельной страницы «создать позицию
-каталога» нет: вы записываете купленную монету, а не заводите каталожную запись.
-Обязательного немного — страна, название, год, тип и материал; остальное можно дополнить
-позже.
+You create it **on the "Додати" page while recording a purchase**: pick a country, start
+typing the name; if the coin is in the catalog, the purchase attaches to it; if not,
+"about the coin" fields appear and the coin and the purchase are saved in one step.
+Required: country, name, year, type and material; the rest can be filled in later. The
+name you type is kept as is; Ukrainian and English versions are filled in automatically
+in the background.
 
-Импорт выгрузки с uCoin или монеты по ссылке — тем же способом создавал бы личные позиции
-для того, чего нет в общем каталоге, но в MVP этой возможности нет: перенесена после MVP
-решением владельца 2026-09-15.
+### 3. The collection — your actual coins
 
-Название, которое вы ввели, сохраняется как есть, а украинский и английский варианты
-приложение подбирает само, в фоне: ответа не ждёте, а если перевод не получится —
-останется ваш исходный текст.
-
-### 3. Коллекция — ваши настоящие монеты
-
-Конкретные экземпляры: когда куплена, за сколько, у кого, в каком состоянии, где лежит.
-Полностью приватна — видна только вам, всегда.
-
-Экземпляр привязывается к позиции каталога, безразлично, к общей или к вашей личной.
+Specific purchases: when, for how much, from whom, in what grade, where it's stored.
+Always private. A collection item points at a shared entry or at your personal one.
 
 ---
 
-## Что будет с моей монетой, если позицию уберут из каталога
+## What happens to my coin if an entry leaves the catalog
 
-Короткий ответ: **ничего**. Монета, деньги и вся история остаются у вас.
+**Nothing.** Your coin, money and history stay.
 
-Иногда позицию нужно убрать из общего каталога — выпуск отменили, запись оказалась
-дубликатом или её завели по ошибке. Приложение в таких случаях **не удаляет** позицию,
-а помечает её как архивную. Причина всегда записывается.
+Sometimes an entry has to leave the shared catalog — a cancelled issue, a duplicate, a
+mistake. It is never deleted, only **archived**, always with a reason.
 
-Что при этом меняется:
+- It disappears from the catalog and search, and stops counting in completeness —
+  neither in "collected" nor in "total", so a series can never show "21 of 20".
+- Your item stays in your collection, the purchase still counts in spending, your photos
+  and the price history stay, and the coin card still opens, with a banner giving the
+  reason.
 
-- позиция пропадает из каталога и из поиска — её больше не предлагают тем, у кого её нет;
-- она перестаёт учитываться в комплектности: ни в «собрано», ни в «всего в серии».
-
-Что **не** меняется:
-
-- ваш экземпляр остаётся в коллекции;
-- покупка, сумма и дата остаются, трата по-прежнему учитывается в «потрачено»;
-- ваши фотографии и вся история цен сохраняются;
-- карточка монеты открывается как обычно — сверху появляется плашка с причиной.
-
-Найти такую монету можно там же, где и раньше: в своей коллекции, а в каталоге —
-переключателем «Показать архивные». Вам там видны только те архивные позиции, где у вас
-есть экземпляр, — не весь чужой архив.
-
-Почему так, а не удалением: позиция каталога общая, и на ней висят коллекции разных людей.
-Удалить её ради опрятности справочника — значит стереть чужие покупки. Поэтому убрать
-позицию из витрины можно, а удалить данные людей — нет.
-
-Архивация обратима. Если позицию убрали по ошибке, администратор возвращает её одним
-действием.
-
-Отдельно про комплектность: раз архивные позиции не входят ни в «собрано», ни в «всего»,
-процент по серии остаётся честным. Не бывает «собрано 21 из 20».
+Archiving is reversible: an administrator restores the entry in one action.
 
 ---
 
-## Что публично, а что нет
+## What is public
 
-| Что | Кто видит |
+| What | Who sees it |
 |---|---|
-| Общий каталог: описания, характеристики, официальные фото | все, включая тех, кто не вошёл в аккаунт (решение владельца 2026-09-07; реализация ещё не завершена) |
-| Цены, собранные автоматической задачей | только зарегистрированные — тот, кто не вошёл, вместо цены видит приглашение войти |
-| Ваши личные позиции каталога | только вы |
-| Ваша коллекция, покупки, суммы, заметки | только вы |
-| Ваши фотографии монет | только вы |
-| Цены, которые вы ввели или обновили сами | только вы |
+| Shared catalog: descriptions, specs, official photos | everyone, guests included |
+| Prices collected by the daily job | signed-in users; guests see an invitation to sign in |
+| Your personal positions | only you |
+| Your collection, purchases, amounts, notes | only you |
+| Your coin photos | only you |
 
-Тому, кто не вошёл, не видно, есть ли монета у кого-то в коллекции — вся «владельческая»
-часть карточки (статус владения, «Мої екземпляри», фильтр «Наявність») доступна только
-вошедшим.
-
-Никакого «профиля коллекционера», ленты и просмотра чужих коллекций в MVP нет. Общее здесь
-одно — справочник выпусков и его цены.
+Guests never see who owns what: ownership status, "my items" and the "in collection"
+filter need an account. There are no public profiles, feeds or browsing of other people's
+collections.
 
 ---
 
-## Цены
+## Prices
 
-Цены берутся из двух независимых источников, и это стоит понимать, чтобы не удивляться.
+**Automatically, daily.** Prices of shared-catalog entries update from the UA-Coins
+site. Nothing to press; everyone sees these prices.
 
-**Автоматически, раз в сутки.** Приложение само обновляет цены позиций общего каталога по
-сайту UA-Coins. Ничего нажимать не нужно, эти цены видят все.
+**Coverage is Ukrainian coins only.** UA-Coins has no other countries. Prices for US and
+USSR coins are whatever came over from the owner's previous app; there's no way yet to
+refresh them or enter a price by hand.
 
-**Важное ограничение, которое честнее сказать сразу:** автоматические цены покрывают
-**только украинские монеты**. UA-Coins по другим странам цен не даёт, а Numista — источник,
-который в исходном проекте должен был закрыть остальные страны, — требует персонального
-ключа и в MVP не подключается. Цены по США и СССР — то, что уже было перенесено при
-переезде на новую версию приложения; довыгрузить их заново или ввести цену руками в MVP
-нельзя (решение владельца 2026-09-15 — ручной ввод цены и импорт переехали после MVP).
+Every price is **checked before it's saved**: glued numbers, a year instead of a price, or
+metal value instead of coin value are rejected and logged instead of silently inflating
+your valuation.
 
-**Вручную, вами.** В MVP можно запустить обновление цены для своей личной позиции по
-одной или пачкой — эта цена видна и учитывается в оценке **только у вас**, запись общего
-каталога она не меняет. Ввести цену от руки, если её не нашлось ни у кого, в MVP пока
-нельзя — перенесено после MVP решением владельца 2026-09-15.
-
-Кнопки «обновить цену» у позиции общего каталога нет — там цены обновляются сами.
-
-**Любая цена проверяется до того, как попадёт в базу.** В прошлой версии приложения парсер
-регулярно приносил мусор — склеенные числа, год вместо цены, стоимость металла вместо
-стоимости монеты, — и оценка коллекции завышалась в семь раз. Теперь цена, не прошедшая
-проверку, не сохраняется: она отклоняется и попадает в лог, чтобы можно было разобраться.
-
-История цен не перезаписывается: каждое обновление — новая точка на графике.
+Price history is never overwritten — every update is a new point on the chart.
 
 ---
 
-## Фотографии
+## Photos
 
-Фотографии тоже бывают разного происхождения, и от этого зависит, кто их видит.
+Where a photo comes from decides who sees it:
 
-| Откуда фото | Кто видит |
+| Source | Who sees it |
 |---|---|
-| Снятые вами | только вы |
-| Официальные, с сайта Национального банка | все |
-| Добавленные администратором | все |
-| Взятые с uCoin | только тот, кто их импортировал |
+| Your own upload | only you |
+| NBU official photos, UA-Coins, administrator uploads | everyone |
+| uCoin | only whoever imported it; others see a placeholder |
 
-Последняя строка — про права. Изображения с uCoin нам не принадлежат, показывать их всем
-подряд нельзя. Поэтому в карточке монеты у постороннего вместо такого фото будет
-заглушка «фото нет».
+We don't own the rights to uCoin images, so they're never shown publicly.
 
-Со временем это перестанет быть заметным: задача, которая обходит каталог Национального
-банка, скачивает официальные снимки украинских выпусков, и они постепенно замещают
-uCoin-фото. По США и СССР официального источника нет — там заглушка останется, пока
-кто-нибудь не загрузит своё фото.
-
-Свои фотографии можно загружать к личным позициям и к экземплярам коллекции — с поворотом,
-зумом и обрезкой в круг прямо в браузере, приложение само сделает превью. Вычистка данных
-камеры и геометок из загруженного файла — доделывается, пока не готово.
+You can upload photos for personal positions and for your collection items, with rotate,
+zoom and round crop in the browser. Camera data and geotags are stripped on upload.
 
 ---
 
-## Деньги
+## Money
 
-- Покупка записывается в той валюте, в которой совершена. Курс Национального банка **на дату
-  покупки** подставляется автоматически, исходная сумма не теряется.
-- Кроме монет учитываются сопутствующие расходы: доставка, альбомы, холдеры, литература,
-  хранение, оценка.
-- Записать их можно **сразу с покупкой**: внизу формы есть свёрнутый блок «Пов'язані
-  витрати», где сумма доставки или холдера добавляется строкой, без второго захода в журнал.
-  Дата и продавец берутся из покупки. Потом это обычные строки журнала: правятся и удаляются
-  отдельно, и удаление доставки монету не трогает, а удаление монеты не стирает доставку —
-  деньги-то потрачены.
-- Приложение показывает: сколько потрачено на монеты, сколько на всё остальное, сколько
-  стоит коллекция сейчас и какова разница.
-- Отдельно показывается, **на сколько недостающих позиций нет цены** — чтобы было понятно,
-  насколько можно доверять оценке «сколько ещё нужно денег».
+- A purchase is recorded in the currency it was made in. The NBU rate **on the purchase
+  date** is filled in automatically; the original amount is never lost.
+- Related expenses count too: shipping, albums, holders, literature, storage, grading.
+  They can be added **with the purchase**, in a collapsible block at the bottom of the
+  form; afterwards they're ordinary journal rows. Deleting the coin doesn't delete its
+  shipping cost — the money was still spent.
+- A setting decides whether related expenses count toward what a coin cost you.
+- You see: spent on coins, spent on everything else, what the collection is worth now,
+  and the difference — in hryvnias, with USD or EUR alongside.
+- The app also shows **how many missing coins have no price**, so you know how far the
+  "how much more to spend" estimate can be trusted.
 
 ---
 
-## Комплектність
+## Completeness
 
-Монеты можно сгруппировать не только по сериям, но и по году, номиналу, материалу, гурту
-или качеству чеканки — какой признак важнее для конкретной коллекции, такой и выбирается.
-По каждой группе видно: сколько всего, сколько собрано, сколько осталось, процент,
-потраченная сумма и текущая оценка. Отдельным фильтром группы можно сузить до только
-драгоценного или только недрагоценного металла — независимо от того, по какому признаку
-идёт группировка.
+Group your coins by series, year, denomination, material, edge or strike quality —
+whichever matters for your collection — and optionally narrow to precious or
+non-precious metal. Each group shows total, collected, missing, percent, money spent and
+current value.
 
-Позиция считается собранной, если есть **хотя бы один** экземпляр. Две одинаковые монеты —
-это по-прежнему одна собранная позиция.
-
-Считаются только действующие позиции каталога: архивные не входят ни в «собрано», ни в
-«всего», поэтому процент не может оказаться больше ста.
-
-Комплектность считается по тому, что сейчас в фильтре — страна, годы, ценность металла, —
-а не по всему каталогу целиком. Иначе получается бесполезное «осталось собрать 2443
-монеты». Открыв конкретную группу, эти фильтры можно уточнить ещё раз, уже глядя на список
-монет внутри неё.
+An entry counts as collected if you have **at least one** of it. Only active entries
+count. Completeness follows your current filters (country, years, metal), not the whole
+catalog — otherwise it would say "2,443 coins left to collect".
 
 ---
 
-## Аккаунт
+## Account
 
-- Регистрация открыта, аккаунт заводится самостоятельно — по email и паролю или через
-  Google (решение владельца 2026-09-15).
-- **Адрес нужно подтвердить**: до перехода по ссылке из письма аккаунт неактивен.
-  Это защита и от ботов, и от опечатки в адресе, из-за которой потом не восстановить пароль.
-- Пароль восстанавливается по ссылке из письма.
-- Пароль можно сменить в настройках.
-- Зарегистрировались по email — можно потом привязать вход через Google на тот же адрес, и
-  наоборот (решение владельца 2026-09-15, детали ещё не спроектированы).
-- Язык интерфейса — **украинский или английский**, по умолчанию украинский.
-- Данные привязаны к аккаунту: удаление аккаунта удаляет коллекцию, покупки, фотографии
-  и личные позиции каталога. Общий каталог при этом не страдает.
+- Open registration with email and password, or with Google. An email account can later
+  link Google sign-in for the same address, and the other way round.
+- **Email must be confirmed**: the account is inactive until the link in the email is
+  opened.
+- Password reset by email link; password change in settings.
+- Settings: display name and avatar, theme (light, dark, system), language, secondary
+  currency (USD or EUR), catalog and collection view mode, default grade, souvenir
+  packaging variants on or off, whether related expenses count toward cost, storage
+  locations.
+- Deleting an account removes its collection, purchases, photos and personal positions;
+  the shared catalog is unaffected. There is no self-service account deletion in the
+  interface yet.
 
-## Футер, донат, саппорт
+## Footer, donations, support
 
-Внизу каждой страницы — футер с кнопкой доната (ссылка на монобанку) и ссылкой на
-телеграм-чат саппорта, куда можно написать с идеей, вопросом или чтобы связаться с
-админами. Новое в MVP, решение владельца 2026-09-15.
-
----
-
-## Чего в MVP нет
-
-Осознанно отложено — в прошлой версии этими функциями за год не воспользовались ни разу:
-
-- продажи монет и архив проданного;
-- цели коллекционирования;
-- список «присматриваюсь к покупке»;
-- разновидности монет (монетные дворы, знаки двора);
-- грейдинг: компания, номер слаба, оценка;
-- цены по США и СССР автоматически;
-- автоматическое слияние дубликатов в каталоге — пока лишняя позиция просто уходит в архив
-  с причиной, а ваш экземпляр остаётся на той, к которой привязан;
-- мобильные приложения — пока только сайт, но он работает с телефона;
-- двухфакторная аутентификация;
-- импорт выгрузки с uCoin и монеты/раздела каталога по ссылке (решение владельца
-  2026-09-15 — было в MVP, перенесено после);
-- экспорт коллекции в Excel (решение владельца 2026-09-15);
-- ввод цены от руки, если автоматически её не нашлось (решение владельца 2026-09-15).
-
-Полный список с обоснованием — `scope.md`.
+Every page has a footer with a donation button (a monobank link) and a link to the
+Telegram support bot — for ideas, questions or reaching the administrators.
 
 ---
 
-## Одним абзацем
+## Out of scope
 
-Вы заводите аккаунт — по email или через Google — подтверждаете почту и попадаете в общий
-каталог из трёх с лишним тысяч выпусков с фотографиями (без входа тоже можно посмотреть
-каталог, но без цен). Отмечаете, какие монеты у вас есть, и за сколько куплены. Чего в
-каталоге нет — заводите себе сами. Приложение считает, сколько вы потратили и сколько это
-стоит сегодня, показывает, чего не хватает до полной серии, и раз в сутки само обновляет
-цены украинских монет.
+### Deferred — may come later on an explicit decision
+
+- sales and a sold-coins archive; collecting goals; a "considering buying" list;
+- varieties (mints, mint marks) as separate required entries;
+- grading details: company, slab number, grade;
+- automatic prices for countries other than Ukraine (Numista would need each user's own
+  API key);
+- entering a market price by hand; refreshing prices of personal positions;
+- import from uCoin (Excel export, coin or catalog section by link) — always at the
+  user's request, never a scheduled crawl;
+- export of the collection to Excel;
+- suggesting an entry for the shared catalog; an administrator promoting a personal
+  position into it; merging duplicate entries (until then duplicates are archived);
+- a shared-catalog editor in the admin area;
+- mobile apps (the website works on phones);
+- two-factor authentication.
+
+### Not part of the project
+
+- offline mode and a local database on the device;
+- a desktop or portable build, or sync with one;
+- stamps and other collectibles;
+- yearly PDF reports.
+
+---
+
+## In one paragraph
+
+You create an account — by email or with Google — confirm the address and get a shared
+catalog of Ukrainian coins with photos (guests can browse it too, without prices). You
+record the coins you have and what you paid. What's missing from the catalog you add
+yourself. The app shows how much you've spent, what the collection is worth today and
+what's left to complete each series, and updates Ukrainian coin prices by itself every
+day.

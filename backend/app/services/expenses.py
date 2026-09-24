@@ -295,7 +295,7 @@ class ExpenseService:
 
     async def _amount_usd_for(self, expense: Expense) -> Decimal | None:
         """The rate on the expense's OWN date, not today's -- what it cost
-        then (docs/backlog.md, NBU rates follow-up). None if NBU has no
+        then (docs/business-rules.md, BR-6). None if NBU has no
         rate that far back, rather than a live-rate guess."""
         usd_rate = await self._rates.rate_on("USD", expense.expense_date)
         if usd_rate is None:

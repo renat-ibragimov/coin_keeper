@@ -66,8 +66,8 @@ def _rate_on_expense_date(code: str) -> ColumnElement[Decimal]:
 
 def _amount_usd() -> ColumnElement[Decimal]:
     """The UAH amount converted by the USD rate on the expense's OWN date --
-    what it cost then, not a live estimate (docs/backlog.md, NBU rates
-    follow-up). NULL (no rate that far back) when there simply is none;
+    what it cost then, not a live estimate (docs/business-rules.md,
+    BR-6). NULL (no rate that far back) when there simply is none;
     SQL division by NULL yields NULL rather than raising."""
     return _amount_uah() / _rate_on_expense_date("USD")
 

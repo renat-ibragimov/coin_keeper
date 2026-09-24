@@ -334,8 +334,8 @@ class CatalogService:
                 * instance.quantity
             )
             # The rate on THIS instance's own purchase date, not today's --
-            # what it cost then, not a live estimate (docs/backlog.md,
-            # NBU rates follow-up).
+            # what it cost then, not a live estimate (docs/business-rules.md,
+            # BR-6).
             usd_rate, eur_rate = (
                 (
                     await self._rates.rate_on("USD", instance.acquisition_date),
