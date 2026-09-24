@@ -210,7 +210,11 @@ push an image (tagged with the PR's SHA, and `latest`), but never deploy.
 ```
 .github/workflows/deploy.yml        project file: triggers and parameters only
 .github/workflows/build-deploy.yml  reusable workflow (workflow_call): all the logic
+.github/workflows/docs.yml          docs consistency: tools/docs_check.py refs + table --check
 ```
+
+`docs.yml` runs independently of the deploy pipeline and never blocks a deploy by
+itself; see `docs/README.md`, "How docs are kept in step".
 
 The reusable workflow is generic (FastAPI + Postgres + Compose on an own server) so it
 can move to its own repository and be pinned by tag once a second project uses it.

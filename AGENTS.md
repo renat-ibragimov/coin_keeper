@@ -37,6 +37,10 @@ Don't introduce new infrastructure (queues, workers, new services) without discu
 AGENTS.md            this file — rules for agents
 CLAUDE.md            imports this file + Claude-only notes
 docs/                specs; start at docs/README.md
+  doc-map.toml       which document describes which code (drives the hook and CI)
+tools/docs_check.py  docs consistency checks (commit-msg hook, CI)
+.githooks/           git hooks; enable with `git config core.hooksPath .githooks`
+.agents/skills/      skills shared by Codex and Claude (.claude/skills links here)
 backend/app/
   api/v1/            routes — thin, no business logic, no visibility filters
   services/          business logic
@@ -56,14 +60,17 @@ frontend/src/
 
 ## Commands
 
-Local setup, test dependencies and gotchas: `docs/development.md`. The checks CI runs,
-all of which must pass before a push:
+Local setup, test dependencies and gotchas: `docs/development.md`. Once per clone, enable
+the docs hook: `git config core.hooksPath .githooks`. The checks CI runs, all of which
+must pass before a push:
 
 ```bash
 # backend/
 uv run ruff format --check . && uv run ruff check . && uv run mypy app scripts && uv run pytest -q
 # frontend/
 npm run format:check && npm run lint -- --max-warnings=0 && npm run typecheck && npm test && npm run test:seo
+# repository root
+python3 tools/docs_check.py refs && python3 tools/docs_check.py table --check
 ```
 
 ## Architecture rules
@@ -130,10 +137,18 @@ Every `media_files` row has a `source` that drives visibility (`docs/media.md`):
 
 - **Read the relevant spec before changing code** — `docs/README.md` maps code areas to
   documents.
-- **Docs live with the code.** A change that alters behavior, API, schema, UI or infra
-  updates the affected document in the same commit. A gap between `docs/` and the code
-  is worse than no document. Docs describe the **current state**, in English — no
-  changelogs, stage numbers or "was / now" notes; history is what git is for.
+- **Docs live with the code — updated before the commit, not after.** Before committing,
+  map your changed files through `docs/doc-map.toml` (table in `docs/README.md`) and
+  update every affected document in the same commit. The `commit-msg` hook blocks a
+  commit that skips one; if behavior, API, schema, UI and infra truly didn't change,
+  add the trailer `Docs: not needed (<why>)` — never use it to postpone a doc update.
+  Docs describe the **current state**, in English — no changelogs, stage numbers or
+  "was / now" notes; history is what git is for.
+- **Cite docs precisely.** `docs/<file>.md, "Section heading"` or
+  `docs/business-rules.md, BR-N` — never section numbers. Renaming a heading means
+  updating its citations; `python3 tools/docs_check.py refs` finds broken ones.
+- **Audit on request** with the `sync-docs` skill (`.agents/skills/sync-docs/SKILL.md`):
+  it compares code changed since each document's last update against the document.
 - **Scoped work.** Change only what the task needs; mention unrelated problems instead of
   fixing them silently. In a multi-task session run the tests for the current task, and
   the full suite plus doc sync once at the end.

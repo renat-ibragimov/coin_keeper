@@ -11,6 +11,20 @@ Backend runbooks (operator scripts, photo background removal): `backend/README.m
   prefix commands with `export PATH="$HOME/.local/bin:$PATH"`.
 - Node.js + npm for the frontend.
 
+## Git hooks
+
+Enable once per clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+`.githooks/commit-msg` runs `tools/docs_check.py commit-msg`: it blocks a commit that
+changes code mapped in `docs/doc-map.toml` without staging the matching document, checks
+doc references in the staged files, and rejects Russian in the message. If the change
+really doesn't affect any document, add a `Docs: not needed (<why>)` trailer. Details:
+`docs/README.md`, "How docs are kept in step".
+
 ## Full stack in Docker
 
 ```bash
@@ -66,6 +80,13 @@ npm run typecheck
 npm test
 npm run test:seo
 npm run build
+```
+
+From the repository root, the docs checks (also a separate CI workflow):
+
+```bash
+python3 tools/docs_check.py refs
+python3 tools/docs_check.py table --check
 ```
 
 Don't pipe a check to `tail`/`head` when you need its result — the pipe hides the exit

@@ -1,0 +1,137 @@
+# Which document describes which code. Read by tools/docs_check.py:
+#  - the commit-msg hook blocks a commit that touches `paths` without staging `doc`
+#    (bypass: a "Docs: not needed (<why>)" trailer when behavior is unchanged);
+#  - `python3 tools/docs_check.py table` renders the table in docs/README.md.
+# Globs: `*` stays within a directory, `**` crosses directories.
+# Tests, i18n JSON and lock files are deliberately unmapped.
+
+# Files where Russian text is data, not prose: original-language names and
+# the raw uCoin strings the material parser has to understand.
+russian_allowed = [
+  "backend/app/reference_data/**",
+  "backend/alembic/versions/0003_three_language_catalog_model.py",
+  "backend/tests/test_reference_data.py",
+  "backend/tests/test_title_translation.py",
+]
+
+# Not scanned at all: generated from the deployed server, may lag the code.
+skip_scan = ["frontend/src/shared/api/generated/**", "**/package-lock.json"]
+
+[[rule]]
+doc = "docs/data-model.md"
+paths = ["backend/app/models/**", "backend/alembic/versions/**"]
+
+[[rule]]
+doc = "docs/api.md"
+paths = ["backend/app/api/**", "backend/app/schemas/**"]
+
+[[rule]]
+doc = "docs/business-rules.md"
+paths = ["backend/app/services/**", "backend/app/repositories/**"]
+note = "`backend/app/services/`, `backend/app/repositories/` (rules, visibility, calculations)"
+
+[[rule]]
+doc = "docs/auth.md"
+paths = [
+  "backend/app/api/v1/auth.py",
+  "backend/app/api/v1/google_auth.py",
+  "backend/app/api/public_rate_limit.py",
+  "backend/app/services/auth.py",
+  "backend/app/services/google_auth.py",
+  "backend/app/core/security.py",
+  "backend/app/core/rate_limit.py",
+  "backend/scripts/promote_admin.py",
+]
+note = "auth routes and services, `core/security.py`, `core/rate_limit.py`, `scripts/promote_admin.py`"
+
+[[rule]]
+doc = "docs/media.md"
+paths = [
+  "backend/app/core/storage.py",
+  "backend/app/core/images.py",
+  "backend/app/core/media_keys.py",
+  "backend/app/services/*photos*.py",
+  "backend/app/services/media_*.py",
+  "backend/app/services/avatars.py",
+  "backend/app/repositories/media.py",
+  "backend/scripts/remove_photo_backgrounds.py",
+]
+note = "storage, image processing, photo services, `repositories/media.py`"
+
+[[rule]]
+doc = "docs/integrations.md"
+paths = ["backend/app/services/translation.py", "backend/app/repositories/rates.py"]
+note = "rates, LLM translation, anything `coin-parser` writes or reports"
+
+[[rule]]
+doc = "docs/ui.md"
+paths = [
+  "frontend/src/app/**",
+  "frontend/src/features/**",
+  "frontend/src/shared/ui/**",
+  "frontend/src/shared/theme/**",
+  "frontend/index.html",
+]
+note = "`frontend/src/app/`, `features/`, `shared/ui/`, `shared/theme/`"
+
+[[rule]]
+doc = "docs/admin.md"
+paths = [
+  "backend/app/api/v1/admin.py",
+  "backend/app/api/v1/jobs.py",
+  "backend/app/api/v1/telegram.py",
+  "backend/app/core/telegram/**",
+  "backend/app/services/jobs.py",
+  "backend/app/services/admin_users.py",
+  "backend/app/services/telegram.py",
+  "backend/app/repositories/admin_*.py",
+  "backend/app/repositories/jobs.py",
+  "backend/app/repositories/telegram.py",
+  "backend/scripts/watchdog.py",
+  "frontend/src/features/admin/**",
+]
+note = "admin and job-report routes, admin Telegram bot, `scripts/watchdog.py`, `features/admin/`"
+
+[[rule]]
+doc = "docs/telegram-support.md"
+paths = [
+  "backend/app/api/v1/support.py",
+  "backend/app/core/support_telegram.py",
+  "backend/app/services/support.py",
+  "backend/app/repositories/support.py",
+  "backend/scripts/configure_support_telegram.py",
+]
+note = "support bot routes, service and setup script"
+
+[[rule]]
+doc = "docs/infra.md"
+paths = [
+  "docker-compose*.yml",
+  "Caddyfile",
+  ".github/workflows/**",
+  ".env.example",
+  "backend/app/core/config.py",
+  "backend/Dockerfile",
+  "frontend/scripts/prerender-catalog.mjs",
+]
+note = "compose, Caddyfile, workflows, `.env.example`, `core/config.py`, Dockerfile, prerender"
+
+[[rule]]
+doc = "docs/development.md"
+paths = [
+  "tools/**",
+  ".githooks/**",
+  "backend/tests/conftest.py",
+  "frontend/vite.config.ts",
+]
+note = "dev tooling, git hooks, test setup, Vite config"
+
+[[rule]]
+doc = "docs/product.md"
+paths = []
+note = "a user-visible capability added or removed (not path-checked)"
+
+[[rule]]
+doc = "docs/backlog.md"
+paths = []
+note = "a backlog item done or found done — remove it (not path-checked)"

@@ -1,0 +1,26 @@
+# Documentation consistency (docs/README.md, "How docs are kept in step"):
+# every cited doc, section and BR-N exists, no Russian outside data files, and
+# the generated table in docs/README.md matches docs/doc-map.toml.
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: References
+        run: python3 tools/docs_check.py refs
+      - name: Generated table
+        run: python3 tools/docs_check.py table --check
