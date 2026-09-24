@@ -1,10 +1,8 @@
 """One short phrase, translated by Claude Haiku (docs/05-integrations.md).
 
-Not the batch/CSV pipeline in app/ukraine_pipeline/translate_c.py — that one
-is an offline, human-reviewed run over the shared catalogue. These are single
-calls for single user-typed phrases, meant to run detached from the request
-in a FastAPI BackgroundTask right after the row is saved: never block the
-response, and a failure just leaves the untranslated placeholder in place
+Single calls for single user-typed phrases, meant to run detached from the
+request in a FastAPI BackgroundTask right after the row is saved: never block
+the response, and a failure just leaves the untranslated placeholder in place
 rather than surfacing an error to the user.
 
 Two phrases, two prompts, one shape of answer (`TranslationResult`):
@@ -27,8 +25,7 @@ from typing import Literal
 
 logger = logging.getLogger("app.services.translation")
 
-# A cheap, current model is enough for translating a couple of words —
-# the same convention app/ukraine_pipeline/translate_c.py uses.
+# A cheap, current model is enough for translating a couple of words.
 MODEL = "claude-haiku-4-5"
 
 TOOL_NAME = "submit_translation"

@@ -32,10 +32,10 @@ class MaterialSeed:
 #
 # Fineness is deliberately not part of it: the National Bank never states a
 # fineness for silver or gold (its own "Матеріал" filter offers only the bare
-# metal, `NBU_METALS` in app/ukraine_pipeline/sources.py), so a specific
-# "Срібло 925" the legacy collection once carried was never something our
-# only source of truth actually said — dropped in favour of the plain metal
-# name rather than keep unverifiable precision (owner's call, 2026-09-12).
+# metal), so a specific "Срібло 925" the legacy collection once carried was
+# never something our only source of truth actually said — dropped in favour
+# of the plain metal name rather than keep unverifiable precision (owner's
+# call, 2026-09-12).
 MATERIALS: tuple[MaterialSeed, ...] = (
     MaterialSeed("silver", "Срібло", "Silver"),
     MaterialSeed("silver_gilded", "Срібло із золотим покриттям", "Gilded silver"),
@@ -81,9 +81,9 @@ BARE_METAL_WORDS: dict[str, str] = {"silver": "срібло", "gold": "золо�
 
 # Stale English tokens the confirmed (Ukrainian) catalogue carries in the
 # free-text `material` column from before this dictionary covered every
-# category the National Bank's own "Матеріал" filter offers (`NBU_METALS` in
-# app/ukraine_pipeline/sources.py) -- an early run left them and nothing since
-# has revisited an already-filled column (docs/09-data-migration.md). Most
+# category the National Bank's own "Матеріал" filter offers -- an early run
+# left them and nothing since has revisited an already-filled column
+# (docs/09-data-migration.md). Most
 # already spell a code exactly (`_composition_of` resolves those on its own);
 # these are the ones that do not.
 LEGACY_RAW_ALIASES: dict[str, str] = {

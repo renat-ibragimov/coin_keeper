@@ -12,8 +12,8 @@ Only unambiguous rows are touched: a supporting expense whose
 gets that row's id. A pair matching more than one purchase is left `NULL` —
 there is no way to tell which purchase it belongs to, and guessing would be
 worse than the status quo (still correctly summed at the item level via
-`catalog_item_id`, just not attributable to one purchase). See the "Бэкфилл
-существующих записей" note in the same rule.
+`catalog_item_id`, just not attributable to one purchase). See the
+"Backfilling existing rows" note in the same rule.
 
 Revision ID: 0025
 Revises: 0024

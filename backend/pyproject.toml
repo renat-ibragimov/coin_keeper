@@ -19,15 +19,7 @@ dependencies = [
     "boto3>=1.35",
     "pillow>=11.0",
     "httpx>=0.28",
-    "selectolax>=0.3.21",
-    "rapidfuzz>=3.9",
     "anthropic>=0.40",
-    # app/ukraine_pipeline/classify_coin_photos.py: geometric coin/packaging
-    # classification. The rest of the codebase's image work is deliberately
-    # Pillow-only (app/services/media_background.py's own docstring); this is
-    # the one module that needs real contour geometry, not just a flood fill.
-    "opencv-python-headless>=4.10",
-    "numpy>=2.1",
 ]
 
 [project.optional-dependencies]
@@ -62,12 +54,6 @@ ignore = ["S101"]
 # series names — data, which the language policy in CLAUDE.md exempts.
 # Comments and docstrings (RUF002/RUF003) still must be plain English.
 "tests/*" = ["S105", "S106", "RUF001"]
-# The legacy fixture carries Ukrainian and Russian coin titles on purpose: the
-# migration has to survive non-ASCII data, and Cyrillic letters that look like
-# Latin ones are exactly what the real database contains. This is data, not
-# code, and the language policy in CLAUDE.md exempts coin, country and series
-# names for that reason.
-"tests/fixtures/build_legacy_db.py" = ["RUF001", "RUF002", "RUF003"]
 # Same exemption for the API test seed: Ukrainian coin and series names are data.
 "tests/seed.py" = ["RUF001", "RUF002", "RUF003"]
 # A migration docstring quotes the data it is about: Russian titles,
@@ -76,14 +62,6 @@ ignore = ["S101"]
 # Country endonyms, denomination words and the material phrases the sources
 # print are data too, same exemption as the reconnaissance parsers.
 "app/reference_data/*" = ["RUF001", "RUF002", "RUF003"]
-# The reconnaissance parsers select cells by the Ukrainian labels the sites
-# print ("Назва", "Тираж"); those literals are the sites' data, not prose.
-"app/ukraine_recon/*" = ["RUF001", "RUF002", "RUF003"]
-# Same for the pipeline: the lexicon and the parsers quote the two languages
-# they compare, letter by letter.
-"app/ukraine_pipeline/*" = ["RUF001", "RUF002", "RUF003"]
-"scripts/ukraine_pipeline.py" = ["RUF001", "RUF002", "RUF003"]
-"scripts/recon_ukraine.py" = ["RUF001", "RUF002", "RUF003"]
 # The admin bot's own wording is Ukrainian by decision (docs/13-admin.md, 2.6):
 # it is not part of the application interface and has no locale files to live
 # in. Only the message strings are exempt -- comments and docstrings in this

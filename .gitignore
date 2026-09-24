@@ -219,11 +219,11 @@ __marimo__/
 .streamlit/secrets.toml
 
 # ---- CoinKeeper ----
-# Личные данные коллекции. Репозиторий публичный — сюда ничего не коммитим.
+# Personal collection data. The repository is public -- nothing here gets committed.
 legacy/data/
-# Каталог, куда данные кладутся на сервере перед миграцией
+# Directory data lands in on the server before migration
 legacy-data/
-# Отчёты миграции: содержат счётчики и примеры из реальной базы
+# Migration reports: contain counts and examples from the real database
 migration-reports/
 media-archive/
 *.db
@@ -231,25 +231,25 @@ media-archive/
 *.db-shm
 *.sqlite3
 
-# Локальные окружения
+# Local environments
 .env
 .env.*
 !.env.example
 
-# Фронтенд
+# Frontend
 node_modules/
 frontend/dist/
 frontend/.vite/
 # Temporary standalone landing handoff for the designer.
 /bakost-landing.html
-# Скретч-папки с визуальными референсами для текущей сессии, не артефакт проекта
+# Scratch folders with visual references for the current session, not a project artifact
 frontend/current_ref/
 docs/current_ref/
 
-# Инфраструктура
+# Infrastructure
 docker-compose.override.yml
 
-# Редакторы и IDE
+# Editors and IDEs
 .idea/
 .vscode/
 *.swp

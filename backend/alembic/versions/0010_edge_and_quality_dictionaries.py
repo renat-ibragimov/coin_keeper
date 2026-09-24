@@ -16,8 +16,7 @@ does not write `quality` itself, only the dictionary and the FK -- the
 backfill below resolves whatever the column already holds.
 
 Materials lose their fineness. The National Bank's own "Матеріал" filter
-never states one for silver or gold (`NBU_METALS`,
-app/ukraine_pipeline/sources.py), so a "Срібло 925" the legacy collection
+never states one for silver or gold, so a "Срібло 925" the legacy collection
 carried was never something our only source of truth actually said. Existing
 `silver_*`/`gold_*`/`silver_gilded_*` rows collapse into one row per family;
 catalog_items pointing at a collapsed row are repointed first. A fresh

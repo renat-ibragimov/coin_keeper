@@ -140,8 +140,8 @@ async def images_by_catalog_item(
 
     Shared by the catalog listing/card and the collection listing: both show
     "the viewer's own coin, with their own photo first" for the same set of
-    catalog items (docs/06-media-storage.md, "Выбор изображения для
-    карточки") — one query pair and one ranking, so the two screens cannot
+    catalog items (docs/06-media-storage.md, "Choosing the card photo")
+    — one query pair and one ranking, so the two screens cannot
     quietly start disagreeing about which photo wins.
     """
     by_item: dict[int, list[MediaFile]] = {}

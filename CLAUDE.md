@@ -1,181 +1,181 @@
-# Bakost Numismatics (техническое имя CoinKeeper) — правила проекта
+# Bakost Numismatics (technical name CoinKeeper) — project rules
 
-## Что это
+## What this is
 
-Веб-версия десктопного приложения для учёта коллекции монет. Десктопная версия (Electron/Tauri)
-**закрыта и не поддерживается** — её исходники частично утрачены, остался только эталонный код
-в `legacy/reference-code/` и рабочая база данных.
+A web version of a desktop app for tracking a coin collection. The desktop version
+(Electron/Tauri) **is discontinued and unsupported** — its sources are partly lost. The
+owner's real collection data migrated to this app once, early on; nothing from the old
+app remains in this repository.
 
-Пишем заново: **Python-бэкенд + PostgreSQL + React-фронтенд.**
+Written from scratch: **Python backend + PostgreSQL + React frontend.**
 
-## Стек — зафиксировано, не меняем без обсуждения
+## Stack — locked in, don't change without discussion
 
-| Слой | Технология |
+| Layer | Technology |
 |---|---|
 | API | FastAPI, Pydantic v2 |
 | ORM | SQLAlchemy 2.0 (async), Alembic |
-| БД | PostgreSQL 16 |
-| Фон | ARQ + Redis |
-| Скрейпинг | Playwright (headless Chromium) |
-| Хранилище файлов | S3-совместимое (MinIO локально) |
-| Фронт | React 19 + TypeScript + Vite + TanStack Query |
-| Деплой | Docker Compose на Hetzner, Caddy как reverse proxy |
-| CI/CD | GitHub Actions (reusable workflow), образы в GHCR, деплой по SSH |
+| DB | PostgreSQL 16 |
+| Background | ARQ + Redis |
+| Scraping | Playwright (headless Chromium) |
+| File storage | S3-compatible (MinIO locally) |
+| Frontend | React 19 + TypeScript + Vite + TanStack Query |
+| Deploy | Docker Compose on Hetzner, Caddy as reverse proxy |
+| CI/CD | GitHub Actions (reusable workflow), images in GHCR, deploy over SSH |
 | Python | 3.12+ |
 
-## Языки в проекте
+## Languages in the project
 
-Правило первое, потому что нарушается чаще всего.
+Rule number one, because it's the one that gets broken most often.
 
-### В коде — только английский, без исключений
+### Code — English only, no exceptions
 
-Английский в коде — это **всё**, что в нём написано, а не только имена переменных:
+English in code means **everything** written in it, not just identifier names:
 
-- имена: переменные, функции, классы, модули, таблицы, колонки, ключи конфигурации;
-- докстринги и комментарии, включая `TODO` и `FIXME`;
-- сообщения логов;
-- тексты ошибок API (`detail` в RFC 7807) и сообщения исключений;
-- сообщения коммитов и названия веток;
-- названия и докстринги миграций Alembic;
-- тестовые данные, фикстуры, названия тестов.
+- names: variables, functions, classes, modules, tables, columns, config keys;
+- docstrings and comments, including `TODO` and `FIXME`;
+- log messages;
+- API error text (`detail` in RFC 7807) and exception messages;
+- commit messages and branch names;
+- Alembic migration names and docstrings;
+- test data, fixtures, test names.
 
-Смешанный язык в коде — типичный источник мусора: `# получаем курс` рядом с
-`def get_rate()`, лог `"Не удалось распарсить цену"`, ветка `feature/архивация`. Так не
-делаем нигде, даже во временном скрипте.
+Mixed-language code is a typical source of mess: `# получаем курс` next to
+`def get_rate()`, a log line `"Не удалось распарсить цену"`, a branch
+`feature/архивация`. We don't do that anywhere, not even in a throwaway script.
 
-Единственное исключение — **данные**: названия монет, стран и серий хранятся на языке
-оригинала, это содержимое базы, а не код.
+The one exception is **data**: coin, country and series names are stored in their
+original language — that's database content, not code.
 
-### Интерфейс — украинский и английский
+### Interface — Ukrainian and English
 
-`'uk' | 'en'`, по умолчанию `'uk'`. Русского в интерфейсе нет.
+`'uk' | 'en'`, default `'uk'`. No Russian in the interface.
 
-Строки интерфейса живут **только в файлах локализации**. Ни одной пользовательской строки
-прямо в коде — ни в компонентах, ни в валидаторах, ни в ответах API, которые фронт
-показывает как есть. Русские строки в `legacy/ui-strings.json` — справочник смысла для
-восстановления экранов, а не источник переводов.
+Interface strings live **only in localization files**. Not a single user-facing string
+sits directly in code — not in components, not in validators, not in API responses the
+frontend shows verbatim.
 
-### Документация и общение
+### Documentation
 
-- `docs/` — **на русском**. Новые документы до переезда проекта в новый репозиторий тоже
-  пишем по-русски, чтобы не получить документацию на двух языках вперемешку. При переезде
-  переведём разом.
-- Общение ассистента с разработчиком в сессиях — **на русском**.
+`docs/` — **in English**, same as the code. It was in Russian until the 2026-09-24
+repository-migration prep; translation is in progress file by file — until a given file
+is converted, treat any Russian left in it as not-yet-migrated, not as an active rule.
 
-Итого: код и всё, что вокруг него в репозитории (коммиты, ветки, миграции), — английский;
-докам и разговорам — русский; интерфейсу — украинский и английский через локализацию.
+In short: code and everything around it in the repository (commits, branches,
+migrations, docs) — English; the interface — Ukrainian and English through localization.
 
-## Правила работы с кодом
+## Rules for working with code
 
-- Все денежные суммы — `Numeric(14, 2)`, никогда не `float`. В legacy-базе были `REAL` — это
-  источник ошибок округления, повторять нельзя.
-- Даты хранения — `date`/`timestamptz`, не строки. В legacy всё было `TEXT`.
-- Любое изменение схемы — только через миграцию Alembic. Руками схему не правим.
-- Записи **общего** каталога не удаляются, а архивируются (`is_archived` + причина):
-  на них висят экземпляры, покупки и расходы чужих пользователей. Физическое удаление —
-  редкая админская операция, только после архивации и при полном отсутствии ссылок.
-  Витрина, поиск и комплектность считаются по активным записям
-  (`docs/04-business-rules.md`, п. 10).
-- Цены с внешних источников проходят валидацию **до** записи в БД. Подробности и список известных
-  багов парсера — в `docs/05-integrations.md`. Не повторять ошибку legacy, где кривые цены
-  чинились точечными миграциями постфактум.
-- **Доки живут вместе с кодом.** Каждая завершённая часть этапа обновляет статусы в
-  `docs/11-roadmap.md` и затронутые документы (`08-ui-map.md`, `10-infra.md`, `README.md`
-  и т. д.) тем же набором коммитов, что и код. Расхождение между `docs/` и кодом хуже,
-  чем отсутствие документа.
+- All money amounts are `Numeric(14, 2)`, never `float`. The legacy database used `REAL`
+  — a source of rounding errors we must not repeat.
+- Stored dates are `date`/`timestamptz`, not strings. In legacy everything was `TEXT`.
+- Any schema change goes through an Alembic migration. Never edit the schema by hand.
+- Records in the **shared** catalog are never deleted, only archived (`is_archived` +
+  reason): other users' instances, purchases and expenses hang off them. Physical
+  deletion is a rare admin operation, only after archiving and only when nothing
+  references the record anymore. The storefront, search and completeness are all
+  computed from active records (`docs/04-business-rules.md`, item 10).
+- Prices from external sources are validated **before** being written to the DB. Details
+  and known parser bugs are in `docs/05-integrations.md`. Don't repeat the legacy
+  mistake of fixing bad prices with one-off migrations after the fact.
+- **Docs live with the code.** Every completed part of a stage updates the status in
+  `docs/11-roadmap.md` and the affected documents (`08-ui-map.md`, `10-infra.md`,
+  `README.md`, etc.) in the same set of commits as the code. A gap between `docs/` and
+  the code is worse than no document at all.
 
-## Три слоя данных — главное архитектурное правило
+## Three data layers — the main architectural rule
 
-`catalog_items.created_by` определяет слой записи:
+`catalog_items.created_by` determines a record's layer:
 
-| Слой | Признак | Кто пишет |
+| Layer | Marker | Who writes |
 |---|---|---|
-| Общий каталог | `created_by IS NULL` | только admin и системные фоновые задачи |
-| Личная позиция | `created_by = <user>` | её автор, полный CRUD |
-| Коллекция | `collection_items.owner_id` | только владелец |
+| Shared catalog | `created_by IS NULL` | only admin and system background jobs |
+| Personal position | `created_by = <user>` | its author, full CRUD |
+| Collection | `collection_items.owner_id` | only the owner |
 
-- **Общий каталог для пользователя read-only.** Он не создаёт, не меняет и не удаляет
-  записи с `created_by IS NULL`. Попытка — `403`.
-- Правило исходного ТЗ «внешние источники не создают каталожных записей» **усилено**:
-  теперь и пользователи не создают записей в ОБЩЕМ каталоге. Единственное исключение —
-  системная задача по официальному каталогу НБУ.
-- Импорт (Excel, uCoin по URL) создаёт **только личные позиции**. Совпало с общим
-  каталогом — привязываем, не создаём.
-- Фильтр видимости `created_by IS NULL OR created_by = :user_id` — **в репозиторийном
-  слое**, рядом с `owner_id`. Не в роутах.
+- **The shared catalog is read-only for the user.** They never create, change or delete
+  records with `created_by IS NULL`. Attempting to — `403`.
+- The original spec's rule "external sources don't create catalog records" is
+  **strengthened**: now users don't create records in the SHARED catalog either. The
+  only exception is the system job against the official NBU catalog.
+- Import (Excel, uCoin by URL) creates **only personal positions**. If it matches the
+  shared catalog, we link to it instead of creating a new record.
+- The visibility filter `created_by IS NULL OR created_by = :user_id` lives **in the
+  repository layer**, next to `owner_id` — not in the routes.
 
-## Видимость снимков цен
+## Price snapshot visibility
 
-`market_price_snapshots.created_by` работает так же:
+`market_price_snapshots.created_by` works the same way:
 
-- `NULL` — снимок центральной суточной задачи (UA-Coins по общему каталогу), виден всем;
-- `<user>` — ручной ввод, обновление личной позиции, Excel-импорт: виден и учитывается
-  в оценке только у автора.
+- `NULL` — a snapshot from the central daily job (UA-Coins against the shared catalog),
+  visible to everyone;
+- `<user>` — manual entry, a personal-position update, an Excel import: visible and
+  counted in valuation only for its author.
 
-В расчёте стоимости коллекции участвуют общие снимки **плюс собственные снимки
-пользователя**. Кнопки «обновить цену» для общих позиций в MVP нет.
+Collection valuation uses shared snapshots **plus the user's own snapshots**. There's no
+"update price" button for shared positions in the MVP.
 
-## Происхождение изображений
+## Image provenance
 
-У каждой записи `media_files` есть `source` (`user_upload | ucoin | nbu | manual`), и от него
-зависит видимость:
+Every `media_files` record has a `source` (`user_upload | ucoin | nbu | manual`), which
+drives visibility:
 
-- `user_upload` — приватные фото владельца;
-- `nbu`, `manual` — публичные каталожные;
-- `ucoin` — виден только тому, кто импортировал; в публичной карточке — плейсхолдер.
+- `user_upload` — the owner's private photos;
+- `nbu`, `manual` — public catalog photos;
+- `ucoin` — visible only to whoever imported it; a placeholder shows on the public card.
 
-Права на изображения uCoin нам не принадлежат. Скачивание файла к себе этого не меняет:
-`source` сохраняется. Подробности — `docs/06-media-storage.md`.
+We don't own the rights to uCoin images. Downloading a copy to our own storage doesn't
+change that: `source` is preserved. Details in `docs/06-media-storage.md`.
 
-## Правила работы с данными
+## Rules for working with data
 
-**Репозиторий публичный.** В git не попадает:
+**The repository is public.** Nothing of the following goes into git:
 
-- `legacy/data/` — реальная база коллекции и фотографии (в `.gitignore`)
-- любые `.db`, `.env`, дампы, ключи API
+- any `.db`, `.env`, dumps, API keys, real collection photos
 
-Перед коммитом проверяй `git status` на предмет случайно добавленных данных.
+Check `git status` before committing for anything accidentally staged.
 
-## Структура
+## Structure
 
 ```
-docs/       спецификации — читать перед тем, как писать код
-legacy/     артефакты старого проекта: схема, эталонный код, ТЗ, UI-тексты
-backend/    FastAPI-приложение
-frontend/   React-приложение
+docs/       specs -- read before writing code
+backend/    FastAPI application
+frontend/   React application
 ```
 
-### `docs/current_ref/` — это не документация
+### `docs/current_ref/` is not documentation
 
-Служебная папка: владелец кладёт туда скриншоты, чтобы показать их ассистенту в текущем
-разговоре. Содержимое живёт один разговор и меняется без предупреждения — тот же `img.png`
-завтра будет другим экраном.
+A scratch folder: the owner drops screenshots there to show the assistant in the current
+conversation. Its contents live for one conversation and change without notice — the
+same `img.png` will be a different screen tomorrow.
 
-**Ссылок на файлы оттуда не должно быть нигде** — ни в коде, ни в комментариях, ни в
-тестах, ни в доках, ни в сообщениях коммитов и миграций. Ссылка на такой файл протухает в
-тот же день, когда её написали, и читатель идёт смотреть чужой скриншот. Если из скриншота
-следует решение — опиши словами, что на нём было и что из этого решили, прямо в том
-документе, которому это решение принадлежит.
+**Nothing should ever link to a file from there** — not in code, not in comments, not in
+tests, not in docs, not in commit or migration messages. A link to such a file goes stale
+the same day it's written, and the reader ends up looking at someone else's screenshot.
+If a screenshot led to a decision, describe in words what it showed and what was decided,
+right in the document that decision belongs to.
 
-## С чего начинать чтение
+## Where to start reading
 
-1. `docs/00-overview.md` — карта документов
-2. `docs/01-scope-mvp.md` — что делаем, а что осознанно откладываем
-3. `docs/11-roadmap.md` — текущий этап и следующая задача
-4. `docs/12-user-facing-scope.md` — то же простым языком, если нужен общий смысл целиком
+1. `docs/00-overview.md` — map of the documents
+2. `docs/01-scope-mvp.md` — what we're doing, and what we're deliberately deferring
+3. `docs/11-roadmap.md` — current stage and the next task
+4. `docs/12-user-facing-scope.md` — the same thing in plain language, for the overall picture
 
-## Чего не делать
+## What not to do
 
-- Не восстанавливать десктопную версию, не трогать Electron/Tauri.
-- Не тащить legacy-схему в Postgres один-в-один: она под SQLite, без пользователей,
-  с `REAL` для денег и `TEXT` для дат. Правильная целевая схема — в `docs/02-data-model.md`.
-- Не добавлять функциональность, помеченную в `docs/01-scope-mvp.md` как отложенную,
-  пока MVP не закрыт.
-- Не давать пользователю права на общий каталог «для удобства»: он read-only, точка.
-  Нужна своя запись — это личная позиция.
-- Не делать планового серверного обхода uCoin: Cloudflare, чужие права на данные.
-  Плановые задачи — только по НБУ и UA-Coins.
-- Не показывать uCoin-изображения посторонним.
-- Не удалять записи общего каталога — архивировать. Это касается и фоновых задач:
-  задача по каталогу НБУ архивирует снятое с выпуска, но не удаляет ничего никогда.
-- Не писать в коде ничего по-русски — см. «Языки в проекте».
+- Don't restore the desktop version, don't touch Electron/Tauri.
+- Don't carry the legacy schema into Postgres as-is: it was built for SQLite, has no
+  users, `REAL` for money and `TEXT` for dates. The correct target schema is in
+  `docs/02-data-model.md`.
+- Don't add functionality marked as deferred in `docs/01-scope-mvp.md` until the MVP is
+  closed.
+- Don't give the user write access to the shared catalog "for convenience": it's
+  read-only, full stop. If they need their own record, that's a personal position.
+- Don't run a scheduled server-side crawl of uCoin: Cloudflare, rights to someone else's
+  data. Scheduled jobs are only for NBU and UA-Coins.
+- Don't show uCoin images to anyone but the person who imported them.
+- Don't delete shared-catalog records — archive them. This applies to background jobs
+  too: the NBU catalog job archives what's been discontinued, but never deletes anything,
+  ever.
+- Don't write anything in Russian in the repository — see "Languages in the project".

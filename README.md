@@ -1,72 +1,72 @@
 # Bakost Numismatics
 
-Веб-приложение для учёта коллекции монет: общий каталог выпусков, личные позиции, личная
-коллекция, покупки и расходы, рыночные цены, комплектность по сериям.
+A web app for tracking a coin collection: a shared catalog of issues, personal positions,
+a personal collection, purchases and expenses, market prices, series completeness.
 
-Общий каталог доступен пользователю только на чтение — его ведут администратор и фоновая
-задача по официальному каталогу НБУ. Чего в нём нет, пользователь заводит личными позициями
-или подгружает импортом; они видны только ему. Регистрация открыта, интерфейс на украинском
-и английском.
+The shared catalog is read-only for the user -- it's maintained by the admin and a
+background task against the official NBU catalog. Whatever isn't in it, the user adds as
+personal positions or loads via import; those are visible only to them. Registration is
+open, the interface is in Ukrainian and English.
 
-Преемник закрытого десктопного приложения CoinKeeper (Electron + SQLite); техническое
-имя `coinkeeper` (пакеты, контейнеры, домен) сохраняется до переезда в новый репозиторий. Пишется с нуля:
-Python-бэкенд, PostgreSQL, React-фронтенд.
+Successor to the discontinued desktop CoinKeeper app (Electron + SQLite); the technical
+name `coinkeeper` (packages, containers, domain) stays until the move to a new repository.
+Written from scratch: Python backend, PostgreSQL, React frontend.
 
-## Стек
+## Stack
 
 FastAPI · SQLAlchemy 2.0 · Alembic · PostgreSQL 16 · Redis · ARQ · Playwright ·
 MinIO · React 19 · TypeScript · Vite · Docker Compose
 
-## Структура
+## Structure
 
 ```
-docs/       спецификации — читать перед кодом
-legacy/     артефакты десктопной версии: схема, эталонный код, ТЗ, тексты интерфейса
-backend/    FastAPI-приложение
-frontend/   React-приложение
+docs/       specs -- read before the code
+backend/    FastAPI application
+frontend/   React application
 ```
 
-## С чего начать
+## Where to start
 
-1. [`docs/00-overview.md`](docs/00-overview.md) — карта документов и предыстория
-2. [`docs/01-scope-mvp.md`](docs/01-scope-mvp.md) — границы MVP
-3. [`docs/11-roadmap.md`](docs/11-roadmap.md) — этапы и текущая задача
-4. [`CLAUDE.md`](CLAUDE.md) — правила проекта
+1. [`docs/00-overview.md`](docs/00-overview.md) -- map of the documents and background
+2. [`docs/01-scope-mvp.md`](docs/01-scope-mvp.md) -- MVP boundaries
+3. [`docs/11-roadmap.md`](docs/11-roadmap.md) -- stages and the current task
+4. [`CLAUDE.md`](CLAUDE.md) -- project rules
 
-## Документация
+## Documentation
 
 | | |
 |---|---|
-| [00-overview](docs/00-overview.md) | Обзор, что уцелело от прошлой версии |
-| [01-scope-mvp](docs/01-scope-mvp.md) | Что делаем и что откладываем |
-| [02-data-model](docs/02-data-model.md) | Схема PostgreSQL |
-| [03-api-contract](docs/03-api-contract.md) | REST-эндпоинты |
-| [04-business-rules](docs/04-business-rules.md) | Комплектность, валюты, дедупликация, права на записи |
-| [05-integrations](docs/05-integrations.md) | НБУ (курсы и каталог), UA-Coins, uCoin |
-| [06-media-storage](docs/06-media-storage.md) | Хранение изображений, происхождение и права |
-| [07-auth](docs/07-auth.md) | Аутентификация, регистрация, доступ |
-| [08-ui-map](docs/08-ui-map.md) | Экраны и тексты |
-| [09-data-migration](docs/09-data-migration.md) | Перенос SQLite → PostgreSQL |
-| [10-infra](docs/10-infra.md) | Docker Compose, Hetzner, CI/CD, почта, бэкапы |
-| [11-roadmap](docs/11-roadmap.md) | Порядок работ |
-| [12-user-facing-scope](docs/12-user-facing-scope.md) | Что умеет приложение, простыми словами |
+| [00-overview](docs/00-overview.md) | Overview, what survived from the previous version |
+| [01-scope-mvp](docs/01-scope-mvp.md) | What we're doing and what we're deferring |
+| [02-data-model](docs/02-data-model.md) | PostgreSQL schema |
+| [03-api-contract](docs/03-api-contract.md) | REST endpoints |
+| [04-business-rules](docs/04-business-rules.md) | Completeness, currencies, deduplication, record permissions |
+| [05-integrations](docs/05-integrations.md) | NBU (rates and catalog), UA-Coins, uCoin |
+| [06-media-storage](docs/06-media-storage.md) | Image storage, provenance and rights |
+| [07-auth](docs/07-auth.md) | Authentication, registration, access |
+| [08-ui-map](docs/08-ui-map.md) | Screens and copy |
+| [09-data-migration](docs/09-data-migration.md) | SQLite -> PostgreSQL migration |
+| [10-infra](docs/10-infra.md) | Docker Compose, Hetzner, CI/CD, mail, backups |
+| [11-roadmap](docs/11-roadmap.md) | Order of work |
+| [12-user-facing-scope](docs/12-user-facing-scope.md) | What the app does, in plain language |
 
-## Статус
+## Status
 
-На 2026-09-04: этапы 0–4 и этап 4.5 завершены. Бэкенд (аутентификация, перенесённая база
-коллекции, API каталога, коллекции, расходов, серий и дашборда) и веб-интерфейс (вход,
-каталог, дашборд, карточка монеты с историей цен, коллекция и покупки, личные позиции,
-серии, «Не вистачає», «Гроші», настройки; две темы, украинский и английский, мобильная
-вёрстка) выкатываются на `coins.renat-ibragimov.com` пушем в `main` (Swagger —
-`/api/v1/docs`).
+As of 2026-09-04: stages 0-4 and stage 4.5 are complete. The backend (authentication, the
+migrated collection database, catalog/collection/expenses/series/dashboard APIs) and the
+web interface (sign-in, catalog, dashboard, coin card with price history, collection and
+purchases, personal positions, series, "Не вистачає", "Гроші", settings; two themes,
+Ukrainian and English, mobile layout) ship to `coins.renat-ibragimov.com` on push to `main`
+(Swagger at `/api/v1/docs`).
 
-Этап 4.5 дал каталогу трёхъязычную модель (у каждой сущности — оригинал на языке эмитента
-плюс украинский и английский переводы, каждый со своим источником) и украинский конвейер:
-официальные названия, серии и фотографии из каталога НБУ, цены с ua-coins.info, всё
-скачано один раз в своё хранилище. Прогон конвейера на боевых данных — по runbook в
-`backend/README.md`. Дальше — демо владельцу коллекции (`docs/11-roadmap.md`).
+Stage 4.5 gave the catalog a three-language model (each entity has the original in the
+issuer's language plus Ukrainian and English translations, each with its own source) and a
+Ukrainian pipeline: official names, series and photos from the NBU catalog, prices from
+ua-coins.info, everything downloaded once into our own storage. Running the pipeline
+against production data follows the runbook in `backend/README.md`. Next: a demo for the
+collection's owner (`docs/11-roadmap.md`).
 
-## Данные
+## Data
 
-Реальная база коллекции и фотографии лежат в `legacy/data/` и **исключены из git**:
-репозиторий публичный, а там личные данные — покупки, суммы, даты.
+The real collection database and photos live in `legacy/data/` and are **excluded from
+git**: the repository is public, and that data is personal -- purchases, amounts, dates.

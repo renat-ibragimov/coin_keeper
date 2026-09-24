@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     # internal endpoint refuses everything.
     job_report_token: str = Field(default="", alias="JOB_REPORT_TOKEN")
 
-    # --- LLM translation, scripts/ukraine_pipeline.py --steps translate-c ---
+    # --- LLM translation (app/services/translation.py) ---
     anthropic_api_key: str | None = Field(default=None, alias="ANTHROPIC_API_KEY")
 
     @property

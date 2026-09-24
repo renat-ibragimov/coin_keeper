@@ -7,7 +7,7 @@ that schedules it is dead, cron itself never fired, or the network between it
 and this API is gone. Nothing reports that on its own, so something has to
 come and look.
 
-No ARQ, on purpose (docs/13-admin.md, "Открытые вопросы", decided 2026-09-15):
+No ARQ, on purpose (docs/13-admin.md, "Open questions", decided 2026-09-15):
 this is a periodic check, not a queued task with retries, so a second cron
 entry calling this script is the whole mechanism -- it will not move to ARQ
 even once ARQ exists in the project for something else.
