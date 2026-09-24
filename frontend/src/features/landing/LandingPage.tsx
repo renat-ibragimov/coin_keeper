@@ -340,6 +340,10 @@ function CollectionDemo({ c, en }: { c: LandingCopy; en: boolean }) {
           </div>
         ))}
       </div>
+      <div className={styles.demoNotice}>
+        <strong>{c.interactiveDemo}</strong>
+        <span>{c.collectionDemoHint}</span>
+      </div>
       <div className={styles.collectionFilters}>
         <label className={styles.search}>
           <Search size={14} />
@@ -375,9 +379,7 @@ function CollectionDemo({ c, en }: { c: LandingCopy; en: boolean }) {
         </label>
       </div>
       <div className={styles.collectionToolbar}>
-        <span aria-live="polite">
-          {t('pagination.shown', { shown: coins.length, total: coins.length })}
-        </span>
+        <span aria-live="polite">{c.coinsShown(coins.length, sampleCoins.length)}</span>
         {filtered && (
           <button type="button" className={styles.resetDemo} onClick={reset}>
             {t('catalog.resetFilters')}
@@ -400,7 +402,7 @@ function CollectionDemo({ c, en }: { c: LandingCopy; en: boolean }) {
         >
           <option value="year">{t('catalog.sortYear')}</option>
           <option value="title">{t('collection.sortTitle')}</option>
-          <option value="cost">{t('collection.sortTotal')}</option>
+          <option value="cost">{c.sortSpent}</option>
         </select>
       </div>
       <div className={styles.collectionResults}>
@@ -595,10 +597,6 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <span className={styles.tryHint}>
-                {c.tryFilters}
-                <ArrowRight size={17} />
-              </span>
             </div>
           </div>
           <CollectionDemo c={c} en={en} />
@@ -619,10 +617,6 @@ export default function LandingPage() {
                 </li>
               ))}
             </ul>
-            <span className={styles.tryHint}>
-              {c.tryPeriod}
-              <ArrowRight size={17} />
-            </span>
           </div>
           <ExpensesDemo c={c} en={en} />
         </div>

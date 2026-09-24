@@ -86,6 +86,10 @@ export function ExpensesDemo({ c, en }: { c: LandingCopy; en: boolean }) {
           </div>
         ))}
       </div>
+      <div className={styles.demoNotice}>
+        <strong>{c.interactiveDemo}</strong>
+        <span>{c.expensesDemoHint}</span>
+      </div>
       <div className={styles.financePeriod}>
         <ExpensesPeriodPicker
           preset={preset}
@@ -112,7 +116,11 @@ export function ExpensesDemo({ c, en }: { c: LandingCopy; en: boolean }) {
                   data={chart.byPeriod}
                   granularity={chart.granularity}
                   locale={locale}
-                  palette={palette}
+                  palette={{
+                    ...palette,
+                    axis: 'var(--color-text-secondary)',
+                    panel: 'var(--color-surface)',
+                  }}
                 />
               ) : (
                 <p className={styles.financeChartEmpty}>

@@ -18,12 +18,12 @@
 
 :global([data-theme='dark']) .landing {
   --landing-bg: #131411;
-  --landing-panel: #1c1d19;
-  --landing-inset: #23241e;
+  --landing-panel: #20211c;
+  --landing-inset: #2a2c24;
   --landing-text: #eee9df;
   --landing-muted: #a9a99b;
   --landing-accent: #c4a36c;
-  --landing-line: #35372d;
+  --landing-line: #494b3e;
   --landing-green: #b2c2a1;
 }
 
@@ -47,7 +47,7 @@
 .landing button {
   cursor: pointer;
 }
-.landing :is(button, a, input):focus-visible {
+.landing :is(button, a, input, select):focus-visible {
   outline: 2px solid var(--landing-accent);
   outline-offset: 5px;
 }
@@ -201,7 +201,7 @@
   justify-content: space-between;
   align-items: center;
   color: var(--landing-muted);
-  font-size: 10px;
+  font-size: 12px;
 }
 .previewTop > span:first-child {
   display: flex;
@@ -247,7 +247,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10px;
+  font-size: 11px;
   padding: 5px 8px;
   border-radius: 4px;
   color: var(--landing-green);
@@ -260,7 +260,7 @@
   margin-top: 12px;
 }
 .coinTags span {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--landing-muted);
   border: 1px solid var(--landing-line);
   padding: 2px 8px;
@@ -273,7 +273,7 @@
 .marketQuote span {
   display: block;
   color: var(--landing-muted);
-  font-size: 9px;
+  font-size: 12px;
 }
 .marketQuote strong {
   display: block;
@@ -300,7 +300,7 @@
 .coinFinance small {
   display: block;
   color: var(--landing-muted);
-  font-size: 9px;
+  font-size: 11px;
 }
 .coinFinance strong {
   display: block;
@@ -337,7 +337,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
-  font-size: 11px;
+  font-size: 13px;
 }
 .tabs button[aria-selected='true'] {
   color: var(--landing-text);
@@ -347,7 +347,7 @@
   padding: 0 5px;
   border-radius: 3px;
   background: var(--landing-inset);
-  font-size: 9px;
+  font-size: 11px;
 }
 .coinPanel {
   display: grid;
@@ -370,7 +370,7 @@
   min-width: 480px;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 11px;
+  font-size: 12px;
 }
 .specimens th,
 .specimens td {
@@ -380,7 +380,7 @@
 }
 .specimens th {
   font-weight: 400;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--landing-muted);
   line-height: 1.35;
 }
@@ -559,14 +559,26 @@
   flex-shrink: 0;
   margin-top: 3px;
 }
-.tryHint {
-  color: var(--landing-accent);
+.demoNotice {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin-top: 16px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-left: 2px solid var(--landing-accent);
+  border-radius: 4px;
+  background: var(--color-surface-control);
+  color: var(--color-text-secondary);
   font-size: 12px;
+  line-height: 1.4;
+}
+.demoNotice strong {
+  color: var(--color-text);
+  font-weight: 600;
 }
 .demoFrame {
+  --color-text-muted: var(--color-text-secondary);
   border: 1px solid var(--landing-line);
   border-radius: 9px;
   padding: 22px;
@@ -582,10 +594,31 @@
   border-color: color-mix(in srgb, var(--landing-accent) 45%, var(--landing-line));
 }
 @media (hover: hover) and (pointer: fine) {
-  .coinPreview:hover,
-  .demoFrame:hover {
-    border-color: color-mix(in srgb, var(--landing-accent) 45%, var(--landing-line));
+  .landing :is(select, input):hover,
+  .collectionFilters .search:hover {
+    border-color: var(--landing-accent);
   }
+  .tabs button:hover,
+  .demoFrame button:not(:disabled):hover {
+    color: var(--landing-text);
+    background: var(--landing-inset);
+  }
+}
+:global([data-theme='dark']) .demoFrame {
+  --color-bg: var(--landing-panel);
+  --color-surface: #191a16;
+  --color-surface-raised: var(--landing-inset);
+  --color-surface-control: #25271f;
+  --color-border: var(--landing-line);
+  --color-border-subtle: var(--landing-line);
+  --color-text-muted: var(--landing-muted);
+}
+.demoFrame :is(button, input, select):focus-visible,
+.coinPreview button:focus-visible {
+  outline-offset: 2px;
+}
+.demoFrame [aria-selected='true'] {
+  border-color: var(--landing-accent);
 }
 .demoHeader {
   display: flex;
@@ -628,7 +661,7 @@
   font-weight: 600;
 }
 .collectionHeading p {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--color-text-muted);
   margin-top: 4px;
 }
@@ -639,9 +672,9 @@
 }
 .collectionMetrics > div {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  padding: 12px 9px;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 10px 8px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   background: var(--color-surface-raised);
@@ -653,23 +686,25 @@
 }
 .collectionMetrics span {
   display: block;
-  font-size: 8px;
+  font-size: 11px;
   color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  line-height: 1.3;
+}
+.collectionMetrics > div > div {
+  min-width: 0;
 }
 .collectionMetrics strong {
   display: block;
   margin-top: 5px;
-  font-family: var(--font-display);
-  font-size: 18px;
-  font-weight: 400;
+  font-family: var(--font-body);
+  font-size: 19px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 .collectionMetrics small {
   display: block;
-  font-size: 8px;
+  font-size: 11px;
   color: var(--color-text-muted);
   margin-top: 4px;
 }
@@ -681,10 +716,10 @@
 }
 .collectionFilters {
   display: grid;
-  grid-template-columns: 1.65fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1.5fr 0.65fr;
   gap: 10px;
   align-items: end;
-  margin: 20px 0 16px;
+  margin: 10px 0 12px;
   padding: 12px;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -696,7 +731,7 @@
   display: block;
   text-align: center;
   color: var(--color-text-secondary);
-  font-size: 10px;
+  font-size: 12px;
   margin-bottom: 6px;
 }
 .collectionFilters .search {
@@ -705,8 +740,11 @@
   min-height: 34px;
   border-color: var(--color-border);
 }
+.collectionFilters .search input::placeholder {
+  color: var(--color-text-secondary);
+}
 .collectionFilters .search input {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text);
 }
 .collectionDemo select {
@@ -718,7 +756,7 @@
   padding: 7px;
   min-height: 34px;
   font: inherit;
-  font-size: 10px;
+  font-size: 12px;
 }
 .collectionFilters select {
   width: 100%;
@@ -731,7 +769,7 @@
   margin-bottom: 16px;
 }
 .collectionToolbar > span {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 .collectionViews {
@@ -747,7 +785,7 @@
   align-items: center;
   gap: 5px;
   padding: 6px 7px;
-  font-size: 10px;
+  font-size: 12px;
   border: 1px solid transparent;
   border-radius: 3px;
   background: transparent;
@@ -755,14 +793,15 @@
 }
 .collectionViews button[aria-pressed='true'] {
   color: var(--color-accent);
-  border-color: var(--color-border);
+  border-color: var(--landing-accent);
   background: var(--color-surface-raised);
+  font-weight: 600;
 }
 .resetDemo {
   background: none;
   border: 0;
-  color: var(--color-accent);
-  font-size: 10px !important;
+  color: var(--color-accent-strong);
+  font-size: 12px !important;
 }
 .collectionResults {
   display: grid;
@@ -782,27 +821,26 @@
 }
 .collectionTable {
   width: 100%;
-  min-width: 550px;
+  min-width: 580px;
   table-layout: fixed;
   border-collapse: collapse;
-  font-size: 10px;
+  font-size: 12px;
 }
 .collectionTable th,
 .collectionTable td {
-  padding: 12px 5px;
+  padding: 10px 4px;
   text-align: center;
   border-bottom: 1px solid var(--color-border-subtle);
   font-variant-numeric: tabular-nums;
 }
 .collectionTable th {
-  font-size: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
+  font-size: 11px;
+  line-height: 1.3;
   font-weight: 600;
   color: var(--color-text-muted);
 }
 .collectionTable th:first-child {
-  width: 35%;
+  width: 33%;
 }
 .collectionTable th:nth-child(2) {
   width: 10%;
@@ -833,12 +871,12 @@
 }
 .collectionCoin > div > span {
   display: block;
-  font-size: 9px;
+  font-size: 11px;
   color: var(--color-text-muted);
   margin-top: 5px;
 }
 .collectionGrade {
-  font-size: 8px;
+  font-size: 10px;
   border: 1px solid var(--color-border);
   padding: 2px 5px;
   border-radius: 10px;
@@ -880,12 +918,12 @@
   overflow: hidden;
 }
 .collectionCards p {
-  font-size: 9px;
+  font-size: 11px;
   color: var(--color-text-muted);
 }
 .collectionCards dl {
   margin: 12px 0 0;
-  font-size: 10px;
+  font-size: 12px;
 }
 .collectionCards dl > div {
   display: flex;
@@ -921,7 +959,8 @@
   min-width: 0;
 }
 .search:focus-within {
-  outline: 1px solid var(--landing-accent);
+  outline: 2px solid var(--landing-accent);
+  outline-offset: 2px;
 }
 .search input:focus-visible {
   outline: none;
@@ -948,11 +987,11 @@
   padding: 45px 0;
   text-align: center;
   font-size: 12px;
-  color: var(--landing-muted);
+  color: var(--color-text-secondary);
 }
 .empty button {
   background: none;
-  color: var(--landing-accent);
+  color: var(--color-accent-strong);
   border: none;
   margin-top: 10px;
 }
@@ -967,15 +1006,32 @@
   grid-template-columns: 0.8fr 1.2fr;
   gap: 56px;
 }
+@media (min-width: 801px) {
+  .expensesSection .sectionCopy h2 {
+    font-size: clamp(30px, 2.7vw, 38px);
+  }
+}
+.expensesSection .sectionCopy ul {
+  margin: 18px 0 0;
+  gap: 10px;
+}
+.expensesSection .sectionCopy > p {
+  line-height: 1.65;
+}
 .financeDemo {
   background: var(--color-bg);
   color: var(--color-text);
 }
 .financePeriod {
-  margin: 18px 0;
+  margin: 10px 0 14px;
 }
 .financePeriod input {
   font-size: 12px;
+}
+/* Native date segments can hold keyboard focus without :focus-visible on the host. */
+.financePeriod input:focus-within {
+  outline: 2px solid var(--landing-accent);
+  outline-offset: 2px;
 }
 .financeChart {
   border: 1px solid var(--color-border);
@@ -984,7 +1040,7 @@
   background: var(--color-surface);
 }
 .financeChart h4 {
-  font: 600 12px var(--font-body);
+  font: 600 14px var(--font-body);
   margin: 0 0 10px 4px;
 }
 .financeChartEmpty {
@@ -1008,7 +1064,7 @@
   background: var(--color-surface-raised);
   color: var(--color-text-secondary);
   padding: 5px 10px;
-  font-size: 10px;
+  font-size: 12px;
 }
 .financeCategories button[aria-pressed='true'] {
   border-color: var(--color-accent);
@@ -1030,13 +1086,12 @@
   min-width: 460px;
   border-collapse: collapse;
   table-layout: fixed;
-  font-size: 10px;
+  font-size: 12px;
 }
 .financeJournal th {
   color: var(--color-text-secondary);
-  font-size: 9px;
-  font-weight: 500;
-  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 600;
   padding: 9px 6px;
   border-bottom: 1px solid var(--color-border);
 }
@@ -1079,7 +1134,7 @@
   align-items: center;
   justify-content: space-between;
   margin-top: 10px;
-  font-size: 9px;
+  font-size: 12px;
   color: var(--color-text-muted);
 }
 .financePagination div {
@@ -1087,7 +1142,9 @@
   gap: 6px;
 }
 .financePagination button:disabled {
-  opacity: 0.35;
+  color: var(--color-text-muted);
+  background: transparent;
+  border-style: dashed;
   cursor: default;
 }
 .finalCta {
@@ -1223,10 +1280,6 @@
   .coinFinance strong {
     font-size: 15px;
   }
-  .coinFinance span,
-  .coinFinance small {
-    font-size: 8px;
-  }
   .marketQuote strong {
     font-size: 22px;
   }
@@ -1266,15 +1319,6 @@
   }
   .coinHeading h2 {
     font-size: 24px;
-  }
-  .owned {
-    font-size: 8px;
-  }
-  .specimens {
-    font-size: 9px;
-  }
-  .specimens th {
-    font-size: 8px;
   }
   .featureStrip {
     padding: 0 24px;
@@ -1325,12 +1369,6 @@
     left: calc(280px - 480px * 1.56 * 1.5);
     width: calc(480px * 1.56 * 1.5);
     height: calc(480px * 1.56);
-  }
-  .expensesSection .tryHint svg {
-    transform: rotate(90deg);
-  }
-  .tryHint svg {
-    transform: rotate(90deg);
   }
   .demoFrame {
     padding: 24px;
@@ -1422,15 +1460,6 @@
   }
   .coinHeading p {
     font-size: 10px;
-  }
-  .owned {
-    font-size: 9px;
-  }
-  .specimens {
-    font-size: 10px;
-  }
-  .specimens th {
-    font-size: 9px;
   }
   .featureStrip {
     grid-template-columns: 1fr;

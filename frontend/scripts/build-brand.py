@@ -22,7 +22,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 ROOT = Path(__file__).resolve().parent.parent / "public"
 BRAND = ROOT / "brand"
@@ -37,6 +37,7 @@ MARK_SIZES = (128, 256, 512)
 # the full logo needs the lower quality to meet its byte budget, the mark
 # is small enough to keep more detail.
 WEBP_FULL = {"quality": 72, "method": 6}
+WEBP_DARK = {**WEBP_FULL, "quality": 71}
 WEBP_MARK = {"quality": 82, "method": 6}
 PNG = {"optimize": True}
 
@@ -50,8 +51,8 @@ BUDGETS = {
 # near-black surface. Pixels below this luminance band become cream (with a
 # little of their own tint kept), the gold bevels and the coin stay as drawn.
 DARK_BAND = (0.12, 0.42)
-DARK_TINT = 0.15
-CREAM = (237, 227, 204)
+DARK_TINT = 0.04
+CREAM = (245, 238, 222)
 
 
 def load_trimmed(name: str) -> Image.Image:
@@ -83,6 +84,15 @@ def dark_variant(image: Image.Image) -> Image.Image:
     mask = rgb.convert("L").point([keep(v) for v in range(256)])
     light = Image.blend(Image.new("RGB", rgb.size, CREAM), rgb, DARK_TINT)
     out = Image.composite(rgb, light, mask)
+    # Only the wordmark is lifted. Preserve the original gold shield and coin.
+    wordmark = Image.new("L", image.size, 0)
+    draw = ImageDraw.Draw(wordmark)
+    draw.rectangle((round(image.width * 0.31), 0, image.width, image.height), fill=255)
+    draw.rectangle(
+        (round(image.width * 0.66), 0, round(image.width * 0.80), round(image.height * 0.63)),
+        fill=0,
+    )
+    out = Image.composite(out, rgb, wordmark)
     out.putalpha(alpha)
     return out
 
@@ -113,7 +123,7 @@ def main() -> int:
     full_dark = dark_variant(full)
     for width in FULL_WIDTHS:
         save_pair(fit_width(full, width), f"logo-full-{width}", WEBP_FULL)
-        save_pair(fit_width(full_dark, width), f"logo-full-dark-{width}", WEBP_FULL)
+        save_pair(fit_width(full_dark, width), f"logo-full-dark-{width}", WEBP_DARK)
     for size in MARK_SIZES:
         save_pair(mark.resize((size, size), Image.Resampling.LANCZOS), f"logo-mark-{size}", WEBP_MARK)
 

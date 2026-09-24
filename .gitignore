@@ -240,6 +240,8 @@ media-archive/
 node_modules/
 frontend/dist/
 frontend/.vite/
+# Temporary standalone landing handoff for the designer.
+/bakost-landing.html
 # Скретч-папки с визуальными референсами для текущей сессии, не артефакт проекта
 frontend/current_ref/
 docs/current_ref/
