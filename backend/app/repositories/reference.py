@@ -35,7 +35,7 @@ class ReferenceRepository:
     ) -> Sequence[Country]:
         """Active countries drive the storefront; the personal-item form asks
         for all of them (docs/business-rules.md). `confirmed_only` is the
-        catalog's own filter panel — a harder, separate gate (§13a): only a
+        catalog's own filter panel — a harder, separate gate (BR-13a): only a
         `catalog_confirmed` country is worth offering there at all."""
         query = select(Country)
         if confirmed_only:
@@ -60,7 +60,7 @@ class ReferenceRepository:
         confirmed_only: bool = False,
         user_id: int | None = None,
     ) -> Sequence[Denomination]:
-        """`confirmed_only` is the catalog's own filter panel (§13a) — mirrors
+        """`confirmed_only` is the catalog's own filter panel (BR-13a) — mirrors
         `CatalogRepository.list_confirmed_materials`: offer only what a
         catalog item actually visible to this user could match, not the
         whole shared dictionary (a denomination can go orphaned when items

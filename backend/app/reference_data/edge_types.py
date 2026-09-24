@@ -3,7 +3,7 @@
 Seeded from what the confirmed (Ukrainian) catalogue actually contains: five
 values, carried over from the legacy collection as bare English codes
 (`reeded`, `plain_incuse_lettering`, ...) with no dictionary behind them at
-all until now (docs/business-rules.md, rule 14).
+all until now (docs/business-rules.md, BR-14).
 """
 
 from __future__ import annotations

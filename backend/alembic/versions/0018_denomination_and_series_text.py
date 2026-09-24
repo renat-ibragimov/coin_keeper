@@ -5,11 +5,11 @@ dictionaries say nothing about — an Austrian 5 euro, say — had nowhere to pu
 its face value or its series, and the two fields rendered as a disabled box
 with an apology. Both now follow the split `composition_id`/`material`,
 `edge_type_id`/`edge` and `quality_type_id`/`quality` already use
-(docs/business-rules.md, rule 14): the dictionary row where one fits, the
+(docs/business-rules.md, BR-14): the dictionary row where one fits, the
 collector's own words where none does.
 
 `series_text` is deliberately *display only*. Series are shared records an
-admin creates (rule 2), and completeness, the «Серії» screen and the series
+admin creates (BR-2), and completeness, the «Серії» screen and the series
 filter are all counted on `series_id`; a typed-in name appears on the card and
 in listings and takes part in none of that. The alternative — a personal
 series row with a visibility filter of its own through the whole series layer

@@ -155,7 +155,7 @@ async def test_denominations_filtered_by_country(
 async def test_confirmed_scope_is_a_harder_gate_than_active(
     client: AsyncClient, db_session: AsyncSession, mail_outbox: list
 ) -> None:
-    """docs/business-rules.md, §13a: `scope=confirmed` is the catalog's
+    """docs/business-rules.md, BR-13a: `scope=confirmed` is the catalog's
     own filter panel — active but unconfirmed is not enough."""
     refs = await seed_reference(db_session)
     await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
@@ -179,7 +179,7 @@ async def test_confirmed_scope_is_a_harder_gate_than_active(
 async def test_confirmed_denominations_require_a_visible_catalog_item(
     client: AsyncClient, db_session: AsyncSession, mail_outbox: list
 ) -> None:
-    """§13a's confirmed-scope gate applies per denomination, not just per
+    """BR-13a's confirmed-scope gate applies per denomination, not just per
     country: a denomination row can outlive every catalog item that used to
     reference it (Ukraine pipeline merges/reassigns, docs/integrations.md),
     and the catalog's filter panel must not offer it once nothing matches."""

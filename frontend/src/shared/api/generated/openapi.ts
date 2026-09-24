@@ -403,7 +403,7 @@ export interface paths {
          *     The same rows `GET /catalog` returns and the same layer visibility —
          *     shared records plus the user's own personal items, active ones only —
          *     with the storefront rule switched off entirely (docs/business-rules.md,
-         *     §13). The field sits under a country the collector just chose out of every
+         *     BR-13). The field sits under a country the collector just chose out of every
          *     issuer there has ever been, so a coin of a country the catalogue project
          *     has not confirmed still has to be findable by name; not finding it means a
          *     personal duplicate of a coin the catalog already holds.
@@ -427,7 +427,7 @@ export interface paths {
         /**
          * List Catalog Materials
          * @description Materials the material filter offers on `GET /catalog` — only what a
-         *     `catalog_confirmed` item actually uses (docs/business-rules.md, §14).
+         *     `catalog_confirmed` item actually uses (docs/business-rules.md, BR-14).
          */
         get: operations["list_catalog_materials_api_v1_catalog_materials_get"];
         put?: never;
@@ -553,7 +553,7 @@ export interface paths {
         /**
          * List Owned Countries
          * @description Countries the owner holds at least one purchase from — narrower than
-         *     `GET /countries`, for the "Мої монети" filters panel (docs/03).
+         *     `GET /countries`, for the "Мої монети" filters panel (docs/api.md).
          */
         get: operations["list_owned_countries_api_v1_collection_countries_get"];
         put?: never;
@@ -774,7 +774,7 @@ export interface paths {
          * @description `scope=mine` (default) is the user's own collection — the "Серії"
          *     screen and the dashboard, unrestricted by which countries the catalogue
          *     project has confirmed. `scope=catalog` is `GET /catalog`'s own series
-         *     filter: a harder, separate gate (§13a), only a `catalog_confirmed`
+         *     filter: a harder, separate gate (BR-13a), only a `catalog_confirmed`
          *     country's series.
          */
         get: operations["list_series_api_v1_series_get"];
@@ -900,7 +900,7 @@ export interface paths {
          * List Countries
          * @description `scope=active` is the storefront; `scope=all` is the personal-item form,
          *     where the user may enter a coin of any issuer ever; `scope=confirmed` is
-         *     the catalog's own filter panel — a harder, separate gate (§13a).
+         *     the catalog's own filter panel — a harder, separate gate (BR-13a).
          *
          *     `minYear`/`maxYear` are the issue-year bounds of the catalog items
          *     actually visible to this user in that country (docs/api.md) —
@@ -926,7 +926,7 @@ export interface paths {
          * List Denominations
          * @description `scope=confirmed` is the catalog's own filter panel: only a
          *     `catalog_confirmed` country's denominations that a catalog item actually
-         *     visible to this user still uses (§13a).
+         *     visible to this user still uses (BR-13a).
          */
         get: operations["list_denominations_api_v1_denominations_get"];
         put?: never;
@@ -970,7 +970,7 @@ export interface paths {
         };
         /**
          * List Edge Types
-         * @description The edge dictionary behind `edgeTypeId` (docs/business-rules.md, §14).
+         * @description The edge dictionary behind `edgeTypeId` (docs/business-rules.md, BR-14).
          */
         get: operations["list_edge_types_api_v1_edge_types_get"];
         put?: never;

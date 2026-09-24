@@ -76,7 +76,7 @@ function metalKindListParam(params: URLSearchParams): MetalKind[] {
 }
 
 /** The URL is the single source of truth: a shared link or F5 restores the
- *  exact same listing (docs/03 filters ↔ query parameters one to one). */
+ *  exact same listing (docs/api.md filters ↔ query parameters one to one). */
 export function parseFilters(params: URLSearchParams): CatalogFilters {
   const scope = params.get('scope');
   const sort = params.get('sort');

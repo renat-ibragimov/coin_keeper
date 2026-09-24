@@ -183,7 +183,7 @@ class CollectionRepository:
         each expense's own rate — the same figure the coin card shows
         (`CatalogRepository._supporting_expenses_uah`), so "Мої монети" and
         the coin card agree on what a position cost (docs/business-rules.md,
-        rule 4)."""
+        BR-4)."""
         amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
         return (
             select(func.sum(amount_uah))
@@ -467,7 +467,7 @@ class CollectionRepository:
     async def list_owned_materials(self, country_id: int | None = None) -> Sequence[Material]:
         """Materials the material filter offers on "Мої монети" — only what
         the owner actually has, regardless of which countries the catalogue
-        project has confirmed (docs/business-rules.md, §13a, §14)."""
+        project has confirmed (docs/business-rules.md, BR-13a and BR-14)."""
         catalog_condition = CatalogItem.composition_id == Material.id
         if country_id is not None:
             catalog_condition = and_(catalog_condition, CatalogItem.country_id == country_id)

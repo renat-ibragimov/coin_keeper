@@ -125,7 +125,7 @@ export function updateCollectionItem(
   return api<CollectionItem>(`/collection/${id}`, { method: 'PATCH', body });
 }
 
-/** Deletes the linked purchase expense as well (docs/business-rules.md, rule 10). */
+/** Deletes the linked purchase expense as well (docs/business-rules.md, BR-10). */
 export function deleteCollectionItem(id: number): Promise<void> {
   return api<void>(`/collection/${id}`, { method: 'DELETE' });
 }

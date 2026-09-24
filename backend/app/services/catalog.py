@@ -247,7 +247,7 @@ class CatalogService:
         """`require_confirmed=False` is for a caller about the user's own
         collection rather than the catalogue browse experience (a series
         screen) -- never from a request filter, see storefront_visible()
-        (app/repositories/catalog.py, docs/business-rules.md §13a).
+        (app/repositories/catalog.py, docs/business-rules.md, BR-13a).
         `apply_storefront=False` goes one further and is the typeahead's
         alone: see the same function's docstring."""
         settings = await self._users.get_settings(self._user.id)
@@ -267,7 +267,7 @@ class CatalogService:
 
     async def summary(self, filters: CatalogFilters) -> CatalogSummaryOut:
         """The "Каталог" KPI tiles for the filters currently applied, always
-        under the catalogue's own `require_confirmed` gate (§13a) -- the same
+        under the catalogue's own `require_confirmed` gate (BR-13a) -- the same
         gate `list_catalog` uses, so the tiles never report a coverage the
         list below could not possibly show."""
         settings = await self._users.get_settings(self._user.id)
@@ -382,7 +382,7 @@ class CatalogService:
         Returns the row rather than a card on purpose: the caller is
         CollectionService, which goes on to create the instance and the
         purchase expense before anything is committed (docs/business-rules.md,
-        rule 4). Both language slots start out holding the typed text, exactly
+        BR-4). Both language slots start out holding the typed text, exactly
         as a new storage location does, and the background job replaces the
         one that is a translation rather than a copy.
         """
@@ -714,7 +714,7 @@ async def translate_title_in_background(item_id: int) -> None:
     Every early return is logged. A silent no-op leaves the record showing the
     collector's own wording in both language slots forever, with nothing in
     the interface to explain why -- the only way to notice is a log line (the
-    same lesson as storage locations, docs/business-rules.md, п. 16).
+    same lesson as storage locations, docs/business-rules.md, BR-16).
     """
     api_key = get_settings().anthropic_api_key
     if not api_key:

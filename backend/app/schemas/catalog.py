@@ -65,7 +65,7 @@ class CatalogListItem(CamelModel):
     series_name: str | None
     denomination: CoinDenomination | None
     # What the collector typed when the dictionary had nothing to offer for
-    # their country; shown in place of `denomination` (docs/04, §14).
+    # their country; shown in place of `denomination` (docs/business-rules.md, BR-14).
     denomination_text: str | None
     year: int
     issue_date: date | None

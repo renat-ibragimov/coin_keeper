@@ -3,7 +3,7 @@
 coin_purchase expenses are owned by the purchase transaction
 (app/services/collection.py): creating, editing or deleting them directly
 through /expenses is refused, otherwise the 1:1 between instances and their
-purchase expenses would silently break (docs/business-rules.md, rule 4).
+purchase expenses would silently break (docs/business-rules.md, BR-4).
 """
 
 from __future__ import annotations

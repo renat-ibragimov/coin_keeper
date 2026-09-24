@@ -201,7 +201,7 @@ async def lookup_catalog(
     The same rows `GET /catalog` returns and the same layer visibility —
     shared records plus the user's own personal items, active ones only —
     with the storefront rule switched off entirely (docs/business-rules.md,
-    §13). The field sits under a country the collector just chose out of every
+    BR-13). The field sits under a country the collector just chose out of every
     issuer there has ever been, so a coin of a country the catalogue project
     has not confirmed still has to be findable by name; not finding it means a
     personal duplicate of a coin the catalog already holds.
@@ -229,7 +229,7 @@ async def list_catalog_materials(
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
 ) -> list[CoinMaterial]:
     """Materials the material filter offers on `GET /catalog` — only what a
-    `catalog_confirmed` item actually uses (docs/business-rules.md, §14)."""
+    `catalog_confirmed` item actually uses (docs/business-rules.md, BR-14)."""
     await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
     return (
         await CatalogService(session, user, locale).list_confirmed_materials(country_id)

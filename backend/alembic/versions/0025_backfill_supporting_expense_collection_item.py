@@ -3,7 +3,7 @@
 Owner's call (2026-09-22): supporting expenses (delivery, holder, grading...)
 now carry `collection_item_id`, same as `coin_purchase`, so a repeat purchase
 of the same catalog item does not mix up which delivery belongs to which
-purchase (docs/business-rules.md, rule 4). No schema change — the column
+purchase (docs/business-rules.md, BR-4). No schema change — the column
 has existed since the `expenses` table itself (`data-model.md`); this only
 fills it in for rows written before the rule changed.
 

@@ -620,7 +620,7 @@ async def test_multi_select_filters_union_within_a_facet(
 async def test_catalog_materials_only_offers_what_the_confirmed_catalog_uses(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/business-rules.md, §14: the material filter offers only
+    """docs/business-rules.md, BR-14: the material filter offers only
     materials a `catalog_confirmed` item actually uses — the whole shared
     dictionary is much bigger than what Ukraine's catalog uses today."""
     refs = ctx.refs
@@ -643,7 +643,7 @@ async def test_catalog_materials_only_offers_what_the_confirmed_catalog_uses(
 async def test_card_resolves_edge_and_quality_dictionaries(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/business-rules.md §13a: edge and quality behave like material —
+    """docs/business-rules.md, BR-13a: edge and quality behave like material —
     a dictionary row where one is known, the record's own text where not."""
     refs = ctx.refs
     reeded = (
@@ -907,7 +907,7 @@ async def test_image_visibility_by_provenance(
 async def test_storefront_hides_records_of_a_deactivated_country(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/business-rules.md, §13: a deactivated country's shared records
+    """docs/business-rules.md, BR-13: a deactivated country's shared records
     drop out of listings unless the user already owns or authored them."""
     refs = ctx.refs
     await set_country_active(db_session, refs.usa, active=False)
@@ -946,7 +946,7 @@ async def test_storefront_hides_records_of_a_deactivated_country(
 async def test_catalog_hides_records_of_an_unconfirmed_country(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/business-rules.md, §13a: an unconfirmed country's records never
+    """docs/business-rules.md, BR-13a: an unconfirmed country's records never
     show as "catalogue", even ones the user authored or already owns — unlike
     a merely deactivated country, there is no escape hatch."""
     refs = ctx.refs

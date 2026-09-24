@@ -5,7 +5,7 @@ account settings (owner's call, 2026-09-22): whether delivery, a holder,
 grading... count toward "Куплено загалом" and the value-change figure on the
 coin card, or stay a separate informational line next to them. On by
 default — most collectors already think of what they paid the courier as
-part of what the coin cost them (docs/business-rules.md, rule 4).
+part of what the coin cost them (docs/business-rules.md, BR-4).
 
 Promoted from a browser-local (`localStorage`) prototype the same day it was
 tried, per the batching rule in `docs/backlog.md` for user preferences.

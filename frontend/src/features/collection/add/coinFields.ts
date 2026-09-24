@@ -13,7 +13,7 @@ export const METAL_KINDS: MetalKind[] = ['unknown', 'precious', 'base'];
  * Everything "Про монету" collects, as the strings the inputs hold.
  *
  * Edge and quality are dictionary ids, not free text: both have had a
- * dictionary of their own since 2026-09-12 (docs/business-rules.md, §14),
+ * dictionary of their own since 2026-09-12 (docs/business-rules.md, BR-14),
  * and a typed-in edge would never match what the catalogue parser stores.
  *
  * Material, denomination and series are the other way round — each is one

@@ -44,7 +44,7 @@ async def list_countries(
 ) -> list[CountryOut]:
     """`scope=active` is the storefront; `scope=all` is the personal-item form,
     where the user may enter a coin of any issuer ever; `scope=confirmed` is
-    the catalog's own filter panel — a harder, separate gate (§13a).
+    the catalog's own filter panel — a harder, separate gate (BR-13a).
 
     `minYear`/`maxYear` are the issue-year bounds of the catalog items
     actually visible to this user in that country (docs/api.md) —
@@ -95,7 +95,7 @@ async def list_denominations(
 ) -> list[DenominationOut]:
     """`scope=confirmed` is the catalog's own filter panel: only a
     `catalog_confirmed` country's denominations that a catalog item actually
-    visible to this user still uses (§13a)."""
+    visible to this user still uses (BR-13a)."""
     await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
     denominations = await ReferenceRepository(session, locale).list_denominations(
         country_id, confirmed_only=scope == "confirmed", user_id=user.id if user else -1
@@ -133,7 +133,7 @@ async def list_materials(
 async def list_edge_types(
     session: DbSession, _user: CurrentUser, locale: RequestLocale
 ) -> list[CoinEdgeType]:
-    """The edge dictionary behind `edgeTypeId` (docs/business-rules.md, §14)."""
+    """The edge dictionary behind `edgeTypeId` (docs/business-rules.md, BR-14)."""
     rows = await ReferenceRepository(session, locale).list_edge_types()
     return [CoinEdgeType(id=row.id, code=row.code, name=_localised(row, locale)) for row in rows]
 

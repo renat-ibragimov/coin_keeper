@@ -88,7 +88,7 @@
   font-size: 14.5px;
 }
 
-/* Honeypot: invisible to people, present in the DOM for bots (docs/07-auth). */
+/* Honeypot: invisible to people, present in the DOM for bots (docs/auth.md). */
 .honeypot {
   position: absolute;
   left: -9999px;

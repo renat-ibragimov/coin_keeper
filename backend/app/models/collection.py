@@ -32,7 +32,7 @@ class StorageLocation(Base):
     owner types the first time they name a new one — get-or-created by
     `StorageLocationService.resolve()`, never a direct user-facing CRUD
     endpoint. `name_original` is what was actually typed; the untranslated
-    slot briefly mirrors it verbatim until a background task (docs/04) fills
+    slot briefly mirrors it verbatim until a background task (docs/business-rules.md) fills
     in the other language via `TranslationSource.LLM`.
     """
 
@@ -135,7 +135,7 @@ class Expense(Base):
     # supporting expense (delivery, holder, grading...) SET NULL *is* the
     # intended behavior: the service never deletes it, so this FK is how
     # deleting the instance detaches it without losing the money spent.
-    # docs/business-rules.md, rules 4 and 10.
+    # docs/business-rules.md, BR-4 and BR-10.
     collection_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("collection_items.id", ondelete="SET NULL")
     )

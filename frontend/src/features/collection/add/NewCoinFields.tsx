@@ -182,7 +182,7 @@ export function NewCoinFields({
         />
         {/* The denominations dictionary is seeded from what the catalogue
             holds, so for most issuers it offers nothing — which is why this
-            is a combobox and not a select (docs/business-rules.md, §14). */}
+            is a combobox and not a select (docs/business-rules.md, BR-14). */}
         <Combobox
           label={t('add.denomination')}
           placeholder={t('add.denominationPlaceholder')}
@@ -196,7 +196,7 @@ export function NewCoinFields({
 
       <FormRow>
         {/* Picking an existing series links to the shared record — only an
-            admin creates those (docs/business-rules.md, rule 2). A name
+            admin creates those (docs/business-rules.md, BR-2). A name
             typed instead is kept as text: it shows on the card and counts
             towards nothing, which is what the hint says. */}
         <Combobox
@@ -301,7 +301,7 @@ export function NewCoinFields({
         <FormRow>
           {/* Both are dictionaries the catalogue parser writes into, so the
               form picks from them rather than offering a text field whose
-              value would never match anything (docs/04, §14). */}
+              value would never match anything (docs/business-rules.md, BR-14). */}
           <Select
             label={t('add.edge')}
             value={values.edgeTypeId}

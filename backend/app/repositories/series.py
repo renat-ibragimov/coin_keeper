@@ -2,9 +2,9 @@
 
 Series are a shared reference, but listings only surface storefront-visible
 ones — a deactivated country's series disappears unless the user already
-owns something in it (docs/business-rules.md, §13). The summary, once a
+owns something in it (docs/business-rules.md, BR-13). The summary, once a
 series is reached, counts every catalog item visible to the user, active in
-both the numerator and the denominator (docs/business-rules.md, rule 5).
+both the numerator and the denominator (docs/business-rules.md, BR-5).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from app.repositories.localization import localized
 
 
 def series_storefront_visible(user_id: int) -> ColumnElement[bool]:
-    """Storefront visibility for a series (docs/business-rules.md, §13).
+    """Storefront visibility for a series (docs/business-rules.md, BR-13).
 
     A series is visible when its country is active, or when the user already
     owns at least one instance of a catalog item that belongs to it — an
@@ -31,7 +31,7 @@ def series_storefront_visible(user_id: int) -> ColumnElement[bool]:
     personal layer, so unlike `storefront_visible()` there is no created_by
     branch.
 
-    No `require_confirmed` gate here, unlike `storefront_visible()` (§13a):
+    No `require_confirmed` gate here, unlike `storefront_visible()` (BR-13a):
     the series screens are about the user's own collection, not the
     catalogue browse experience, so an unconfirmed country's series still
     shows when the user actually has something in it (owner's call,
@@ -73,7 +73,7 @@ class SeriesRepository:
         self, country_id: int | None = None, *, confirmed_only: bool = False
     ) -> Sequence[CoinSeries]:
         """`confirmed_only` is the catalog's own filter panel — a harder,
-        separate gate (§13a): only a `catalog_confirmed` country's series,
+        separate gate (BR-13a): only a `catalog_confirmed` country's series,
         no exception for one the user already owns coins of. The default
         (off) is every other caller — the series screens and the dashboard,
         which are about the user's own collection (owner's call,
@@ -103,7 +103,7 @@ class SeriesRepository:
     async def get_visible(self, series_id: int) -> CoinSeries | None:
         """The series if storefront-visible to the user, else None: unlike
         `/catalog/{id}`, a direct series summary follows the same rule as the
-        listing (docs/business-rules.md, §13)."""
+        listing (docs/business-rules.md, BR-13)."""
         query = select(CoinSeries).where(
             CoinSeries.id == series_id, series_storefront_visible(self._user_id)
         )
@@ -154,7 +154,7 @@ class SeriesRepository:
         total, owned = int(counts[0] or 0), int(counts[1] or 0)
 
         # The money side goes over the user's instances; an instance of an
-        # archived item still counts (docs/04, rule 10).
+        # archived item still counts (docs/business-rules.md, BR-10).
         in_series_any_state = [
             CatalogItem.series_id == series_id,
             self._visible(),

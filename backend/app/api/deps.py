@@ -192,7 +192,7 @@ JobToken = Annotated[None, Depends(require_job_token)]
 
 
 class PageParams:
-    """?page=1&pageSize=50 — every list endpoint is paginated (docs/03)."""
+    """?page=1&pageSize=50 — every list endpoint is paginated (docs/api.md)."""
 
     def __init__(
         self,

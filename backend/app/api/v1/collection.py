@@ -205,7 +205,7 @@ async def list_owned_countries(
     session: DbSession, user: CurrentUser, locale: RequestLocale
 ) -> list[CountryOut]:
     """Countries the owner holds at least one purchase from — narrower than
-    `GET /countries`, for the "Мої монети" filters panel (docs/03)."""
+    `GET /countries`, for the "Мої монети" filters panel (docs/api.md)."""
     return await CollectionService(session, user, locale).list_owned_countries()
 
 

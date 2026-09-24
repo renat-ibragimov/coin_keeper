@@ -21,7 +21,7 @@ class CountryOut(CamelModel):
     collect_variants: bool
     is_active: bool
     # Whether the general catalog counts this country as "the catalogue"
-    # (docs/business-rules.md §13a) — GET /catalog hides everything of an
+    # (docs/business-rules.md, BR-13a) — GET /catalog hides everything of an
     # unconfirmed country, however much of it a user personally owns. The
     # series screens read this to explain that gap instead of just looking
     # broken (owner-reported, 2026-09-13).

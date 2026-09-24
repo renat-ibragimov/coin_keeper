@@ -19,7 +19,7 @@
 }
 
 /* Explains the gap left by an unconfirmed country (docs/business-rules.md
- * §13a) instead of a misleading "Open in the catalog" button and an empty
+ * BR-13a) instead of a misleading "Open in the catalog" button and an empty
  * grid that looks like the page is broken (owner-reported, 2026-09-13). */
 .notConfirmedNotice {
   margin: 0 auto;

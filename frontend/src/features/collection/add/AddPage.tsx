@@ -73,7 +73,7 @@ function decimalOrNull(value: string): string | null {
 /**
  * Resolves what was typed into a dictionary-or-own-words field: the id of the
  * row whose name it matches, or the text itself when nothing matches. Never
- * both, and an empty field is neither (docs/business-rules.md, §14).
+ * both, and an empty field is neither (docs/business-rules.md, BR-14).
  */
 function matchByName<T extends { id: number }>(
   rows: T[] | undefined,

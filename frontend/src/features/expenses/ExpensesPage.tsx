@@ -94,7 +94,7 @@ export function ExpensesPage() {
   const [editor, setEditor] = useSessionDraft<Editor>('expenses:editor', { mode: 'closed' });
   const [deleting, setDeleting] = useState<ExpenseOut | null>(null);
   // A purchase row deletes the coin, not the expense — the expense goes with
-  // it (docs/business-rules.md, rule 10), so it uses the collection's own
+  // it (docs/business-rules.md, BR-10), so it uses the collection's own
   // dialog, which says exactly that.
   const [deletingPurchase, setDeletingPurchase] = useState<{
     id: number;
@@ -461,7 +461,7 @@ export function ExpensesPage() {
                             owned by the purchase, so its icons lead to the
                             instance — editing opens the purchase form, and
                             deleting removes the coin together with this very
-                            row (docs/business-rules.md, rule 4). Only a
+                            row (docs/business-rules.md, BR-4). Only a
                             purchase whose instance is somehow gone has
                             nothing to offer. */}
                         {fromPurchase ? (

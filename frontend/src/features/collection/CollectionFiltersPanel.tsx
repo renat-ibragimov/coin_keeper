@@ -54,7 +54,7 @@ export function CollectionFiltersPanel({
 
   // Bounds for the period fields' suggestion lists: the union of the selected
   // countries' own range among the owner's purchases, or the whole loaded
-  // list when none is selected (docs/03). In "year range" mode each field
+  // list when none is selected (docs/api.md). In "year range" mode each field
   // additionally narrows against the other's current value, so "до" never
   // suggests a year before "від" and vice versa. All year fields stay
   // free-text inputs — the list is a suggestion, not a constraint

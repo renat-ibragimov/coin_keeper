@@ -64,7 +64,7 @@ async def country_by_code(session: AsyncSession, code: str) -> Country:
 
 
 async def set_country_active(session: AsyncSession, country: Country, active: bool) -> None:
-    """Flips `is_active` for the storefront-visibility tests (docs/04, §13)."""
+    """Flips `is_active` for the storefront-visibility tests (docs/business-rules.md, BR-13)."""
     await session.execute(update(Country).where(Country.id == country.id).values(is_active=active))
     await session.commit()
 
@@ -72,7 +72,7 @@ async def set_country_active(session: AsyncSession, country: Country, active: bo
 async def set_country_catalog_confirmed(
     session: AsyncSession, country: Country, confirmed: bool
 ) -> None:
-    """Flips `catalog_confirmed` for the hard-gate tests (docs/04, §13a)."""
+    """Flips `catalog_confirmed` for the hard-gate tests (docs/business-rules.md, BR-13a)."""
     await session.execute(
         update(Country).where(Country.id == country.id).values(catalog_confirmed=confirmed)
     )
@@ -86,7 +86,7 @@ async def seed_reference(session: AsyncSession) -> ReferenceData:
     usa = await country_by_code(session, "US")
     # Only Ukraine is seeded active and catalog_confirmed; the storefront
     # tests expect both, and catalog_confirmed is orthogonal to what most of
-    # them actually exercise (docs/business-rules.md, §13a).
+    # them actually exercise (docs/business-rules.md, BR-13a).
     usa.is_active = True
     usa.catalog_confirmed = True
     await session.flush()

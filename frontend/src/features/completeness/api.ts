@@ -40,7 +40,7 @@ export function fetchCompletenessGroup(
 }
 
 /** The detail screen's own tiles -- shared or personal, regardless of the
- *  country's catalog_confirmed (docs/business-rules.md §13a). Deliberately
+ *  country's catalog_confirmed (docs/business-rules.md, BR-13a). Deliberately
  *  not `fetchCatalog(...)`: that's the catalogue browse experience's harder
  *  gate, which hides a user's own coins of a country the catalogue project
  *  hasn't confirmed yet. `owned` is the detail screen's own filter (narrows

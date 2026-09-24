@@ -7,7 +7,7 @@ indexes expect. Routes never assemble these conditions themselves
 (docs/auth.md, docs/data-model.md).
 
 Listings additionally carry `storefront_visible()` (docs/business-rules.md,
-§13): a record from a deactivated country drops out of listings and
+BR-13): a record from a deactivated country drops out of listings and
 aggregates unless it is personal or already owned. The single-item card and
 its price/instance sub-resources are exempt on purpose — see that function's
 docstring.
@@ -149,7 +149,7 @@ def _search_vector() -> ColumnElement[Any]:
 
 
 def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> ColumnElement[bool]:
-    """Storefront visibility for a shared catalog record (docs/business-rules.md, §13, §13a).
+    """Storefront visibility for a shared catalog record (docs/business-rules.md, BR-13 and BR-13a).
 
     A record shows when its country is active, when it is the user's own
     personal item, or when the user already holds at least one instance of
@@ -158,7 +158,7 @@ def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> Colum
     never applied to the single-item card or price/instance sub-resources,
     which stay reachable by id.
 
-    `require_confirmed` (default on) adds the harder gate from §13a on top,
+    `require_confirmed` (default on) adds the harder gate from BR-13a on top,
     with no exception for a personal item or an owned instance: an
     unconfirmed country never shows as *the catalogue*, however much of it a
     user has collected. This is what makes `GET /catalog` Ukraine-only today.
@@ -211,7 +211,7 @@ def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> Colum
 
 
 def snapshot_visible_to(user_id: int) -> ColumnElement[bool]:
-    """Price snapshot visibility (docs/business-rules.md, rule 7)."""
+    """Price snapshot visibility (docs/business-rules.md, BR-7)."""
     return or_(
         MarketPriceSnapshot.created_by.is_(None),
         MarketPriceSnapshot.created_by == user_id,
@@ -496,7 +496,7 @@ class CatalogRepository:
         )
 
     def _snapshot_price_uah(self) -> ColumnElement[Decimal]:
-        """Convert a snapshot to UAH by the latest rate (docs/04, rule 7)."""
+        """Convert a snapshot to UAH by the latest rate (docs/business-rules.md, BR-7)."""
         return case(
             (MarketPriceSnapshot.currency_code == "UAH", MarketPriceSnapshot.price),
             else_=MarketPriceSnapshot.price * func.coalesce(self._latest_rate_to_uah(), 0),
@@ -533,7 +533,7 @@ class CatalogRepository:
         return func.coalesce(name, CatalogItem.material)
 
     def _series_name(self) -> ColumnElement[str]:
-        """Falls back to the typed-in series of a personal item (§14)."""
+        """Falls back to the typed-in series of a personal item (BR-14)."""
         return series_display_name(self._locale)
 
     @staticmethod
@@ -567,7 +567,7 @@ class CatalogRepository:
         each expense's own rate. By `catalog_item_id`, not `collection_item_id`
         — this is the item's total across every purchase, regardless of
         whether a given row has been backfilled onto its purchase
-        (docs/business-rules.md, rule 4; docs/api.md)."""
+        (docs/business-rules.md, BR-4; docs/api.md)."""
         amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
         return (
             select(func.sum(amount_uah))

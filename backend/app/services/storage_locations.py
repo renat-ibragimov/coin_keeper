@@ -150,7 +150,7 @@ async def translate_in_background(location_id: int) -> None:
     Every early return is logged: a silent no-op here means the location
     keeps showing the owner's typed text in both language slots forever,
     with nothing in the UI to explain why -- the only way to notice is a
-    log line (docs/business-rules.md, п. 16, incident 2026-09-13).
+    log line (docs/business-rules.md, BR-16, incident 2026-09-13).
     """
     api_key = get_settings().anthropic_api_key
     if not api_key:

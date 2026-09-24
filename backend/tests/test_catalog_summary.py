@@ -132,7 +132,7 @@ async def test_summary_requires_a_confirmed_country_like_the_listing(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
     """The unconfirmed country's owned item shows in "Моя колекція" but not
-    in the catalog summary -- the same §13a gate `GET /catalog` applies."""
+    in the catalog summary -- the same BR-13a gate `GET /catalog` applies."""
     refs = ctx.refs
     await set_country_catalog_confirmed(db_session, refs.usa, False)
     usa_item = await make_catalog_item(db_session, country=refs.usa, title="Quarter", year=2020)

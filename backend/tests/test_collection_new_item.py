@@ -2,7 +2,7 @@
 
 `POST /collection` with `newCatalogItem` creates the personal catalog item,
 the instance and the coin_purchase expense in one transaction
-(docs/business-rules.md, rule 4). What the tests here are actually about
+(docs/business-rules.md, BR-4). What the tests here are actually about
 is that "one transaction" — a purchase rejected for a missing rate must not
 leave a coin nobody bought behind.
 """
@@ -298,7 +298,7 @@ async def test_a_coin_of_a_country_with_no_dictionaries_keeps_its_own_words(
 ) -> None:
     """An Austrian 5 euro: the denominations table has nothing for that
     country and neither does the series list, so both are typed in
-    (docs/business-rules.md, §14, owner 2026-09-14)."""
+    (docs/business-rules.md, BR-14, owner 2026-09-14)."""
     austria = await country_by_code(db_session, "AT")
     coin = coin_payload(
         austria.id,

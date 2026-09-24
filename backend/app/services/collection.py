@@ -3,7 +3,7 @@
 Creating an instance also creates a coin_purchase expense for
 price x quantity with the NBU rate on the purchase date; updating recomputes
 that expense, deleting removes it — always in the same transaction
-(docs/business-rules.md, rules 4, 6 and 10).
+(docs/business-rules.md, BR-4, BR-6 and BR-10).
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def _denomination_label(
     denomination: Denomination | None, item: CatalogItem, locale: str
 ) -> str | None:
     """The dictionary label, or what the owner typed on a personal item when
-    their country has no denominations at all (docs/business-rules.md, §14)."""
+    their country has no denominations at all (docs/business-rules.md, BR-14)."""
     if denomination is not None:
         return render_label(denomination.value, denomination.unit, locale)
     text = (item.denomination_text or "").strip()
@@ -139,7 +139,7 @@ class UnknownCurrencyError(CollectionError):
 
 
 class MissingRateError(CollectionError):
-    """No NBU rate on or before the purchase date: 422 (docs/03)."""
+    """No NBU rate on or before the purchase date: 422 (docs/api.md)."""
 
     def __init__(self, currency: str, on_date: str) -> None:
         super().__init__(currency)
@@ -229,7 +229,7 @@ class CollectionService:
         return await self._get_out(item_id)
 
     async def create(self, payload: CollectionItemCreate) -> CollectionItemOut:
-        """The purchase transaction (docs/business-rules.md, rule 4).
+        """The purchase transaction (docs/business-rules.md, BR-4).
 
         With `newCatalogItem` it grows a third write — the personal catalog
         item itself — and with `extraExpenses` one more per supporting
@@ -402,7 +402,7 @@ class CollectionService:
         Linked to both the coin and this exact purchase (`collection_item_id`),
         same as `coin_purchase` — the same catalog item bought more than once
         would otherwise make it impossible to tell which delivery belongs to
-        which purchase (docs/business-rules.md, rule 4). Unlike
+        which purchase (docs/business-rules.md, BR-4). Unlike
         `coin_purchase`, the service never deletes this expense when the
         instance goes away; `collection_item_id`'s `ON DELETE SET NULL` detaches
         it on its own, and the expense stays in the money journal — the money

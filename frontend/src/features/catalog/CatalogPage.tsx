@@ -66,7 +66,7 @@ const GROUP_LABELS: Record<CollectionGroup, string> = {
 };
 
 // The catalog's own filter panel only ever offers a `catalog_confirmed`
-// country's own facets (§13a) — narrowed further to one country when
+// country's own facets (BR-13a) — narrowed further to one country when
 // exactly one is picked, same as the single-select filters used to (a
 // multi-country selection just shows the whole confirmed-scope list
 // unnarrowed, owner's call, 2026-09-12).

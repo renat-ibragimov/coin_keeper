@@ -2,7 +2,7 @@
 
 A catalog_items row belongs to one of two layers, decided by created_by:
 NULL is a shared record (admin and system jobs only), a value is the author's
-personal item. See docs/business-rules.md, rule 2.
+personal item. See docs/business-rules.md, BR-2.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ class Country(Base):
     all. Unlike `is_active` it has no escape hatch for an owned or personal
     item — a country stays out of every catalogue listing until someone
     flips this, however many personal positions or instances a user holds
-    against it (docs/business-rules.md, §13a).
+    against it (docs/business-rules.md, BR-13a).
     """
 
     __tablename__ = "countries"
@@ -141,7 +141,7 @@ class EdgeType(Base):
     (`reeded`, `plain`), `name_uk`/`name_en` the two locales the interface
     shows. No `name_original` slot — an edge type is universal numismatic
     vocabulary, not something owned by one issuer's language
-    (docs/business-rules.md, rule 14).
+    (docs/business-rules.md, BR-14).
     """
 
     __tablename__ = "edge_types"
@@ -209,7 +209,7 @@ class CatalogItem(Base):
     series_id: Mapped[int | None] = mapped_column(ForeignKey("coin_series.id", ondelete="SET NULL"))
     # Display only, unlike series_id: completeness, the series screens and the
     # series filter are all counted on the shared record an admin creates
-    # (docs/business-rules.md, rule 2). A typed-in name shows on the card
+    # (docs/business-rules.md, BR-2). A typed-in name shows on the card
     # and takes part in none of that.
     series_text: Mapped[str | None] = mapped_column(Text)
     # The bare (non-packaged) catalog item this one is a souvenir-packaging
@@ -223,7 +223,7 @@ class CatalogItem(Base):
     )
     # The same dictionary-or-own-words split as composition_id/material: a
     # face value the denominations table has no row for (an Austrian 5 euro,
-    # say) is kept as the collector typed it (docs/business-rules.md, §14).
+    # say) is kept as the collector typed it (docs/business-rules.md, BR-14).
     denomination_text: Mapped[str | None] = mapped_column(Text)
     collection_group: Mapped[CollectionGroup] = mapped_column(collection_group_enum, nullable=False)
     subtype: Mapped[str | None] = mapped_column(Text)

@@ -6,8 +6,8 @@ dimensions, so N groups cost the same three queries regardless of how many
 there are — unlike the series screen's per-series loop.
 
 Completeness: both sides of the fraction over active items visible to the
-user (docs/business-rules.md, rule 5). Money counts an instance of an
-archived item too (rule 10) — the same split `SeriesRepository.summary()`
+user (docs/business-rules.md, BR-5). Money counts an instance of an
+archived item too (BR-10) — the same split `SeriesRepository.summary()`
 makes between the "active" and the "any state" predicate sets.
 """
 
@@ -128,7 +128,7 @@ class CompletenessRepository:
             )
 
         # The money side goes over the user's instances of any state — an
-        # instance of an archived item still counts (docs/04, rule 10).
+        # instance of an archived item still counts (docs/business-rules.md, BR-10).
         any_state_conditions: list[ColumnElement[bool]] = [self._visible()]
         if country_id is not None:
             any_state_conditions.append(CatalogItem.country_id == country_id)

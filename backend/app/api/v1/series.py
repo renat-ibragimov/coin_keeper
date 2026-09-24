@@ -39,7 +39,7 @@ async def list_series(
     """`scope=mine` (default) is the user's own collection — the "Серії"
     screen and the dashboard, unrestricted by which countries the catalogue
     project has confirmed. `scope=catalog` is `GET /catalog`'s own series
-    filter: a harder, separate gate (§13a), only a `catalog_confirmed`
+    filter: a harder, separate gate (BR-13a), only a `catalog_confirmed`
     country's series."""
     await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
     if user is None:

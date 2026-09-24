@@ -1,812 +1,480 @@
-# 04. Бизнес-правила
+# Business rules
 
-Правила извлечены из работающего кода десктопной версии (947-строчный `database.ts`)
-и исходного ТЗ продукта. Формулы проверены на реальных данных.
+The rules the backend enforces. Each rule has a stable ID (`BR-N`); cite it from code as
+`docs/business-rules.md, BR-N`. IDs are never renumbered — a retired rule keeps its
+number unused.
 
-Отличия от legacy отмечены явно — не всё стоит переносить как было.
+Schema details: `data-model.md`. Endpoint contracts: `api.md`.
 
 ---
 
-## 1. Каталог против коллекции
+## BR-1. Catalog vs collection
 
-Фундаментальное разделение, нарушать нельзя:
+- A **catalog item** describes a coin issue. It exists regardless of who owns it.
+- A **collection item** is a specific purchase of a specific user, with a `quantity`.
+- One catalog item → many collection items (different users, or one user buying twice).
 
-- **Позиция каталога** описывает выпуск. Существует независимо от владельцев.
-- **Экземпляр коллекции** — конкретная монета конкретного пользователя.
-- Одна позиция каталога → много экземпляров (у разных людей и у одного человека).
+Catalog items are **shared** (`created_by IS NULL`, visible to everyone) or **personal**
+(`created_by = <user>`, visible only to the author). A collection item may point at
+either kind.
 
-Позиции каталога, в свою очередь, бывают двух видов: **общие** (`created_by IS NULL`, видны
-всем) и **личные** (`created_by = <пользователь>`, видны только автору). Для экземпляра
-коллекции разницы нет — он ссылается и на ту, и на другую. Подробности — п. 2 и
-`data-model.md`.
+## BR-2. Who creates catalog records
 
-## 2. Кто создаёт записи каталога
+### Shared catalog — admins and system jobs only
 
-Из ТЗ, раздел 3 — правило сохраняется и **усиливается**:
+Shared records are created, edited and archived only by admins and by the NBU catalog
+sync in `coin-parser`. For everyone else the shared catalog is **read-only**; an attempt
+to change it returns `403`. Shared records are archived, never deleted in normal work
+(BR-10).
 
-> Интернет-источники не имеют права автоматически создавать, удалять или менять основные
-> каталожные записи. Они могут только предложить соответствие и обновить цену уже существующей
-> монеты после однозначного сопоставления.
+The shared catalog grows two ways:
 
-### Общий каталог — только администратор
+1. **The initial seed** — the owner's migrated catalog (`data-model.md`, "Data origins").
+2. **The NBU catalog sync** — enriches existing records and adds new issues as
+   `status = 'draft'`. Drafts are invisible to non-admins (storefront, search,
+   completeness) until an admin publishes them; rejecting a draft archives it with a
+   reason (`admin.md`).
 
-Записи общего каталога (`created_by IS NULL`) создаёт, правит и **архивирует** только
-администратор. Для обычного пользователя общий каталог доступен **только на чтение**.
+Price updates and user actions never add shared records.
 
-Удаления здесь нет: лишняя или отменённая позиция архивируется, а не удаляется, потому что
-на ней висят данные чужих коллекций. Правило целиком — п. 10.
+**Series** belong to the shared catalog: there are no personal series and only admins
+create them. A personal position can reference an existing series, or carry free text
+in `series_text` (BR-14), which is shown but never counted.
 
-Общий каталог пополняется двумя путями:
+### Personal positions — full CRUD for the author
 
-1. **Затравка** — мигрированная база владельца, 3063 позиции (`09-data-migration.md`).
-2. **Системная фоновая задача по каталогу НБУ** — официальный источник по Украине
-   (`integrations.md`, раздел 3). Она обогащает существующие позиции и добавляет новые
-   выпуски. Записи США и СССР пополняет администратор вручную.
+When an issue isn't in the shared catalog, the user creates a **personal position**
+(`created_by = <user>`). It is visible only to its author, fully editable and
+deletable by them, has its own photos, and counts in the author's filters, search,
+completeness and statistics exactly like a shared record.
 
-Пользовательский импорт, скрейпинг uCoin и обновление цен общий каталог **не пополняют
-никогда**.
+A personal position is created **inside a purchase**, on the "Додати" page — there is
+no standalone "create catalog item" screen. Technically it's one request,
+`POST /collection` with a nested `newCatalogItem` (`api.md`): position, collection item
+and expense are created in one transaction, so a rejected purchase never leaves an
+orphan position.
 
-То же относится к **сериям**: серия — атрибут общего каталога, личных серий нет, создаёт
-их только администратор. Личная позиция может ссылаться на существующую общую серию, но
-завести новую серию пользователь не может. В legacy `createSeriesOption` был доступен
-пользователю — в многопользовательской версии это создавало бы мусор в общем справочнике.
+Price updates never create positions in any layer: no match → `not-found`.
 
-### Личные позиции — полный CRUD у автора
+## BR-3. Import deduplication (not implemented — import is deferred)
 
-Если выпуска нет в общем каталоге, пользователь создаёт **личную позицию**
-(`created_by = <его id>`). Она:
+Import (uCoin Excel export, uCoin page by URL) is post-MVP (`scope.md`). When it's built,
+it must follow this rule:
 
-- видна только автору;
-- полностью редактируется и удаляется автором;
-- имеет свои фотографии;
-- участвует в фильтрах, поиске, сериях, комплектности и статистике владельца наравне с общими.
+Import creates **personal positions only** and looks for an existing record in two
+rounds:
 
-Личная позиция создаётся:
+1. **Shared catalog.** Match among `created_by IS NULL`. Found → create nothing; link the
+   user's collection items to the shared record and take only data that doesn't touch
+   the record itself (e.g. a price snapshot with `created_by = <user>`, BR-7).
+2. **The user's personal positions.** Found → update it. Not found → create a new
+   personal position.
 
-1. вручную — **внутри записи покупки**, на странице «Додати» (решение владельца 2026-09-14,
-   отменяет решение 2026-09-07 «ручного создания личной позиции в интерфейсе нет»);
-2. импортом из Excel;
-3. явным импортом с uCoin по URL, инициированным пользователем.
+Matching inside each round:
 
-Первый путь важен формулировкой: отдельной страницы «создать позицию каталога» нет и не
-планируется. Позиция появляется как побочный результат покупки — человек записывает
-монету, которую купил, а не «заводит каталожную запись». Технически это один составной
-запрос `POST /collection` с вложенным `newCatalogItem` (`api.md`): позиция,
-экземпляр и расход создаются одной транзакцией, поэтому отклонённая покупка не оставляет
-осиротевшую позицию. Общего каталога это не касается ни в каком виде — запись всегда
-личная, `shared: true` по-прежнему только у администратора.
+1. By `source_key`:
+   ```
+   uCoin Excel row:  ucoin:<country>|<denomination>|<year>|<variety>|<title>|<catalog no.>   (lower case)
+   uCoin page:       ucoin:<hostname><pathname>[?tid=<tid>]   (hostname normalised)
+   ```
+2. Otherwise by natural key: country + denomination + year + lower(title), plus, when
+   a catalog number is given, a match on the first non-empty of KM / UC / Numista. On
+   several matches, prefer the one whose catalog number matched.
 
-Фоновое обновление цен **не создаёт** позиций ни в одном слое. Если совпадение не найдено —
-возвращаем `not-found`, а не заводим новую запись.
+Updates never overwrite filled fields with empty ones (`COALESCE(new, old)` on
+`series_id`, `subtype`, `catalog_km`, `material`, `source_key`). The whole import is
+one transaction; the report is `scanned / inserted / updated / skipped + warnings[]`.
 
-«Повышение» личной позиции в общий каталог администратором — после MVP
-(`scope.md`).
+`source_key` uniqueness is per layer: global among shared records, per owner among
+personal ones (two partial unique indexes, `data-model.md`).
 
-## 3. Дедупликация при импорте
+## BR-4. Buying a coin
 
-Импорт (Excel-выгрузка, uCoin по URL) **создаёт только личные позиции**. Поиск существующей
-записи при этом идёт в два круга:
+One transaction:
 
-**Круг 1 — общий каталог.** Ищем совпадение среди записей с `created_by IS NULL` по правилам
-ниже. Нашли → ничего не создаём: экземпляры коллекции привязываются к найденной **общей**
-записи, а из данных импорта берём только то, что не трогает саму запись (снимок цены с
-`created_by = <пользователь>`, см. п. 7).
+1. insert the `collection_items` row;
+2. insert an `expenses` row, category `coin_purchase`, amount `unit price × quantity`,
+   linked to both the catalog item and the new collection item.
 
-**Круг 2 — личные позиции пользователя.** Ищем среди его собственных (`created_by = <он>`)
-по тем же правилам. Нашли → обновляем личную позицию. Не нашли → **создаём новую личную
-позицию**.
+**Currency.** The purchase keeps the price and currency the user entered
+(`purchase_price`, `purchase_currency`) plus `purchase_rate_uah` — the NBU rate on the
+purchase date (BR-6). The UAH amount is always computed: `purchase_price ×
+purchase_rate_uah`. The original amount and currency are never lost.
 
-Общий каталог импортом не меняется и не пополняется ни при каком исходе.
+**A coin that isn't in the catalog** adds a third step before the collection item:
+insert the personal position (BR-2). Rates, currency and storage location are resolved
+before the first insert, so a rejected purchase leaves nothing behind. Never split this
+into two requests (`POST /catalog` then `POST /collection`) — a failure of the second
+would leave junk in the user's catalog.
 
-Правила сопоставления внутри каждого круга — двухступенчатые, из `findExistingCatalogItem`:
+**Commit before background work.** FastAPI runs `BackgroundTasks` while sending the
+response, *before* the request-scoped session commits in dependency cleanup. The
+background title translation opens its own session, so `CollectionService.create`
+commits the whole transaction explicitly before the route schedules the task (see
+BR-16 for the same issue with storage locations).
 
-**Шаг 1 — по `source_key`.** Точный идентификатор из источника. Формат:
+### Supporting expenses
 
-```
-Excel-выгрузка uCoin:  ucoin:<страна>|<номинал>|<год>|<разновидность>|<название>|<катномер>
-                       (всё в нижнем регистре, через |)
-Страница uCoin:        ucoin:<hostname><pathname>[?tid=<tid>]
-                       (hostname нормализуется к ru.ucoin.net)
-```
+A purchase can carry supporting expenses — shipping, holder, grading — each with its
+own amount and currency, sharing the purchase's date and seller. Rates for **every**
+currency in the request are resolved before the first insert: an expense in a currency
+without a rate rejects the whole purchase.
 
-**Шаг 2 — по естественному ключу**, если `source_key` не дал совпадения:
+- **The amount is per purchase, not per unit** — never multiplied by `quantity`. Cost
+  per unit including extras is `(unit price × quantity + Σ supporting) / quantity`.
+- **Linked like the purchase:** both `catalog_item_id` and `collection_item_id` are
+  set. `collection_item_id` is what tells which purchase a shipping cost belongs to when
+  the same catalog item was bought several times.
+- **Deleting the collection item keeps them.** The service doesn't delete supporting
+  expenses; `expenses.collection_item_id ON DELETE SET NULL` clears the link and the
+  expense stays in "Гроші" with its `catalog_item_id` — the money was spent regardless.
+- **Older rows** created before the link existed have `collection_item_id` backfilled
+  (migration `0025`) only where `(owner_id, catalog_item_id)` has exactly one collection
+  item; ambiguous ones stay `NULL` until the user fixes them.
 
-```
-страна + номинал + год + нижний_регистр(название)
-  и, если каталожный номер задан, — совпадение по первому непустому из KM / UC / Numista
-```
+**Counting them in "bought for".** `user_settings.include_supporting_expenses`
+(default `true`): when on, the headline cost on the coin card and the base for value
+change is `purchaseTotalUah + supportingExpensesUah`, with a note of how much of it is
+extras; when off, the headline is `purchaseTotalUah` and extras are shown separately.
+The API always returns both sums unchanged — the setting only affects how the frontend
+combines and labels them.
 
-При нескольких совпадениях приоритет у записи с совпавшим каталожным номером.
+## BR-5. Completeness
 
-**Найдено → обновляем, не найдено → вставляем.** При обновлении часть полей защищена
-`COALESCE(новое, старое)`: `series_id`, `subtype`, `catalog_km`, `material`, `source_key`.
-То есть импорт **не затирает** уже заполненные поля пустыми значениями. Это важное поведение,
-сохраняем.
-
-Весь импорт — одна транзакция. Отчёт: `scanned / inserted / updated / skipped + warnings[]`.
-
-### Отличие от legacy
-
-В legacy `source_key` был глобально уникален. В многопользовательской версии уникальность
-двухуровневая, по слою записи:
-
-- **глобальная** для общих записей — дубль выпуска в общем каталоге не нужен никому;
-- **в пределах владельца** для личных — один и тот же выпуск может быть заведён личной
-  позицией у нескольких пользователей независимо.
-
-Реализация — два частичных уникальных индекса, см. `data-model.md`.
-
-## 4. Покупка монеты
-
-Из `addPurchase`. Одна транзакция, два действия:
-
-1. `INSERT INTO collection_items` — экземпляр
-2. `INSERT INTO expenses` категории `coin_purchase` на сумму `цена × количество`,
-   со ссылками на позицию каталога и на созданный экземпляр
-
-Удаление экземпляра удаляет связанный расход — явным `DELETE` в сервисном слое, см. п. 10.
-В legacy это давало ровно 620 расходов на 620 экземпляров.
-
-### Что чинить относительно legacy
-
-В legacy `addPurchase` **жёстко прописывал** `purchase_currency = 'UAH'` и
-`purchase_rate_uah = 1`, игнорируя валюту из ввода. Поэтому все 620 покупок в базе — гривневые,
-а поля `coinSpendUsdAtPurchase` / `coinSpendEurAtPurchase` в дашборде всегда пустые.
-
-Правильное поведение:
-
-1. Принять `price` и `currency` от пользователя.
-2. Если валюта не UAH — получить курс НБУ на `purchaseDate` (правило в п. 6).
-3. Записать `purchase_price` в исходной валюте, `purchase_currency`, `purchase_rate_uah`.
-4. Исходную сумму и валюту не терять никогда — требование ТЗ, раздел 6.
-
-Сумма в гривне всегда вычисляемая: `purchase_price × purchase_rate_uah`.
-
-**Монета, которой нет в каталоге** (2026-09-14): та же транзакция, три действия — перед
-экземпляром вставляется личная позиция каталога (п. 2). Курс, валюта и место хранения
-разрешаются до первой вставки, поэтому отклонённая покупка не оставляет позицию без
-экземпляра. Двух последовательных запросов (`POST /catalog`, затем `POST /collection`)
-быть не должно — падение второго оставило бы мусор в каталоге пользователя. Транзакция
-коммитится явно внутри запроса: `BackgroundTasks` у FastAPI выполняются раньше закрывающего
-коммита сессии (п. 16, инцидент 2026-09-13), а фоновая задача перевода названия открывает
-свою сессию. Контракт — `api.md`.
-
-**Сопутствующие расходы той же покупкой** (2026-09-14, уточнено 2026-09-22): в транзакцию
-может входить ещё несколько расходов — доставка, холдер, грейдинг, — с суммой и валютой
-каждый, а датой и продавцом самой покупки. Курсы **всех** валют запроса разрешаются до
-первой вставки, то есть доставка в валюте без курса отклоняет покупку целиком.
-
-Сумма каждого сопутствующего расхода — это то, что ввёл пользователь **за покупку целиком**,
-а не за единицу товара. В отличие от `coin_purchase` (`amount = цена_за_шт × quantity`) её
-**никогда не домножают на `quantity`**: доставка в 45 ₴ при покупке 2 экземпляров одной
-позиции остаётся 45 ₴, а не 90. Формула для «цены экземпляра с учётом сопутствующих
-расходов» — `(цена_за_шт × quantity + Σ сопутствующих) / quantity`, а не
-`цена_за_шт + Σ сопутствующих`, иначе доставка задвоится при quantity > 1.
-
-Связь такая же по силе, как у `coin_purchase`: заполняются оба поля — `catalog_item_id`
-**и** `collection_item_id`. Причина — `collection_items` не «один экземпляр = одна строка»,
-а «одна покупка = одна строка» с полем `quantity`; если одну и ту же каталожную позицию
-купили несколько раз отдельными покупками, только `collection_item_id` показывает, какая
-доставка к какой конкретно покупке относится. Одного `catalog_item_id` недостаточно: он
-одинаков у всех покупок этой позиции и не различает их.
-
-При этом сервисный слой **не удаляет** сопутствующий расход явным `DELETE`, когда удаляют
-экземпляр (в отличие от `coin_purchase`, см. п. 10). Он полагается на
-`expenses.collection_item_id ON DELETE SET NULL`: связь с экземпляром обнуляется,
-`catalog_item_id` и сам расход остаются в журнале «Гроші» — деньги были потрачены независимо
-от того, в коллекции ли ещё монета. Иначе доставку пришлось бы либо молча удалять вместе с
-монетой, либо считать покупкой — и в журнале на неё смотрели бы иконки, которые удаляют
-экземпляр.
-
-**Бэкфилл существующих записей** (2026-09-22): у сопутствующих расходов, заведённых до этого
-правила, `collection_item_id IS NULL`. Разовая миграция данных проставляет его там, где для
-пары `(owner_id, catalog_item_id)` находится **ровно один** `collection_item` — это
-безопасно и однозначно. Если находится больше одного (позицию покупали неоднократно и нельзя
-понять, к какой покупке относится старая доставка) — колонку оставляют `NULL` и это не
-считается ошибкой миграции: расход просто продолжает светиться только по `catalog_item_id`,
-как раньше, до тех пор пока пользователь не поправит его вручную.
-
-**Учитывать ли в «Куплено загалом»** (`user_settings.include_supporting_expenses`, миграция
-0026, решение владельца 2026-09-22): кто-то считает доставку частью стоимости монеты, кто-то
-нет. Настройка глобальная, по умолчанию `true` — сумма `purchaseTotalUah + supportingExpensesUah`
-становится и заголовочной цифрой на карточке, и базой для «Зміни вартості», а под ней короткая
-строка «у т.ч. N ₴ супутні витрати» просто поясняет состав. При `false` заголовок — только
-`purchaseTotalUah`, а строка ниже — «+ N ₴ супутні витрати» (не входит). Сами суммы
-`purchaseTotalUah` и `supportingExpensesUah`, что отдаёт `GET /catalog/{id}`, от этой настройки
-не зависят — она чисто про то, как фронт их складывает и подписывает, `api.md`.
-
-## 5. Комплектность
-
-### Базовое правило (режим «разновидности выключены»)
-
-Позиция считается собранной, если у пользователя есть **хотя бы один** экземпляр этой позиции
-каталога. Количество не влияет: две одинаковые монеты — это по-прежнему одна собранная позиция.
+A catalog item counts as **collected** when the user has at least one collection item
+for it; quantity doesn't matter.
 
 ```
-всего    = COUNT(catalog_items) в области подсчёта, только активные
-собрано  = COUNT(DISTINCT collection_items.catalog_item_id) для пользователя,
-           по пересечению с теми же активными позициями области подсчёта
-осталось = MAX(0, всего − собрано)
-процент  = ROUND(собрано / всего × 100, 1)   -- при всего = 0 → 0
+total     = COUNT(active catalog items in scope)
+collected = COUNT(DISTINCT collection_items.catalog_item_id) for the user,
+            intersected with the same active items in scope
+missing   = MAX(0, total − collected)
+percent   = ROUND(collected / total × 100, 1)      -- 0 when total = 0
 ```
 
-«Область подсчёта» ограничена видимыми пользователю позициями: общие плюс его личные (п. 2).
-Личная позиция — такая же обязательная к сбору позиция, как общая.
+- **Scope** = catalog items visible to the user (shared + own personal, BR-2),
+  narrowed by the active filter or grouping (country, series, year, denomination,
+  material, metal kind, edge, quality…; `api.md`, `/completeness/*`). Personal
+  positions count like shared ones.
+- **Numerator and denominator use the same set — active items** (`NOT is_archived`,
+  published). Counting all of the user's instances against active items only would give
+  "21 of 20". An instance of an archived item stays in the collection, spend and value,
+  but not in completeness (BR-10).
+- **Varieties.** `countries.collect_variants` would make each variety its own required
+  item. The flag exists; the mode is not implemented (`scope.md`).
 
-**Числитель и знаменатель считаются по одному и тому же множеству — активным позициям**
-(`NOT is_archived`). Это не мелочь: если исключить архивные из знаменателя, а в числителе
-оставить все экземпляры пользователя, получится «собрано 21 из 20» и процент выше сотни.
-Поэтому «собрано» — это не «сколько у меня экземпляров», а **пересечение** экземпляров
-с активными позициями области подсчёта.
+## BR-6. Exchange rates
 
-Экземпляр архивной позиции при этом никуда не пропадает: он виден в коллекции, учитывается
-в тратах и в стоимости коллекции, но в комплектность серии не входит ни числителем, ни
-знаменателем. Подробности про архивацию — п. 10.
+Source: the NBU API, loaded by `coin-parser` into `exchange_rates` (`integrations.md`).
+Only USD and EUR against UAH are stored; there is no direct USD↔EUR rate.
 
-При сравнении учитываются серия, название, год и номинал. Разновидность, монетный двор и знак
-двора игнорируются. Номинал входит в ключ обязательно: одно название и год могут существовать
-в разных номиналах и металлах.
+- A historical amount converts at the rate **on the purchase date**; on a non-banking
+  day, the last rate published before it (`RateRepository.rate_on`).
+- If NBU has no rate on or before that date, the converted amount is `null` — it is
+  **never** filled in from a later rate.
+- Current value uses the latest rate.
+- The original amount and currency are always kept.
 
-### Режим «разновидности включены»
+### Secondary display currency
 
-Задаётся флагом `countries.collect_variants`. Каждая разновидность становится самостоятельной
-обязательной позицией. **В MVP не реализуем** (см. `scope.md`), но поле и логику
-разделения закладываем.
+UAH is the only currency sums are computed in (SQL aggregates for the dashboard,
+catalog, "Гроші"); everything else is a conversion of the finished UAH number.
+`user_settings.secondary_currency` (`USD` | `EUR`) picks which of the two
+already-computed numbers the UI shows next to UAH — the API always returns both:
 
-### Область подсчёта
+- at the purchase-date rate: `purchaseTotalUsd/Eur` (catalog item), `totalUsd/Eur`
+  (collection item), `amountUsd/Eur` (expense row);
+- at the latest rate: only current market value on the coin card.
 
-В legacy комплектность считалась по **всему** каталогу — отсюда «осталось собрать 2443 монеты»
-при 620 своих. Формально верно, практически бесполезно.
+## BR-7. Market prices
 
-В вебе область подсчёта задаётся фильтром: страна, серия, группа, диапазон лет. Дашборд
-показывает комплектность по активному фильтру, а не по всей базе. Полноценные «цели
-коллекционирования» из ТЗ — после MVP.
+### Who updates prices
 
-## 6. Курсы валют
-
-Источник — API НБУ. Правила из ТЗ (раздел 6) и legacy-кода курсов:
-
-- Исторические расходы пересчитываются по курсу **на дату покупки**.
-- Если дата не банковский день — берётся **последний опубликованный курс до этой даты**.
-- Текущая стоимость считается по последнему доступному курсу.
-- Исходная сумма и валюта не теряются.
-
-Курс на дату кешируется в `exchange_rates` — повторно у НБУ не спрашиваем.
-
-### Вторичная валюта отображения (2026-09-13)
-
-Гривна — единственная валюта, в которой реально считаются суммы (SQL-агрегаты дашборда,
-каталога, «Гроші»); всё остальное — конвертация поверх готового гривневого числа, никогда
-структурная замена оси расчёта. `user_settings.secondary_currency` (`USD` или `EUR`,
-`data-model.md`) выбирает, какое из двух уже посчитанных чисел показать вторым, мелким,
-рядом с гривневой суммой — `USD` и `EUR` считаются всегда, оба, независимо от выбора:
-
-- по историческому курсу **на дату покупки** — `purchaseTotalUsd`/`purchaseTotalEur`
-  (позиция в каталоге), `totalUsd`/`totalEur` (экземпляр в «Мої монети»),
-  `amountUsd`/`amountEur` (строка в «Гроші»); `null`, если на ту дату у НБУ ещё нет курса —
-  не считается по позднему курсу вместо этого (owner-reported баг, 2026-09-13: 40 ₴/$
-  2026 года просачивался в долларовую сумму покупки 2020-го);
-- по текущему (последнему) курсу — только «поточна вартість» в карточці монеты, живая
-  переоценка того, чему нет собственной даты покупки.
-
-Набор валют закрыт двумя: `exchange_rates` вообще не хранит курсов, кроме USD и EUR к
-гривне, прямого курса USD↔EUR тоже нет — только через гривну как мост.
-
-### Закрытая дыра (была: 2026-09-13)
-
-Legacy умел досинхронизировать недостающие даты (`syncMissingRates`, с 2009-01-01), но
-делал это по одной дате за запрос — для 17 лет истории это тысячи запросов. В вебе
-эту работу делает `coin-parser` (`collector/rates/`, отдельный репозиторий,
-`integrations.md`, раздел 1): диапазонный запрос НБУ одним вызовом на валюту,
-`ON CONFLICT DO UPDATE` перезаписывает и мигрированные легаси-значения (2002-02-23 —
-2026-08-06, 141 запись на валюту) свежим ответом того же API. Суточный крон каждые
-5 часов держит окно открытым дальше.
-
-## 7. Рыночные цены
-
-### Кто обновляет цены
-
-Два независимых пути, и их нельзя смешивать:
-
-| Что | Кто обновляет | Как часто |
+| Records | Updated by | How often |
 |---|---|---|
-| Общий каталог | системная фоновая задача, источник UA-Coins | раз в сутки |
-| Личные позиции | владелец, вручную — по одной монете или пачкой по своим позициям | по требованию |
+| Shared catalog | the central job in `coin-parser`, source UA-Coins | daily |
+| Personal positions | nobody yet — manual entry and per-position refresh are deferred (`scope.md`) | — |
 
-Суточная задача обходит **только активные** позиции: у архивной цену обновлять незачем,
-её история цен замораживается на момент архивации (п. 10).
+The daily job visits **active** records only; an archived record's price history
+freezes at archiving. There is no "update price" button for shared records, and no
+server-side crawl of uCoin (`integrations.md`).
 
-Пользовательской кнопки «обновить цену» для позиции **общего** каталога в MVP нет: цены там
-центральные, ручной запуск чужого обхода не нужен и создаёт нагрузку на внешний сайт.
-Серверный обход uCoin для центрального обновления не делаем — Cloudflare, см.
-`integrations.md`.
+### Snapshot visibility
 
-### Видимость снимков цены
-
-Определяется полем `market_price_snapshots.created_by`:
-
-| `created_by` | Откуда снимок | Кто видит |
+| `market_price_snapshots.created_by` | Source | Visible to |
 |---|---|---|
-| `NULL` | центральная суточная задача | все |
-| `<пользователь>` | ручной ввод, обновление своей личной позиции, колонка «рыночная цена» из Excel-импорта | только автор |
+| `NULL` | the central daily job | everyone |
+| `<user>` | the user's own entry (manual, personal refresh, import) | the author only |
 
-В расчёте стоимости коллекции у пользователя участвуют **общие снимки плюс его собственные**.
-Свой снимок по общей позиции перекрывает общий, если он свежее: текущая цена всегда
-последняя по `observed_at` в пределах видимых пользователю снимков.
+A user's collection is valued from shared snapshots **plus their own**; the current
+price is the latest by `observed_at` among snapshots visible to them, so a fresher own
+snapshot overrides a shared one. Snapshots with `is_suspect = true` are excluded
+(`data-model.md`, "Data origins").
 
-### История не перезаписывается
+### History is append-only
 
-Каждая проверка создаёт новую строку `market_price_snapshots`. Текущая цена — последняя по
-`observed_at` среди видимых пользователю. Требование ТЗ, раздел 4.3.
+Every check inserts a new snapshot row; nothing is overwritten.
 
-### Пересчёт в гривну
-
-```
-если currency_code = 'UAH' → price
-иначе                      → price × (последний курс для этой валюты)
-```
-
-### Состояние по умолчанию
-
-Один настраиваемый дефолт на все монеты — `UNC`, пока пользователь не поменял его в
-настройках (`user_settings.default_grade`, миграция 0014). Подставляется в форму покупки
-независимо от группы каталога и переопределяется там же, для любой позиции или экземпляра.
-До миграции 0014 было два раздельных значения по группе каталога (памятные и коллекционные
-— `UNC`, обиходные — `VF`), без интерфейса для правки; разделение убрали как лишнюю
-сложность ради поля, которое всё равно правится вручную на каждой покупке.
-
-### Валидация — обязательна, это главный урок legacy
-
-В legacy цена писалась в базу как есть, а ошибки чинились точечными миграциями постфактум.
-В схеме сохранились их следы:
+### Conversion to UAH
 
 ```
-5. sanitize-ucoin-glued-prices
-7. sanitize-ucoin-year-prefixed-prices
-8. classify-ukraine-metal-from-title
-+ бэкапы: before-bad-ucoin-metal-price-fix,
-          before-bad-ucoin-metal-price-cleanup,
-          before-ucoin-svdb-price-correction,
-          before-ucoin-1914-p-cent-price-correction
+currency_code = 'UAH' → price
+otherwise             → price × latest rate for that currency
 ```
 
-Результат: оценка коллекции 313 400 грн при затратах 42 766 грн — рост в 7,3 раза, что
-неправдоподобно. Часть цен в базе заведомо мусорная.
+### Validation before writing
 
-**Правило: цена проходит валидацию до записи.** Проверки и разбор конкретных багов —
-в `integrations.md`, раздел «Валидация цены». Не прошедшая проверку цена не пишется в
-`market_price_snapshots`, а возвращается со статусом `rejected` и сохраняется в лог
-вместе с сырым ответом источника.
+A price is validated **before** it's written, identically on every write path. A price
+that fails is not written to `market_price_snapshots`: it's returned as `rejected` and
+logged with the source's raw response. Checks and known parser pitfalls:
+`integrations.md`, "Price validation".
 
-Валидация одинакова для **всех** путей записи: центральная задача, пользовательское
-обновление личной позиции, ручной ввод, Excel-импорт. Исключений нет.
+### Default grade
 
-## 8. Финансы
+One configurable default for all coins, `UNC` until the user changes it
+(`user_settings.default_grade`). It pre-fills the purchase form and can be overridden
+per purchase.
 
-Из `getDashboardSnapshot`:
-
-```
-потрачено на монеты   = SUM(amount × COALESCE(rate_uah,1)) где category = 'coin_purchase'
-сопутствующие расходы = SUM(amount × COALESCE(rate_uah,1)) где category <> 'coin_purchase'
-всего на хобби        = потрачено на монеты + сопутствующие
-
-оценка коллекции      = SUM(quantity × последняя_цена_в_грн) по экземплярам пользователя
-бюджет на недостающее = SUM(последняя_цена_в_грн) по позициям каталога,
-                        которых нет в коллекции пользователя
-недостающие без цены  = COUNT позиций без экземпляра и без единого снимка цены
-```
-
-«Последняя цена» здесь — последняя среди **видимых пользователю** снимков
-(`created_by IS NULL OR created_by = :user_id`, п. 7). «Позиции каталога» — видимые
-пользователю: общие плюс его личные (п. 2).
-
-Показатель «недостающие без цены» нужен, чтобы пользователь понимал, насколько бюджету
-можно верить.
-
-Все суммы считаются **в пределах владельца**. В legacy владельца не было — все запросы
-нужно дополнить фильтром `owner_id`, а обращения к каталогу и ценам — фильтрами видимости
-из п. 2 и п. 7.
-
-## 9. Разбивки
+## BR-8. Finances
 
 ```
-по странам:  всего позиций в стране, собрано (DISTINCT catalog_item_id), топ-6
-по сериям:   всего позиций в серии, собрано, топ-6, сортировка по количеству
+coin spend       = SUM(amount × COALESCE(rate_uah, 1)) where category = 'coin_purchase'
+related spend    = SUM(amount × COALESCE(rate_uah, 1)) where category <> 'coin_purchase'
+total spend      = coin spend + related spend
+
+collection value = SUM(quantity × latest UAH price) over the user's collection items
+missing budget   = SUM(latest UAH price) over visible catalog items the user doesn't own
+unpriced missing = COUNT of visible catalog items the user doesn't own that have no price
 ```
 
-## 10. Удаление и архивация
+"Latest price" = latest among snapshots visible to the user (BR-7). "Visible catalog
+items" = shared + own personal, under the storefront rule (BR-13). "Unpriced missing"
+tells the user how far the budget can be trusted. Every sum is scoped by `owner_id`.
 
-### Общий каталог: архивация, а не удаление
+## BR-9. Breakdowns
 
-Записи общего каталога **не удаляются**. Позиция, которой больше не место в витрине —
-отменённый выпуск, дубликат, ошибочно заведённая запись, — **архивируется**:
-`is_archived = true` плюс `archived_at` и обязательная `archive_reason`.
+- **By country:** items per country, collected (`DISTINCT catalog_item_id`), top 6 by
+  item count.
+- **By series:** every series the user has started — no limit. The frontend sorts
+  (least complete first, finished last, alphabetical among ties); trimming on the server
+  would silently drop series from a personal collection.
 
-Причина проста: позиция общего каталога — не собственность того, кто её убирает. На ней
-висят экземпляры, покупки, расходы, фотографии и история цен **чужих** людей. Удалять
-чужие данные ради опрятности справочника нельзя.
+## BR-10. Deletion and archiving
 
-**Что делает архивация:**
+### Shared catalog: archive, don't delete
 
-| | Архивная общая позиция |
+Shared records are **not deleted**. A record that no longer belongs in the storefront —
+discontinued, duplicate, created by mistake — is **archived**: `is_archived = true`,
+`archived_at`, and a required `archive_reason`. Other people's collection items,
+purchases, expenses, photos and price history hang off it.
+
+| | Archived shared record |
 |---|---|
-| Витрина каталога, поиск, фильтры | не показывается, если явно не запрошено `archived=true` |
-| Знаменатель комплектности («всего в серии/стране») | не входит |
-| Числитель комплектности («собрано») | не входит, см. п. 5 |
-| Суточная задача обновления цен | пропускает |
-| Задача по каталогу НБУ | пропускает при сопоставлении |
-| Экземпляры владельцев, покупки, расходы | сохраняются полностью, продолжают учитываться |
-| Стоимость коллекции и сумма трат владельца | считаются как раньше, экземпляр учитывается |
-| Фотографии и история цен | сохраняются |
-| Карточка позиции у владельца экземпляра | открывается, сверху плашка «Позиция архивирована: <причина>» |
+| Storefront, search, filters | hidden unless `archived=true` is requested |
+| Completeness numerator and denominator | excluded (BR-5) |
+| Daily price job, NBU catalog sync matching | skipped |
+| Owners' collection items, purchases, expenses | kept and still counted |
+| Collection value and spend | unchanged |
+| Photos and price history | kept |
+| Coin card for an owner | opens, with a banner "archived: <reason>" |
 
-Коротко: для справочника позиции больше нет, для владельца монеты — есть всё, кроме
-участия в подсчёте комплектности.
+Archiving is reversible: `unarchive` clears the flag, `archived_at` and
+`archive_reason`. Only admins archive and unarchive shared records (`auth.md`); both
+actions go to `audit_log`. Duplicates are archived with a "duplicate" reason — merging
+with re-pointing of instances is deferred (`scope.md`).
 
-**Архивация обратима.** Снятие флага (`unarchive`) возвращает позицию в витрину и обнуляет
-`archived_at` и `archive_reason`. Ошибочно заархивированное чинится в одно действие, а не
-восстановлением из бэкапа.
+### Physical deletion of a shared record
 
-Архивировать и разархивировать общую запись может **только администратор**
-(`auth.md`). Дубликаты в общем каталоге до появления полноценного слияния закрываются
-именно архивацией с причиной `'дубликат'` — перепривязка экземпляров на каноническую
-позицию отложена на после MVP (`scope.md`).
+A clean-up tool, not a workflow. All conditions at once, else `409`:
 
-### Физическое удаление
+1. done by an admin;
+2. the record is shared and **already archived**;
+3. no `collection_items` or `expenses` reference it;
+4. its `media_files` and `market_price_snapshots` go by cascade — they belong to the
+   record, not to users.
 
-Остаётся, но как операция «прибраться за опечаткой», а не рабочий инструмент. Условия
-жёсткие, все сразу:
+### Personal positions and the rest
 
-1. выполняет администратор;
-2. запись общая и **уже архивирована** — удалить активную позицию нельзя, сначала архив;
-3. на неё нет **ни одной** ссылки из `collection_items` и `expenses`;
-4. `media_files` и `market_price_snapshots` при этом уходят каскадом — они принадлежат самой
-   записи, а не пользователям.
+- **A personal position** is deleted physically by its author; archiving doesn't apply.
+  In the same transaction the service deletes the author's collection items on it and
+  their `coin_purchase` expenses — safe, since a personal position can't carry anyone
+  else's data.
+- The "can't delete an item with instances" guard lives **in the service layer**:
+  `collection_items.catalog_item_id` is `ON DELETE NO ACTION` because of the cascade
+  diamond on user deletion (`data-model.md`).
+- **Deleting a collection item deletes its `coin_purchase` expense** with an explicit
+  `DELETE` in the same transaction. `expenses.collection_item_id ON DELETE SET NULL` is
+  only a safety net for that category — on its own it would keep the expense and
+  inflate spend.
+- **Supporting expenses are left alone** — `ON DELETE SET NULL` is exactly the intended
+  behavior for them (BR-4).
+- Deleting a user deletes their collection, expenses, photos and personal positions and
+  never touches the shared catalog.
+- Deleting an image requires confirmation and is written to `audit_log`.
 
-Не выполнено любое условие — `409`, а не частичное удаление.
+## BR-11. (retired)
 
-### Личные позиции и остальное
+Coin-group heuristics of the previous app. The resulting data was corrected once; no
+code applies them now.
 
-- **Личную позицию** её автор удаляет физически, как и раньше. Архивация к ней не
-  применяется: запись видна только автору, и прятать её от самого себя незачем.
-  Вместе с позицией сервисный слой той же транзакцией удаляет собственные экземпляры
-  автора на ней и их расходы `coin_purchase` — каскад безопасен, потому что личная
-  позиция не может нести чужих данных. Legacy требовал сначала удалить экземпляр
-  («Нельзя удалить монету с покупками») — в вебе это лишний шаг: пользователь удаляет
-  свою же запись целиком.
-- Запрет «нельзя удалить позицию с экземплярами» живёт **в сервисном слое**, а не на внешнем
-  ключе: `collection_items.catalog_item_id` объявлен `ON DELETE NO ACTION` из-за каскадного
-  ромба при удалении пользователя (`data-model.md`).
-- **Удаление экземпляра удаляет связанный расход `coin_purchase`** — явным `DELETE` в
-  сервисном слое, в той же транзакции, что и удаление `collection_items`. Внешний ключ
-  `expenses.collection_item_id` объявлен `ON DELETE SET NULL` и для `coin_purchase` служит
-  только страховкой от висячей ссылки: сам по себе он расход не удалит, а обнулит связь и
-  завысит сумму трат. Полагаться на FK здесь нельзя, удаление расхода — обязанность сервиса
-  (`data-model.md`).
-- **Сопутствующие расходы (не `coin_purchase`) сервис не трогает вообще** — для них тот же
-  `ON DELETE SET NULL` не страховка, а единственный и ожидаемый механизм: удаление
-  экземпляра просто обнуляет `collection_item_id` у расхода, сам расход и `catalog_item_id`
-  остаются (п. 4).
-- Удаление пользователя удаляет его коллекцию, расходы, фото и **личные позиции каталога**,
-  но не трогает общий каталог — в том числе не архивирует ничего в нём.
-- Удаление изображения требует подтверждения и пишется в `audit_log` (ТЗ, раздел 12).
-  Туда же пишутся архивация и разархивация общих позиций.
+## BR-12. Language and Unicode
 
-## 11. Классификация группы монеты
+- Interface: `'uk' | 'en'`, default `'uk'`.
+- Coin names: any language and script.
+- **Three slots on every named entity** (countries, series, coins): `*_original` in the
+  issuer's language (plus `original_lang`) and two translations, `*_uk` and `*_en`, each
+  with a `*_source` (`official | llm | manual`). The original is never translated — it's
+  what the issuer called the coin.
+- **Russian is not a separate language.** There are no `*_ru` columns. For Soviet
+  coins Russian *is* the original (`original_lang = 'ru'`).
+- **Display name** = `title_<locale>` → `title_original`, nothing beyond that. Response
+  locale: `?locale=`, else `Accept-Language`, else `uk` (`data-model.md`).
+- When the displayed name is a translation, the card also shows the original and its
+  language, so the reader knows it's a translation.
+- Search covers the original, both translations and catalog numbers at once
+  (full-text config `simple`, `data-model.md`).
 
-Из `groupFor` в `excel-import.ts` — эвристика для украинских монет:
+## BR-13. Country visibility and the storefront rule
 
-```
-если номинал содержит "грив" и числовое значение >= 2 → commemorative
-иначе                                                  → circulation
-```
+`countries.is_active` is the **storefront switch**: the country chips in catalog filters
+and what the catalog shows by default. Only Ukraine is active; a country that existed
+before the seed keeps its state and `id`. Countries are ordered by `sort_order`
+(Ukraine = 0), then by name in the reader's locale.
 
-Грубо, но на украинском каталоге работает: обиходные — копейки и 1 гривна, памятные —
-от 2 гривен. Для других стран не применимо. При импорте с uCoin группа берётся из раздела
-каталога, а не угадывается.
+The purchase form offers **all** issuers (about 260, ISO 3166-1 plus historical ones),
+searchable by any of the three names and by code: a personal position may be any
+issuer's coin.
 
-Отдельная эвристика `classifyGroup` в `ucoin-import.ts`:
+### The storefront rule
 
-```
-если текст содержит регуляр|обиход|обігов|circulation → circulation
-иначе                                                 → commemorative
-```
+A catalog record is visible in listings and aggregates if **any** holds:
 
-Грубость эвристики оставила в `circulation` юбилейные обиходные 1 гривню
-(2004–2016) и карбованцевые памятные 1995–1996 — они не попадают под «гривна
-≥ 2», но уже связаны с нумизматическим каталогом НБУ. Починено на уровне данных
-одноразовым прогоном (этап 4.5, `docs/archive/2026-09-ukraine-pipeline-buildlog.md`):
-активная запись `circulation`, у которой есть NBU-связь, переведена в
-`commemorative`.
+1. its country is active;
+2. it's the current user's personal position;
+3. the current user owns at least one collection item of it.
 
-## 12. Язык и Unicode
+A series is visible if its country is active **or** the user owns an item in it (no
+personal layer for series, so point 2 doesn't apply).
 
-- Интерфейс: украинский и английский. Локали — `'uk' | 'en'`, по умолчанию `'uk'`.
-- Названия монет — любой язык и письменность, без ограничений.
-- **Три слота у каждой именованной сущности** — страны, серии, монеты:
-  `*_original` на языке эмитента (плюс `original_lang`) и два перевода, `*_uk` и `*_en`,
-  каждый со своим `*_source` (`official | llm | manual`). Оригинал не переводится
-  никогда: это то, как эмитент назвал монету.
-- **Русский — не отдельный язык.** Колонок `title_ru` / `name_ru` / `label_ru` нет.
-  Для советской части каталога русский — это и есть оригинал (`original_lang = 'ru'`),
-  для американской оригинал английский.
-- **Название для показа** — `title_{локаль} → title_original`, и за оригиналом ничего
-  нет. Локаль ответа: `?locale=`, иначе `Accept-Language`, иначе `uk`. Одно правило на
-  весь код, см. `data-model.md`.
-- Если показанное имя — перевод, карточка называет и оригинал:
-  «Оригінал: Рубль (російська)». Читатель должен видеть, что перед ним перевод.
-- Поиск работает по оригиналу, обоим переводам и каталожным номерам одновременно.
-  Полнотекстовый индекс — с конфигурацией `simple`, см. `data-model.md`.
+One predicate implements it — `storefront_visible()` in `app/repositories/catalog.py`,
+`series_storefront_visible()` in `app/repositories/series.py` — used by `GET /catalog`
+(list and `total`), the "missing" listing and the missing budget, `GET /series*`,
+`GET /completeness/*`, and the dashboard aggregates in `GET /bootstrap`, so KPIs match
+the lists.
 
-## 13. Видимость стран
+**Direct card exception.** `GET /catalog/{id}` and its sub-resources (`/prices`,
+`/collection-items`) ignore the rule: a record of an inactive country opens by direct
+link. An explicit `?countryId=` of an inactive country isn't an error — it just returns
+what the rule allows.
 
-`countries.is_active` — это **витрина**: чипы фильтра каталога и общий каталог по
-умолчанию. Активна Украина; страна, уже бывшая в базе до сида, сохраняет своё состояние.
+**Open question:** point 3 (owned records of an inactive country appear in shared
+listings) is provisional; the owner may replace it with a separate marker or a
+different scope.
 
-`countries.catalog_confirmed` — более жёсткий, независимый признак: страна, чей каталог
-реально собран и подтверждён и годится показываться как «каталог» вообще. Подробности и
-разница с `is_active` — п. 13a.
+## BR-13a. Hard gate: confirmed-catalog countries
 
-Форма «створити свою позицію» предлагает **все** страны — 260 эмитентов, от ISO 3166-1 до
-Австро-Угорщини, — с поиском по любому из трёх имён и по коду. Личная позиция может быть
-монетой какого угодно эмитента, и правило «общий каталог read-only» этому не мешает:
-пользователь заводит свою запись, а не правит чужую (п. 2).
+`countries.catalog_confirmed` marks a country whose catalog has actually been built and
+verified against an official source. Only Ukraine is `true`; everything else, including
+the US and USSR records from the seed, is `false` until someone does the same
+verification and confirms it by hand.
 
-Порядок стран — `sort_order`, затем имя в локали читателя. У Украины `sort_order = 0`.
+Without this gate, points 2–3 of BR-13 would turn a whole country into "catalog" for a
+user as soon as they bought one coin from it.
 
-### Витринная видимость записей, серий и агрегатов
+- **The gate applies to `GET /catalog` only** (list, search, year bounds for the year
+  filter) — the one screen that presents "the catalog". A record appears there only if
+  its country is `catalog_confirmed`, and **only then** are BR-13 points 1–3 checked.
+- **"Моя колекція", the overview and "Комплектність" ignore the gate.** They're about
+  the user's own collection and must show everything the user has. The predicates take
+  `require_confirmed` (default on); `/series*`, `/completeness/*` and the `/bootstrap`
+  aggregates pass `require_confirmed=False`. Dashboard KPIs and `GET /catalog` totals
+  therefore differ for an unconfirmed country the user has coins in — by design.
+- **Completeness tiles** come from `GET /completeness/items` with the same
+  `require_confirmed=False`, never from `GET /catalog`, which would show an empty grid
+  under "56 of 56". The frontend offers "open in catalog" only for `groupBy=series`
+  when `CountryOut.catalogConfirmed` is true.
+- **Exceptions:** the direct card and `GET /collection` are never gated.
+  `GET /catalog/lookup` (suggestions in the purchase form) ignores both the gate and the
+  storefront rule — the user picked the country explicitly, and hiding a shared record
+  there would push them to create a personal duplicate. Layer visibility and archiving
+  still apply. Implemented as `apply_storefront=False` on `CatalogRepository.list_items`,
+  its only use.
 
-`is_active` не ограничивается справочником стран — он определяет, что вообще
-попадает в выдачи. Запись общего каталога видима в листингах и агрегатах, если
-выполняется хотя бы одно:
+## BR-14. Material, edge, strike quality
 
-1. её страна активна (`countries.is_active`);
-2. это личная позиция текущего пользователя (`created_by = user`);
-3. у текущего пользователя есть хотя бы один экземпляр этой записи в коллекции
-   (`collection_items`) — владелец монет неактивной страны не теряет их в каталоге.
+Three coin attributes share one design: a dictionary (`materials`, `edge_types`,
+`quality_types` — code + `name_uk` + `name_en`, no `name_original`: this is universal
+numismatic vocabulary) plus a free-text fallback on the catalog record (`material`,
+`edge`, `quality`) for what the dictionary doesn't cover. The FK (`composition_id`,
+`edge_type_id`, `quality_type_id`) and the text coexist: dictionary name where known,
+source text where not (`data-model.md`).
 
-Серия видима, если её страна активна ИЛИ у пользователя есть хотя бы один
-экземпляр в записях этой серии (у серий нет личного слоя, поэтому пункт 2 для
-них не действует).
+- **No fineness in materials.** The NBU "Матеріал" filter has nine values and never
+  states silver or gold fineness, so the dictionary has only the metal ("Срібло",
+  "Золото", "Срібло із золотим покриттям"). Fineness, when known, lives in `notes`.
+- **Technical tokens** (`nickel_silver`, bare `silver`/`gold`, `bimetallic`,
+  `cupronickel`…) left in `material`/`edge` by the seed are resolved to dictionary rows by
+  migrations `0007` and `0010`; the known aliases are in
+  `app/reference_data/materials.py` (`LEGACY_RAW_ALIASES`).
 
-Правило единое — реализовано как переиспользуемый предикат
-(`storefront_visible()` в `app/repositories/catalog.py`,
-`series_storefront_visible()` в `app/repositories/series.py`) и применяется в:
+**The purchase form splits these fields deliberately:**
 
-- `GET /catalog` (список и `total`);
-- «Не вистачає» (фильтр `owned=false` того же листинга) и агрегаты бюджета
-  недостающих монет на Огляді;
-- `GET /series`, `GET /series/summary`;
-- `GET /completeness/summary`, `GET /completeness/group` — тот же предикат, обобщённый на
-  произвольное поле группировки (`api.md`), а не только на серию;
-- агрегатах Огляда/дашборда (`catalogItems`, `countries`, `completedItems`,
-  `countryBreakdown`, `seriesBreakdown`, `missingBudgetUah`,
-  `unpricedMissingItems`) — чтобы KPI совпадали со списками.
+- *Dictionary plus free text* (`Combobox`): **material**, **denomination**, **series**.
+  The dictionaries are seeded from what the catalog holds (Ukraine, USSR, US), so they
+  know nothing about, say, Austria. On submit, a case-insensitive match sends the id;
+  otherwise the text (`material`, `denomination_text`, `series_text`). `series_text` is
+  display-only — completeness counts `series_id` (BR-2).
+- *Dictionary only* (`Select`): **edge** and **quality**. Both are optional, and
+  hand-typed values would never match parser output.
+- **Year** — a list plus free input (a 1780 coin won't be in any country's list),
+  newest first.
 
-**Исключение — прямая карточка.** `GET /catalog/{id}` и его под-ресурсы
-(`/prices`, `/collection-items`) правилу не подчиняются: запись неактивной
-страны остаётся доступной по прямой ссылке (переход из коллекции). Явный
-`?countryId=` неактивной страны не даёт отдельной ошибки — он просто
-показывает то, что разрешает то же правило (обычно пусто для чужого
-пользователя).
+Full dictionaries for the form: `GET /materials`, `GET /edge-types`,
+`GET /quality-types`. Don't confuse them with `GET /catalog/materials`, which narrows the
+filter to values actually present.
 
-**TODO (решение владельца не финализировано):** то, что «владеемая запись
-неактивной страны видна в общих листингах» (пункт 3) — временное решение.
-Итоговую логику (например, отдельную пометку таких записей в интерфейсе или
-иной охват) владелец продукта ещё определит.
+## BR-15. Coins in souvenir packaging
 
-## 13a. Жёсткий гейт: страна с подтверждённым каталогом
+NBU often sells the same coin as two cards: plain and "у сувенірній упаковці". For a
+collector that's a presentation variant, not a second coin.
+`catalog_items.packaging_of_id` (self-referencing FK) links the packaged card to the
+plain one.
 
-Правило из п. 13 само по себе оказалось слишком щедрым: пункты 2 и 3 («это личная позиция»
-и «у пользователя есть экземпляр») означают, что как только пользователь заводит личную
-позицию или покупает монету любой страны — вся эта страна тут же становится частью общего
-каталога для него. На затравке (`09-data-migration.md`) это конкретно означало, что
-монеты США и СССР — попавшие в базу как общие записи (`created_by IS NULL`) при переносе
-личной легаси-коллекции владельца, а не как результат какой-либо сверки с официальным
-источником, — оказывались наравне с Украиной, у которой такая сверка (НБУ + uCoin, 38
-серий) реально пройдена. Решение владельца 2026-09-12: каталогом считаем только то, что
-реально собрано и подтверждено, и это отдельная, более жёсткая ось видимости — без
-исключений для личных позиций и для уже купленных монет.
+- **Pairing criterion:** exact equality of `weight_grams` and `diameter_mm` within
+  (series, title without the packaging suffix, issue year). Not title alone — a theme
+  re-issued decades later or a heavier silver variant is not a pair. `mintage` is
+  excluded: NBU counts loose and packaged as separate batches. Pairs are found by
+  `coin-parser` on every parse run.
+- **Visibility is a user setting:** `user_settings.show_packaging_variants`, default
+  `true`. `GET /catalog` hides records with a `packaging_of_id` when it's off; the direct
+  card never checks it (lists filter, a single card doesn't — as with BR-10 and BR-13).
+- Not built: `catalog_variants` and a "has a packaged variant" badge on the plain card
+  (`backlog.md`).
 
-`countries.catalog_confirmed` (миграция `0008`) держит один этот факт. Сегодня `true`
-только у Украины; всё остальное, включая США и СССР из легаси-затравки, — `false`, пока
-кто-то не пройдёт по стране такую же сверку и не подтвердит её вручную.
+## BR-16. Storage location
 
-**Гейт живёт только в `GET /catalog`** (список, поиск, `year_bounds_by_country` для границ
-фильтра по году) — это единственный экран, который на самом деле показывает «каталог» как
-таковой. Запись видна в нём, только если её страна `catalog_confirmed` — **и только затем**
-проверяются пункты 1–3 из п. 13 (страна активна / личная позиция / есть экземпляр). У
-страны без подтверждения эти три исключения не работают вообще: сколько бы личных позиций
-или экземпляров у пользователя ни было, они не превращают страну в каталог.
+A dictionary (`storage_locations`, `data-model.md`), not free text on
+`collection_items`.
 
-**«Моя колекція», Огляд (дашборд) и «Комплектність» (до 2026-09-23 — «Серії») гейту не
-подчиняются вообще** — решение владельца 2026-09-12, уточняющее первоначальное «применяем
-везде» того же дня. Это экраны про **личную коллекцию пользователя**, а не про витрину
-каталога: там должны быть видны все монеты, все серии/годы/номиналы/материалы и все страны,
-которые у пользователя реально есть, независимо от того, подтверждён ли каталог по этой
-стране. `storefront_visible()` и `series_storefront_visible()` реализуют это одним
-предикатом с параметром `require_confirmed` (по умолчанию включён): `GET /catalog`
-вызывает его как есть, `GET /series` и его разновидности, `CompletenessService`
-(`app/services/completeness.py` — обобщение того же правила на произвольное поле
-группировки, не только серию), а также агрегаты `GET /bootstrap` (`catalogItems`,
-`countries`, `completedItems`, `countryBreakdown`, `seriesBreakdown`, `missingBudgetUah`,
-`unpricedMissingItems`) — с `require_confirmed=False`. КПИ дашборда и итоги `GET /catalog`
-из-за этого осознанно расходятся для неподтверждённой страны, где у пользователя что-то
-есть: это не рассинхронизация, это и есть цель.
-
-**То же исключение, что и в п. 13.** Прямая карточка (`GET /catalog/{id}` и под-ресурсы) и
-`GET /collection` гейту не подчиняются в любом случае — они не про каталог-витрину. Монета
-неподтверждённой страны, которую пользователь уже держит, остаётся у него в «Моя колекція»
-и открывается по прямой ссылке точно так же, как обычная монета; недоступным становится
-только её появление в списке каталога, поиске и агрегатах именно каталога.
-
-**Пробел (закрыт 2026-09-13, обобщён на «Комплектність» 2026-09-23).** Правило выше про
-серии касалось `summary`/списка, но сама плитка монет на экране деталей серии фронтом
-бралась через `GET /catalog?seriesId=` — тот самый жёсткий гейт, только с чужого экрана.
-Итог на живых данных: серия США «50 State Quarters» показывала «Зібрано 56 з 56, 100%» и
-пустую сетку под этим — `summary` личные позиции видел, плитки нет. Правильная плитка была
-`GET /series/{id}/items`, теперь — `GET /completeness/items?groupBy=series&value={id}`
-(`api.md`, эндпоинт `/series/{id}/items` удалён), тем же
-`require_confirmed=False`. `CountryOut.catalogConfirmed` заодно доехал до фронта — экран
-комплектности показывает «Відкрити в каталозі» только когда `groupBy=series` и каталог по
-стране действительно подтверждён, иначе поясняет, что видна лишь особиста колекція.
-
-**Третье исключение — подсказки формы «Додати» (2026-09-14).** `GET /catalog/lookup`
-не подчиняется ни гейту п. 13a, ни витринному правилу п. 13 вообще: он ищет **внутри одной
-страны, которую пользователь назвал сам**, выбрав её из полного списка эмитентов. Логика та
-же, что у прямой карточки: раз страна названа явно, витрине нечего добавить, а не найти по
-ней общую запись — значит подтолкнуть человека завести личный дубль монеты, которая в
-каталоге уже есть. Видимость слоёв (общие + свои личные) и правило архива при этом не
-меняются. Реализация — `apply_storefront=False` у `CatalogRepository.list_items`,
-единственный вызов на всё приложение.
-
-## 14. Матеріал, гурт, категорія якості карбування
-
-Три атрибута монеты — из чего она сделана, какой у неё гурт (ребро) и какого качества
-чеканка — устроены одинаково: словарь-справочник (`materials`, `edge_types`,
-`quality_types` — код + `name_uk` + `name_en`, без `name_original`, поскольку это
-универсальная нумизматическая терминология, а не название, принадлежащее языку
-эмитента) плюс свободный текст-фолбэк (`material`, `edge`, `quality`) на записи каталога
-для того, что словарь ещё не покрывает. FK на словарь (`composition_id`, `edge_type_id`,
-`quality_type_id`) и текст сосуществуют по одному правилу: словарное название — где оно
-известно, текст источника — где нет (`data-model.md`).
-
-**У материала нет пробы.** Официальный фильтр «Матеріал» на сайте НБУ предлагает ровно
-девять значений и не
-указывает пробу серебра или золота никогда. Раньше словарь всё равно нёс пробу
-(«Срібло 925», «Gold .999») — она пришла из легаси-коллекции или текста импорта uCoin,
-а не от НБУ, то есть с точки зрения единственного источника истины для подтверждённого
-каталога (Украина, п. 13a) это была непроверяемая точность. Решение владельца
-2026-09-12: убрать пробу совсем, оставить только сам металл — «Срібло», «Золото»,
-«Срібло із золотим покриттям». Если проба указана в описании монеты (`notes`) —
-пользователь может прочитать её там; полем «Метал/матеріал» она не считается.
-
-**Категорія якості карбування (`quality`) была в базе и нигде не показывалась.** Более
-ранний, уже не сохранившийся в репозитории скрипт разобрал её с карточек НБУ и заполнил
-1132 позиции; ни API, ни интерфейс это поле не читали. Миграция `0010` даёт ему словарь
-и включает в карточку монеты.
-
-**Историческая замусоренность.** Легаси-коллекция и ранние прогоны конвейера НБУ иногда
-оставляли в `material`/`edge` технический токен вместо человекочитаемого текста — код
-нашего же словаря (`nickel_silver`), голый металл (`silver`, `gold`) или чужие английские
-слова, которых словарь не знал (`bimetallic`, `cupronickel`, `banknote`,
-`bimetallic_precious`, `zinc_alloy`, `not_specified`). Миграции `0007` и `0010`
-разрешают такие токены в словарную запись и обнуляют текст; список известных алиасов —
-`app/reference_data/materials.py`, `LEGACY_RAW_ALIASES`.
-
-**В форме «Додати» (2026-09-14) поля делятся на две группы, и это осознанно.**
-
-*Словарь плюс свои слова* (`Combobox`, одно поле на оба случая): **матеріал**, **номінал**
-и **серія**. Все три справочника засеяны тем, что реально лежит в каталоге, то есть
-Украиной, СССР и США, — и про австрийскую монету молчат все три. Что вписано, разрешается
-при отправке: совпало со строкой справочника (без учёта регистра) — уходит id, не совпало —
-текст (`denomination_text`, `series_text`, `material`; `data-model.md`). `series_text`
-при этом только показывается: комплектность и экран «Серії» по-прежнему считаются по
-`series_id`, потому что серии — общие записи администратора (п. 2).
-
-*Только словарь* (`Select`): **гурт** и **якість**. Они необязательны, а вписанный от руки
-гурт никогда не совпал бы с тем, что пишет парсер, и превратился бы в ту самую
-замусоренность, которую чинили миграции `0007` и `0010`.
-
-**Рік випуску** — то же поле, что «Рік від/до» в фильтрах каталога: список для выбора плюс
-свободный ввод, потому что монета 1780 года в список по стране не попадёт никогда. Порядок
-обратный фильтрам — от свежего года к старому: только что купленная монета куда чаще
-недавняя.
-
-Полные словари для формы отдают `GET /materials`, `GET /edge-types`, `GET /quality-types`
-(`api.md`) — их не надо путать с `GET /catalog/materials`, который сужает фильтр
-до реально встречающегося.
-
-## 15. Монеты в сувенирной упаковке
-
-НБУ часто продаёт одну и ту же физическую монету двумя карточками: обычную и «у
-сувенірній упаковці»/«у сувенірному пакованні». Для коллекционера это шум — не вторая
-монета, а вариант подачи первой. `catalog_items.packaging_of_id` (миграция `0011`,
-self-referencing FK на `catalog_items.id`) связывает упаковочную карточку с голой.
-
-**Критерий пары не название и не серия.** Тема, переизданная через 10–25 лет под тем же
-названием, и параллельный серебряный/более тяжёлый вариант той же темы — не пара, хотя
-называются одинаково. Единственный надёжный признак — точное совпадение `weight_grams` и
-`diameter_mm` внутри (серия, название без упаковочного хвоста, год выпуска); `mintage`
-в сравнение не входит — НБУ считает россыпь и упаковку отдельными партиями одной и той
-же монеты. Пары находит и пишет `coin-parser` (`collector/countries/ua/packaging.py`,
-`find_packaging_pairs()`) на каждом прогоне парсинга; связь подхватывается сама при
-следующей пересборке серии, ручного шага не требуется.
-
-**Видимость — по настройке пользователя, не глобальная.** `user_settings.show_packaging_variants`
-(миграция `0012`, дефолт перевёрнут в `0013`), по умолчанию `true`. `GET /catalog`
-(`CatalogRepository._filter_conditions`) показывает запись с непустым `packaging_of_id`,
-пока владелец не выключил её в настройках (`PATCH /bootstrap/settings`); карточка по прямой ссылке (`GET /catalog/{id}`)
-и остальные под-ресурсы правило не проверяют — тот же принцип, что у архива и деактивированной
-страны (see §10, §13): списки фильтруют, одиночная карточка — нет. Ни `catalog_variants`
-(отложено, `scope.md`), ни бейдж «є варіант у сувенірній упаковці» на карточке
-голой монеты этим не реализованы — см. `docs/backlog.md`.
-
-## 16. Місце зберігання (2026-09-13)
-
-Свой словарь (`storage_locations`, `data-model.md`), а не свободный текст на
-`collection_items` — тот вариант (миграция более раннего этапа) остался мёртвым: подтверждено
-чтением прод-БД, что `storage_location` пуст у всех 620 записей владельца, поэтому он
-дропнут в той же миграции `0017`, что вводит словарь.
-
-**Ровно один системный пресет — «Вдома».** Владельческое решение (2026-09-13): не
-захламлять выпадашку набором вариантов на все случаи — «Вдома» подходит почти всем, а
-что-то более специфичное («В дорозі», «У банківському сейфі» и т.д.) владелец заводит
-сам одним и тем же get-or-create, каким создаётся любая личная запись.
-
-**Get-or-create по имени, без ID на клиенте.** И форма покупки, и настройки видят и
-передают только имя (`GET /collection/storage-locations` → `{name, custom}`); id
-существует исключительно на сервере (`StorageLocationService.resolve`). Совпадение по
-имени регистронезависимое и идёт по всем трём слотам (`name_uk`/`name_en`/`name_original`)
-— повторный ввод «вдома»/«Вдома»/« Вдома » не плодит дублей и не создаёт второй записи
-поверх пресета.
-
-**Перевод — в фоне, не блокируя сохранение.** Свежая личная запись хранит typed-текст в
-обоих языковых слотах (`MANUAL`); `POST /collection` и `PATCH /bootstrap/settings`
-ставят `BackgroundTasks`-задачу (не ARQ — единственная в проекте очередь, ARQ, реально не
-поднята, заводить её ради этой одной фичи владелец решил не давать ходу 2026-09-13),
-которая через Haiku определяет язык оригинала и дополняет оба слота (`TranslationSource.LLM`
-— тот слот, что уже совпал с определённым языком, остаётся нетронутым). Одноразовый
-перенос легаси-данных резолвил те же тексты синхронно и без фоновой задачи — это был
-офлайн-скрипт, а не запрос, поэтому перенесённые тогда места остались с обоими слотами
-как есть, пока владелец не тронет их через интерфейс.
-
-**Своё удалить можно, пресет — нет.** `DELETE /collection/storage-locations?name=` бросает
-`403`, если запись — пресет (`owner_id IS NULL`, общий на всех, тот же принцип «не даём
-удалить общее», что у каталога, §2), и `404`, если имя не видно этому владельцу вовсе —
-включая случай, когда оно существует, но принадлежит другому пользователю: не палим факт
-существования чужой личной записи. Удаление своей записи не трогает покупки, где она уже
-стояла — `ON DELETE SET NULL` на обеих FK (`collection_items.storage_location_id`,
-`user_settings.default_storage_location_id`).
-
-**Молчаливый отказ перевода — залогирован, не только проглочен.** Инцидент 2026-09-13:
-первая же личная запись на проде («В дорозі») осталась непереведённой, и ни одной строки в
-логах API не было — молчаливый путь `_find_or_create`/`translate_in_background` не
-оставлял следов ни на одном раннем `return`. Добавлено логирование на каждый такой выход
-(нет ключа, запись пропала до перевода, Haiku не вернул ожидаемый tool-use, исключение при
-вызове API).
-
-**Настоящая причина — не сам Anthropic, а порядок событий FastAPI.** С логированием
-воспроизвелось не один раз, а на каждой без исключения новой записи, и лог неизменно
-показывал одно и то же: `storage_location N vanished before translation ran` —
-`translate_in_background` открывает свою сессию и не находит строку, которую вот только
-что создал тот же запрос. Причина — в самом FastAPI: `BackgroundTasks` выполняются
-как часть отправки ответа (`Response.__call__`), а сессия текущего запроса коммитится
-позже — в `finally`-очистке request-scoped зависимостей, которая по устройству FastAPI
-(`fastapi/routing.py`, `request_stack` оборачивает и вызов эндпоинта, и отправку ответа)
-идёт **после**, а не до неё. Воспроизведено локально: залогировав временные метки коммита
-запроса и старта фоновой задачи рядом, коммит стабильно приходил на 5-10 мс позже, чем
-`translate_in_background` уже пытался прочитать строку. Починено в
-`StorageLocationRepository.add()` — коммит идёт сразу после `flush()`, не дожидаясь
-общего коммита запроса; единственный вызывающий (`_find_or_create`, создание новой
-записи) в обоих местах использования (`create`/`update` покупки, `PATCH
-/bootstrap/settings`) в этот момент ещё ничего больше не добавил в сессию, так что ранний
-коммит не фиксирует ничего чужого раньше времени.
-
-**Тот же порядок событий — и у перевода названия монеты (2026-09-14).** Личная позиция,
-созданная составным `POST /collection`, переводится такой же фоновой задачей и упёрлась бы
-в ровно ту же стену. Лечение здесь другое, потому что ранний коммит одной строки сломал бы
-атомарность п. 4: коммитится не позиция отдельно, а вся транзакция целиком — позиция,
-экземпляр и расход — явным `session.commit()` в конце `CollectionService.create`, до того
-как роут ставит задачу. Место хранения при этом резолвится **первым**, до вставки позиции:
-его собственный ранний коммит не должен приходиться на середину этой транзакции.
+- **One system preset, "Вдома"** (`owner_id IS NULL`). Anything more specific the user
+  creates themselves.
+- **Get-or-create by name; the client never sees ids.** The purchase form and settings
+  send only the name (`GET /collection/storage-locations` → `{name, custom}`);
+  `StorageLocationService.resolve` finds or creates the row. Matching is
+  case-insensitive, trimmed, and checks all three name slots, so "вдома" / " Вдома "
+  never create a duplicate or shadow the preset.
+- **Translation in the background.** A new personal location stores the typed text in
+  both language slots (`manual`); `POST /collection` and `PATCH /bootstrap/settings`
+  schedule a `BackgroundTasks` job that detects the language via the Anthropic API and
+  fills the other slot (`llm`). Every early exit of that job is logged (no API key, row
+  vanished, no tool-use in the reply, API error).
+- **Commit before the background job.** Because FastAPI commits the request session
+  *after* background tasks start (BR-4), `StorageLocationRepository.add()` commits right
+  after `flush()`. That's safe: at that moment nothing else is pending in the session.
+  In `CollectionService.create` the location is therefore resolved **first**, before the
+  catalog item insert, so its early commit never splits the purchase transaction.
+- **Delete own, not the preset.** `DELETE /collection/storage-locations?name=` returns
+  `403` for the preset and `404` for a name this owner can't see — including someone
+  else's, so their existence isn't revealed. Purchases that used a deleted location keep
+  working: both FKs (`collection_items.storage_location_id`,
+  `user_settings.default_storage_location_id`) are `ON DELETE SET NULL`.

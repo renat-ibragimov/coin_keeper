@@ -44,7 +44,7 @@ def series_display_name(locale: str) -> ColumnElement[str]:
     fallback is display only — completeness, the series screens and the
     series filter all count on `series_id`, so the dashboard's own
     `_series_name` (which groups by real series) deliberately does not use
-    this (docs/business-rules.md, rule 2).
+    this (docs/business-rules.md, BR-2).
     """
     from app.models import CatalogItem, CoinSeries
 

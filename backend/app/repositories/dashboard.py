@@ -3,9 +3,9 @@
 The formulas come from the legacy desktop app's getDashboardSnapshot/
 getFinanceSummary, with the multi-user filters applied:
 owner_id on personal tables, the visibility filter on catalog and snapshots,
-active-only completeness (docs/business-rules.md, rules 5, 8, 9), and
-storefront visibility on every catalog-wide aggregate (§13). Unlike
-`GET /catalog`, the dashboard does not require a confirmed country (§13a):
+active-only completeness (docs/business-rules.md, BR-5, BR-8 and BR-9), and
+storefront visibility on every catalog-wide aggregate (BR-13). Unlike
+`GET /catalog`, the dashboard does not require a confirmed country (BR-13a):
 it is the user's own collection overview, not the catalogue browse
 experience, so its KPIs and `GET /catalog`'s totals deliberately diverge for
 an unconfirmed country the user has something in (2026-09-12).
@@ -88,7 +88,7 @@ class DashboardRepository:
         return or_(CatalogItem.created_by.is_(None), CatalogItem.created_by == self._user_id)
 
     def _visible_active(self) -> list[ColumnElement[bool]]:
-        # require_confirmed=False (§13a): the dashboard is about the user's
+        # require_confirmed=False (BR-13a): the dashboard is about the user's
         # own collection, not the catalogue browse experience, so it counts
         # everything they actually have regardless of which countries the
         # catalogue project has confirmed (owner's call, 2026-09-12).

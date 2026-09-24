@@ -172,7 +172,7 @@ class UserSettings(Base):
     )
     # Whether delivery/holder/grading count toward "Куплено загалом" and the
     # value-change figure, or stay a separate informational line next to
-    # them (docs/business-rules.md, rule 4). On by default.
+    # them (docs/business-rules.md, BR-4). On by default.
     include_supporting_expenses: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

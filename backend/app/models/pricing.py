@@ -28,7 +28,7 @@ class MarketPriceSnapshot(Base):
     """Append-only price history.
 
     created_by decides visibility: NULL is a central job snapshot visible to
-    everyone, a value is the author's own. See docs/business-rules.md, rule 7.
+    everyone, a value is the author's own. See docs/business-rules.md, BR-7.
     """
 
     __tablename__ = "market_price_snapshots"

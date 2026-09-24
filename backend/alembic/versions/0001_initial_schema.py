@@ -427,7 +427,7 @@ def upgrade() -> None:
         sa.Column("observed_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("source_url", sa.Text(), nullable=True),
         sa.Column("raw_payload", postgresql.JSONB(), nullable=True),
-        # NULL = central job snapshot, visible to everyone. docs/04, rule 7.
+        # NULL = central job snapshot, visible to everyone. docs/business-rules.md, BR-7.
         sa.Column(
             "created_by",
             sa.BigInteger(),
@@ -598,7 +598,7 @@ def upgrade() -> None:
             nullable=True,
         ),
         # SET NULL is only a backstop; the service layer deletes the
-        # coin_purchase expense explicitly. docs/business-rules.md, rule 10.
+        # coin_purchase expense explicitly. docs/business-rules.md, BR-10.
         sa.Column(
             "collection_item_id",
             sa.BigInteger(),

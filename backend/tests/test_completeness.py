@@ -302,7 +302,7 @@ async def test_items_metal_kind_and_owned_filters(
 async def test_items_of_an_unconfirmed_country_still_show(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """The same rule the retired GET /series/{id}/items tested (§13a):
+    """The same rule the retired GET /series/{id}/items tested (BR-13a):
     GET /catalog?seriesId= is the harder gate and stays empty for a series of
     an unconfirmed country however much of it the user owns, while the
     completeness items endpoint (about the user's own collection) shows it."""

@@ -3,7 +3,7 @@
 Two new tables, `edge_types` and `quality_types`, mirror `materials` exactly
 (code + name_uk + name_en, no `name_original` -- edge and strike quality are
 universal numismatic vocabulary, not something an issuer names in its own
-language, docs/business-rules.md, rule 14). `catalog_items` gets an
+language, docs/business-rules.md, BR-14). `catalog_items` gets an
 `edge_type_id` and a `quality_type_id` FK alongside the `edge`/`quality` text
 columns it already had, the same split `composition_id`/`material` already
 uses: a dictionary row where one is known, the source's own text where it is
@@ -11,7 +11,7 @@ not.
 
 `quality_types` gives a home to data that was already there: some earlier,
 uncommitted script filled `catalog_items.quality` for 1132 rows and nothing
-has read the column since (docs/business-rules.md, rule 14). This migration
+has read the column since (docs/business-rules.md, BR-14). This migration
 does not write `quality` itself, only the dictionary and the FK -- the
 backfill below resolves whatever the column already holds.
 

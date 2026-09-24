@@ -1,4 +1,4 @@
-"""Exchange rate lookups (docs/business-rules.md, rule 6).
+"""Exchange rate lookups (docs/business-rules.md, BR-6).
 
 Only the table is read here. It is filled by a separate repository,
 coin-parser (collector/rates/), the same way UA-Coins prices are
