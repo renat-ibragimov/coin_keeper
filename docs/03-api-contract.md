@@ -219,6 +219,20 @@ GET /catalog/lookup
 `materials` на языке запроса, а где его нет — свободный текст `catalog_items.material`
 (`08-ui-map.md`).
 
+```
+GET /catalog/summary
+  — те же query-параметры, что у GET /catalog (без page/pageSize/sort/order)
+  → CatalogSummaryOut = {total, owned, missing, purchaseTotalUah, missingBudgetUah,
+                          unpricedMissing}
+```
+
+KPI-плитки экрана «Каталог» (є / не вистачає / витрачено на монети / треба докупити),
+посчитанные с теми же фильтрами, что применены к списку — чтобы числа на плитках всегда
+совпадали с тем, что показано под ними (`08-ui-map.md`, §«Каталог»). Параметр `owned`
+принимается для симметрии сигнатуры с `GET /catalog`, но намеренно игнорируется: иначе выбор
+«не вистачає» обнулил бы саму плитку, которая должна показать обе стороны этого соотношения.
+Маршрут зарегистрирован до `/catalog/{id}`.
+
 Выдача всегда ограничена видимыми позициями: общий каталог плюс личные позиции текущего
 пользователя (`created_by IS NULL OR created_by = :userId`). Фильтр ставит репозиторий, а не
 роут — `07-auth.md`.
@@ -462,6 +476,17 @@ DELETE /collection/{id}
 имеет такой стан; агрегаты при этом считаются по **всем** покупкам позиции, не только по
 совпавшей — грейд-фильтр показывает позицию целиком, а не отфильтрованный кусок.
 
+```
+GET /collection/summary
+  — те же фильтры, что у GET /collection (без page/pageSize/sort/order)
+  → CollectionSummaryOut = {collectionItems, completedItems, coinSpendUah, relatedSpendUah,
+                             totalSpendUah, marketValueUah}
+```
+
+KPI-плитки экрана «Мої монети», посчитанные с активными фильтрами страницы — та же форма,
+что у дашбордного снимка без фильтров (`11-roadmap.md`), но суженная под то, что сейчас видит
+пользователь; без фильтров числа совпадают с бутстрапом (`08-ui-map.md`, §«Мої монети»).
+
 Форма позиции — контекст каталожной монеты (как сейчас) плюс агрегаты по покупкам:
 
 - `totalQuantity` — сумма `quantity` всех покупок;
@@ -679,9 +704,9 @@ GET  /series/summary?countryId
 ```
 GET /completeness/summary?groupBy&countryId&metalKind
   → [CompletenessGroupOut]
-GET /completeness/group?groupBy&value|unassigned&countryId
+GET /completeness/group?groupBy&value|unassigned&countryId&metalKind
   → CompletenessGroupOut
-GET /completeness/items?groupBy&value|unassigned&countryId&page&pageSize
+GET /completeness/items?groupBy&value|unassigned&countryId&metalKind&owned&page&pageSize
   → Page<CatalogListItem>               — та же схема, что и у GET /catalog
 
 groupBy = series | year | denomination | material | edge | quality
@@ -704,11 +729,17 @@ CompletenessGroupOut = {
 включая экземпляры архивных позиций (`04-business-rules.md`, пп. 5 и 10) — то же правило, что
 раньше проверялось только для серий, теперь общее для всех измерений.
 
-`metalKind` (`precious`/`base`, необязательный) на `/completeness/summary` — фильтр по
-`catalog_items.metal_kind`, независимый от `groupBy`: применяется одинаково к любому измерению
-(«тільки дорогоцінні по роках», «тільки недорогоцінні по серіях»), а не только к выбору
-конкретного значения. Без него — все монеты, вне зависимости от цінності металу (UI-контрол —
-`08-ui-map.md`, тулбар «Комплектність»).
+`metalKind` (`precious`/`base`, необязательный) — фильтр по `catalog_items.metal_kind`,
+независимый от `groupBy`: применяется одинаково к любому измерению («тільки дорогоцінні по
+роках», «тільки недорогоцінні по серіях»), а не только к выбору конкретного значения. Без
+него — все монеты, вне зависимости от цінності металу (UI-контрол — `08-ui-map.md`, тулбар
+«Комплектність»). Изначально был только на `/summary`; с 2026-09-24 (карточка группы получила
+свой тулбар) — также на `/group` и `/items`, чтобы клик по строке списка переносил активный
+фильтр в детальный экран, а не сбрасывал его.
+
+`owned` (bool, необязательный) — только на `/completeness/items`: сужает плитки до
+«тільки наявні»/«тільки відсутні» в детальном экране группы, независимо от `groupBy` и
+`metalKind`.
 
 `/completeness/items` — плитки монет для экрана деталей группы, **не** `GET /catalog?...=`
 (правило унаследовано от `/series/{id}/items`, добавлено 2026-09-13, `04-business-rules.md`
