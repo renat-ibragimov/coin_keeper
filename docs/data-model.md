@@ -1,155 +1,176 @@
-# 02. Модель данных
+# Data model
 
-Целевая схема PostgreSQL. Ссылка на DDL старой SQLite-базы (`legacy/legacy-schema.sql`)
-и одноразовый код переноса удалены после завершения миграции (`11-roadmap.md`) — старую
-схему **копировать один-в-один было нельзя** (причины ниже), она пригодилась только как
-справка на время переноса.
+The PostgreSQL schema as it stands at Alembic head. Source of truth is
+`backend/app/models/` plus `backend/alembic/versions/`; this document explains the
+shape and the reasons. Behavior built on top of it: `business-rules.md`.
 
-## Что меняем относительно legacy и почему
+---
 
-| Было в SQLite | Стало в PostgreSQL | Причина |
+## Conventions
+
+- Money is `numeric(14,2)`; exchange rates `numeric(14,6)`. Never `float`.
+- Stored dates are `date` / `timestamptz`, never text. Flags are `boolean`.
+- Closed value sets are native `ENUM` types (see "Enums"); open-ended vocabularies that
+  grow from outside (`catalog_items.quality`, `job_runs.job`) stay `text`.
+- `created_at` defaults to `now()`. `updated_at` is maintained by the `set_updated_at()`
+  trigger (not by the app) on `users`, `countries`, `coin_series`, `catalog_items`,
+  `collection_items`, `sales`, `ucoin_catalog_sources`, `user_settings`, `job_runs`.
+- Extensions: `citext` (case-insensitive email), `pg_trgm` (installed; no trigram index
+  yet).
+- Constraint and index names follow the naming convention in `app/models/base.py`.
+- Every schema change is an Alembic migration; migrations run on API container start.
+
+## Layers and ownership
+
+Data splits into three layers (`AGENTS.md`, "Three data layers"):
+
+| Layer | Tables | Marker |
 |---|---|---|
-| `REAL` для денег | `NUMERIC(14,2)` | плавающая точка в деньгах даёт ошибки округления |
-| `TEXT` для дат | `DATE` / `TIMESTAMPTZ` | сортировка, диапазоны, арифметика дат |
-| `INTEGER` 0/1 для флагов | `BOOLEAN` | нативный тип |
-| `CHECK (x IN (...))` | `ENUM` | валидация на уровне типа, видно в схеме |
-| Нет пользователей | `users` + `owner_id` | сервис многопользовательский |
-| `original_path` — путь или URL вперемешку | раздельные `storage_key` и `external_url` | см. `media.md` |
-| Единая база на человека | Общий каталог + личные позиции + личные коллекции | см. ниже |
-| `title_original / title_ru / title_en` колонками | три слота колонками: `*_original` + `*_uk` + `*_en`, русского слота нет | переводов немного, отдельная таблица избыточна |
+| Shared reference data | `countries`, `currencies`, `denominations`, `materials`, `edge_types`, `quality_types`, `coin_series`, `exchange_rates` | — |
+| Catalog | `catalog_items`, `catalog_variants`, `market_price_snapshots`, `price_source_links`, catalog `media_files` | `catalog_items.created_by`: `NULL` = shared, user id = personal position |
+| Personal | `collection_items`, `expenses`, `storage_locations` (non-preset), `user_settings`, own `media_files`, own price snapshots | `owner_id` / `created_by` / `user_id` |
 
-## Разделение общего и личного
+The visibility filters — `created_by IS NULL OR created_by = :user_id` for catalog items
+and price snapshots, `owner_id = :user_id` for personal rows — live in the repository
+layer, never in routes (`auth.md`). Who may write what: `business-rules.md`, BR-2.
 
-Ключевое архитектурное решение. Данные делятся на **три слоя**: общий каталог, личные позиции
-каталога, личная коллекция.
-
-**Общее (одно на всех):** `countries`, `currencies`, `denominations`, `coin_series`,
-`catalog_items` с `created_by IS NULL`, `catalog_variants`, `media_files` для каталожных фото,
-`exchange_rates`.
-
-Каталог монет — это объективный справочник: тираж, металл, диаметр не зависят от того, кто
-смотрит. Держать копию на каждого пользователя бессмысленно и дорого.
-
-**Личное (привязано к `owner_id` или `created_by`):** `catalog_items` с
-`created_by = <пользователь>`, `collection_items`, `expenses`, `sales`, `purchase_offers`,
-`collection_goals`, `media_files` для фото собственных монет, `settings`.
-
-### Кто наполняет общий каталог
-
-Общий каталог (`created_by IS NULL`) наполняет и правит **только администратор** — вручную и
-через системные фоновые задачи (каталог НБУ, см. `integrations.md`). Обычный пользователь
-общий каталог **не создаёт, не меняет и не удаляет** — только читает.
-
-Поле `users.role` (`user` / `admin`) закладываем сразу.
-
-### Личная позиция каталога
-
-Если нужного выпуска в общем каталоге нет, пользователь заводит **личную позицию**:
-`catalog_items.created_by = <его id>`. Она видна только автору, у неё полный CRUD и свои фото.
-Во всех выборках, фильтрах, сериях, комплектности и статистике владельца личные позиции
-участвуют наравне с общими.
-
-Фильтр видимости каталога — **в репозиторийном слое**, рядом с фильтром `owner_id`
-(см. `auth.md`):
+## Enums
 
 ```sql
-WHERE catalog_items.created_by IS NULL OR catalog_items.created_by = :user_id
+collection_group    ('circulation', 'commemorative', 'collector', 'other')
+metal_kind          ('precious', 'base', 'unknown')
+media_role          ('obverse', 'reverse', 'edge', 'additional')
+media_source        ('user_upload', 'ucoin', 'nbu', 'ua_coins', 'manual')
+translation_source  ('official', 'llm', 'manual')
+match_status        ('suggested', 'confirmed', 'rejected')
+offer_status        ('considering', 'ordered', 'purchased', 'rejected', 'unavailable')
+user_role           ('user', 'admin')
+auth_token_kind     ('email_verify', 'password_reset', 'telegram_link')
+expense_category    ('coin_purchase', 'delivery', 'album', 'holder', 'storage',
+                     'grading', 'literature', 'photo_equipment', 'other')
 ```
 
-Импорт (Excel-выгрузка, uCoin по URL) создаёт **только личные позиции**; общий каталог
-импортом не пополняется — правило дедупликации в `business-rules.md`, BR-3.
+`collection_group` has **four** values; queries that branch on it must handle all four.
 
-`collection_items` может ссылаться и на общую, и на личную позицию — разницы для экземпляра нет.
+## Three language slots
 
-«Повышение» удачной личной позиции в общий каталог администратором — после MVP
-(`scope.md`).
+Every named entity — country, series, coin — carries:
 
-### Цены (`market_price_snapshots`)
-
-Снимок цены принадлежит позиции каталога, но его **видимость определяется полем `created_by`**:
-
-| `created_by` | Откуда | Кто видит |
-|---|---|---|
-| `NULL` | центральная суточная задача обновления цен | все |
-| `<пользователь>` | ручной ввод, обновление своей личной позиции, Excel-импорт | только автор |
-
-В расчёте стоимости коллекции у пользователя участвуют общие снимки **плюс его собственные**.
-Правила обновления — `business-rules.md`, BR-7, и `integrations.md`.
-
-## Перечисления
-
-```sql
-CREATE TYPE collection_group AS ENUM ('circulation', 'commemorative', 'collector', 'other');
-CREATE TYPE metal_kind       AS ENUM ('precious', 'base', 'unknown');
-CREATE TYPE media_role       AS ENUM ('obverse', 'reverse', 'edge', 'additional');
-CREATE TYPE media_source     AS ENUM ('user_upload', 'ucoin', 'nbu', 'manual');
-CREATE TYPE match_status     AS ENUM ('suggested', 'confirmed', 'rejected');
-CREATE TYPE offer_status     AS ENUM ('considering', 'ordered', 'purchased', 'rejected', 'unavailable');
-CREATE TYPE user_role        AS ENUM ('user', 'admin');
-CREATE TYPE expense_category AS ENUM (
-    'coin_purchase', 'delivery', 'album', 'holder', 'storage',
-    'grading', 'literature', 'photo_equipment', 'other'
-);
+```
+<name>_original     the issuer's own wording; NEVER translated
+original_lang       ISO 639-1 language of <name>_original
+<name>_uk           Ukrainian translation
+<name>_en           English translation
+<name>_uk_source    official | llm | manual   (series and catalog items)
+<name>_en_source    same
 ```
 
-Категории расходов перенесены из legacy без изменений — они описаны в исходном ТЗ (раздел 7)
-и покрывают реальные траты на хобби.
+- There are no `*_ru` columns. For Soviet coins Russian *is* the original
+  (`original_lang = 'ru'`); for US coins, English.
+- A translation slot that merely repeats the original is not a translation and is left
+  `NULL`.
+- `*_source` answers "can this translation be trusted": `official` — published by the
+  issuer (NBU's Ukrainian and English sites); `llm` — machine translation; `manual` —
+  set by a human (an admin `PATCH` sets it automatically). Loaders never overwrite a
+  `manual` slot. `*_original` has no source.
 
-## Таблицы
+Example (a Polish coin): `title_original` (`pl`) `W Polskę wierzę – Pieśń „Rota”`,
+`title_uk` `Я вірю в Польщу — пісня „Рота“`, `title_en`
+`I Believe in Poland — the Song ‘Rota’`.
+
+### Display name and sorting
+
+```
+title_<locale> → title_original
+```
+
+Nothing beyond the original — it's `NOT NULL`, so the fallback is always meaningful.
+The response locale is `?locale=`, else `Accept-Language`, else `uk`. Lists sort by the
+same expression, with an explicit ICU collation (`uk-x-icu` / `en-x-icu`,
+`app/repositories/localization.py`); without it Postgres sorts by code point and puts
+Є, І, Ї, Ґ before А.
+
+Dictionaries (`materials`, `edge_types`, `quality_types`) and storage locations use a
+reduced form, described with those tables.
+
+## Accounts
 
 ### users
 
 ```
 id              bigserial PK
 email           citext UNIQUE NOT NULL
-password_hash   text NOT NULL          -- argon2id
+password_hash   text              -- argon2id; NULL for a Google-only account
 display_name    text
 role            user_role NOT NULL DEFAULT 'user'
-is_active       boolean NOT NULL DEFAULT true
+is_active       boolean NOT NULL DEFAULT true    -- registration creates it false until email verification
 email_verified  boolean NOT NULL DEFAULT false
-locale          text NOT NULL DEFAULT 'uk'   -- 'uk' | 'en'
-created_at      timestamptz NOT NULL DEFAULT now()
-updated_at      timestamptz NOT NULL DEFAULT now()
+locale          text NOT NULL DEFAULT 'uk'       -- 'uk' | 'en'
+avatar_key      text              -- storage key of the profile picture, not a URL
+created_at, updated_at timestamptz
 ```
 
-Требуется расширение `citext` — email сравниваем без учёта регистра.
+`avatar_key` is a plain column, not a `media_files` row: that table's checks tie every
+file to a catalog or collection item. Auth flows: `auth.md`.
 
-## Три языковых слота
-
-Правило, общее для всех именованных сущностей — страны, серии, монеты:
+### auth_identities
 
 ```
-<имя>_original    как называет эмитент; НИКОГДА не переводится
-original_lang     ISO 639-1: язык, на котором написан original
-<имя>_uk          украинский перевод
-<имя>_en          английский перевод
-<имя>_uk_source   official | llm | manual — откуда взят перевод
-<imя>_en_source   то же
+id             bigserial PK
+user_id        bigint NOT NULL FK users ON DELETE CASCADE
+provider       text NOT NULL        -- 'google'
+subject        text NOT NULL        -- the provider's stable user id
+email_at_link  text NOT NULL
+created_at     timestamptz
+UNIQUE (provider, subject), UNIQUE (user_id, provider)
 ```
 
-Русский языком-исключением не является. У СССР русский — это `original`
-(`original_lang = 'ru'`), у США английский, у Украины украинский; отдельных колонок
-`title_ru` / `name_ru` / `label_ru` в схеме нет (миграция `0003`). Слот перевода,
-дословно повторяющий оригинал, — не перевод: такие значения обнулены.
+A provider subject identifies the account even if the email changes later.
 
-Эталон, к которому идём (польская монета):
+### refresh_tokens, auth_tokens
 
-| Слот | Значение |
-|---|---|
-| `title_original` (`pl`) | `W Polskę wierzę – Pieśń „Rota”` |
-| `title_uk` | `Я вірю в Польщу — пісня „Рота“` |
-| `title_en` | `I Believe in Poland — the Song ‘Rota’` |
+Both store the sha256 of a token, never the token.
 
-`*_source` отвечает на вопрос «этому переводу можно верить?»: `official` — так написал сам
-эмитент (украинский и английский сайты НБУ), `llm` — машинный перевод (этап 4.5, часть C),
-`manual` — правка человека. У `*_original` источника нет: он не перевод.
+```
+refresh_tokens: id, user_id FK users CASCADE, token_hash UNIQUE, expires_at,
+                revoked_at, user_agent, ip inet, created_at
+auth_tokens:    id, user_id FK users CASCADE, kind auth_token_kind, token_hash UNIQUE,
+                expires_at, used_at, created_at; INDEX (user_id, kind)
+```
+
+An `auth_tokens` row is usable while `used_at IS NULL AND expires_at > now()`. Lifetimes
+come from settings: 24 h for email verification, 1 h for password reset,
+`telegram_link_ttl_minutes` for Telegram linking. Issuing a new token of a kind voids
+the user's unused ones of that kind (`auth.md`).
+
+### user_settings
+
+One row per user, `user_id` is the PK (FK users `ON DELETE CASCADE`).
+
+| Column | Default | Meaning |
+|---|---|---|
+| `locale` | `'uk'` | interface language |
+| `display_currency` | `'UAH'` | unused — always `UAH`, no UI or API to change it |
+| `default_grade` | `'UNC'` | pre-fills the purchase form (`business-rules.md`, BR-7) |
+| `show_packaging_variants` | `true` | show souvenir-packaging cards in catalog lists (BR-15) |
+| `theme` | `'system'` | `light` / `dark` / `system` |
+| `catalog_view_mode`, `collection_view_mode` | `'cards'` | `cards` / `table` |
+| `secondary_currency` | `'USD'` | `USD` / `EUR`, second amount next to UAH (BR-6) |
+| `include_supporting_expenses` | `true` | count extras in "bought for" (BR-4) |
+| `default_storage_location_id` | `NULL` | FK storage_locations `ON DELETE SET NULL` |
+
+`theme` and the view modes are the cross-device copy of preferences; the client also
+keeps a `localStorage` copy to paint before `GET /bootstrap` returns (and on sign-in
+screens). New per-user preferences belong here, not in `localStorage`.
+
+## Reference data
 
 ### countries
 
 ```
 id                bigserial PK
-code              text UNIQUE     -- ISO 3166-1 alpha-2; alpha-4 из 3166-3 или X+3 у исторических
-name_original     text NOT NULL   -- эндоним: 'Україна', 'Polska', 'СССР'
+code              text UNIQUE     -- ISO 3166-1 alpha-2; 3166-3 alpha-4 or X+3 for historical states
+name_original     text NOT NULL UNIQUE   -- endonym: 'Україна', 'Polska', 'СССР'
 original_lang     text NOT NULL
 name_uk, name_en  text
 collect_variants  boolean NOT NULL DEFAULT false
@@ -157,44 +178,23 @@ is_active         boolean NOT NULL DEFAULT true
 catalog_confirmed boolean NOT NULL DEFAULT false
 sort_order        int NOT NULL DEFAULT 100
 created_at, updated_at timestamptz
-UNIQUE (name_original)
 ```
 
-Таблица засеяна **всеми странами-эмитентами**: 249 стран ISO 3166-1 (эндоним, украинское и
-английское название — из CLDR) плюс исторические государства, у которых названий в ISO нет
-и которым CLDR подставляет преемника (`SU` отвечает «Росія»): СРСР, РСФРР, Російська
-імперія, УНР, Австро-Угорщина, Німецька імперія, НДР, Чехословаччина, Югославія, Сербія і
-Чорногорія, Нідерландські Антильські острови. Сид — `app/reference_data/countries.json`.
+Seeded with every issuer (`app/reference_data/countries.json`): the 249 ISO 3166-1
+countries (endonym, Ukrainian and English names from CLDR) plus historical states CLDR
+maps to a successor — USSR, RSFSR, Russian Empire, UNR, Austria-Hungary, German Empire,
+GDR, Czechoslovakia, Yugoslavia, Serbia and Montenegro, Netherlands Antilles.
 
-`is_active` — витрина: чипы фильтра и общий каталог по умолчанию. Форма «створити свою
-позицію» предлагает **все** страны с поиском по любому из трёх имён и по коду: личная
-позиция может быть монетой какого угодно эмитента (`business-rules.md`, BR-2).
-Сид активирует только Украину; страна, которая уже была в базе, сохраняет своё состояние
-и, что важнее, свой `id`.
-
-`catalog_confirmed` — независимый и более жёсткий признак: страна, чей каталог реально
-собран и подтверждён, единственная ось, определяющая, показывается ли страна как «каталог»
-вообще, без исключений для личных позиций и уже купленных монет (`business-rules.md`,
-BR-13a). Заведена миграцией `0008`, сегодня `true` только у Украины — даже у США и СССР,
-попавших в общий каталог затравкой (`09-data-migration.md`), она `false`.
-
-**Факт из боевой диагностики 2026-09-05:** в базе владельца `is_active = true` у ТРЁХ
-стран (id 1, 2, 3), не только у Украины — легаси-миграция или ручная правка активировали
-что-то ещё поверх сида. Не баг сида (он по-прежнему активирует только Украину), но
-витринный код, который считает активные страны украинским частным случаем, должен
-сверяться с этим фактом, а не с намерением сида. Не проверялось и не чинилось этой
-задачей — код витрины не трогали, см. `docs/backlog.md`.
-
-`sort_order` — порядок на витрине: Украина `0`, остальные `100`, дальше по имени в локали
-читателя.
-
-`collect_variants` — режим учёта разновидностей для страны из ТЗ (раздел 5). В MVP не
-используется, но поле сохраняем.
+- `is_active` — the storefront switch (`business-rules.md`, BR-13). The seed activates
+  Ukraine only; a country that existed before the seed keeps its state and `id`.
+- `catalog_confirmed` — the hard catalog gate (BR-13a); `true` for Ukraine only.
+- `sort_order` — Ukraine `0`, everyone else `100`, then name in the reader's locale.
+- `collect_variants` — varieties mode (BR-5); not implemented.
 
 ### currencies
 
 ```
-code            text PK          -- 'UAH', 'USD', 'EUR'
+code            text PK          -- 'UAH', 'USD', 'EUR', 'UAK' (karbovanets 1992–1996), 'SUR' (Soviet ruble)
 name            text NOT NULL
 symbol          text
 decimal_places  smallint NOT NULL DEFAULT 2
@@ -202,40 +202,30 @@ decimal_places  smallint NOT NULL DEFAULT 2
 
 ### denominations
 
-Номинал — структура, а не строка: строку нельзя показать на другом языке и нельзя
-отсортировать.
+A face value is structure, not a string — a string can't be shown in another language
+or sorted.
 
 ```
-id                bigserial PK
-country_id        bigint NOT NULL FK countries
-currency_code     text NOT NULL FK currencies
-value             numeric(14,3) NOT NULL  -- число в названной единице: 5 для «5 копійок»
-unit              text NOT NULL           -- hryvnia | kopiika | karbovanets | ruble |
-                                          -- kopeck | poltinnik | chervonets |
-                                          -- dollar | dime | cent
-sort_order        int NOT NULL DEFAULT 0  -- номинал в минимальной единице валюты
-is_active         boolean NOT NULL DEFAULT true
+id             bigserial PK
+country_id     bigint NOT NULL FK countries
+currency_code  text NOT NULL FK currencies
+value          numeric(14,3) NOT NULL   -- the number in the named unit: 5 for "5 копійок"
+unit           text NOT NULL            -- hryvnia | kopiika | karbovanets | ruble | kopeck |
+                                        -- poltinnik | chervonets | dollar | dime | cent
+sort_order     int NOT NULL DEFAULT 0   -- face value in the currency's smallest unit
+is_active      boolean NOT NULL DEFAULT true
 UNIQUE (country_id, currency_code, unit, value)
 ```
 
-Подпись рендерится по локали запроса с правилами множественного числа CLDR:
-«5 копійок» / «5 kopecks», «1 000 000 карбованців» / «1,000,000 karbovantsi», «¼ долара».
-Правила и единицы — `app/reference_data/denominations.py`.
-
-`sort_order` ставит 50 копійок перед 1 гривнею; `value` разводит единицы равной цены
-(25 центів и ¼ долара). Валюты сверх трёх мигрированных: `UAK` (карбованець 1992–1996)
-и `SUR` (радянський рубль).
-
-Миграция `0003` разобрала 52 легаси-подписи по шаблонам; шесть американских номиналов
-лежали дважды — русской и английской подписью, — и слились в один ряд с перепривязкой
-монет. Неразбираемая подпись останавливает миграцию со списком: угадать номинал значит
-показать владельцу неверное число.
+The label is rendered per request locale with CLDR plural rules ("5 копійок" /
+"5 kopecks", "¼ долара"); units and rules are in `app/reference_data/denominations.py`.
+`sort_order` puts 50 kopiiok before 1 hryvnia; `value` separates units of equal worth
+(25 cents vs ¼ dollar).
 
 ### materials, edge_types, quality_types
 
-Три одинаковых по форме словаря — техническая лексика, а не что-то, что владеет своим
-названием на языке эмитента, поэтому у них нет `name_original`, только код и два локале
-(`business-rules.md`, BR-14):
+Three dictionaries of the same shape — universal numismatic vocabulary, so no
+`name_original` (`business-rules.md`, BR-14):
 
 ```
 id       bigserial PK
@@ -244,34 +234,7 @@ name_uk  text NOT NULL
 name_en  text NOT NULL
 ```
 
-`materials` — справочник составов, засеянный по факту встречающегося в каталоге. До
-2026-09-12 в нём была проба («Срібло 925», «Gold .999») — убрана: официальный фильтр
-Нацбанка («Матеріал» на bank.gov.ua) пробу не указывает никогда, так что сохранённая
-проба была не тем, что говорит наш
-единственный источник истины, а догадкой легаси-коллекции либо текстом импорта uCoin.
-Семейства `silver_*`/`gold_*`/`silver_gilded_*` схлопнуты в `silver`/`gold`/
-`silver_gilded` миграцией `0010`.
-
-`edge_types`, `quality_types` — новые с `0010`. `catalog_items.edge_type_id` /
-`quality_type_id` — необязательные FK рядом с уже существующими текстовыми
-`edge`/`quality`, по тому же принципу, что и `composition_id`/`material`: словарное
-название, где оно известно, текст источника — где нет.
-
-`catalog_items.material` був свободным текстом импортёра uCoin —
-«Цинк с медным покрытием, 2.5g, ø 19mm», а в худшем случае с приклеенным впереди
-заголовком монеты. Миграция `0003` разобрала его на `composition_id`, `weight_grams` и
-`diameter_mm`; что разобрать не удалось, осталось текстом в `material` и попало в отчёт.
-
-Среди неразобранного оказались не только сплавы: легаси-база и ранние прогоны конвейера
-НБУ иногда держали технический токен — наш же код справочника (`nickel_silver`) или
-голый металл (`silver`, `gold`), либо чужие английские слова (`bimetallic`, `cupronickel`,
-`banknote`), которых в словаре не было вовсе. Миграции `0007` и `0010` разрешают такие
-токены в `composition_id` и обнуляют текст; что не совпадает ни с одним известным алиасом,
-остаётся текстом как есть.
-
-`quality_types` заодно даёт применение данным, которые уже лежали в базе: какой-то
-разовый скрипт (его самого в репозитории уже нет) заполнил `catalog_items.quality` для
-1132 позиций, и до `0010` это никуда не читалось и не показывалось.
+Seeded from `app/reference_data/`. Materials carry the metal only, no fineness.
 
 ### coin_series
 
@@ -283,29 +246,46 @@ original_lang     text NOT NULL
 name_uk, name_en  text
 name_uk_source, name_en_source  translation_source
 description       text
-start_year, end_year int
-is_official       boolean NOT NULL DEFAULT false   -- ведётся парсером каталога эмитента
+start_year, end_year  int
+is_official       boolean NOT NULL DEFAULT false
 created_at, updated_at timestamptz
 UNIQUE (country_id, name_original)
 ```
 
-`is_official` проставляет `load-series` из coin-parser: true получают серии, которые ведёт
-парсер официального каталога эмитента (сегодня — НБУ). Кураторские серии и серии других
-стран остаются false. Бэкфилла по данным нет — флаг появляется на серии тогда, когда по ней
-проходит парсер.
+`is_official` is set by `coin-parser`'s series loader for series the issuer's own
+catalog maintains (today: NBU). Curated series and other countries stay `false`; the
+flag appears when the parser first visits a series.
+
+### exchange_rates
+
+```
+id              bigserial PK
+currency_code   text NOT NULL FK currencies
+rate_uah        numeric(14,6) NOT NULL CHECK (rate_uah > 0)
+effective_date  date NOT NULL
+fetched_at      timestamptz NOT NULL
+source          text NOT NULL DEFAULT 'NBU'
+UNIQUE (currency_code, effective_date, source)
+```
+
+Shared; written by `coin-parser`. Only USD and EUR are loaded (`business-rules.md`,
+BR-6).
+
+## Catalog
 
 ### catalog_items
 
-Центральная таблица. Описывает **выпуск**, а не конкретную монету.
+The central table. A row describes an **issue**, not a physical coin.
 
 ```
 id                 bigserial PK
 item_type          text NOT NULL DEFAULT 'coin'
 country_id         bigint NOT NULL FK countries
 series_id          bigint FK coin_series ON DELETE SET NULL
-series_text        text              -- своя серия личной позиции; только для показа
+series_text        text             -- a personal position's own series name; display only
+packaging_of_id    bigint FK catalog_items ON DELETE SET NULL   -- souvenir-packaging variant of
 denomination_id    bigint FK denominations ON DELETE SET NULL
-denomination_text  text              -- номинал словами, когда справочника по стране нет
+denomination_text  text             -- face value in words when there's no dictionary row
 collection_group   collection_group NOT NULL
 subtype            text
 title_original     text NOT NULL
@@ -314,41 +294,70 @@ title_uk, title_en text
 title_uk_source, title_en_source  translation_source
 issue_year         int NOT NULL
 issue_date         date
-mintage_announced  bigint
-mintage_actual     bigint
+mintage_announced, mintage_actual  bigint
 composition_id     bigint FK materials ON DELETE SET NULL
-material           text              -- только то, что не разобралось в composition_id
+material           text             -- only what didn't resolve to composition_id
 metal_kind         metal_kind NOT NULL DEFAULT 'unknown'
 weight_grams       numeric(10,3)
-diameter_mm        numeric(8,2)
-thickness_mm       numeric(8,2)
-shape, edge, orientation  text
+diameter_mm, thickness_mm  numeric(8,2)
+shape, orientation text
+edge_type_id       bigint FK edge_types ON DELETE SET NULL
+edge               text             -- only what didn't resolve to edge_type_id
+quality_type_id    bigint FK quality_types ON DELETE SET NULL
+quality            text             -- strike quality code; kept verbatim when not in the dictionary
 catalog_km, catalog_uc, catalog_numista  text
-catalog_number     text              -- номер без указания каталога: то, что вписали руками
+catalog_number     text             -- a number with no named catalog (hand-entered coins)
 notes              text
-quality            text              -- качество чеканки каноническим кодом, словарь в coin-parser
-descriptions       jsonb             -- парсер coin-collector и форма «Додати» для личной позиции
-artists            jsonb             -- заполняется парсером coin-collector, руками не редактируется
-edited_fields      jsonb             -- имена полей, правленных руками; загрузчики их не трогают
-source_key         text              -- ключ дедупликации импорта, см. 04-business-rules
-created_by         bigint FK users ON DELETE CASCADE    -- NULL = общая (системная) запись
+descriptions       jsonb            -- see below
+artists            jsonb            -- see below
+edited_fields      jsonb            -- names of hand-corrected fields
+source_key         text             -- import/loader dedup key (business-rules.md, BR-3)
+created_by         bigint FK users ON DELETE CASCADE   -- NULL = shared record
 status             text NOT NULL DEFAULT 'active' CHECK (status IN ('draft','active','rejected'))
 is_archived        boolean NOT NULL DEFAULT false
 archived_at        timestamptz
-archive_reason     text              -- 'снята с выпуска НБУ', 'дубликат', 'ошибочная запись'
+archive_reason     text
 created_at, updated_at timestamptz
 ```
 
-### descriptions и artists
+**`created_by` is `ON DELETE CASCADE`, not `SET NULL`:** otherwise deleting a user
+would silently turn their personal positions into shared records.
 
-Обе колонки могут быть `NULL` целиком — это нормальное состояние строки, которую парсер
-coin-collector ещё не коснулся. Но если колонка не `NULL`, внутренняя форма JSON
-зафиксирована, и код не должен защищаться от отсутствующих ключей.
+**Dictionary plus free text.** `composition_id`/`material`, `edge_type_id`/`edge`,
+`quality_type_id`/`quality`, `denomination_id`/`denomination_text`,
+`series_id`/`series_text` follow one pattern: the dictionary row where one fits, the
+source's or user's own words where not (`business-rules.md`, BR-14).
+`denomination_text` is shown in place of a denomination when `denomination_id` is empty;
+sorting and filtering by denomination ignore it, as they ignore free-text `material`.
+`series_text` is display only (via `series_display_name()` in
+`app/repositories/localization.py`); completeness, the series filter and series screens
+count `series_id` only.
 
-`descriptions` — тексты описания по локалям и частям монеты. Ключ локали (`uk`, `en`, в
-будущем `pl` и другие) и ключи `general`/`obverse`/`reverse` внутри локали присутствуют
-всегда — их пишет coin-collector безусловно. Отсутствие текста — это `null` в значении, а
-не отсутствие ключа:
+**`quality`** has no `CHECK`: its vocabulary lives in `coin-parser` and grows.
+
+**Catalog number shown on the card:** the first non-empty of `catalog_km`, `catalog_uc`,
+`catalog_numista`, `catalog_number` — a named catalog always wins.
+
+**`status`.** `draft` — created by the NBU catalog sync, waiting for an admin;
+`active` — published; `rejected` — a rejected draft, which is also archived with the
+reason. Non-admin reads require `status = 'active'` (`business-rules.md`, BR-2;
+`admin.md`).
+
+**`edited_fields`** — the contract that a catalog loader leaves hand-corrected fields
+alone. Nothing writes it yet.
+
+**Archiving** (`is_archived`, `archived_at`, `archive_reason`) replaces deletion for
+shared records; the three are set together and cleared together. Semantics:
+`business-rules.md`, BR-10.
+
+#### descriptions and artists
+
+Either column may be `NULL` as a whole — a row the parser hasn't touched and the user
+didn't describe. **Once non-null, the inner shape is fixed** and code must not guard
+against missing keys.
+
+`descriptions`: both locale keys (`uk`, `en`) and all three parts are always present;
+missing text is `null`, not a missing key.
 
 ```json
 {
@@ -357,15 +366,12 @@ coin-collector ещё не коснулся. Но если колонка не `
 }
 ```
 
-С 2026-09-14 `descriptions` пишет не только парсер: форма «Додати» собирает три поля —
-«Опис», «Опис аверса», «Опис реверса» — и кладёт их под локаль запроса, а вторую локаль
-заполняет `null`-ами. Форма JSON от этого не меняется: если колонка не `NULL`, обе локали и
-все три ключа на месте. Ничего не вписали — колонка остаётся `NULL` целиком, потому что
-строка из одних `null` означала бы «парсер приходил и ничего не нашёл», а это неправда.
+The purchase form's three description fields write under the request locale and fill
+the other locale with `null`s. If nothing was typed, the column stays `NULL` — a row of
+nulls would claim "the parser came and found nothing".
 
-`artists` — авторы монеты. `designers` и `sculptors` — всегда массивы (в худшем случае
-пустые `[]`), никогда `null` и никогда не отсутствуют как ключи. Каждый автор — не голая
-строка, а объект с теми же локалями `uk`/`en`, что и `descriptions`:
+`artists`: `designers` and `sculptors` are always arrays (possibly `[]`), each person an
+object with the same locales:
 
 ```json
 {
@@ -374,598 +380,298 @@ coin-collector ещё не коснулся. Но если колонка не `
 }
 ```
 
-API отдаёт оба поля уже свёрнутыми до текущей локали интерфейса — `CatalogCard.description`
-(`general`/`obverse`/`reverse`) и списки имён `designers`/`sculptors` — с запасным вариантом
-на другую локаль там, где парсер не нашёл текста для запрошенной.
+The API collapses both to the reader's locale (`description.general/obverse/reverse`,
+`designers`, `sculptors`), falling back to the other locale where the requested one has
+no text.
 
-### series_text и denomination_text (2026-09-14)
-
-Тот же приём, что `composition_id` + `material`: справочная строка, где она есть, и слова
-владельца, где справочника нет вовсе. Понадобилось форме «Додати»: справочники номиналов и
-серий засеяны тем, что реально лежит в каталоге, то есть Украиной, СССР и США, — и
-австрийская монета упиралась в два неактивных поля с извинением.
-
-**`denomination_text` показывается вместо номинала**, когда `denomination_id` пуст, — в
-карточке, в списках каталога и в «Мої монети». Сортировка и фильтр по номиналу его не
-видят, ровно как не видят свободный `material`.
-
-**`series_text` — только показ.** Комплектность, экран «Серії» и фильтр «Серія» считаются по
-`series_id`, а серии — общие записи, которые заводит администратор
-(`business-rules.md`, BR-2). Вписанное имя выводится рядом с монетой (общий
-`series_display_name()` в репозиториях каталога и коллекции) и не участвует ни в чём из
-перечисленного. Альтернатива — личные серии со своим фильтром видимости через весь серийный
-слой — отдельная задача, а не поле формы.
-
-### status, quality и edited_fields
-
-`status` — место, где импортированная запись ждёт публикации. Пишет её загрузчик каталога;
-существующие строки получили `'active'` через server_default. **Сейчас колонку никто не
-читает:** отсев драфтов из витрины, поиска и комплектности — задача этапа админки, а до неё
-в базу пишется только `'active'`. Это сознательное решение, а не пропущенная фильтрация.
-
-`quality` — качество чеканки каноническим кодом: `proof`, `special_uncirculated`,
-`uncirculated`, `brilliant_uncirculated` и далее. Колонки под это в схеме не было, а признак
-коллекционно значимый — ua-coins разводит такие монеты отдельными строками, и без колонки
-различие терялось. `CHECK` намеренно нет: словарь кодов живёт в coin-parser и будет расти,
-и миграция на каждый новый код — плохой обмен.
-
-`edited_fields` — список имён полей, поправленных руками. Контракт: загрузчик каталога не
-перезаписывает поля из этого списка. Пока в колонку никто не пишет — она заведена ради
-контракта, чтобы ручная правка не потерялась при первом же прогоне парсера.
-
-`created_by` определяет слой: `NULL` — общая запись, значение — личная позиция автора.
-Здесь именно `ON DELETE CASCADE`, а не `SET NULL`: иначе удаление пользователя молча
-превратило бы все его личные позиции в записи общего каталога. Общих записей каскад не
-касается — у них `created_by IS NULL`.
-
-### Архивация вместо удаления
-
-`is_archived` — мягкое удаление записи общего каталога. Физический `DELETE` общей позиции
-перестал быть штатной операцией: на позицию могут ссылаться экземпляры, покупки, расходы,
-фотографии и история цен **чужих** пользователей, и удаление записи разрушило бы их данные
-ради чистоты справочника.
-
-Архивная позиция исчезает из витрины каталога, из поиска и из знаменателя комплектности,
-но остаётся в базе, и всё, что на неё ссылается, продолжает работать. Семантика целиком —
-`business-rules.md`, BR-10.
-
-`archived_at` и `archive_reason` заполняются вместе с флагом; снятие флага их обнуляет.
-Причина обязательна — без неё через полгода никто не вспомнит, почему позиции нет в
-каталоге.
-
-### Отображение названия
-
-```
-title_{локаль} → title_original
-```
-
-И всё: за оригиналом ничего нет. Оригинал — `NOT NULL` и написан на языке эмитента, так что
-это всегда осмысленный ответ, а не пустая строка. Русского слота, в который можно было бы
-провалиться, больше нет — для советской части каталога русский **и есть** оригинал.
-
-Локаль ответа берётся из `?locale=`, иначе из `Accept-Language`, иначе украинская. По той же
-формуле идёт сортировка списков: каталог «по стране» упорядочен по имени, которое видит
-читатель, а не по оригиналу.
-
-Сортировка этих выражений — явно `COLLATE "uk-x-icu"` / `"en-x-icu"`
-(`app/repositories/localization.py`, встроенные в сам Postgres ICU-локали, доустанавливать
-ничего не нужно). Без этого Postgres сортирует по коду символа: у четырёх специфичных
-украинских букв (Є, І, Ї, Ґ) код ниже, чем у всего остального кириллического блока, так что
-всё на них улетало в начало списка, перед «А» — баг, найденный владельцем 2026-09-09 на
-сортировке серий.
-
-Индексы:
+#### Indexes
 
 ```sql
--- основные выборки каталога идут по активным записям: индексы частичные
-CREATE INDEX ON catalog_items (country_id, issue_year) WHERE NOT is_archived;
-CREATE INDEX ON catalog_items (series_id)              WHERE NOT is_archived;
-CREATE INDEX ON catalog_items (created_by);
+-- catalog reads work on active rows, so most indexes are partial
+(country_id, issue_year)   WHERE NOT is_archived
+(series_id)                WHERE NOT is_archived
+(packaging_of_id)          WHERE NOT is_archived
+(created_by)
+(catalog_km)               WHERE NOT is_archived   -- three single-column indexes: search
+(catalog_uc)               WHERE NOT is_archived   -- matches any one number, a composite
+(catalog_numista)          WHERE NOT is_archived   -- would only serve the first column
+(archived_at)              WHERE is_archived       -- admin archive views
 
--- три отдельных индекса, а не один составной: поиск идёт по любому одному
--- каталожному номеру, составной индекс работал бы только по первой колонке
-CREATE INDEX ON catalog_items (catalog_km)       WHERE NOT is_archived;
-CREATE INDEX ON catalog_items (catalog_uc)       WHERE NOT is_archived;
-CREATE INDEX ON catalog_items (catalog_numista)  WHERE NOT is_archived;
+-- source_key: unique globally among shared rows, per owner among personal rows
+UNIQUE catalog_items_source_key_shared_idx (source_key)
+  WHERE source_key IS NOT NULL AND created_by IS NULL
+UNIQUE catalog_items_source_key_own_idx (created_by, source_key)
+  WHERE source_key IS NOT NULL AND created_by IS NOT NULL
 
--- админский разбор архива и отчёты задачи НБУ
-CREATE INDEX ON catalog_items (archived_at DESC) WHERE is_archived;
-
--- уникальность source_key: глобальная для общих записей,
--- в пределах владельца — для личных.
--- Архивные записи из уникальности НЕ исключаются, см. ниже
-CREATE UNIQUE INDEX catalog_items_source_key_shared_idx ON catalog_items (source_key)
-  WHERE source_key IS NOT NULL AND created_by IS NULL;
-CREATE UNIQUE INDEX catalog_items_source_key_own_idx ON catalog_items (created_by, source_key)
-  WHERE source_key IS NOT NULL AND created_by IS NOT NULL;
-
--- полнотекстовый поиск по всем трём слотам названия, только по активным
-CREATE INDEX catalog_items_search_idx ON catalog_items
-  USING gin (to_tsvector('simple',
-    coalesce(title_original,'') || ' ' || coalesce(title_uk,'') || ' ' ||
-    coalesce(title_en,'')))
-  WHERE NOT is_archived;
+-- full-text search over all three title slots
+catalog_items_search_idx USING gin (to_tsvector('simple',
+  coalesce(title_original,'') || ' ' || coalesce(title_uk,'') || ' ' || coalesce(title_en,'')))
+  WHERE NOT is_archived
 ```
 
-**Почему индексы частичные.** Практически каждый запрос к каталогу — витрина, поиск,
-фильтры, подсчёт комплектности, суточная задача цен — работает только по активным записям
-и несёт в себе `WHERE NOT is_archived`. Частичный индекс планировщик применит именно к таким
-запросам, а сам индекс будет меньше полного ровно на объём архива. Запросы «покажи архив»
-редкие и админские — для них отдельный индекс по `archived_at`.
-
-Условие `WHERE NOT is_archived` работает как частичный индекс только при дословном
-совпадении с предикатом запроса: писать в репозитории надо `NOT is_archived`, а не
-`is_archived = false` или `is_archived IS NOT TRUE`. Проще всего зафиксировать это одним
-методом репозитория и не собирать условие в каждом месте руками.
-
-**Уникальность `source_key` архив не исключает.** Соблазн добавить `AND NOT is_archived`
-есть — тогда можно было бы завести новую позицию с тем же ключом взамен архивной. Но именно
-это и порождает молчаливые дубликаты: импорт нашёл бы новую запись, а экземпляры чужих
-коллекций остались бы висеть на архивной. Если позицию надо «переоткрыть» — снимается флаг
-архива, а не создаётся вторая запись.
-
-Два частичных индекса выбраны вместо одного по `(source_key, coalesce(created_by, 0))`:
-условие читается прямо в определении, и общие записи защищены отдельно от личных. Один и тот же
-`source_key` может существовать один раз в общем каталоге и по одному разу у каждого
-пользователя — это и есть правило дедупликации импорта из `business-rules.md`, BR-3.
-
-Поиск делаем через `simple`-конфигурацию, а не `russian`: в каталоге украинские, русские и
-английские названия вперемешку, стемминг по одному языку испортит остальные. Дополнительно
-стоит включить `pg_trgm` для поиска по опечаткам.
+- **Write `NOT is_archived` verbatim** in queries. A partial index applies only when the
+  query predicate matches it; `is_archived = false` or `IS NOT TRUE` won't use it.
+- **The search expression in code must match the index expression exactly**
+  (`_search_vector()` in `app/repositories/catalog.py`). The `simple` configuration is
+  deliberate: titles mix Ukrainian, Russian and English, and stemming for one language
+  would break the others.
+- **Archived rows stay in `source_key` uniqueness.** Excluding them would let a loader
+  create a fresh record with the same key while other people's coins stay attached to the
+  archived one — a silent duplicate. To "reopen" a record, unarchive it.
 
 ### catalog_variants
 
 ```
-id               bigserial PK
-catalog_item_id  bigint NOT NULL FK catalog_items ON DELETE CASCADE
-name             text NOT NULL
-mint_name, mint_mark, variety_code, notes  text
+id, catalog_item_id FK catalog_items CASCADE, name NOT NULL,
+mint_name, mint_mark, variety_code, notes
 UNIQUE (catalog_item_id, name, mint_mark)
 ```
 
-Создаём, в MVP не используем.
-
-### collection_items
-
-Физические экземпляры пользователя.
-
-```
-id                bigserial PK
-owner_id          bigint NOT NULL FK users ON DELETE CASCADE
-catalog_item_id   bigint NOT NULL FK catalog_items ON DELETE NO ACTION
-variant_id        bigint FK catalog_variants ON DELETE SET NULL
-quantity          int NOT NULL DEFAULT 1 CHECK (quantity > 0)
-grade             text
-condition_notes   text
-acquisition_date  date
-acquisition_place text
-seller            text
-purchase_price    numeric(14,2)
-purchase_currency text FK currencies
-purchase_rate_uah numeric(14,6)      -- курс НБУ на дату покупки
-storage_location_id  bigint FK storage_locations ON DELETE SET NULL
-grading_company, grading_number, grading_grade  text
-is_for_swap       boolean NOT NULL DEFAULT false
-is_for_sale       boolean NOT NULL DEFAULT false
-needs_replacement boolean NOT NULL DEFAULT false
-notes             text
-created_at, updated_at timestamptz
-```
-
-```sql
-CREATE INDEX ON collection_items (owner_id, catalog_item_id);
-CREATE INDEX ON collection_items (owner_id, acquisition_date DESC);
-```
-
-### Почему `NO ACTION`, а не `RESTRICT`
-
-Правило «нельзя удалить позицию, на которую есть экземпляры» сохраняется — оно было в legacy
-(«Нельзя удалить монету с покупками»). Но обеспечивается оно **на уровне API**, а не этим
-внешним ключом. Внешний ключ здесь — страховка от осиротевшей строки, а не механизм правила.
-
-Раз это страховка, из двух подходящих вариантов берём наименее ограничивающий.
-
-**Что проверено на PostgreSQL 16 (а не взято из общих соображений).** Опасение было такое:
-`DELETE FROM users` запускает два каскада, которые сходятся в одной точке —
-
-```
-users ──CASCADE──> collection_items ──┐
-  │                                   ├──> catalog_items (личные)
-  └──CASCADE──> catalog_items ────────┘        created_by
-```
-
-— и немедленная проверка `RESTRICT` может сработать на промежуточном состоянии.
-**Этого не происходит.** Оба варианта, `RESTRICT` и `NO ACTION`, проходят удаление
-пользователя одинаково успешно, при любом порядке создания ограничений: PostgreSQL складывает
-все ссылочные действия одного стейтмента в общую очередь AFTER-триггеров, и к моменту проверки
-экземпляры уже удалены каскадом по `owner_id`.
-
-**Настоящее отличие — в отложенности.** `RESTRICT` проверяется немедленно и не откладывается
-**никогда**, даже если объявить ограничение `DEFERRABLE INITIALLY DEFERRED`. `NO ACTION`
-в этом случае откладывается до конца транзакции. Проверено отдельно: в транзакции, где сначала
-удаляется родительская строка, а следом дочерняя, `RESTRICT` падает сразу, `NO ACTION`
-проходит.
-
-Пока эта разница ни на что не влияет — ни одна операция так не пишет. Но она может
-понадобиться там, где внутри одной транзакции экземпляры перевешиваются с одной позиции
-каталога на другую: это ровно сценарий слияния дубликатов, отложенного на после MVP
-(`scope.md`). Возможность отложить проверку ничего не стоит, а её отсутствие потом
-потребует миграции. Поэтому `NO ACTION`.
-
-Целостность при этом не страдает: `NO ACTION` так же не даст оставить экземпляр без позиции
-каталога — на это есть отдельный тест.
-
-Запрет на удаление позиции с экземплярами живёт в сервисном слое и после введения архивации
-относится к двум случаям: удаление **личной** позиции её автором и физическое удаление уже
-архивированной общей записи администратором (`business-rules.md`, BR-10).
-
-Сумма в гривне не хранится, а считается: `purchase_price * purchase_rate_uah`. Исходная сумма
-и валюта не теряются — требование ТЗ (раздел 6).
+Exists; unused (varieties are deferred, `product.md`, "Out of scope").
 
 ### market_price_snapshots
 
-История цен. Не перезаписывается — каждая проверка создаёт новую строку.
+Append-only price history — every check inserts a row.
 
 ```
 id               bigserial PK
 catalog_item_id  bigint NOT NULL FK catalog_items ON DELETE CASCADE
-source           text NOT NULL        -- 'uCoin', 'UA-Coins', 'Manual'
+source           text NOT NULL        -- 'UA-Coins', 'uCoin', 'Manual'
 grade            text
 price            numeric(14,2) NOT NULL CHECK (price >= 0)
 currency_code    text NOT NULL FK currencies
 observed_at      timestamptz NOT NULL
 source_url       text
-raw_payload      jsonb                -- сырой ответ источника, для разбора багов
-created_by       bigint FK users ON DELETE SET NULL   -- NULL = снимок центральной задачи
+raw_payload      jsonb                -- the source's raw response, for debugging parsers
+created_by       bigint FK users ON DELETE SET NULL   -- NULL = central job
 is_suspect       boolean NOT NULL DEFAULT false
 UNIQUE NULLS NOT DISTINCT (catalog_item_id, source, grade, observed_at)
+INDEX (catalog_item_id, observed_at DESC), INDEX (created_by),
+INDEX (catalog_item_id) WHERE is_suspect
 ```
 
-```sql
-CREATE INDEX ON market_price_snapshots (catalog_item_id, observed_at DESC);
-CREATE INDEX ON market_price_snapshots (created_by);
-```
-
-`created_by` задаёт видимость снимка (см. «Разделение общего и личного»). Выборка цен для
-пользователя всегда сужается условием:
-
-```sql
-WHERE created_by IS NULL OR created_by = :user_id
-```
-
-Ключ уникальности — `NULLS NOT DISTINCT` (миграция 0006). У большинства снимков `grade`
-пуст, а при поведении Postgres по умолчанию две строки с `grade IS NULL` и одинаковыми
-остальными полями конфликтом не считаются — то есть от дублей истории защищала только
-дисциплина загрузчика. Миграция схлопнула такие группы до минимального `id`, дальше их не
-пропускает база.
-
-`raw_payload` был `TEXT` с JSON — переводим в `jsonb`. Это важно: в legacy цены ломались,
-и без сырых данных разобраться было нечем.
-
-`is_suspect` — снимок не прошёл проверки из `integrations.md`. Такие строки **остаются
-в истории и видны в карточке монеты**, но исключаются из расчёта стоимости коллекции.
-Флаг проставляет миграция legacy-данных (`09-data-migration.md`); при обычной работе цена,
-не прошедшая проверку, в базу вообще не пишется — она отклоняется со статусом `rejected`.
-То есть `is_suspect` существует только для унаследованных данных, которые уже в базе.
-
-Индекс частичный, по `is_suspect`: подозрительных меньшинство, и спрашивают именно их.
+- `created_by` decides visibility (`business-rules.md`, BR-7).
+- `NULLS NOT DISTINCT`: most snapshots have no grade, and by default two rows differing
+  only in a `NULL` grade wouldn't collide.
+- `is_suspect` exists only for imported history (see "Data origins"); normal writes
+  reject a bad price instead of flagging it. Suspect rows show in history and are
+  excluded from value.
 
 ### price_source_links
 
-Подтверждённое соответствие позиции каталога записи во внешнем источнике.
+A confirmed mapping of a catalog item to an external source record.
 
 ```
-id               bigserial PK
-catalog_item_id  bigint NOT NULL FK catalog_items ON DELETE CASCADE
-source           text NOT NULL
-external_id      text NOT NULL       -- URL или идентификатор на стороне источника
-match_status     match_status NOT NULL DEFAULT 'confirmed'
-matched_at       timestamptz
+id, catalog_item_id FK catalog_items CASCADE, source NOT NULL,
+external_id NOT NULL    -- URL or id on the source side
+match_status match_status NOT NULL DEFAULT 'confirmed', matched_at
 UNIQUE (catalog_item_id, source)
 ```
 
 ### media_files
 
 ```
-id                bigserial PK
-catalog_item_id   bigint FK catalog_items ON DELETE CASCADE
-collection_item_id bigint FK collection_items ON DELETE CASCADE
-owner_id          bigint FK users ON DELETE CASCADE   -- NULL для каталожных
-role              media_role NOT NULL
-source            media_source NOT NULL DEFAULT 'user_upload'
-license           text            -- условия использования, если известны
-attribution       text            -- обязательная подпись к изображению, если требуется
-storage_key       text            -- ключ самого большого хранимого размера
-external_url      text            -- если изображение с чужого сервера
-thumbnail_key     text            -- ключ превью (300 px)
-variants          jsonb           -- {"300": ключ, "600": ключ, "1200": ключ}
-mime_type         text
-width, height     int
-size_bytes        bigint
-sha256            text
-created_at        timestamptz
+id                  bigserial PK
+catalog_item_id     bigint FK catalog_items ON DELETE CASCADE
+collection_item_id  bigint FK collection_items ON DELETE CASCADE
+owner_id            bigint FK users ON DELETE CASCADE   -- NULL for catalog photos
+role                media_role NOT NULL
+source              media_source NOT NULL DEFAULT 'user_upload'
+license, attribution  text
+storage_key         text      -- key of the largest stored size
+external_url        text      -- hotlink; the frontend never shows foreign URLs
+thumbnail_key       text      -- 300 px preview
+variants            jsonb     -- {"300": key, "600": key, "1200": key}
+mime_type           text
+width, height       int
+size_bytes          bigint
+sha256              text
+created_at          timestamptz
 CHECK (catalog_item_id IS NOT NULL OR collection_item_id IS NOT NULL)
 CHECK (storage_key IS NOT NULL OR external_url IS NOT NULL)
+INDEX (catalog_item_id), INDEX (collection_item_id), INDEX (owner_id)
 ```
 
-Разделение `storage_key` / `external_url` — исправление legacy, где в одном поле лежали
-и локальные пути, и ссылки на `i.ucoin.net`. Подробности в `media.md`.
+`variants` lists sizes actually stored — nothing is upscaled, so a 600 px source has no
+`1200`. Rows with empty `variants` fall back to `storage_key` / `thumbnail_key`.
+`source` drives visibility; rules, sizes and rights: `media.md`.
 
-`variants` перечисляет **фактически** сохранённые размеры. Ничего не растягивается: у
-источника в 600 px варианта 1200 просто нет, и ряд об этом честно молчит вместо того, чтобы
-пообещать файл, которого нет. У записей, сделанных до миграции `0004`, `variants` пуст, и
-сборщик URL берёт `storage_key` с `thumbnail_key` — перезаливать ничего не нужно.
+## Collection and money
 
-`source` — происхождение изображения, от него зависит видимость:
+### collection_items
 
-| `source` | Что это | Кто видит |
-|---|---|---|
-| `user_upload` | фото пользователя | владелец (`owner_id`) |
-| `nbu` | официальное каталожное фото НБУ | все |
-| `ua_coins` | взято с ua-coins.info там, где у НБУ фото нет | все, с подписью |
-| `ucoin` | взято с uCoin — своё или скачанное | только импортировавший пользователь |
-| `manual` | добавлено администратором вручную | все |
-
-Права на изображения uCoin нам не принадлежат, поэтому в публичных карточках вместо них
-показывается плейсхолдер. Правила целиком — `media.md`.
-
-### exchange_rates
+One purchase of a catalog item by a user, with a `quantity`.
 
 ```
-id             bigserial PK
-currency_code  text NOT NULL FK currencies
-rate_uah       numeric(14,6) NOT NULL CHECK (rate_uah > 0)
-effective_date date NOT NULL
-fetched_at     timestamptz NOT NULL
-source         text NOT NULL DEFAULT 'NBU'
-UNIQUE (currency_code, effective_date, source)
+id                   bigserial PK
+owner_id             bigint NOT NULL FK users ON DELETE CASCADE
+catalog_item_id      bigint NOT NULL FK catalog_items ON DELETE NO ACTION
+variant_id           bigint FK catalog_variants ON DELETE SET NULL
+quantity             int NOT NULL DEFAULT 1 CHECK (quantity > 0)
+grade, condition_notes  text
+acquisition_date     date
+acquisition_place, seller  text
+purchase_price       numeric(14,2)
+purchase_currency    text FK currencies
+purchase_rate_uah    numeric(14,6)      -- NBU rate on the purchase date
+storage_location_id  bigint FK storage_locations ON DELETE SET NULL
+grading_company, grading_number, grading_grade  text
+is_for_swap, is_for_sale, needs_replacement  boolean NOT NULL DEFAULT false
+notes                text
+created_at, updated_at timestamptz
+INDEX (owner_id, catalog_item_id), INDEX (owner_id, acquisition_date DESC)
 ```
 
-Общая таблица: курс НБУ не зависит от пользователя.
+The UAH amount is never stored: `purchase_price × purchase_rate_uah`
+(`business-rules.md`, BR-4).
+
+#### Why `NO ACTION`, not `RESTRICT`
+
+"Don't delete a catalog item that has collection items" is enforced in the **service
+layer** (`business-rules.md`, BR-10); the FK is only a backstop against orphans, so it
+uses the least restrictive option that still guarantees integrity.
+
+Deleting a user fires two cascades that meet at personal catalog items
+(`users → collection_items` and `users → catalog_items.created_by`). On PostgreSQL 16
+both `RESTRICT` and `NO ACTION` handle that correctly: all referential actions of one
+statement are queued together, so the collection items are gone before the check
+runs (`tests/test_cascade_diamond.py`).
+
+The real difference is deferral: `RESTRICT` is checked immediately even when declared
+`DEFERRABLE INITIALLY DEFERRED`; `NO ACTION` can wait until commit. That matters for
+re-pointing collection items from one catalog item to another inside a transaction —
+exactly what merging duplicates will need (deferred, `product.md`, "Out of scope"). Keeping the option
+costs nothing; lacking it later would cost a migration.
 
 ### expenses
 
 ```
-id                 bigserial PK
-owner_id           bigint NOT NULL FK users ON DELETE CASCADE
-category           expense_category NOT NULL
-amount             numeric(14,2) NOT NULL CHECK (amount >= 0)
-currency_code      text NOT NULL FK currencies
-rate_uah           numeric(14,6)
-expense_date       date NOT NULL
-catalog_item_id    bigint FK catalog_items ON DELETE SET NULL
-collection_item_id bigint FK collection_items ON DELETE SET NULL
-series_id          bigint FK coin_series ON DELETE SET NULL
-vendor             text
-description        text
-created_at         timestamptz
+id                  bigserial PK
+owner_id            bigint NOT NULL FK users ON DELETE CASCADE
+category            expense_category NOT NULL
+amount              numeric(14,2) NOT NULL CHECK (amount >= 0)
+currency_code       text NOT NULL FK currencies
+rate_uah            numeric(14,6)
+expense_date        date NOT NULL
+catalog_item_id     bigint FK catalog_items ON DELETE SET NULL
+collection_item_id  bigint FK collection_items ON DELETE SET NULL
+series_id           bigint FK coin_series ON DELETE SET NULL
+vendor, description text
+created_at          timestamptz
+INDEX (owner_id, expense_date)
 ```
 
-В legacy покупка монеты автоматически создавала расход категории `coin_purchase` — все 620
-записей именно такие. Поведение сохраняем: расход создаётся в той же транзакции, что и
-`collection_items`.
-
-**Удаление — в сервисном слое, не каскадом.** При удалении экземпляра сервис той же
-транзакцией удаляет связанный расход категории `coin_purchase`. FK остаётся
-`ON DELETE SET NULL` как страховка от висячей ссылки, если запись всё-таки удалят в обход
-сервиса, — но полагаться на него нельзя: `SET NULL` оставит расход в базе и завысит сумму
-трат. См. `business-rules.md`, BR-10.
-
-**`collection_item_id` у сопутствующих расходов** (уточнено 2026-09-22): доставка, холдер,
-грейдинг и т. п. заполняют `collection_item_id` так же, как `coin_purchase` — на ту же
-покупку (строку `collection_items`), к которой относятся. Здесь `ON DELETE SET NULL` — не
-страховка, а рабочий сценарий: сервис не удаляет такие расходы при удалении экземпляра,
-просто связь обнуляется, а расход остаётся в журнале «Гроші» с сохранённым
-`catalog_item_id`. Подробности и обоснование — `business-rules.md`, BR-4.
-
-### sales, purchase_offers, collection_goals
-
-Переносим из legacy с добавлением `owner_id` и заменой типов. В MVP не используются —
-адаптировать по тем же правилам, что применены к остальной схеме выше.
-
-### ucoin_catalog_sources
-
-Сохранённые разделы каталога uCoin для повторного импорта.
-
-```
-id                bigserial PK
-owner_id          bigint FK users ON DELETE CASCADE
-title             text NOT NULL
-url               text NOT NULL
-country           text
-collection_group  collection_group
-last_import_at    timestamptz
-last_scanned, last_inserted, last_updated, last_skipped  int NOT NULL DEFAULT 0
-created_at, updated_at timestamptz
-UNIQUE (owner_id, url)
-```
-
-В legacy `url` был глобально уникален — при многопользовательской работе это неверно,
-уникальность должна быть в пределах пользователя.
-
-### user_settings
-
-Вместо legacy-таблицы `settings` с ключом-строкой:
-
-```
-user_id     bigint PK FK users ON DELETE CASCADE
-locale      text NOT NULL DEFAULT 'uk'   -- 'uk' | 'en'
-display_currency text NOT NULL DEFAULT 'UAH'
-default_grade text NOT NULL DEFAULT 'UNC'
-show_packaging_variants boolean NOT NULL DEFAULT true
-theme       text NOT NULL DEFAULT 'system'   -- 'light' | 'dark' | 'system'
-catalog_view_mode     text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
-collection_view_mode  text NOT NULL DEFAULT 'cards'   -- 'cards' | 'table'
-secondary_currency    text NOT NULL DEFAULT 'USD'     -- 'USD' | 'EUR'
-default_storage_location_id  bigint FK storage_locations ON DELETE SET NULL
-include_supporting_expenses  boolean NOT NULL DEFAULT true
-updated_at  timestamptz
-```
-
-Один дефолт на все монеты, редактируемый в настройках (`PATCH /bootstrap/settings`),
-подставляется в форму покупки независимо от группы каталога. До миграции 0014 было два
-раздельных столбца по группе каталога (`default_grade_commemorative` = 'UNC' из ТЗ, раздел
-6, `default_grade_circulation` = 'VF') без интерфейса для правки; объединены в одно
-редактируемое поле — разделение по группе не оправдывало сложность.
-
-`theme`, `catalog_view_mode`, `collection_view_mode` (миграция 0015) — кросс-девайсные
-версии того, что раньше жило только в localStorage браузера. Клиент по-прежнему держит
-локальную копию для мгновенной отрисовки до ответа `GET /bootstrap` (и для экранов входа,
-где юзера ещё нет), но именно эта колонка переживает новый браузер или устройство.
-
-`secondary_currency` (миграция 0016) — какая валюта показывается вторым числом рядом с
-гривневой суммой («≈ …») в карточке монеты, в «Мої монети» и в «Гроші». Гривна остаётся
-основной осью расчётов всюду; вторичная валюта — только слой отображения. Только `USD`
-или `EUR`: история курсов НБУ (`exchange_rates`) покрывает лишь эти две.
-
-`include_supporting_expenses` (миграция 0026, решение владельца 2026-09-22) — считать ли
-сопутствующие расходы (доставка, холдер, грейдинг) частью «Куплено загалом» и «Зміни
-вартості» на карточці монеты, или показывать их отдельной информационной строкой рядом.
-По умолчанию `true`. Начинался как прототип на `localStorage` в тот же день, но не пережил
-даже одной сессии до переноса — таблица уже даёт готовый паттерн для настроек такого рода
-(`business-rules.md`, BR-4).
-
-`display_currency` де-факто мёртвое поле: всегда `'UAH'`, ни UI, ни PATCH-параметра для
-его изменения нет.
-
-`default_storage_location_id` (миграция 0017) — то же самое "один дефолт, редактируемый
-в настройках, подставляется в форму покупки", что и `default_grade`, только резолвится
-через `storage_locations` по имени: клиенту всегда виден только текст, id внутренний.
+- Every purchase creates a `coin_purchase` expense in the same transaction.
+- `collection_item_id ON DELETE SET NULL` means different things per category: for
+  `coin_purchase` it's only a backstop — the service deletes that expense explicitly, and
+  relying on the FK would keep it and inflate spend; for supporting expenses it's the
+  intended behavior. Both: `business-rules.md`, BR-4 and BR-10.
 
 ### storage_locations
 
-Свой словарь для «Хранение» (миграция 0017), тем же способом, что и три языковых слота
-выше, но с двумя, а не тремя слотами — эндонима тут нет, это не название монеты:
-
 ```
-id             bigserial PK
-owner_id       bigint FK users ON DELETE CASCADE   -- NULL = системный пресет, виден всем
-name_original  text NOT NULL   -- как ввёл владелец
-name_uk        text NOT NULL
-name_uk_source translation_source NOT NULL
-name_en        text NOT NULL
-name_en_source translation_source NOT NULL
-created_at     timestamptz
+id              bigserial PK
+owner_id        bigint FK users ON DELETE CASCADE   -- NULL = system preset, visible to all
+name_original   text NOT NULL                       -- what the owner typed
+name_uk         text NOT NULL
+name_uk_source  translation_source NOT NULL
+name_en         text NOT NULL
+name_en_source  translation_source NOT NULL
+created_at      timestamptz
 ```
 
-Никогда не CRUD-ресурс по id для клиента: и в форме покупки, и в настройках запись видна
-и адресуется только по имени (`GET /collection/storage-locations` отдаёт `{name, custom}`),
-резолвится в id на сервере. Один системный пресет — «Вдома» (`owner_id IS NULL`), он же
-единственный, который нельзя удалить (`403`); всё остальное, включая «В дорозі», владелец
-заводит сам — первое использование текста заводит личную запись
-(`owner_id = <владелец>`), совпадение по имени (без учёта регистра, по любому из трёх
-слотов) переиспользует существующую. Свежесозданная запись хранит typed-текст в обоих
-языковых слотах и переводится в фоне (`BackgroundTasks`, не ARQ — see `infra.md`) через
-Haiku, чтобы сохранение покупки не ждало LLM.
+Never exposed as a CRUD resource by id — the client addresses locations by name and the
+server resolves them. One preset, "Вдома" / "At home". Get-or-create, translation and
+deletion rules: `business-rules.md`, BR-16.
 
-`collection_items.storage_location_id` и `user_settings.default_storage_location_id` —
-обе FK сюда, `ON DELETE SET NULL`: удаление личной записи владельцем просто снимает
-значение там, где она стояла, а не рвёт покупку.
-
-### auth_tokens
-
-Одноразовые токены подтверждения email и восстановления пароля. Устроены по образцу
-`refresh_tokens` (`auth.md`): в базе лежит хеш, а не сам токен.
-
-```
-id          bigserial PK
-user_id     bigint NOT NULL FK users ON DELETE CASCADE
-kind        auth_token_kind NOT NULL      -- 'email_verify' | 'password_reset'
-token_hash  text NOT NULL UNIQUE          -- sha256 от токена
-expires_at  timestamptz NOT NULL
-used_at     timestamptz
-created_at  timestamptz NOT NULL DEFAULT now()
-```
-
-```sql
-CREATE TYPE auth_token_kind AS ENUM ('email_verify', 'password_reset');
-CREATE INDEX ON auth_tokens (user_id, kind);
-```
-
-Токен считается годным, если `used_at IS NULL` и `expires_at > now()`. Срок жизни: 24 часа
-для подтверждения email, 1 час для сброса пароля. Выдача нового токена того же типа гасит
-предыдущие невыполненные. Регистрация и восстановление пароля — обязательная часть MVP,
-см. `auth.md`.
+## Operations
 
 ### audit_log
 
 ```
-id           bigserial PK
-user_id      bigint FK users ON DELETE SET NULL
-action       text NOT NULL
-entity_type  text NOT NULL
-entity_id    text
-details      jsonb
-created_at   timestamptz NOT NULL DEFAULT now()
+id, user_id FK users ON DELETE SET NULL, action NOT NULL, entity_type NOT NULL,
+entity_id text, details jsonb, created_at
 ```
 
-Создаём сразу, заполнять начинаем на операциях удаления и массового импорта.
+Written for catalog item archive / unarchive / delete / draft publish / reject
+(`catalog_item.*`) and admin role changes (`role.promote`, `role.demote`). Image
+deletion is not audited.
 
 ### job_runs
 
+One row per run of a background job, as the job reported it (`admin.md`).
+
 ```
 id           bigserial PK
-job          text NOT NULL              -- 'update-prices', дальше 'nbu-catalog-sync'
-status       text NOT NULL              -- running | ok | partial | failed
+job          text NOT NULL     -- 'update-prices', ...; open-ended on purpose
+status       text NOT NULL CHECK (status IN ('running','ok','partial','failed'))
 started_at   timestamptz NOT NULL
-finished_at  timestamptz                -- NULL ровно тогда, когда status = 'running'
-run_date     date                       -- день, о котором прогон, а не день запуска
-summary      text                       -- строка самоотчёта задачи
-stats        jsonb                      -- счётчики задачи, как она их посчитала
-details      text                       -- только при не-ok
+finished_at  timestamptz       -- CHECK: NULL exactly when status = 'running'
+run_date     date              -- the day the run is about, not the day it ran
+summary      text              -- the job's one-line self-report
+stats        jsonb             -- the job's own counters, verbatim
+details      text              -- only when not ok
 exit_code    smallint
-created_at   timestamptz NOT NULL DEFAULT now()
-updated_at   timestamptz NOT NULL DEFAULT now()
+created_at, updated_at timestamptz
+INDEX (job, started_at DESC)
 ```
 
-Одна строка на прогон фоновой задачи (`admin.md`). Открывается со `status = 'running'`
-до начала работы и закрывается исходом после — поэтому прогон, убитый на середине,
-оставляет строку в `running`, а не пустоту. Слова статусов — те же, что уже печатает
-парсер (`ok | partial | failed`), наше здесь только `running`. Два CHECK: допустимый
-статус и связка «`finished_at` пуст ровно у незавершённых».
+A run opens as `running` before work starts, so a killed run leaves a `running` row
+rather than nothing. No foreign keys: a job reports on itself, not on records.
+`run_date` differs from `started_at` because the nightly price run is dated by the
+UA-Coins table header, which may still show yesterday.
 
-Таблица ни с чем не связана внешними ключами: задача отчитывается о себе, а не о записях.
-`stats` хранит счётчики как есть — схема не знает, что считает конкретная задача.
-`run_date` отличается от даты запуска намеренно: ночной прогон цен датируется заголовком
-таблицы ua-coins, который утром может быть ещё вчерашним.
+### telegram_recipients
 
-## Схема связей
+```
+id, user_id FK users CASCADE, chat_id bigint NOT NULL UNIQUE, linked_at
+INDEX (user_id)
+```
+
+Chats that receive admin notifications. A row appears only through a one-time link code
+issued to a signed-in admin (`admin.md`).
+
+### Support bot tables
+
+`support_telegram_settings` (singleton row, `CHECK (id = 1)`: the forum group chat id),
+`support_link_tokens` (hashed one-time tokens linking a Telegram chat to an account),
+`support_tickets` (`status IN ('open','closed')`, one forum topic per ticket),
+`support_messages` (`direction IN ('user_to_admin','admin_to_user')`). Behavior:
+`telegram-support.md`.
+
+## Unused tables
+
+Created by the initial schema for deferred features (`product.md`, "Out of scope"); nothing reads or
+writes them:
+
+- `sales` — sold collection items (FKs `NO ACTION`, `quantity > 0`, `sale_price >= 0`).
+- `purchase_offers` — offers being considered (`offer_status`).
+- `collection_goals` — collecting targets by country / series / group / years.
+- `ucoin_catalog_sources` — saved uCoin sections for repeat import, unique per
+  `(owner_id, url)`.
+
+## Relationships
 
 ```
 users ──< collection_items >── catalog_items ──< market_price_snapshots
-  │              │                   │       └─< price_source_links
-  │              │                   │       └─< catalog_variants
-  │              │                   │       └─< media_files (каталожные)
-  │              └─< media_files (свои фото)
-  │              └─< expenses
-  ├──< catalog_items (личные позиции, created_by)
-  ├──< market_price_snapshots (свои снимки цен, created_by)
-  ├──< storage_locations (свои, owner_id; пресет — owner_id NULL)
-  └─< user_settings
-  └─< ucoin_catalog_sources
-  └─< refresh_tokens, auth_tokens
+  │            │                     │       ├─< price_source_links
+  │            │                     │       ├─< catalog_variants
+  │            │                     │       └─< media_files (catalog photos)
+  │            ├─< media_files (own photos)
+  │            └─< expenses
+  ├──< catalog_items (personal positions, created_by)
+  ├──< market_price_snapshots (own snapshots, created_by)
+  ├──< storage_locations (own; the preset has owner_id NULL)
+  ├── user_settings
+  ├──< auth_identities, refresh_tokens, auth_tokens
+  └──< telegram_recipients, support_link_tokens, support_tickets
 
-storage_locations ──< collection_items (storage_location_id)
-storage_locations ──< user_settings (default_storage_location_id)
-
+storage_locations ──< collection_items, user_settings.default_storage_location_id
 countries ──< coin_series ──< catalog_items
     └─────< denominations ──< catalog_items
-
-currencies ──< exchange_rates
+materials / edge_types / quality_types ──< catalog_items
+currencies ──< exchange_rates, denominations
 ```
-
-## Что проверить при реализации
-
-- Расширения: `citext`, `pg_trgm`
-- `updated_at` обновлять триггером, а не в приложении
-- Все `numeric` для денег, ни одного `float`
-- Каскады: удаление пользователя чистит его коллекцию и личные позиции каталога,
-  но не трогает общий каталог. Проверить отдельным тестом — там каскадный ромб,
-  см. `collection_items`
-- Все выборки витрины каталога несут `NOT is_archived` дословно, иначе частичные индексы
-  не применятся
-- Фильтр видимости каталога (`created_by IS NULL OR created_by = :user_id`) и снимков цен —
-  в репозиторийном слое, рядом с `owner_id`, а не в роутах
 
 ## Data origins
 
@@ -975,13 +681,17 @@ data is described here so that odd-looking rows have an explanation.
 
 - **Catalog.** Its 3063 items became shared-catalog records (`created_by IS NULL`),
   including the US and USSR ones — those countries stay `catalog_confirmed = false`.
-- **Collection.** 620 instances and their purchase history belong to the owner's account.
+- **Collection.** 620 collection items and their purchase history belong to the owner's
+  account.
 - **Price snapshots.** The 3938 imported snapshots were run through the price checks in
   `integrations.md`; failures were kept with `is_suspect = true`, visible in history but
   excluded from value. New prices never get this flag — they're rejected before writing.
 - **Free text.** `catalog_items.material` keeps, verbatim, whatever could not be mapped
   to a `materials` code instead of guessing. The alias tables in
   `backend/app/reference_data/` (`LEGACY_RAW_ALIASES` in `materials.py`,
-  `LEGACY_ALIASES` in `edge_types.py`) map raw imported values to dictionary codes.
+  `LEGACY_ALIASES` in `edge_types.py`) map raw imported values to dictionary codes;
+  migrations `0007` and `0010` resolved the known technical tokens.
+- **Denominations.** Migration `0003` parsed the imported free-text labels into
+  structured rows and merged duplicates; an unparseable label would have stopped it.
 - **Photos.** About 320 US images use the old `legacy-N.webp` key scheme without size
   variants; tools that expect all three sizes report them as missing originals.
