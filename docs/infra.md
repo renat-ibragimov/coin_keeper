@@ -1,176 +1,151 @@
-# 10. Инфраструктура и деплой
+# Infrastructure and deployment
 
-## Окружения: dev и prod (решение владельца 2026-09-15)
+How the system runs on the server and how code gets there. Local setup and the CI check
+list: `development.md`. Open infrastructure work (backups, dev/prod split, hardening):
+`backlog.md`, "Production hardening".
 
-Весь остальной документ описывает то, что сегодня работает как единственное окружение —
-по факту это **дев**: домен `coins.renat-ibragimov.com`, сервер Hetzner `2.28.42.171`.
-Пользователей там нет, официального запуска не было. Решением владельца 2026-09-15 это
-разводится на два окружения, и разнесение — часть MVP (`scope.md`,
-`docs/HANDOFF.md`, §3), не постMVP-хвост:
+## Environments
 
-| Окружение | Домен | Назначение |
+There is one running environment today: `coins.renat-ibragimov.com` on a Hetzner server.
+It serves the owner's real collection and is deployed on every push to `main`.
+
+**Planned (not built):** split into dev (`coins.renat-ibragimov.com`) and prod
+(`numismatics.bakost.club`), with the database and media duplicated at the split. The
+principles already agreed:
+
+- a country's catalog is built on dev and promoted to prod as a whole (records, photos,
+  series), matching records across databases by `source_key`, never by `id`;
+- users and their collections live only in prod and never sync back to dev;
+- restricting dev to certain users (e.g. via Cloudflare) is an open question.
+
+Undecided: one server with two stacks or a separate prod server; one Postgres with two
+databases or two instances; how a promotion physically runs. Document here once decided.
+
+## Topology
+
+```
+central Caddy (outside this repo) ── HTTPS, static frontend, /api → api, /media → minio
+docker compose "coinkeeper":
+  api         FastAPI (uvicorn, 2 workers); runs Alembic migrations on start
+  postgres    PostgreSQL 16 (shared_buffers 512MB, work_mem 16MB)
+  redis       Redis 7 — rate limits and short-lived keys
+  minio       S3-compatible image storage
+  minio-init  one-shot: creates the bucket, then exits
+coin-parser (separate repository, cron on the same server)
+  rates, UA-Coins prices, NBU catalog sync — writes to the same Postgres,
+  reports runs to /api/v1/internal/job-runs (admin.md)
+```
+
+There is no queue or worker service: request-time background work uses FastAPI
+`BackgroundTasks` (BR-4, BR-16), scheduled work runs in `coin-parser` on cron.
+
+`docker-compose.yml` is the production topology: Postgres, Redis and MinIO publish **no
+host ports**. It builds the image with `target: production` explicitly — without it
+Docker builds the Dockerfile's last stage, the development one (dev dependencies,
+running as root). The production image runs as an unprivileged `app` user.
+
+`docker-compose.dev.yml` is for local development only (published ports, hot reload) and
+is deliberately not named `docker-compose.override.yml`: the server checks out the same
+repository, and an auto-loaded override would publish the database there
+(`development.md`).
+
+`minio-init` isn't pulled in by `up -d api`; on a fresh server run
+`docker compose up minio-init` once.
+
+## Configuration
+
+Environment variables only. The server's `.env` is written by CI from the `SERVER_ENV`
+secret (see "Deployment"); the repository has `.env.example` with placeholders. The
+settings class is `backend/app/core/config.py`.
+
+| Variables | Purpose |
+|---|---|
+| `DATABASE_URL`, `POSTGRES_USER/PASSWORD/DB` | app connection; container init |
+| `REDIS_URL` | rate limits |
+| `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | image storage |
+| `JWT_SECRET`, `COOKIE_SECURE`, `ALLOW_REGISTRATION` | auth (`auth.md`) |
+| `DOMAIN`, `PUBLIC_BASE_URL`, `CORS_ORIGINS` | public origin, links in emails, CORS |
+| `MAIL_BACKEND`, `SMTP_*` | mail, see "Mail" |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in; both empty hides the button |
+| `ANTHROPIC_API_KEY` | background translation of personal names (BR-16); empty disables it |
+| `JOB_REPORT_TOKEN` | `coin-parser` job reports (`admin.md`) |
+| `TELEGRAM_BOT_*`, `TELEGRAM_WEBHOOK_SECRET` | private admin bot (`admin.md`) |
+| `SUPPORT_TELEGRAM_*` | public support bot (`telegram-support.md`) |
+| `LOG_LEVEL` | default `INFO` |
+
+Notes:
+
+- **`PUBLIC_BASE_URL`** builds the links in verification and reset emails. Never derive
+  them from request headers — a forged `Host` would send the user to another domain.
+- **`S3_PUBLIC_ENDPOINT`** (`https://<domain>/media`) is the browser-reachable host that
+  presigned GET URLs are signed for; `S3_ENDPOINT` (`http://minio:9000`) only resolves
+  inside the docker network. Leave it empty locally (`media.md`).
+- **`ALLOW_REGISTRATION=true`** is the normal state; the flag is an emergency switch
+  (flip it and restart, no deploy) against a bot wave.
+- **`JOB_REPORT_TOKEN`** is shared with the `coin-parser` container, which reads the same
+  `.env`. Empty disables job reporting entirely.
+- **Telegram:** an empty bot token disables sending (messages go to the log, so a dev
+  machine can never post to a real chat); an empty webhook secret makes the webhook
+  answer `404`. The username builds the `t.me/<bot>?start=…` link behind "connect".
+
+## Mail
+
+| `MAIL_BACKEND` | Behavior | Where |
 |---|---|---|
-| dev | `coins.renat-ibragimov.com` (нынешний) | сборка и проверка новых стран каталога, разработка |
-| prod | `numismatics.bakost.club` | боевой сервис для пользователей |
+| `console` | the whole message, link included, is written to the log; nothing leaves the process | local, tests, CI |
+| `smtp` | real delivery via `SMTP_*` | server |
 
-Зафиксированные владельцем принципы целевой схемы:
-- **Полное дублирование** существующей БД и медиа на оба окружения на момент разведения.
-- **Первый промоушен**: украинский каталог и коллекция владельца целиком переезжают в prod.
-- **Механизм промоушена каталога dev → prod**: страна собирается на деве (следующая —
-  США), когда готова — переносится в prod целиком (записи + фото + серии). Матчинг между
-  базами — по `source_key`, не по `id` (id на каждой стороне независимы).
-- **Пользователи и их коллекции** живут только в prod, назад на dev не синкаются.
-- «Закрытие» dev для определённых пользователей — вариант через Cloudflare, владелец ещё
-  обсуждает; **открытый вопрос, не проектировать**.
+Only the transport changes; registration and password reset run the same code in both
+modes. Tests always run with `console`. `MAIL_BACKEND=smtp` without `SMTP_HOST` fails
+at startup.
 
-<!-- TODO(owner): инфраструктурные детали второго окружения не решены — один Hetzner-сервер
-с двумя стеками (два docker-compose, два порта у Caddy) или отдельный сервер под prod;
-общий Postgres с двумя базами или два инстанса Postgres; как физически выполняется
-промоушен страны (дамп+восстановление конкретных таблиц по source_key, скрипт, вручную) —
-прописать в этом разделе, когда решите. -->
+**Provider: Resend over SMTP** (`smtp.resend.com:587`, user `resend`, password = API
+key, STARTTLS). No own mail server — deliverability from a single VPS is poor. Setup:
 
-## Целевая площадка
+1. Add the sending domain in Resend; add its DNS records (SPF, DKIM) and DMARC; wait for
+   `Verified`.
+2. Create an API key with send permission; put it only in `SERVER_ENV`.
+3. Set `MAIL_BACKEND=smtp` and `SMTP_FROM="Bakost Numismatics <noreply@<verified-domain>>"`
+   — the address must belong to the verified domain.
+4. Redeploy, register a test account, check the verification email; request a password
+   reset and check that email too.
 
-Собственный сервер Hetzner + домен. Слабая конфигурация — этого достаточно: одновременных
-пользователей единицы, база небольшая, тяжёлые операции фоновые.
+## Google sign-in
 
-Минимум: 2 vCPU, 4 ГБ RAM, 40 ГБ диска. Playwright с Chromium — самый прожорливый компонент,
-под него держим запас памяти и ограничиваем одновременные задачи скрейпинга до одной.
-
-## Состав
-
-```
-┌─ Caddy ──────────── HTTPS, Let's Encrypt, reverse proxy, отдача фронтенда
-├─ api ────────────── FastAPI (uvicorn)
-├─ worker ─────────── ARQ, фоновые задачи
-├─ postgres ───────── PostgreSQL 16
-├─ redis ──────────── очередь задач и rate limiting
-└─ minio ──────────── S3-совместимое хранилище изображений
-```
-
-Всё в одном `docker-compose.yml`. Kubernetes на этом масштабе — лишняя сложность.
-
-Рядом лежит `docker-compose.dev.yml` — только для локальной разработки: публикует порты
-Postgres, Redis и MinIO наружу и включает hot-reload.
-
-```
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
-```
-
-Он **намеренно не назван** `docker-compose.override.yml`: файл с таким именем compose
-подхватывает сам, а на сервере лежит тот же репозиторий — автоподхват открыл бы порты базы
-наружу. Имя `docker-compose.override.yml` остаётся в `.gitignore`: кому удобнее короткая
-команда, копирует туда dev-файл у себя на машине.
-
-`docker-compose.yml` собирает образ со стадией `target: production` явно. Без этого Docker
-берёт последнюю стадию Dockerfile — это стадия разработки, с dev-зависимостями и
-процессом от root.
-
-## Конфигурация
-
-Только через переменные окружения. Файл `.env` на сервере, в репозитории — `.env.example`
-с пустыми значениями.
-
-```
-DATABASE_URL=postgresql+asyncpg://coinkeeper:***@postgres:5432/coinkeeper
-REDIS_URL=redis://redis:6379/0
-S3_ENDPOINT=http://minio:9000
-S3_PUBLIC_ENDPOINT=https://<домен>/media
-S3_BUCKET=coinkeeper-media
-S3_ACCESS_KEY=***
-S3_SECRET_KEY=***
-JWT_SECRET=***
-CORS_ORIGINS=https://<домен>
-ALLOW_REGISTRATION=true
-NBU_CATALOG_BASE=https://bank.gov.ua/ua/numismatic-products
-UACOINS_BASE=https://www.ua-coins.info
-PUBLIC_BASE_URL=https://<домен>
-MAIL_BACKEND=smtp
-SMTP_HOST=smtp.resend.com
-SMTP_PORT=587
-SMTP_USER=resend
-SMTP_PASSWORD=***
-SMTP_FROM="Bakost Numismatics <noreply@<домен>>"
-SMTP_STARTTLS=true
-GOOGLE_CLIENT_ID=***
-GOOGLE_CLIENT_SECRET=***
-LOG_LEVEL=INFO
-JOB_REPORT_TOKEN=***
-TELEGRAM_BOT_TOKEN=***
-TELEGRAM_BOT_USERNAME=***
-TELEGRAM_WEBHOOK_SECRET=***
-```
-
-`ALLOW_REGISTRATION=true` — штатное состояние. Регистрация открыта с первого дня,
-подтверждение email обязательно, поэтому закрывать её незачем. Флаг остаётся **аварийным
-рубильником**: волна ботов гасится сменой переменной и перезапуском, без выкладки кода
-(`auth.md`).
-
-`PUBLIC_BASE_URL` нужен, чтобы собирать ссылки в письмах подтверждения и восстановления
-пароля. Из заголовков запроса их брать нельзя — заголовок подделывается, и письмо уведёт
-пользователя на чужой домен.
-
-`S3_PUBLIC_ENDPOINT` — тот же приём для presigned-ссылок на изображения. `S3_ENDPOINT`
-(`http://minio:9000`) виден только внутри docker-сети; браузер этот хост не резолвит, и
-presigned-URL, подписанный на него, в браузере не открывается. Когда `S3_PUBLIC_ENDPOINT`
-задан, `presigned_get_url` подписывает ссылку отдельным клиентом с этим endpoint'ом
-(`docs/media.md`); клиент для `put`/`get` внутри бэкенда остаётся на
-`S3_ENDPOINT`. Локально переменную не задают — там браузер и так открывает
-`http://localhost:9000` напрямую (`docker-compose.dev.yml` публикует порт MinIO).
-
-`JOB_REPORT_TOKEN` — общий секрет, которым задача по расписанию отчитывается о своём
-прогоне (`admin.md`). Его читает не только бэкенд: контейнер `coin-parser` берёт тот же
-`.env` ради доступа к базе, поэтому отдельного места для секрета не появляется. Пустое
-значение выключает приём отчётов совсем — забытая переменная не оставляет открытой двери.
-
-Три переменные `TELEGRAM_*` — админский бот (`admin.md`). Пустой `TELEGRAM_BOT_TOKEN`
-выключает отправку: сообщения уходят в лог, и машина разработчика физически не может
-написать в настоящий чат. Пустой `TELEGRAM_WEBHOOK_SECRET` выключает приём: вебхук
-отвечает `404`. `TELEGRAM_BOT_USERNAME` нужен, чтобы собрать ссылку `t.me/<бот>?start=…`
-за кнопкой подключения.
-
-### `MAIL_BACKEND` — как отправляется почта
-
-| Значение | Что делает | Где используется |
-|---|---|---|
-| `console` | письмо целиком пишется в лог, включая ссылку подтверждения; наружу ничего не уходит | локальная разработка, тесты, CI |
-| `smtp` | реальная отправка через `SMTP_*` | сервер |
-
-Смысл переключателя в том, что регистрация и восстановление пароля работают **одинаково**
-в обоих режимах: разработчик поднимает окружение без единого секрета, регистрируется и
-достаёт ссылку подтверждения из `docker compose logs`. Заглушек в коде для этого не нужно —
-подменяется только транспорт, вся остальная логика одна и та же.
-
-Локальный `.env.example` идёт с `MAIL_BACKEND=console` и примером `SMTP_*` для Resend;
-значения SMTP в этом режиме не используются. На сервере —
-`smtp` с первого дня (`11-roadmap.md`, этап 1). Тесты всегда гоняются на `console`,
-и это проверяется: тест, который отправил бы настоящее письмо, — сломанный тест.
+Create a **Web application** OAuth client in Google Cloud Console with the exact
+redirect URI `https://<domain>/api/v1/auth/google/callback` (one client per
+environment), scopes `openid email profile`. Put `GOOGLE_CLIENT_ID` and
+`GOOGLE_CLIENT_SECRET` into that environment's `SERVER_ENV`; the secret never reaches
+the frontend. While the consent screen is in Testing mode only test users can sign in —
+switch it to Production before a public launch.
 
 ## Caddy
 
-Автоматический HTTPS без ручной возни с сертификатами.
+The server runs **one central Caddy** for several sites, outside this compose project.
+Its block for this site is edited by hand on the server. The repository's `Caddyfile`
+and the `caddy` compose service (profile `proxy`) are the reference configuration and a
+way to run the full stack locally; changes to the reference must be copied to the
+central Caddyfile manually.
 
-**Как оно на самом деле на сервере.** Caddy там **один, центральный**, обслуживает несколько
-сайтов и живёт вне нашего `docker-compose.yml`. Сервис `caddy` в compose и `Caddyfile` в
-репозитории — эталон конфигурации и вариант для локального прогона с профилем `proxy`; на
-сервере блок для `coins.renat-ibragimov.com` живёт в Caddyfile центрального Caddy и правится
-руками. Апстримы `/api/*` и `/media/*` там уже настроены — их не трогаем.
-
-Целевой блок сайта:
+Required site block (upstream names as on the server):
 
 ```
-coins.renat-ibragimov.com {
+<domain> {
     handle /api/* {
         request_body {
             max_size 13MB
         }
-        reverse_proxy <существующий апстрим api>
+        reverse_proxy <api upstream>
     }
     handle_path /media/* {
-        reverse_proxy <существующий апстрим minio>
+        reverse_proxy <minio upstream>
     }
     handle {
         root * /srv/coinkeeper/frontend
+        @assets path /assets/* /brand/*
+        header @assets Cache-Control "public, max-age=31536000, immutable"
+        @entry path / /index.html /catalog /catalog/* /manifest.webmanifest
+        header @entry Cache-Control "no-cache"
         try_files {path} {path}/index.html /index.html
         file_server
     }
@@ -183,356 +158,134 @@ coins.renat-ibragimov.com {
 }
 ```
 
-Порядок `handle` важен: без `handle` для `/api/*` и `/media/*` SPA-fallback отдал бы
-`index.html` вместо ответа API. `try_files {path} {path}/index.html /index.html`
-сначала находит подготовленный HTML каталога и монет, затем SPA fallback для остальных
-маршрутов. `/catalog?page=3` и `/reset-password?token=…` открываются по прямой ссылке.
-Центральный Caddy живёт вне репозитория, поэтому эту строку нужно обновить в его реальном
-Caddyfile перед публикацией подготовленных страниц.
+- **`handle` order matters:** without the `/api/*` and `/media/*` handlers the SPA
+  fallback would answer API calls with `index.html`.
+- **`try_files {path} {path}/index.html /index.html`** serves prerendered catalog pages
+  first, then falls back to the SPA, so deep links like `/reset-password?token=…` work.
+- **`max_size 13MB`** is one megabyte over the 12 MB an image upload may carry
+  (`MAX_SOURCE_BYTES`), so oversized bodies stop at the edge. The API checks
+  `Content-Length` itself too, in case a request bypasses Caddy.
+- **`/media/*` uses `handle_path`**, which strips `/media` so MinIO sees its path-style
+  `/<bucket>/<key>`. `Host` passes through unchanged — the presigned signature covers it.
+- **Caching:** hashed `assets/*` are immutable; `index.html` and entry routes are
+  `no-cache`, otherwise an old page would request deleted bundles after a deploy.
+- **`Referrer-Policy no-referrer`** keeps tokens in email links out of `Referer`.
+- The API takes the client IP (rate limits) from the first `X-Forwarded-For` entry.
+  That's safe only because Caddy (without `trusted_proxies`) replaces any incoming
+  `X-Forwarded-For` and the API has no host port. Putting another proxy in front
+  (e.g. Cloudflare in proxied mode) requires revisiting `client_ip` in
+  `app/api/deps.py`.
 
-`request_body` на `/api/*` — мегабайтом выше 12 МБ, которые может нести загрузка
-изображения (`MAX_SOURCE_BYTES`): тело сверх лимита отсекается на границе, а не течёт в
-API, чтобы там быть измеренным. Остальные эндпоинты принимают JSON и близко к этой
-величине не подходят. Бэкенд ту же проверку делает сам по заголовку `Content-Length` — на
-случай, если запрос пришёл мимо Caddy. **Строчку нужно добавить руками в блок сайта в
-центральном Caddyfile на сервере** (см. выше: этот блок правится вручную, `Caddyfile` в
-репозитории — только эталон), иначе двенадцатимегабайтный мусор будет доезжать до Python.
+## Frontend delivery
 
-`/media/*` — именно `handle_path`, не `handle`: MinIO обслуживает объекты по path-style
-адресу `/<bucket>/<key>`, а `S3_PUBLIC_ENDPOINT=https://<домен>/media` подписывает ссылки
-как `/media/<bucket>/<key>`. `handle_path` срезает совпавший префикс `/media` перед тем,
-как отдать запрос апстриму — до MinIO доходит `/<bucket>/<key>`, как он и ждёт. Заголовок
-`Host` при этом реверс-прокси не переписывает: presigned-подпись покрывает именно его, и
-подпись, посчитанная на публичный домен, должна дойти до MinIO с тем же значением `Host`.
+The frontend is static: `vite build` → `frontend/dist`, served by Caddy from disk; no
+Node process on the server. Fonts are self-hosted, no external CDNs. The client calls a
+relative `/api/v1`, so one `dist` works behind any domain.
 
-## Фронтенд
+Delivery (job `deploy-frontend`, after the API deploy succeeded, so a new bundle never
+meets an old schema):
 
-Фронтенд — статика: `vite build` в `frontend/dist`, отдаёт её Caddy, отдельный Node-процесс
-не нужен. В `dist` уже лежат шрифты (самохостинг через `@fontsource`), внешних CDN нет.
+1. download the `frontend-dist` artifact built and checked by `frontend-build`;
+2. `frontend/scripts/prerender-catalog.mjs` reads the public catalog from the live API
+   (`site-url` input) and adds crawlable HTML pages for the catalog and coins,
+   `sitemap.xml` and `robots.txt` to `dist/`;
+3. `rsync` to the deploy user's staging directory `~/frontend-dist/`;
+4. on the server: `rsync -a --delete --delay-updates ~/frontend-dist/ /srv/coinkeeper/frontend/`.
 
-API-адрес в сборку не зашит: клиент ходит на относительный `/api/v1` (`VITE_API_BASE`,
-если понадобится другой), поэтому один и тот же `dist` работает за любым доменом. В
-`vite dev` тот же путь проксируется на боевой API (`vite.config.ts`), и refresh-cookie
-ходит как same-origin.
+**Why rsync into the same directory:** the central Caddy bind-mounts
+`/srv/coinkeeper/frontend` read-only and holds its inode — replacing the directory with
+`mv` would leave Caddy serving the old one. `--delay-updates` renames all changed files
+in one final pass, `--delete` removes old hashed bundles. The directory must be owned by
+the deploy user (one-time `chown -R deploy:deploy /srv/coinkeeper/frontend` as root);
+the job fails with a clear message if it isn't writable.
 
-**Выкладка статики — из CI, вместе с бэкендом.** Job `frontend-build` собирает и
-проверяет фронтенд (format, lint, typecheck, tests, build) и публикует артефакт `dist`;
-после успешного `deploy` API job `deploy-frontend` доставляет его на сервер:
-
-```
-1. actions/download-artifact  → dist/
-2. после подъёма API `frontend/scripts/prerender-catalog.mjs` получает публичные страницы каталога и добавляет в `dist/` HTML монет, `sitemap.xml`, `robots.txt`;
-3. rsync dist/ → deploy@<host>:~/frontend-dist/        (staging-каталог деплой-пользователя)
-4. ssh: rsync -a --delete --delay-updates ~/frontend-dist/ /srv/coinkeeper/frontend/
-```
-
-Каталог назначения задаётся входом `frontend-deploy-path` reusable workflow
-(`deploy.yml` передаёт `/srv/coinkeeper/frontend`); пустое значение отключает шаг.
-Порядок важен: статика едет **после** API, чтобы новый бандл не встретил старую схему.
-
-**Почему rsync в тот же каталог, а не подмена каталога.** Центральный Caddy монтирует
-`/srv/coinkeeper/frontend` внутрь контейнера (`:ro`), то есть держит inode каталога.
-`mv frontend.new frontend` оставил бы контейнеру старый inode. Поэтому каталог остаётся на
-месте, меняется только содержимое: `--delay-updates` копирует все изменённые файлы во
-временные имена и переименовывает их одним проходом в конце, `--delete` убирает старые
-хешированные бандлы. Окно, в котором `index.html` ссылается на ещё не существующий
-`assets/*.js`, сводится к миллисекундам; сами `assets/*` имеют хеш в имени, поэтому старая
-вкладка продолжает работать со своими файлами до перезагрузки.
-
-**Права.** Deploy-пользователь не sudoer, а `/srv/coinkeeper/frontend` изначально
-принадлежал root. Выбран вариант с передачей каталога деплой-пользователю — Caddy читает
-его как угодно, ему владелец безразличен. Один раз на сервере, от root:
-
-```
-chown -R deploy:deploy /srv/coinkeeper/frontend
-```
-
-Job `deploy-frontend` проверяет, что каталог доступен на запись, и падает с понятным
-сообщением, если команда выше не выполнена.
-
-**Кэширование.** Vite кладёт хеш в имена файлов `assets/*`, поэтому их можно кэшировать
-надолго; `index.html` должен всегда браться заново, иначе после выкладки старая страница
-попросит удалённые бандлы. Блок для центрального Caddyfile (внутри `handle` статики):
-
-```
-handle {
-    root * /srv/coinkeeper/frontend
-    @assets path /assets/* /brand/*
-    header @assets Cache-Control "public, max-age=31536000, immutable"
-    @entry path / /index.html /catalog /catalog/* /manifest.webmanifest
-    header @entry Cache-Control "no-cache"
-    try_files {path} {path}/index.html /index.html
-    file_server
-}
-```
-
-Аварийный путь без GitHub — тот же rsync с машины разработчика после `npm run build`:
+Emergency path without GitHub: `npm run build`, then
 `rsync -a --delete --delay-updates frontend/dist/ deploy@<host>:/srv/coinkeeper/frontend/`.
 
-## Бэкапы
+## Deployment
 
-В десктопной версии бэкап был функцией приложения: ZIP с базой, медиа, манифестом и
-SHA-256. В вебе это задача сервера, из интерфейса убирается.
-
-**База:**
+GitHub Actions deploys every push to `main`. Pull requests run the checks and build and
+push an image (tagged with the PR's SHA, and `latest`), but never deploy.
 
 ```
-ежедневно  pg_dump -Fc → /backups/db/coinkeeper-YYYY-MM-DD.dump
-хранение   7 ежедневных, 4 еженедельных, 6 ежемесячных
+.github/workflows/deploy.yml        project file: triggers and parameters only
+.github/workflows/build-deploy.yml  reusable workflow (workflow_call): all the logic
 ```
 
-**Изображения:** MinIO синхронизируется на внешнее хранилище (Hetzner Storage Box или
-Backblaze B2) через `rclone`.
+The reusable workflow is generic (FastAPI + Postgres + Compose on an own server) so it
+can move to its own repository and be pinned by tag once a second project uses it.
 
-**Обязательно:** проверка восстановления. Бэкап, который ни разу не разворачивали, —
-не бэкап. Раз в месяц восстанавливать дамп в отдельную базу и сверять количество записей.
-
-Хранить бэкапы только на том же сервере нельзя.
-
-## Миграции схемы
-
-Alembic. Применяются при старте контейнера `api` до приёма трафика:
-
-```
-alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-Перед миграцией на боевой базе — свежий дамп. Автоматический откат не делаем: каждая
-миграция должна быть обратимой или заведомо безопасной.
-
-## Логи и наблюдение
-
-На старте — минимум:
-
-- Структурированные логи в JSON в stdout, собираются `docker compose logs`.
-- Эндпоинт `GET /health`: проверка базы, Redis, S3.
-- Отдельно логируются: все обращения к внешним источникам с URL и кодом ответа,
-  все отклонённые цены с причиной, все ошибки фоновых задач.
-
-Sentry, Prometheus, Grafana — когда появится реальная нагрузка. Раньше это трата времени.
-
-## Ресурсные ограничения
-
-```
-worker:  1 одновременная задача скрейпинга, память ограничена в compose
-api:     2 воркера uvicorn
-postgres: shared_buffers 512MB, work_mem 16MB
-```
-
-Chromium в Playwright запускать с `--no-sandbox --disable-dev-shm-usage`
-и монтировать увеличенный `/dev/shm`, иначе падает в контейнере.
-
-## Выкладка
-
-**Автоматическая с первого дня, через GitHub Actions.** Пуш в `main` выкатывается на домен
-сам. Ручной путь остаётся, но как аварийный — см. ниже.
-
-Настраивается в этапе 1 вместе с сервером, а не «когда выкладки станут частыми»: пока
-выкладка ручная, она обрастает недокументированными шагами, которые живут в голове одного
-человека. Дешевле собрать пайплайн на пустом проекте, чем потом воспроизводить по памяти.
-
-### Пайплайн
-
-```
-check          → бэкенд: ruff + mypy + pytest с поднятыми postgres и redis (MAIL_BACKEND=console)
-frontend-build  → фронтенд: prettier + eslint + tsc + vitest + vite build, артефакт dist
-images          → сборка Docker-образа api (worker — тот же образ, другая команда)
-push            → публикация образа в GHCR (ghcr.io/<owner>/coinkeeper-api)
-deploy          → SSH на Hetzner: docker compose pull && docker compose up -d
-deploy-frontend → rsync артефакта dist в каталог, который отдаёт центральный Caddy
-```
-
-Статика фронтенда образом не оформляется — её отдаёт центральный Caddy с диска; пайплайн
-собирает её и после выкладки API доставляет на сервер по rsync, см. «Фронтенд».
-
-Порядок жёсткий: не прошёл lint или test — до сборки образов дело не доходит, на сервер
-ничего не уезжает.
-
-Образы тегируются SHA коммита и `latest`. Тег по SHA нужен для отката: `docker compose`
-на сервере переключается на предыдущий тег без пересборки.
-
-Сборка фронтенда — **в CI, не на сервере**: `node_modules` на слабой машине собирается
-долго и съедает память, которая нужна Chromium. На сервер едет только `dist`.
-
-Миграции применяются при старте контейнера `api` (см. «Миграции схемы»), отдельным шагом
-пайплайна их не гоняем — иначе схема поедет раньше, чем встанет код.
-
-### Reusable workflow
-
-Пайплайн оформляется как **reusable workflow** (`workflow_call`), а не как один большой
-файл в проекте: он будет переиспользоваться в других проектах с тем же составом —
-FastAPI + Postgres + Docker Compose на своём сервере.
-
-Разделение:
-
-```
-.github/workflows/deploy.yml          проектный: триггеры и параметры, 15–20 строк
-.github/workflows/build-deploy.yml    reusable: вся логика (позже переедет в отдельный репозиторий)
-```
-
-Проектный файл только вызывает reusable с параметрами — имя образа, путь к compose-файлу,
-целевой каталог на сервере, версии Python и Node — и пробрасывает секреты. Никакой логики
-в нём нет. Пока reusable workflow лежит в этом же репозитории; когда появится второй
-проект, он переезжает в отдельный и подключается по `<owner>/<repo>/.github/workflows/
-build-deploy.yml@<tag>` — с закреплённым тегом, не с `@main`.
-
-### Секреты пайплайна
-
-Все в GitHub Secrets репозитория, ни один не хранится в коде и не печатается в логах:
-
-| Секрет | Что это |
+| Job | What it does |
 |---|---|
-| `DEPLOY_SSH_KEY` | приватный ключ деплой-пользователя, отдельный от личного ключа администратора |
-| `DEPLOY_HOST` | адрес сервера |
-| `DEPLOY_USER` | пользователь, от которого идёт выкладка |
-| `DEPLOY_PATH` | каталог с `docker-compose.yml` на сервере |
-| `SSH_KNOWN_HOSTS` | отпечаток хоста; без него проверка ключа сервера отключается, и выкладка становится уязвима к подмене |
-| `SERVER_ENV` | содержимое `.env` сервера целиком |
-| `GHCR_TOKEN` | публикация образов, если штатного `GITHUB_TOKEN` не хватает прав |
+| `check` | backend: ruff format, ruff check, mypy, pytest against Postgres + Redis service containers |
+| `frontend-build` | Prettier, ESLint (`--max-warnings=0`), typecheck, Vitest, prerender test, build → `frontend-dist` artifact |
+| `build` | only if both checks passed: Docker image (`target: production`) → GHCR, tagged with the commit SHA and `latest` |
+| `deploy` | writes `SERVER_ENV` + `API_IMAGE=<image>:<sha>` to the server `.env`, `docker compose pull api && up -d api`, prunes images, then polls `/api/v1/health` inside the container for up to 150 s |
+| `deploy-frontend` | see "Frontend delivery" |
 
-`SERVER_ENV` — единственный источник правды для `.env`: пайплайн раскладывает его на сервер
-перед `up -d`. Так конфигурация не расходится с тем, что помнит человек, а смена секрета —
-это правка в одном месте и перезапуск, без ssh.
+- **Only the `api` service is redeployed.** Postgres, Redis and MinIO are changed by hand.
+- **Migrations run when the `api` container starts** (`alembic upgrade head && uvicorn …`),
+  before it accepts traffic — never as a separate pipeline step, so the schema never
+  moves ahead of the code. **A pushed migration changes the production database:** take
+  a dump first. There's no automatic downgrade; every migration must be reversible or
+  safe.
+- **Rollback:** point `API_IMAGE` at a previous SHA tag and `docker compose up -d api` —
+  no rebuild.
 
-Деплой-пользователю на сервере даётся ровно то, что нужно: доступ к своему каталогу и право
-запускать `docker compose`. Полноценного root-доступа по ключу из CI быть не должно.
+### Secrets
 
-### Аварийный путь
+In GitHub repository secrets, never in code or logs:
 
-Если GitHub недоступен или пайплайн сломан, выкладка руками с сервера:
+| Secret | Purpose |
+|---|---|
+| `DEPLOY_SSH_KEY` | the deploy user's private key, separate from any personal key |
+| `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH` | where and as whom to deploy; directory with `docker-compose.yml` |
+| `SSH_KNOWN_HOSTS` | pinned host key — without it the host check is off and a deploy could be redirected |
+| `SERVER_ENV` | the complete server `.env` |
 
-```
-docker compose pull && docker compose up -d      # образы уже в GHCR
-docker compose build && docker compose up -d     # если нужно собрать на месте
-```
+**`SERVER_ENV` is the single source of truth for the server `.env`.** Every deploy
+overwrites the file, so a change made directly on the server is lost on the next push —
+always change the secret. The deploy user may only manage its own directory and run
+`docker compose`; it has no root.
 
-Это резерв, а не рабочая привычка. Всё, что выложено руками, должно после починки
-пайплайна выкатиться через него ещё раз — иначе состояние сервера расходится с `main`.
+### Emergency manual deploy
 
-## Домен и почта
-
-- Домен указывает на IP сервера, Caddy получает сертификат автоматически. Домен, сервер и
-  Caddy поднимаются в **этапе 1**, вместе с каркасом бэкенда (`11-roadmap.md`).
-- **Почта нужна с первого дня**: подтверждение email обязательно, без него аккаунт неактивен,
-  а восстановление пароля входит в MVP (`auth.md`). Боевой SMTP настраивается в **этапе 1**,
-  не в этапе 7: регистрация второго администратора с настоящим письмом — часть приёмки
-  этапа 1. Локально и в тестах работает `MAIL_BACKEND=console`, секреты для этого не нужны.
-
-**Внешний SMTP — Resend.** Для небольшого проекта подходит бесплатный тариф
-(на сентябрь 2026: 3000 писем в месяц, до 100 в день). Свой почтовый сервер не
-поднимаем — доставляемость с одиночного VPS плохая. Текущий SMTP-транспорт приложения
-работает с Resend без дополнительной библиотеки.
-
-Порядок настройки:
-
-1. Создать аккаунт в Resend и добавить свой домен или почтовый поддомен.
-2. Добавить в DNS записи, которые покажет Resend, дождаться статуса `Verified`.
-   Настроить DMARC для того же домена.
-3. Выпустить API key с правом отправки писем. Ключ хранить только в серверном `.env`.
-4. На сервере задать `MAIL_BACKEND=smtp`, `SMTP_HOST=smtp.resend.com`,
-   `SMTP_PORT=587`, `SMTP_USER=resend`, `SMTP_PASSWORD=<API key>`,
-   `SMTP_STARTTLS=true`, `SMTP_FROM="Bakost Numismatics <noreply@<verified-domain>>"`.
-   Адрес в `SMTP_FROM` должен принадлежать подтверждённому домену.
-5. Пересоздать контейнер API, зарегистрировать тестовый аккаунт и проверить письмо
-   подтверждения, затем запросить сброс пароля и проверить второе письмо.
-
-На центральном Caddy для этого сайта установить `Referrer-Policy: no-referrer`, как в
-репозиторном `Caddyfile`. Токены в ссылках не должны уходить в заголовке `Referer`.
-
-## Google-вход
-
-В Google Cloud Console создать OAuth client типа **Web application**. Для текущего
-окружения разрешить точный redirect URI
-`https://coins.renat-ibragimov.com/api/v1/auth/google/callback`; для отдельного prod
-добавить `https://numismatics.bakost.club/api/v1/auth/google/callback` в его клиент.
-Запросить только `openid email profile`. `GOOGLE_CLIENT_ID` и
-`GOOGLE_CLIENT_SECRET` добавить в `SERVER_ENV` соответствующего окружения; секрет не
-попадает во фронтенд. Пока оба значения пусты, кнопка Google не показывается.
-
-На экране согласия Google приложение в режиме Testing доступно только тестовым
-пользователям. Перед публичным запуском перевести его в Production и завершить
-необходимую настройку экрана согласия. Проверить вход с новым Google-адресом,
-конфликт с существующим email, привязку из настроек и вход обоими способами.
-
-Что настроить обязательно:
-
-- SPF, DKIM и DMARC для домена — без них подтверждения не дойдут. Настраиваются в этапе 1,
-  вместе с доменом: DNS-записи всё равно правятся в один заход.
-- Отдельный адрес отправителя (`noreply@<домен>`).
-- Логирование неудачных отправок: письмо не ушло — пользователь не может войти, и об этом
-  надо знать сразу, а не из жалобы.
-- Повторная отправка — по кнопке пользователя, с ограничением частоты (`auth.md`).
-
-## Безопасность сервера
-
-- Вход по SSH-ключу, парольная аутентификация отключена.
-- Firewall: наружу открыты только 80, 443 и SSH. Postgres, Redis, MinIO — только внутри
-  docker-сети, портов на хост не публикуем.
-- Автоматические обновления безопасности.
-- Регулярное обновление базовых образов.
-
-## Чек-лист первого деплоя (этап 1)
+If GitHub or the pipeline is down, on the server:
 
 ```
-□ Сервер, SSH-ключ, firewall
-□ Домен указывает на сервер
-□ docker и docker compose установлены
-□ Деплой-пользователь заведён, у него нет root-доступа
-□ GitHub Secrets заполнены (список выше), SSH_KNOWN_HOSTS не пропущен
-□ .env на сервере разложен из SERVER_ENV, JWT_SECRET сгенерирован случайно
-□ MAIL_BACKEND=smtp на сервере, console — локально и в тестах
-□ docker compose up -d, все контейнеры healthy
-□ docker compose up minio-init — однократно, создать бакет. Сервис одноразовый
-  и за `up -d api` не подтягивается: вскрылось на реальном деплое
-□ HTTPS работает, сертификат выдан
-□ alembic upgrade head прошёл
-□ Пуш в main проходит пайплайн целиком и выкатывается на домен
-□ GET /health отвечает по HTTPS после автоматической выкладки
-□ Откат на предыдущий тег образа проверен хотя бы раз
-□ SMTP настроен, SPF/DKIM/DMARC проставлены, тестовое письмо дошло не в спам
-□ Регистрация нового аккаунта проходит целиком: письмо → подтверждение → вход
-□ Восстановление пароля проходит целиком
-□ Ограничение частоты работает: подряд идущие попытки входа отбиваются
+docker compose pull api && docker compose up -d api     # image already in GHCR
+docker compose build api && docker compose up -d api    # build on the server
 ```
 
-## Чек-лист продакшн-закалки (этап 7)
+Anything deployed by hand must go through the pipeline again once it works, or the
+server drifts from `main`.
 
-Расширен решением владельца 2026-09-15 — переезд и разнесение dev/prod теперь часть
-этого чек-листа, не постMVP-хвост.
+## Logging and health
 
-Статусы по ревизии 2026-09-23 (проверка по коду обоих репозиториев, не только доков):
+- JSON logs to stdout (`app/core/logging.py`), read with `docker compose logs`.
+- `GET /api/v1/health` reports database, Redis and object storage separately; the
+  container healthcheck and the deploy smoke check use it.
+- Rejected prices, external-source calls and failed jobs are logged (in `coin-parser`
+  for scheduled jobs); job runs are visible in `/admin` (`admin.md`).
 
-```
-□ Скрипт миграции данных отработал, проверки из 09-data-migration.md пройдены
-□ Владелец может войти
-□ Бэкап базы настроен по расписанию                         — не сделано, скрипта/крона нет
-□ Синхронизация MinIO на внешнее хранилище работает          — не сделано, rclone не настроен
-□ Бэкап один раз развёрнут в отдельную базу и сверён          — не сделано
-  по количеству записей
-✅ PWA: манифест, иконки, установка на телефон                — готово (manifest.webmanifest,
-                                                                 иконки, install работает;
-                                                                 Service Worker/офлайн — нет)
-□ Расписание системных задач включено, задачи отработали
-  хотя бы раз
-✅ Логи не содержат секретов, пароли и токены нигде            — беглая проверка чистая,
-  не печатаются                                                глубокого аудита не было
-□ Репозиторий вычищен от русского языка (код и всё вокруг
-  него — CLAUDE.md)
-□ Переезд в bakost-numismatics: новое имя репо, coinkeeper → новый технический
-  идентификатор (пакеты, контейнеры, образ, compose, секреты CI)  — не начато,
-  `git remote` всё ещё `renat-ibragimov/coin_keeper`, образ — `coinkeeper-api`
-□ Решение о приватности/публичности нового репозитория принято — не принято
-□ dev (coins.renat-ibragimov.com) и prod (numismatics.bakost.club) разведены,   — не начато,
-  БД и медиа продублированы на оба окружения                                    второго
-                                                                                  compose/CI нет
-□ Первый промоушен (украинский каталог + коллекция владельца) в prod выполнен  — не выполнен
-```
+No Sentry, Prometheus or Grafana — add them when real load appears.
 
-Отдельно, не в исходном чек-листе, но проверено ревизией: наружу закрытые порты
-Postgres/Redis/MinIO ✅ и строгий `CORS_ORIGINS` (не `*`) ✅ — оба уже в коде
-(`docker-compose.yml` без `ports:` у этих сервисов, `CORSMiddleware` в `main.py`).
-Автоматические обновления безопасности (unattended-upgrades) — не настроены.
-Firewall и SSH-по-ключу — состояние сервера, не проверяется по коду репозитория.
+## Backups
 
-Перенос миграции данных сюда не опечатка: в этапе 1 сервер поднимается пустым, база
-владельца приезжает в этапе 2 (`11-roadmap.md`).
+**Not implemented** (`backlog.md`, "Production hardening"). Today there are only manual
+`pg_dump`s before risky migrations. The target:
+
+- Postgres: daily `pg_dump -Fc`, keeping 7 daily, 4 weekly, 6 monthly;
+- MinIO: `rclone` sync to external storage (Hetzner Storage Box or Backblaze B2);
+- never only on the same server;
+- a monthly restore into a separate database with record counts compared — a backup
+  that was never restored doesn't count.
+
+## Server security
+
+Repository side (done): Postgres, Redis and MinIO have no host ports in production;
+`CORS_ORIGINS` lists the frontend origin only (no `*`); the image runs as non-root.
+
+Server side (to verify, not visible from the repository): SSH by key only, password
+login off; firewall open only for 80, 443 and SSH; unattended security upgrades (not
+configured); regular base-image updates.

@@ -57,12 +57,6 @@ class Settings(BaseSettings):
     google_client_id: str = Field(default="", alias="GOOGLE_CLIENT_ID")
     google_client_secret: str = Field(default="", alias="GOOGLE_CLIENT_SECRET")
 
-    # --- external sources, wired up in stages 5 and 6 ---
-    nbu_catalog_base: str = Field(
-        default="https://bank.gov.ua/ua/numismatic-products", alias="NBU_CATALOG_BASE"
-    )
-    uacoins_base: str = Field(default="https://www.ua-coins.info", alias="UACOINS_BASE")
-
     # --- admin telegram bot, docs/admin.md ---
     # No token means the bot is switched off: messages go to the log and the
     # webhook refuses everything, so a dev machine can never reach a real chat.

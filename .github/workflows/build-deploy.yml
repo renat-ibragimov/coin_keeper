@@ -40,7 +40,7 @@ on:
         description: >-
           Directory on the server the reverse proxy serves the static bundle
           from; empty string skips the static deploy. Must be writable by
-          DEPLOY_USER (docs/infra.md, "Frontend").
+          DEPLOY_USER (docs/infra.md, "Frontend delivery").
         type: string
         default: ""
       site-url:
@@ -134,7 +134,7 @@ jobs:
   # --------------------------------------------------------------- frontend
   # The static bundle is served by Caddy from disk, so no image is built for
   # it; this job keeps a broken build from reaching main and produces the
-  # dist artifact the deploy-frontend job ships (docs/infra.md, "Frontend").
+  # dist artifact the deploy-frontend job ships (docs/infra.md, "Frontend delivery").
   frontend-build:
     if: inputs.frontend-path != ''
     runs-on: ubuntu-latest
