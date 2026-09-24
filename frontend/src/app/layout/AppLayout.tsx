@@ -252,7 +252,10 @@ export function AppLayout() {
                     type="button"
                     role="menuitem"
                     className={styles.accountMenuLink}
-                    onClick={() => void signOut()}
+                    onClick={() => {
+                      closeAccount();
+                      void signOut();
+                    }}
                   >
                     <LogOut size={16} aria-hidden="true" />
                     {t('header.logout')}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSessionDraft } from '@/features/auth/useSessionDraft';
 import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -92,7 +93,7 @@ export function ExpenseForm({
   onCancel,
 }: ExpenseFormProps) {
   const { t } = useTranslation();
-  const [fields, setFields] = useState<Fields>({
+  const [fields, setFields] = useSessionDraft<Fields>(`expense:${initial?.id ?? 'new'}`, {
     category: initial?.category ?? category ?? 'other',
     amount: initial?.amount ?? carried?.amount ?? '',
     currency: initial?.currencyCode ?? carried?.currency ?? 'UAH',

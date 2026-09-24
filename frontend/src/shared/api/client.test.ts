@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api, ApiError, setAccessToken, toQuery } from './client';
+import { api, ApiError, getAccessToken, setAccessToken, toQuery, tryRefresh } from './client';
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -79,6 +79,64 @@ describe('api client', () => {
 
     expect((failure as ApiError).status).toBe(401);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+  it('does not try to restore a session for an anonymous 401', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(401, {}));
+    await expect(api('/collection')).rejects.toMatchObject({ status: 401 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears authentication when the retried request is still unauthorized', async () => {
+    setAccessToken('stale');
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(401, {}))
+      .mockResolvedValueOnce(jsonResponse(200, { tokens: { accessToken: 'fresh' } }))
+      .mockResolvedValueOnce(jsonResponse(401, {}));
+    await expect(api('/collection')).rejects.toMatchObject({ status: 401 });
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it.each([500, 503, 429])(
+    'does not log out on a temporary refresh failure (%s)',
+    async (status) => {
+      setAccessToken('stale');
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(401, {}))
+        .mockResolvedValueOnce(jsonResponse(status, {}));
+      await expect(api('/collection')).rejects.toMatchObject({ status: 401 });
+      expect(getAccessToken()).toBe('stale');
+    },
+  );
+
+  it('does not resurrect a session when refresh finishes after logout', async () => {
+    setAccessToken('old');
+    let finish!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = tryRefresh();
+    setAccessToken(null);
+    finish(jsonResponse(200, { tokens: { accessToken: 'too-late' } }));
+    expect(await pending).toBe(false);
+    expect(getAccessToken()).toBeNull();
+  });
+
+  it('discards a late private response after logout', async () => {
+    setAccessToken('old');
+    let finish!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = api('/collection');
+    setAccessToken(null);
+    finish(jsonResponse(200, { private: true }));
+    await expect(pending).rejects.toMatchObject({ status: 401 });
   });
 });
 

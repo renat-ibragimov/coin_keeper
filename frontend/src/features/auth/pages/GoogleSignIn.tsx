@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { AuthDialogMode } from '../authDialogContext';
 import * as authApi from '../api';
 import { saveAuthReturn, takeAuthReturn } from '../authReturn';
 import { useAuth } from '../useAuth';
@@ -13,9 +14,11 @@ const GOOGLE_START = '/api/v1/auth/google/start';
 export function GoogleSignIn({
   returnTo,
   onSuccess,
+  onResult,
 }: {
   returnTo?: string;
   onSuccess?: () => void;
+  onResult?: (mode: AuthDialogMode, google: string) => void;
 }) {
   const { t } = useTranslation();
   const { completeGoogleSession } = useAuth();
@@ -72,8 +75,27 @@ export function GoogleSignIn({
         })
         .catch(() => setError(true));
     };
-    channel.onmessage = (message: MessageEvent<{ type?: string; flowId?: string }>) => {
-      if (message.data?.type === 'complete' && message.data.flowId === flowId) finish();
+    channel.onmessage = (
+      message: MessageEvent<{
+        type?: string;
+        flowId?: string;
+        mode?: AuthDialogMode;
+        google?: string;
+      }>,
+    ) => {
+      if (message.data?.flowId !== flowId) return;
+      if (message.data.type === 'complete') finish();
+      if (message.data.type === 'result' && !completed) {
+        completed = true;
+        stop();
+        popup.close();
+        if (onResult)
+          onResult(
+            message.data.mode === 'check-email' ? 'check-email' : 'login',
+            message.data.google ?? 'error',
+          );
+        else setError(true);
+      }
     };
     const closedCheck = setInterval(() => {
       if (popup.closed) stop();

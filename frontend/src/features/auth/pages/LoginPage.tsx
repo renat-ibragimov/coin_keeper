@@ -1,39 +1,39 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
 
 import { useAuth } from '../useAuth';
-import { readAuthReturn, safeAuthReturn, saveAuthReturn, takeAuthReturn } from '../authReturn';
+import { saveAuthReturn, takeAuthReturn } from '../authReturn';
 import { PasswordInput } from './PasswordInput';
 import { GoogleSignIn } from './GoogleSignIn';
+import type { AuthDialogMode } from '../authDialogContext';
 import styles from './authForms.module.css';
-
-export function LoginPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const from =
-    safeAuthReturn((location.state as { from?: string } | null)?.from) ?? readAuthReturn() ?? '/';
-  return <LoginForm from={from} onSuccess={() => navigate(from, { replace: true })} />;
-}
 
 export function LoginForm({
   from,
   onSuccess,
   onSwitch,
+  onGoogleResult,
+  onForgot,
+  google,
   showHeading = true,
 }: {
   from: string;
   onSuccess: () => void;
   onSwitch?: () => void;
+  onGoogleResult?: (mode: AuthDialogMode, google: string) => void;
+  onForgot?: () => void;
+  google?: string;
   showHeading?: boolean;
 }) {
   const { t } = useTranslation();
   const { signIn } = useAuth();
   const [params] = useSearchParams();
+  const googleResult = google ?? params.get('google');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -69,9 +69,9 @@ export function LoginForm({
       {showHeading ? <h2 className={styles.title}>{t('auth.loginTitle')}</h2> : null}
       <p className={styles.subtitle}>{t('auth.loginSubtitle')}</p>
       <form className={styles.form} onSubmit={(event) => void submit(event)}>
-        {params.get('google') === 'link-required' ? (
+        {googleResult === 'link-required' ? (
           <div className={styles.formInfo}>{t('auth.googleLinkRequired')}</div>
-        ) : params.has('google') ? (
+        ) : googleResult ? (
           <div className={styles.formError}>{t('auth.googleError')}</div>
         ) : null}
         {error ? <div className={styles.formError}>{error}</div> : null}
@@ -102,15 +102,21 @@ export function LoginForm({
             />
             {t('auth.rememberMe')}
           </label>
-          <Link to="/forgot-password" onClick={() => saveAuthReturn(from)}>
-            {t('auth.forgotPassword')}
-          </Link>
+          {onForgot ? (
+            <button type="button" className={styles.textButton} onClick={onForgot}>
+              {t('auth.forgotPassword')}
+            </button>
+          ) : (
+            <Link to="/forgot-password" onClick={() => saveAuthReturn(from)}>
+              {t('auth.forgotPassword')}
+            </Link>
+          )}
         </div>
         <Button type="submit" block loading={busy}>
           {t('auth.signIn')}
         </Button>
       </form>
-      <GoogleSignIn returnTo={from} onSuccess={onSuccess} />
+      <GoogleSignIn onResult={onGoogleResult} returnTo={from} onSuccess={onSuccess} />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
         {t('auth.noAccount')}{' '}

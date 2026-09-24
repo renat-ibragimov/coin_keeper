@@ -14,6 +14,8 @@ interface Props {
   onPreset: (preset: ExpensesPeriodPreset) => void;
   onCustomRange: (dateFrom: string, dateTo: string) => void;
   invalidRange: boolean;
+  /** Use horizontal labels in the full desktop screen, not in compact demos. */
+  inlineLabels?: boolean;
 }
 
 export function ExpensesPeriodPicker({
@@ -23,6 +25,7 @@ export function ExpensesPeriodPicker({
   onPreset,
   onCustomRange,
   invalidRange,
+  inlineLabels = false,
 }: Props) {
   const { t } = useTranslation();
   const options: TabOption<ExpensesPeriodPreset | ''>[] = [
@@ -33,7 +36,7 @@ export function ExpensesPeriodPicker({
   ];
 
   return (
-    <div className={styles.picker}>
+    <div className={`${styles.picker} ${inlineLabels ? styles.inlineLabels : ''}`}>
       <Tabs
         options={options}
         value={preset ?? ''}

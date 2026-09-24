@@ -17,7 +17,7 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        <Brand to={user ? '/collection' : '/login'} />
+        <Brand to={user ? '/collection' : '/'} />
         <div className={styles.controls}>
           <LocaleSwitcher />
           <ThemeSwitcher />
@@ -25,7 +25,7 @@ export function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
       </header>
       <main className={styles.main}>
         <nav className={styles.backNav} aria-label={copy.navigation}>
-          <Link to={user ? '/collection' : '/login'}>{copy.back}</Link>
+          <Link to={user ? '/collection' : '/'}>{copy.back}</Link>
           <span aria-hidden="true">·</span>
           <Link to={kind === 'privacy' ? '/terms' : '/privacy'}>{copy.other}</Link>
         </nav>

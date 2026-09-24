@@ -1,11 +1,16 @@
 import { createContext, useContext } from 'react';
 
-export type AuthDialogMode = 'login' | 'register';
+export type AuthDialogMode = 'login' | 'register' | 'forgot-password' | 'check-email';
+export interface AuthDialogOptions {
+  from?: string;
+  purpose?: AuthDialogPurpose;
+  reason?: 'expired';
+  email?: string;
+  google?: string;
+  returnState?: { from?: string };
+}
 export type AuthDialogPurpose = 'collection';
-export type OpenAuthDialog = (
-  mode?: AuthDialogMode,
-  options?: { from?: string; purpose?: AuthDialogPurpose },
-) => void;
+export type OpenAuthDialog = (mode?: AuthDialogMode, options?: AuthDialogOptions) => void;
 
 export const AuthDialogContext = createContext<OpenAuthDialog | null>(null);
 

@@ -17,12 +17,10 @@ export function GoogleCompletePage() {
   const isLink = params.get('mode') === 'link';
   const linkResult = params.get('google');
   const started = useRef(false);
+  const [popupFlowId] = useState(() => sessionStorage.getItem(GOOGLE_POPUP_FLOW_KEY));
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const popupFlowId = sessionStorage.getItem(GOOGLE_POPUP_FLOW_KEY);
     if (!isLink && popupFlowId) {
       sessionStorage.removeItem(GOOGLE_POPUP_FLOW_KEY);
       if (typeof BroadcastChannel !== 'undefined') {
@@ -33,6 +31,8 @@ export function GoogleCompletePage() {
         return () => window.clearTimeout(closeTimer);
       }
     }
+    if (started.current) return;
+    started.current = true;
     void completeGoogleSession(isLink ? undefined : true)
       .then(() => {
         navigate(
@@ -45,7 +45,7 @@ export function GoogleCompletePage() {
         );
       })
       .catch(() => setError(true));
-  }, [completeGoogleSession, navigate, isLink, linkResult]);
+  }, [completeGoogleSession, navigate, isLink, linkResult, popupFlowId]);
 
   return (
     <div className={styles.centered}>

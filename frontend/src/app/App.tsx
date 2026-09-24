@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from '
 
 import { AuthProvider } from '@/features/auth/AuthProvider';
 import { AuthDialogProvider } from '@/features/auth/AuthDialog';
+import { AuthEntry } from '@/features/auth/AuthEntry';
 import { AuthLayout } from '@/features/auth/AuthLayout';
 import { useAuth } from '@/features/auth/useAuth';
 import { GuestCollectionPage } from '@/features/collection/guest/GuestCollectionPage';
@@ -22,27 +23,13 @@ const LandingPage = lazy(() => import('@/features/landing/LandingPage'));
 const AdminPage = lazy(() =>
   import('@/features/admin/AdminPage').then((module) => ({ default: module.AdminPage })),
 );
-const CheckEmailPage = lazy(() =>
-  import('@/features/auth/pages/CheckEmailPage').then((module) => ({
-    default: module.CheckEmailPage,
-  })),
-);
-const ForgotPasswordPage = lazy(() =>
-  import('@/features/auth/pages/ForgotPasswordPage').then((module) => ({
-    default: module.ForgotPasswordPage,
-  })),
-);
+
 const GoogleCompletePage = lazy(() =>
   import('@/features/auth/pages/GoogleCompletePage').then((module) => ({
     default: module.GoogleCompletePage,
   })),
 );
-const LoginPage = lazy(() =>
-  import('@/features/auth/pages/LoginPage').then((module) => ({ default: module.LoginPage })),
-);
-const RegisterPage = lazy(() =>
-  import('@/features/auth/pages/RegisterPage').then((module) => ({ default: module.RegisterPage })),
-);
+
 const ResetPasswordPage = lazy(() =>
   import('@/features/auth/pages/ResetPasswordPage').then((module) => ({
     default: module.ResetPasswordPage,
@@ -155,9 +142,7 @@ function AuthCacheReset() {
 function ReadyRoute() {
   const { ready } = useAuth();
   return ready ? (
-    <AuthDialogProvider>
-      <AppLayout />
-    </AuthDialogProvider>
+    <AppLayout />
   ) : (
     <div style={{ display: 'grid', placeItems: 'center', minHeight: '60vh' }}>
       <Spinner size={32} />
@@ -253,48 +238,52 @@ export function App() {
             <ThemeSettingsSync />
             <AuthCacheReset />
             <BrowserRouter>
-              <ScrollToTop />
-              <DonationDialogProvider>
-                <Suspense fallback={<Spinner />}>
-                  <Routes>
-                    <Route path="/privacy" element={<LegalPage kind="privacy" />} />
-                    <Route path="/terms" element={<LegalPage kind="terms" />} />
-                    <Route element={<AuthLayout />}>
-                      <Route path="/login" element={<LoginPage />} />
-                      <Route path="/register" element={<RegisterPage />} />
-                      <Route path="/check-email" element={<CheckEmailPage />} />
-                      <Route path="/verify-email" element={<VerifyEmailPage />} />
-                      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                      <Route path="/google-complete" element={<GoogleCompletePage />} />
-                      <Route path="/reset-password" element={<ResetPasswordPage />} />
-                    </Route>
-                    <Route element={<ReadyRoute />}>
-                      <Route path="/" element={<RootRoute />} />
-                      <Route path="/collection" element={<CollectionRoot />} />
-                      <Route
-                        path="/collection/coins"
-                        element={<CollectionSectionRoute section="coins" />}
-                      />
-                      <Route
-                        path="/collection/completeness"
-                        element={<CollectionSectionRoute section="completeness" />}
-                      />
-                      <Route
-                        path="/collection/money"
-                        element={<CollectionSectionRoute section="money" />}
-                      />
-                      <Route path="/catalog" element={<CatalogPage />} />
-                      <Route path="/catalog/:id" element={<CoinCardPage />} />
-                      <Route element={<ProtectedRoute />}>
-                        <Route path="/collection/add" element={<AddPage />} />
-                        <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
+              <AuthDialogProvider>
+                <ScrollToTop />
+                <DonationDialogProvider>
+                  <Suspense fallback={<Spinner />}>
+                    <Routes>
+                      <Route path="/privacy" element={<LegalPage kind="privacy" />} />
+                      <Route path="/terms" element={<LegalPage kind="terms" />} />
+                      <Route element={<AuthLayout />}>
+                        <Route path="/verify-email" element={<VerifyEmailPage />} />
+                        <Route path="/google-complete" element={<GoogleCompletePage />} />
+                        <Route path="/reset-password" element={<ResetPasswordPage />} />
+                      </Route>
+                      <Route element={<ReadyRoute />}>
+                        <Route path="/" element={<RootRoute />} />
+                        <Route path="/login" element={<AuthEntry mode="login" />} />
+                        <Route path="/register" element={<AuthEntry mode="register" />} />
                         <Route
-                          path="/collection/completeness/:groupBy/:value"
-                          element={<CompletenessDetailPage />}
+                          path="/forgot-password"
+                          element={<AuthEntry mode="forgot-password" />}
                         />
-                        <Route path="/settings" element={<SettingsPage />} />
-                        <Route path="/admin" element={<AdminRoute />} />
-
+                        <Route path="/check-email" element={<AuthEntry mode="check-email" />} />
+                        <Route path="/collection" element={<CollectionRoot />} />
+                        <Route
+                          path="/collection/coins"
+                          element={<CollectionSectionRoute section="coins" />}
+                        />
+                        <Route
+                          path="/collection/completeness"
+                          element={<CollectionSectionRoute section="completeness" />}
+                        />
+                        <Route
+                          path="/collection/money"
+                          element={<CollectionSectionRoute section="money" />}
+                        />
+                        <Route path="/catalog" element={<CatalogPage />} />
+                        <Route path="/catalog/:id" element={<CoinCardPage />} />
+                        <Route element={<ProtectedRoute />}>
+                          <Route path="/collection/add" element={<AddPage />} />
+                          <Route path="/collection/coins/:id/edit" element={<PurchaseFormPage />} />
+                          <Route
+                            path="/collection/completeness/:groupBy/:value"
+                            element={<CompletenessDetailPage />}
+                          />
+                          <Route path="/settings" element={<SettingsPage />} />
+                          <Route path="/admin" element={<AdminRoute />} />
+                        </Route>
                         {/* Retired paths, kept as redirects for old bookmarks and links. */}
                         <Route path="/dashboard" element={<Navigate to="/collection" replace />} />
                         <Route
@@ -323,11 +312,11 @@ export function App() {
                           element={<RedirectTo to="/collection/add" />}
                         />
                       </Route>
-                    </Route>
-                    <Route path="*" element={<Navigate to="/catalog" replace />} />
-                  </Routes>
-                </Suspense>
-              </DonationDialogProvider>
+                      <Route path="*" element={<Navigate to="/catalog" replace />} />
+                    </Routes>
+                  </Suspense>
+                </DonationDialogProvider>
+              </AuthDialogProvider>
             </BrowserRouter>
           </AuthProvider>
         </ToastProvider>

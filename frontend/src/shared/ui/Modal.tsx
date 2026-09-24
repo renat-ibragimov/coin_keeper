@@ -18,6 +18,7 @@ interface ModalProps {
   footer?: ReactNode;
   size?: 'sm' | 'md';
   mobilePlacement?: 'bottom' | 'center';
+  dismissOnNavigation?: boolean;
 }
 
 /** A centred dialog: Escape and a click on the backdrop close it. */
@@ -29,11 +30,12 @@ export function Modal({
   footer,
   size = 'md',
   mobilePlacement = 'bottom',
+  dismissOnNavigation = true,
 }: ModalProps) {
   const { t } = useTranslation();
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  useDismissable(open, onClose);
+  useDismissable(open, onClose, { routeChange: dismissOnNavigation });
 
   useEffect(() => {
     if (!open) return;

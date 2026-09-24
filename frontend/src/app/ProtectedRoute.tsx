@@ -1,10 +1,11 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
+import { guestDestination } from '@/features/auth/authReturn';
 import { useAuth } from '@/features/auth/useAuth';
 import { Spinner } from '@/shared/ui';
 
 export function ProtectedRoute() {
-  const { user, ready } = useAuth();
+  const { user, ready, sessionEnd } = useAuth();
   const location = useLocation();
 
   if (!ready) {
@@ -15,7 +16,18 @@ export function ProtectedRoute() {
     );
   }
   if (!user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+    // The global auth dialog handles explicit exits and expired sessions once.
+    if (sessionEnd) return null;
+    const from = location.pathname + location.search + location.hash;
+    return (
+      <Navigate
+        to={guestDestination(from)}
+        replace
+        state={{
+          authRequest: { mode: 'login', from, returnState: location.state },
+        }}
+      />
+    );
   }
   return <Outlet />;
 }

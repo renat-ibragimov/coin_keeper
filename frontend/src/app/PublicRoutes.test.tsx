@@ -70,11 +70,11 @@ describe('public routes', () => {
           <Route element={<ProtectedRoute />}>
             <Route path="/collection/add" element={<p>Personal form</p>} />
           </Route>
-          <Route path="/login" element={<p>Login form</p>} />
+          <Route path="/collection/coins" element={<p>Public coins preview</p>} />
         </Routes>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Login form')).toBeInTheDocument();
+    expect(screen.getByText('Public coins preview')).toBeInTheDocument();
     expect(screen.queryByText('Personal form')).not.toBeInTheDocument();
   });
 

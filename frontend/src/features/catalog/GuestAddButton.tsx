@@ -33,7 +33,7 @@ export function GuestAddButton({
   }
   const from = backTo ?? location.pathname + location.search;
   return (
-    <GuestAction from={from} size={size} block={block}>
+    <GuestAction from={from} itemId={itemId} size={size} block={block}>
       {children}
     </GuestAction>
   );
@@ -41,11 +41,13 @@ export function GuestAddButton({
 
 function GuestAction({
   from,
+  itemId,
   size,
   block,
   children,
 }: {
   from: string;
+  itemId: number;
   size: 'sm' | 'md';
   block: boolean;
   children: React.ReactNode;
@@ -55,7 +57,13 @@ function GuestAction({
     <Button
       size={size}
       block={block}
-      onClick={() => openAuth('register', { from, purpose: 'collection' })}
+      onClick={() =>
+        openAuth('register', {
+          from: `/collection/add?catalogItemId=${itemId}`,
+          returnState: { from },
+          purpose: 'collection',
+        })
+      }
     >
       {children}
     </Button>

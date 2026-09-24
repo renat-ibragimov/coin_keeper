@@ -146,7 +146,10 @@
     "resetSubmit": "Change password",
     "resetSuccess": "Password changed. Sign in with the new one.",
     "resetError": "The link is invalid or expired. Request a new one.",
-    "weakPassword": "The password is too short: at least 10 characters."
+    "weakPassword": "The password is too short: at least 10 characters.",
+    "backToSite": "Back to the site",
+    "sessionExpired": "Your session has ended. Sign in again to continue.",
+    "checkEmailGeneric": "Open the email from Bakost and follow the link to verify your address."
   },
   "catalog": {
     "title": "Coin catalog",

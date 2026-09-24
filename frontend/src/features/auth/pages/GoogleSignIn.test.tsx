@@ -14,7 +14,11 @@ vi.mock('../api', () => ({ googleStatus: vi.fn() }));
 
 class FakeChannel {
   static latest: FakeChannel;
-  onmessage: ((message: MessageEvent<{ type: string; flowId: string }>) => void) | null = null;
+  onmessage:
+    | ((
+        message: MessageEvent<{ type: string; flowId: string; mode?: string; google?: string }>,
+      ) => void)
+    | null = null;
   close = vi.fn();
 
   constructor(name: string) {
@@ -56,10 +60,33 @@ describe('GoogleSignIn', () => {
 
     FakeChannel.latest.onmessage?.({
       data: { type: 'complete', flowId: popupStorage.get(GOOGLE_POPUP_FLOW_KEY) },
-    } as MessageEvent<{ type: string; flowId: string }>);
+    } as MessageEvent<{ type: string; flowId: string; mode?: string; google?: string }>);
     await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce());
     expect(completeGoogleSession).toHaveBeenCalledWith(true);
     expect(popup.close).toHaveBeenCalled();
     expect(sessionStorage.getItem('ck-auth-return')).toBeNull();
+  });
+  it.each([
+    ['login', 'link-required'],
+    ['check-email', 'verify'],
+  ])('returns OAuth %s results to the original dialog', async (mode, google) => {
+    const popupStorage = new Map<string, string>();
+    const popup = {
+      closed: false,
+      close: vi.fn(),
+      location: { replace: vi.fn() },
+      sessionStorage: { setItem: (key: string, value: string) => popupStorage.set(key, value) },
+      opener: window,
+    };
+    vi.spyOn(window, 'open').mockReturnValue(popup as unknown as Window);
+    const onResult = vi.fn();
+    render(<GoogleSignIn returnTo="/catalog/7" onResult={onResult} />);
+    await userEvent.click(await screen.findByRole('link', { name: 'Продовжити з Google' }));
+    FakeChannel.latest.onmessage?.({
+      data: { type: 'result', flowId: popupStorage.get(GOOGLE_POPUP_FLOW_KEY), mode, google },
+    } as MessageEvent<{ type: string; flowId: string; mode: string; google: string }>);
+    expect(onResult).toHaveBeenCalledWith(mode, google);
+    expect(completeGoogleSession).not.toHaveBeenCalled();
+    expect(popup.close).toHaveBeenCalled();
   });
 });

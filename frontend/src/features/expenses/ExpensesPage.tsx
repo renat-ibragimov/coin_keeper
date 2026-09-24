@@ -1,6 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CalendarDays, Coins, Pencil, Receipt, Trash2, Wallet } from 'lucide-react';
 import { useState } from 'react';
+import { useSessionDraft } from '@/features/auth/useSessionDraft';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
@@ -90,7 +91,7 @@ export function ExpensesPage() {
     ? (sortParam as ExpenseSort)
     : 'date';
   const order = params.get('order') === 'asc' ? 'asc' : 'desc';
-  const [editor, setEditor] = useState<Editor>({ mode: 'closed' });
+  const [editor, setEditor] = useSessionDraft<Editor>('expenses:editor', { mode: 'closed' });
   const [deleting, setDeleting] = useState<ExpenseOut | null>(null);
   // A purchase row deletes the coin, not the expense — the expense goes with
   // it (docs/04-business-rules.md, rule 10), so it uses the collection's own
@@ -273,6 +274,7 @@ export function ExpensesPage() {
           {summary && summary.categories.length > 0 ? (
             <>
               <ExpensesPeriodPicker
+                inlineLabels
                 preset={preset}
                 dateFrom={dateFrom}
                 dateTo={dateTo}

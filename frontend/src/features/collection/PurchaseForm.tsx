@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSessionDraft } from '@/features/auth/useSessionDraft';
 import type { FormEvent, ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -136,7 +137,7 @@ export function PurchaseForm({
   onCancel,
 }: PurchaseFormProps) {
   const { t } = useTranslation();
-  const [fields, setFields] = useState<Fields>(() =>
+  const [fields, setFields] = useSessionDraft<Fields>(`purchase:${initial?.id ?? 'new'}`, () =>
     initialFields(initial, defaultGrade, defaultStorageLocation, carried),
   );
   const [errors, setErrors] = useState<FieldErrors>({});

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { useSessionDraft } from '@/features/auth/useSessionDraft';
 import { useTranslation } from 'react-i18next';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -115,21 +116,27 @@ export function AddPage() {
   const isPurchase = type === PURCHASE;
   const catalogItemId = positiveInt(params.get('catalogItemId'));
 
-  const [carried, setCarried] = useState<CarriedValues>(emptyCarried);
-  const [countryId, setCountryId] = useState<number | null>(null);
-  const [title, setTitle] = useState('');
-  const [coinFields, setCoinFields] = useState<CoinFields>(emptyCoinFields);
+  const [carried, setCarried] = useSessionDraft<CarriedValues>('add:carried', emptyCarried);
+  const [countryId, setCountryId] = useSessionDraft<number | null>('add:country', null);
+  const [title, setTitle] = useSessionDraft('add:title', '');
+  const [coinFields, setCoinFields] = useSessionDraft<CoinFields>('add:coin', emptyCoinFields);
   const [coinErrors, setCoinErrors] = useState<CoinFieldErrors>({});
   const [pickerErrors, setPickerErrors] = useState<{ country?: string; title?: string }>({});
-  const [extras, setExtras] = useState<ExtraExpenseRow[]>([]);
+  const [extras, setExtras] = useSessionDraft<ExtraExpenseRow[]>('add:extras', []);
   const [extraErrors, setExtraErrors] = useState<ExtraExpenseErrors>({});
 
   // Held in the form until the purchase itself is saved: there is no
   // instance id to upload against yet (docs/06-media-storage.md — no server
   // drafts). Keyed by side, not a fixed pair, so "no photo picked" needs no
   // sentinel value.
-  const [pendingPhotos, setPendingPhotos] = useState<Partial<Record<CoinSide, Blob>>>({});
-  const [photoPreviews, setPhotoPreviews] = useState<Partial<Record<CoinSide, string>>>({});
+  const [pendingPhotos, setPendingPhotos] = useSessionDraft<Partial<Record<CoinSide, Blob>>>(
+    'add:photos',
+    {},
+  );
+  const [photoPreviews, setPhotoPreviews] = useSessionDraft<Partial<Record<CoinSide, string>>>(
+    'add:previews',
+    {},
+  );
 
   function setPhoto(side: CoinSide, blob: Blob) {
     setPhotoPreviews((current) => {

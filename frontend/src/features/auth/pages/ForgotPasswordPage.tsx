@@ -1,15 +1,23 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
 
+import { saveAuthReturn } from '../authReturn';
 import * as authApi from '../api';
 import styles from './authForms.module.css';
 
-export function ForgotPasswordPage() {
+export function ForgotPasswordForm({
+  from,
+  onBack,
+  onSent,
+}: {
+  from: string;
+  onBack: () => void;
+  onSent: () => void;
+}) {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
@@ -21,8 +29,10 @@ export function ForgotPasswordPage() {
     setError(null);
     setBusy(true);
     try {
+      saveAuthReturn(from);
       await authApi.forgotPassword(email);
       setSent(true);
+      onSent();
     } catch (cause) {
       setError(
         cause instanceof ApiError && cause.status === 429
@@ -36,13 +46,14 @@ export function ForgotPasswordPage() {
 
   return (
     <div>
-      <h2 className={styles.title}>{t('auth.forgotTitle')}</h2>
       <p className={styles.subtitle}>{t('auth.forgotText')}</p>
       {sent ? (
         <div className={styles.centered}>
           <div className={styles.formInfo}>{t('auth.forgotSent')}</div>
           <p className={styles.switch}>
-            <Link to="/login">{t('auth.goToLogin')}</Link>
+            <button type="button" className={styles.textButton} onClick={onBack}>
+              {t('auth.goToLogin')}
+            </button>
           </p>
         </div>
       ) : (
@@ -51,6 +62,7 @@ export function ForgotPasswordPage() {
           <Input
             label={t('auth.email')}
             type="email"
+            autoFocus
             autoComplete="email"
             required
             placeholder={t('auth.emailPlaceholder')}
@@ -61,7 +73,9 @@ export function ForgotPasswordPage() {
             {t('auth.sendResetLink')}
           </Button>
           <p className={styles.switch}>
-            <Link to="/login">{t('auth.goToLogin')}</Link>
+            <button type="button" className={styles.textButton} onClick={onBack}>
+              {t('auth.goToLogin')}
+            </button>
           </p>
         </form>
       )}

@@ -12,10 +12,12 @@
 const API_BASE: string = import.meta.env.VITE_API_BASE ?? '/api/v1';
 
 let accessToken: string | null = null;
+let sessionVersion = 0;
 let apiLocale = 'uk';
 const listeners = new Set<(token: string | null) => void>();
 
 export function setAccessToken(token: string | null): void {
+  if (token === null) sessionVersion += 1;
   accessToken = token;
   for (const listener of listeners) listener(token);
 }
@@ -104,17 +106,20 @@ async function rawRequest(path: string, options: RequestOptions, token: string |
 let refreshInFlight: Promise<boolean> | null = null;
 
 export async function tryRefresh(): Promise<boolean> {
+  const version = sessionVersion;
   refreshInFlight ??= (async () => {
     try {
       const response = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
       });
+      if (version !== sessionVersion) return false;
       if (!response.ok) {
-        setAccessToken(null);
+        if (response.status === 401 || response.status === 403) setAccessToken(null);
         return false;
       }
       const session = (await response.json()) as { tokens: { accessToken: string } };
+      if (version !== sessionVersion) return false;
       setAccessToken(session.tokens.accessToken);
       return true;
     } catch {
@@ -127,6 +132,8 @@ export async function tryRefresh(): Promise<boolean> {
 }
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const version = sessionVersion;
+  const requestToken = accessToken;
   let response: Response;
   try {
     response = await rawRequest(path, options, accessToken);
@@ -134,8 +141,19 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     throw new ApiError(0, { type: 'network-error' });
   }
 
-  if (response.status === 401 && options.auth !== false && (await tryRefresh())) {
-    response = await rawRequest(path, options, accessToken);
+  if (requestToken && options.auth !== false && version !== sessionVersion) {
+    throw new ApiError(401, { type: 'session-ended' });
+  }
+  if (response.status === 401 && options.auth !== false && requestToken) {
+    if (accessToken !== requestToken || (await tryRefresh())) {
+      try {
+        response = await rawRequest(path, options, accessToken);
+      } catch {
+        throw new ApiError(0, { type: 'network-error' });
+      }
+      if (version !== sessionVersion) throw new ApiError(401, { type: 'session-ended' });
+      if (response.status === 401) setAccessToken(null);
+    }
   }
 
   if (!response.ok) throw await parseProblem(response);

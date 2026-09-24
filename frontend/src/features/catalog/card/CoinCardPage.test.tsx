@@ -284,7 +284,8 @@ describe('CoinCardPage', () => {
     expect(vi.mocked(fetchBootstrap)).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: /Додати до колекції/ }));
     expect(openAuth).toHaveBeenCalledWith('register', {
-      from: '/catalog/7',
+      from: '/collection/add?catalogItemId=7',
+      returnState: { from: '/catalog/7' },
       purpose: 'collection',
     });
   });

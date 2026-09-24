@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { ApiError } from '@/shared/api/client';
 import { Button, Input } from '@/shared/ui';
@@ -9,31 +9,21 @@ import { Button, Input } from '@/shared/ui';
 import * as authApi from '../api';
 import { saveAuthReturn } from '../authReturn';
 import { GoogleSignIn } from './GoogleSignIn';
+import type { AuthDialogMode } from '../authDialogContext';
 import styles from './authForms.module.css';
-
-export function RegisterPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from;
-  return (
-    <RegisterForm
-      from={from}
-      onSuccess={(email) => navigate('/check-email', { state: { email } })}
-      onGoogleSuccess={() => navigate(from ?? '/', { replace: true })}
-    />
-  );
-}
 
 export function RegisterForm({
   from,
   onSuccess,
   onSwitch,
+  onGoogleResult,
   onGoogleSuccess,
   showHeading = true,
 }: {
   from?: string;
   onSuccess: (email: string) => void;
   onSwitch?: () => void;
+  onGoogleResult?: (mode: AuthDialogMode, google: string) => void;
   onGoogleSuccess?: () => void;
   showHeading?: boolean;
 }) {
@@ -105,7 +95,7 @@ export function RegisterForm({
           {t('auth.signUp')}
         </Button>
       </form>
-      <GoogleSignIn returnTo={from ?? '/'} onSuccess={onGoogleSuccess} />
+      <GoogleSignIn onResult={onGoogleResult} returnTo={from ?? '/'} onSuccess={onGoogleSuccess} />
       <div className={styles.divider}>{t('common.or')}</div>
       <p className={styles.switch}>
         {t('auth.haveAccount')}{' '}
