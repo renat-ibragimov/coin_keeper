@@ -117,8 +117,8 @@ class AuthService:
         existing = await self._users.get_by_email(email)
         if existing is not None:
             if existing.email_verified:
-                # Do not leak the collision through the API; tell the owner of
-                # the address instead, out of band.
+                # Do not leak the collision through the API; the attempt is
+                # only logged.
                 logger.info("registration attempt for an existing verified account")
                 return
             # The mailbox owner chooses the password when consuming the link.

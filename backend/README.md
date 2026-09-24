@@ -125,7 +125,7 @@ the repository is public.
 Classic (non-ML) cleanup over `media_files` rows that already hold their own
 `storage_key` — a white, round coin photo is cut to a transparent WebP; a
 rectangular blister pack or a colored background is left alone. Rule and
-runbook detail: `../docs/media.md`, "Removing the background". The
+runbook detail: `../docs/media.md`, "Background removal". The
 classifier is `app/services/media_background.py`; the command line is
 `scripts/remove_photo_backgrounds.py`.
 

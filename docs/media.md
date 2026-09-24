@@ -1,438 +1,251 @@
-# 06. Хранение изображений
+# Media storage
 
-## Принцип из ТЗ
+How coin photos and avatars are stored, processed, shown and protected. Schema of
+`media_files`: `data-model.md`. Visibility rules summarised in `../AGENTS.md`, "Image
+provenance".
 
-> Оригиналы хранятся отдельными файлами, а не внутри базы. База содержит метаданные и
-> относительные пути. Для интерфейса создаются миниатюры. Оригинал не изменяется при
-> создании миниатюры.
+---
 
-Правило сохраняется. В вебе «отдельные файлы» = объектное хранилище.
+## Storage
 
-## Хранилище
+S3-compatible object storage — **MinIO** in Docker Compose, locally and on the server.
+Any S3 provider (R2, B2) would work without code changes.
 
-S3-совместимое. Локально и на сервере — **MinIO** в Docker Compose. Если проект вырастет,
-переезд на Cloudflare R2 или Backblaze B2 не требует изменений в коде — тот же протокол.
-
-Бакеты:
+One bucket, keys by owner of the image:
 
 ```
-coinkeeper-media/
-  catalog/{catalog_item_id}/{role}/{name}_300.webp    превью — списки
-  catalog/{catalog_item_id}/{role}/{name}_600.webp    средний — карточка
-  catalog/{catalog_item_id}/{role}/{name}_1200.webp   большой — лайтбокс
-  users/{user_id}/{collection_item_id}/{role}/{name}_300.webp
-  users/{user_id}/{collection_item_id}/{role}/{name}_600.webp
-  users/{user_id}/{collection_item_id}/{role}/{name}_1200.webp
-  users/{user_id}/avatar/{sha256[:12]}_256.webp               аватарка профиля
+catalog/{catalog_item_id}/{role}/{name}_{300|600|1200}.webp               catalog photos
+users/{user_id}/{collection_item_id}/{role}/{name}_{300|600|1200}.webp    a user's own photos
+users/{user_id}/avatar/{sha256[:12]}_256.webp                              profile picture
 ```
 
-Размер — часть ключа: листинг бакета читается глазами, и устаревший вариант не спрячется
-за именем, которое ни о чём не говорит.
+The size is part of the key so a bucket listing is readable and a stale variant can't hide
+behind a meaningless name (`app/core/media_keys.py`). The database stores **keys only**,
+never full URLs — the storage domain can change.
 
-**Аватарка — единственное изображение вне `media_files`.** У той таблицы CHECK-констрейнт
-привязывает каждый файл к каталожной записи или экземпляру, а колонки `source` и `role`
-отвечают на вопросы («чьи это права?», «аверс или реверс?»), которых у портрета нет.
-Поэтому ключ лежит прямо в `users.avatar_key` (миграция `0020`), и правила видимости
-изображений на него не распространяются: аватарку видит всякий, кто видит профиль.
-
-Размер один, а не три: интерфейс показывает аватарку в 26–40 css px (шапка, меню
-аккаунта) и 72 px в настройках — 256 покрывает и 3x-экран. Имя ключа — sha256 исходника:
-при замене фото URL меняется целиком, и ни один закешированный адрес не продолжает
-отдавать прежнее лицо. Кадрирует браузер (круглая маска, drag, zoom), но сервер всё равно
-ре-валидирует и центр-кропит в квадрат — эндпоинт принимает сырые байты от любого клиента,
-не только от нашей формы. Удаление фона к аватаркам не применяется: оно настроено на белый
-фон снимка монеты.
-
-В БД — только ключ (`storage_key`), не полный URL. Домен хранилища может смениться.
-
-## Проблема хотлинков — требует решения
-
-В legacy-базе 5066 записей `media_files`, и поле `original_path` содержало вперемешку два
-разных типа значений:
-
-| Тип | Записей | Пример |
-|---|---|---|
-| Ссылка на чужой сервер | 2796 | `https://i.ucoin.net/coin/50/796/50796073-1s/usa-1-cent-2009.jpg` |
-| Локальный файл | 2270 | `1023_obverse_eb5c6f1c1ed041d9bbf86fe77855243b.jpg` |
-
-То есть больше половины «фотографий» — это ссылки на изображения uCoin, которые никогда
-не скачивались. Работало, пока uCoin отдавал картинки.
-
-**Почему это плохо в вебе:**
-
-- Скорость зависит от чужого сервера.
-- uCoin может закрыть хотлинкинг в любой момент — отвалятся сразу тысячи изображений.
-- Referer с твоего домена на их сервере — они это видят.
-- Нельзя сделать превью, оптимизацию, отдачу в WebP.
-
-**Решение в схеме:** два отдельных поля вместо одного (см. `data-model.md`):
+`media_files` separates the two ways an image can exist:
 
 ```
-storage_key   text   -- заполнено, если файл у нас
-external_url  text   -- заполнено, если ссылка на чужой сервер
+storage_key   -- set when the file is in our storage
+external_url  -- set when it's a link to someone else's server (a hotlink)
 CHECK (storage_key IS NOT NULL OR external_url IS NOT NULL)
 ```
 
-**Решение по данным:** фоновая задача-загрузчик проходит по записям с `external_url` и
-пустым `storage_key`, скачивает изображение к себе, делает превью, заполняет `storage_key`.
-`external_url` сохраняется как ссылка на первоисточник.
+Some catalog rows imported from uCoin are still hotlinks (`external_url` only). The
+frontend neither proxies nor retries them; an unreachable hotlink looks the same as no
+photo (`frontend/src/shared/ui/CoinImage.tsx`). Downloading them is not implemented, and
+downloading wouldn't change their rights (below).
 
-Скачивание — с паузой между запросами, порциями, с возможностью остановить. Не одним залпом
-на 2796 файлов.
+## Provenance and rights
 
-**Скачанный файл не становится нашим.** Запись сохраняет `source = 'ucoin'` и правило
-видимости этого происхождения (ниже): загрузка к себе решает проблему скорости и надёжности,
-но не вопрос прав.
+Storing an image and showing it to everyone are different things. Every `media_files`
+row has a `source`, plus `license` and `attribution` when known:
 
-## Происхождение и права
-
-Хранить чужое изображение и показывать его всем — разные вещи. Поэтому у каждой записи
-`media_files` есть происхождение и, если известны, условия использования
-(`data-model.md`):
-
-```
-source       media_source  -- user_upload | ucoin | nbu | ua_coins | manual
-license      text NULL     -- условия использования, если известны
-attribution  text NULL     -- обязательная подпись, если требуется
-```
-
-### Правило видимости
-
-| `source` | Что это | Кто видит |
+| `source` | What it is | Who sees it |
 |---|---|---|
-| `user_upload` | фотографии, снятые пользователем | только владелец (`owner_id`) |
-| `nbu` | официальные каталожные фото Национального банка | все, это публичный каталог |
-| `ua_coins` | взято с ua-coins.info там, где у НБУ фото нет | все, с подписью «ua-coins.info» |
-| `ucoin` | взято с uCoin — хотлинк или скачанный файл | только пользователь, который его импортировал; для мигрированных записей — владелец исходной базы |
-| `manual` | добавлено администратором вручную | все |
+| `nbu` | official NBU catalog photos | everyone |
+| `ua_coins` | ua-coins.info photos, used where NBU has none | everyone, with attribution |
+| `manual` | added by an admin (e.g. photos of a draft under review) | everyone |
+| `user_upload` | photos a user took of their own coin | the owner only |
+| `ucoin` | uCoin images, hotlinked or downloaded | only the user who imported them |
 
-В публичной карточке монеты изображение с `source = 'ucoin'` **не показывается** — вместо
-него плейсхолдер «фото нет». Автор импорта видит своё изображение как обычно.
+Public sources are `PUBLIC_SOURCES` in `app/repositories/media.py`; every other row is
+returned only when `owner_id` is the viewer. On a card, a `ucoin` image is never shown to
+anyone else — they get the placeholder. Copying a uCoin image into our storage doesn't
+change `source`: we don't own the rights.
 
-Ограничение снимается само собой: задача по каталогу НБУ (`integrations.md`, раздел 3)
-скачивает официальные фото украинских выпусков с `source = 'nbu'`, и они становятся
-основными для общего каталога. uCoin-фото при этом не удаляются — они остаются у того, кто
-их импортировал. Для США и СССР официального источника нет, там плейсхолдер сохраняется,
-пока администратор или сам пользователь не добавит своё фото.
+`attribution` is always filled when the source requires it and is shown under the image.
+For Ukrainian coins this matters: NBU allows use of its materials only with a link to the
+source, and `coin-parser` sets both NBU and ua-coins attributions when it loads photos.
 
-`attribution` заполняем всегда, когда источник требует подписи, и показываем её под
-изображением. `license` — свободный текст: ссылка на условия или их краткое изложение.
+**Where Ukrainian photos come from** (`coin-parser` picks, in this order): the NBU
+full-size PNG (1600 px) → the ua-coins 600 px WebP → the NBU 198 px preview. The 600 px
+secondary source ranks above the tiny official preview on purpose: quality matters more
+than source preference here.
 
-Для украинской части это не формальность: НБУ разрешает использование материалов
-**исключительно со ссылкой на первоисточник** (`/ua/useterms`), а фото ua-coins.info берутся
-только там, где у НБУ своего нет. Обе подписи ставит `coin-parser` при загрузке фото,
-и карточка их показывает.
+### User photos belong to the collection item
 
-### Откуда берутся украинские фото
+A `user_upload` row always hangs off `collection_item_id` + `owner_id`, **never** off
+`catalog_item_id`. `app/services/collection_photos.py` is the only writer of
+`user_upload` rows and can't write anything else, so a user's photo can never attach to a
+catalog record or to another account. To show "my own photo" on a catalog card, the
+repository joins through the owner's `collection_items`
+(`MediaRepository.owned_instance_media_for_catalog_items`).
 
-Порядок выбора в конвейере:
+A new personal position's photos are held in the browser until the purchase is created,
+then uploaded against the new collection item — there's no server-side object to hold
+them earlier.
 
-1. полноразмерный PNG НБУ `/files/coins_images/{code}a.png|r.png` — 1600 px, есть у 389
-   карточек из 1048;
-2. `middle` WebP ua-coins `/images/coins/middle/{id}_{side}.webp` — 600 px;
-3. превью НБУ `/media/coins/{id}/avers.jpg` — 198 px, последним средством.
+## Choosing the card photo
 
-Второй пункт стоит выше третьего сознательно: 600 больше 198, и качество здесь важнее
-порядка предпочтения источников. Хотлинки uCoin у украинских записей конвейер удаляет —
-их никогда не скачивали, показывать их мы не вправе, а НБУ те же монеты закрывает.
+Several rows can exist per role. Per role (`obverse` / `reverse`), the highest-ranked row
+the viewer may see wins (`MediaUrlBuilder.pick_catalog_images`); among equals, the
+newest:
 
-## Локальные файлы из legacy
+1. the viewer's own `user_upload` of any of their purchases of the item;
+2. `nbu` or `manual`;
+3. `ua_coins`;
+4. `ucoin` — only ever present for its importer;
+5. otherwise a placeholder.
 
-839 файлов в `legacy/data/media/` (142 МБ). Это то, что уцелело от 1681 — остальные
-повреждены при переносе архива и восстановлению не подлежат.
+The catalog listing, the coin card and the collection listing share this function
+(`images_by_catalog_item`), so the screens can't disagree about which photo wins.
 
-Имена: `{catalog_item_id}_{role}_{uuid32}.{jpg|png}`, например
-`1023_obverse_eb5c6f1c1ed041d9bbf86fe77855243b.jpg`. По этому шаблону файл сопоставляется
-с записью `media_files` при миграции.
+## Roles
 
-Размеры оригиналов — от 242×242 до 700×700, форматы JPEG и PNG.
+`obverse`, `reverse`, `edge`, `additional` exist in the enum. Upload endpoints accept
+`obverse` and `reverse` only — one photo per role per collection item (or per catalog
+item for admin uploads).
 
-## Обработка при загрузке
+## Processing on upload
 
-Библиотека — **Pillow**.
+`app.core.images.process_image`, Pillow only. The same path serves user photos
+(`collection_photos.py`) and admin photos of catalog drafts (`catalog_photos.py`).
 
-1. Проверить, что это действительно изображение (по содержимому, не по расширению).
-2. Ограничения: максимум 12 МБ, максимум 4000×4000, форматы JPEG / PNG / WebP.
-3. Снять EXIF полностью — там геометки и данные камеры.
-4. Сохранить **три размера**: 300, 600 и 1200 px по длинной стороне, WebP, качество 80.
-5. Посчитать `sha256` **исходного файла** — он опознаёт файл у первоисточника и говорит
-   повторному прогону, что ничего не изменилось.
-6. Записать `width`, `height`, `size_bytes`, `mime_type` и `variants`.
+1. Verify it's an image by content, not extension; accept JPEG / PNG / WebP.
+2. Limits: 12 MB, 4000 px on the longer side.
+3. **Strip all metadata** (EXIF with geotags, ICC) by copying pixels into a blank canvas.
+4. Remove the background if the photo qualifies (below).
+5. Save **three sizes** — 300, 600, 1200 px on the longer side, WebP quality 80.
+   Nothing is upscaled: a 600 px source yields two variants, and `variants` lists exactly
+   what was stored.
+6. Record `sha256` of the **source** file (identifies it upstream and tells a re-run
+   nothing changed), plus `width`, `height`, `size_bytes`, `mime_type`, `variants`.
 
-Ничего не растягивается: `thumbnail()` только уменьшает, поэтому у источника в 600 px
-вариантов получается два, а не три, и `variants` перечисляет ровно то, что сохранено.
+The source file isn't kept: coins are small and round, 1200 px is plenty, and NBU PNGs
+weigh 3–4 MB each.
 
-**Почему три, а не один.** В списке монета занимает около 150 px, в карточке около 300,
-в лайтбоксе столько, сколько даст экран. Один файл на все три случая либо тратит трафик,
-либо мылит лайтбокс. Страница берёт нужный размер и предлагает следующий на 2x через
-`srcset`; для плотного экрана это резкая картинка, для обычного — прежний вес.
+**Why three sizes.** A listing shows a coin at ~150 px, a card at ~300, the lightbox as
+large as the screen allows. Pages pick the matching size and offer the next one up via
+`srcset` for dense screens. Rows from before the three-size layout have no `variants`;
+the URL builder answers with the keys they do have.
 
-Исходник не храним: монеты круглые и мелкие, 1200 px хватает с запасом, а PNG с сайта НБУ
-весит 3–4 МБ каждый.
+Replacing a photo writes the new object, points the row at it, and deletes the old
+objects last, so a failure part-way never leaves a row naming a missing key. Deleting a
+photo removes the row and its objects immediately.
 
-## Кадрирование фото монеты в браузере
+### Cropping in the browser
 
-В отличие от аватарки (где круг — только визуальная маска над квадратом, см. выше),
-у пользовательского фото монеты (`user_upload` экземпляра коллекции) круг вырезается
-по-настоящему уже в браузере — сервер получает готовый RGBA-файл, а не квадрат.
+A user's coin photo is cut to a circle **in the browser**; the server receives a
+finished RGBA image. The editor (`CoinPhotoCropDialog.tsx` over the shared
+`CropDialog.tsx`) offers zoom up to 5×, rotation ±15°, and a soft blur warning (variance
+of the Laplacian over the visible circle, `blurCheck.ts`) that never blocks saving.
+`rotatedCircleCrop.ts` renders the rotated source, cuts the selected area, downsizes to
+at most 1600 px and masks the circle exactly at its edge. Output is WebP with alpha; if
+the browser can't produce real `image/webp`, PNG — never JPEG, which has no alpha.
 
-Редактор (`frontend/src/features/collection/CoinPhotoCropDialog.tsx` поверх общего
-`frontend/src/shared/ui/CropDialog.tsx`) даёт:
+On the server nothing special happens: an already transparent (non-RGB) image skips
+background removal, and Pillow keeps alpha through every variant
+(`test_a_transparent_upload_keeps_its_alpha_channel_through_every_variant`).
 
-- зум до 5× (у аватарки — до 3×, диапазон настраивается через пропсы, не глобально);
-- наклон ±15° для выравнивания монеты (`react-easy-crop`, `rotation`/`onRotationChange`);
-- мягкую клиентскую эвристику размытости — вариация отклика Лапласиана по видимому кругу
-  фото, без прозрачных углов и без тонкого кольца у самой границы маски
-  (`frontend/src/features/collection/blurCheck.ts`). Порог — именованная константа,
-  UX-подсказка, а не гарантия качества; предупреждение не блокирует сохранение.
+## Avatars
 
-Обрезка выполняется на Canvas в `frontend/src/shared/lib/rotatedCircleCrop.ts`:
-исходник рисуется повёрнутым вокруг своего центра на canvas размером с bounding box
-поворота (та же система координат, в которой `react-easy-crop` считает
-`croppedAreaPixels`), из него вырезается выбранная область, масштабируется вниз до
-1600 px (никогда не растягивается) и обрезается по кругу без внутреннего или внешнего
-запаса — прозрачность строго по границе видимого круга. Кодируется в WebP с альфа-каналом;
-если браузер не отдал настоящий `image/webp` (старый Safari), fallback — PNG, никогда не
-JPEG (в нём нет альфа-канала).
+A profile picture is the one image **outside `media_files`**: that table requires a
+catalog or collection item and a provenance, neither of which a portrait has. The key
+lives in `users.avatar_key`; whoever sees the profile sees the avatar.
 
-На сервере это ничего не меняет: `app.core.images.process_image` уже пропускает
-удаление фона для не-`RGB`-режима (см. ниже), а Pillow сохраняет альфа-канал через все
-WebP-варианты 300/600/1200 без дополнительного кода — закреплено тестом
-`test_a_transparent_upload_keeps_its_alpha_channel_through_every_variant`
-(`backend/tests/test_collection_photos.py`).
+One size, 256 px square (the UI shows it at 26–72 css px, so 256 covers 3× screens). The
+key name is the sha256 of the source, so replacing the picture changes the URL and no
+cached copy keeps serving the old face. The browser crops (circular mask, drag, zoom
+up to 3×), but the server re-validates and center-crops to a square anyway — the endpoint
+takes raw bytes from any client. Background removal doesn't apply to avatars.
 
-## Удаление фона
+## Background removal
 
-Классическая (без ML) обработка: `app/services/media_background.py` (Pillow + stdlib, без
-opencv/rembg/numpy) и батч-скрипт `backend/scripts/remove_photo_backgrounds.py`.
+Classic, no ML: `app/services/media_background.py` (Pillow + stdlib) and the batch
+script `backend/scripts/remove_photo_backgrounds.py`. It runs on every upload
+(`process_image(remove_background=True)`); a special path that must keep bytes exactly
+as given passes `False`.
 
-**Правило.** Режем только то, в чём уверены: однородный фон **и** круглый объект.
+**Rule: cut only what we're sure of — a uniform background and a round object.**
 
-- Все четыре угла фото проверяются на два исхода: «почти белые» (консервативный порог по
-  каждому каналу и по разбросу между каналами, чтобы кремовый или голубоватый фон не прошёл
-  за белый) или «почти чёрные» (тот же принцип, порог по каждому каналу ~30/255, тот же
-  разброс) — пруфы у ua-coins часто снимают на чёрном бархате/фетре. Ни то ни другое —
-  `skip:not_white_bg` (имя не переименовано, чтобы сравнивать прогоны до и после появления
-  тёмной ветки).
-- Флудфилл от рамки изображения строит маску фона по цвету, снятому с углов; мелкий шум
-  (пятнышко тени, артефакт сжатия) морфологически зачищается, а не считается вторым объектом.
-  У тёмной ветки допуск флудфилла заметно жёстче, чем у белой: зеркальное поле пруфа
-  отражает ту же чёрную студию, и на границе монета/фон тон «грязный» — слишком широкий
-  допуск рискует откусить часть диска в фон. Лучше недорезать в skip, чем потерять кольцо
-  монеты, поэтому вырезанные с тёмного фона проверяются отдельным блоком (`cut:dark`, ниже).
-- Фон должен занимать хотя бы 75% рамки кадра по периметру — ниже порога,
-  `skip:object_touches_border`. Касание края само по себе не проблема: флудфилл всё равно
-  сеется со всей рамки, а плоская хорда там, где монету обрезали впритык при съёмке, уже есть
-  в исходнике. От прямоугольной упаковки, снятой край в край, это не спасает само по себе —
-  но такую форму отдельно ловит «круглость» ниже: потеря рамки с двух противоположных сторон
-  двигает заполненность bbox выше её верхнего порога раньше, чем фон опустится намного ниже 75%.
-- Ровно одна связная компонента объекта — иначе `skip:fragments`.
-- «Круглость» (площадь объекта / площадь его bounding box — у диска ≈0.785, у прямоугольника
-  1.0) должна попасть в коридор: выше верхнего порога — `skip:not_round` (это и отсекает монету
-  в блистере/сувенирной упаковке), ниже нижнего — `skip:odd_shape`. Пороги общие для белой и
-  тёмной ветки.
-- Всё прошло — вырезаем: маска идёт в альфа-канал, край на 1–2 px размывается (feather), чтобы
-  не было эффекта «ножниц». Вердикт при этом различает, с какого фона резали: белый — просто
-  `cut`, тёмный — `cut:dark`; сам срез (feather/trim/`-nobg`/идемпотентность) для обоих общий.
-- Последним шагом кадр обрезается по границе непрозрачных пикселей (`trim_to_alpha`): bbox по
-  альфе с порогом, включающим растушёванный край, плюс равномерный отступ ~2% от большей стороны
-  bbox (не меньше 2 px), не выходя за исходный кадр. У исходников разные пустые поля вокруг
-  монеты; без этой обрезки они остаются в кадре прозрачными, и `contain` на фронте вписывает кадр
-  целиком — монеты в плитках выходят разного видимого размера. С обрезкой монета заполняет свой
-  фрейм, и все круглые выглядят одним размером.
+- **Already transparent input is left alone.** Before anything else, if more than 0.5%
+  of pixels have alpha < 250 (`ALREADY_TRANSPARENT_FRACTION_MIN`), the verdict is
+  `skip:already_transparent`. Some NBU sources are alpha 0 over an arbitrary black matte;
+  this check must see the original alpha before any conversion to RGB, or the matte
+  reads as a black background and hidden junk gets exposed.
+- **Background kind.** All four corners must be near-white (conservative per-channel
+  threshold and low channel spread, so cream or bluish backgrounds don't pass) or
+  near-black (≈30/255 per channel, same spread rule — proofs are often shot on black
+  velvet). Otherwise `skip:not_white_bg` (name kept for comparable reports).
+- **Flood fill** from the image border builds the background mask; small noise is removed
+  morphologically. The dark branch uses a much stricter tolerance: a proof's mirror field
+  reflects the same black studio, and a loose tolerance would eat into the coin.
+- **Border:** background must cover ≥ 75% of the frame perimeter, else
+  `skip:object_touches_border`.
+- **One object:** exactly one connected component, else `skip:fragments`.
+- **Roundness:** object area / bounding-box area in 0.60–0.87 (a disc is ≈0.785, a
+  rectangle 1.0). Above → `skip:not_round` (blister packs, souvenir packaging); below →
+  `skip:odd_shape`.
+- **Cut:** mask → alpha channel, 1–2 px feathered edge. Verdict `cut` (white) or
+  `cut:dark`.
+- **Trim:** crop to the alpha bounding box plus a uniform ~2% margin (≥ 2 px), so every
+  round coin fills its frame the same way under `object-fit: contain`.
 
-Цветные, текстурные или неоднородные фоны (в том числе тёмно-серые, не дотягивающие ни до
-белого, ни до чёрного порога), а также прямоугольные объекты не трогаем никогда — это
-осознанное ограничение, а не недоработка классификатора.
+Colored, textured, uneven or mid-grey backgrounds and rectangular objects are never
+touched — a deliberate limit, not a classifier gap.
 
-**Уже прозрачные исходники.** Перед всем остальным `classify()` проверяет сам входной
-альфа-канал: если доля пикселей с alpha < 250 больше ~0.5% (`ALREADY_TRANSPARENT_FRACTION_MIN`
-в `media_background.py`), фон у фото уже снят выше по цепочке — вердикт `skip:already_transparent`,
-без попытки резать. Часть исходников НБУ хранится именно так: alpha=0 поверх произвольной чёрной
-матты. Проверка обязана видеть исходную альфу до какого-либо `.convert("RGB")` — плоское RGB
-превращает такую матту в неотличимый от настоящего чёрный фон.
-
-> **Инцидент (2026-09).** Прогон тёмной ветки без этой проверки прочитал чёрную матту таких
-> исходников как обычный чёрный фон, флудфилл прошёл по матте, а `cut_background` назначил
-> новую альфу по своей маске — скрытый под старой прозрачностью мусор (градиенты, тени, обрезки)
-> стал видимым. Закрыто добавлением проверки выше и режимом отката `--revert-transparent-originals`
-> (ниже) для уже испорченных строк.
-
-**Ключ.** Вырезанный объект сохраняется под **новым** ключом объектного хранилища — старая база
-имени плюс суффикс `-nobg` (например, `catalog/42/obverse/ab12cd34_1200.webp` →
-`catalog/42/obverse/ab12cd34-nobg_1200.webp`), пересчитанный на все актуальные размеры
-(300/600/1200). Оригинал **не удаляется и не перезаписывается** — обратимость важнее места на
-диске, и пара старый→новый ключ из CSV прогона сама по себе план отката. Признак «уже
-обработано» — этот же суффикс в ключе, отдельной колонки в схеме под это нет.
-
-**На ингесте.** Точка генерации вариантов при сохранении фото — `app.core.images.process_image`,
-общая для загрузки фото в каталог (`app/services/catalog_photos.py` — в т. ч. фото
-пропозицій монет в адмінці) и в коллекцию (`app/services/collection_photos.py`). Флаг
-`remove_background: bool = True`: круглое фото на белом или чёрном режется сразу при
-сохранении, без отдельного прохода постфактум и без отдельного флага на тёмную ветку — она
-внутри того же `classify()`.
+**Keys and rollback.** A cut image is stored under a **new** key: the old base plus
+`-nobg` (`…/ab12cd34_1200.webp` → `…/ab12cd34-nobg_1200.webp`) for every size. The
+original is never deleted or overwritten, so the old→new key pair is the rollback plan.
+The `-nobg` suffix is also the "already processed" marker — there's no schema column for
+it.
 
 ### Runbook
 
-Не запускать два прогона скрипта одновременно (в том числе `--trim` или
-`--revert-transparent-originals` рядом с обычным) — все читают и пишут одни и те же строки
-`media_files` по одному и тому же `storage_key`.
+Never run two passes of the script at once (any mode) — they read and write the same
+`media_files` rows. Run long passes in tmux. Reports go to `--out-dir`
+(`migration-reports/` by default); mount it when running in the container:
 
 ```bash
-# ревью: ничего не пишет, только классифицирует и готовит отчёты
-docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --dry-run
-
-# посмотреть migration-reports/nobg-review.csv (utf-8-sig — открывается в Excel) и
-# migration-reports/nobg-review.html (простыня до/после для cut и отдельно для cut:dark,
-# список skip по причинам)
-# CSV несёт числовые метрики по каждой строке (bgKind, borderBackgroundFraction, circularity,
-# cornerWhiteness) независимо от вердикта -- по ним и подбираются пороги выше, а не вслепую.
-# Вердикты cut:dark смотреть особенно внимательно: у тёмной ветки жёсткий допуск флудфилла,
-# и ложноотрицательный skip там ожидаемее, чем откушенное кольцо монеты
-
-# применить только к вердиктам cut/cut:dark
-docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --apply
-
-# точечный повтор по списку media_files.id
-docker compose run --no-deps api python scripts/remove_photo_backgrounds.py --apply \
-  --only-ids 101,102,103
+R="-v /home/deploy/coinkeeper/migration-reports:/app/migration-reports"
+docker compose run --no-deps $R api python scripts/remove_photo_backgrounds.py --dry-run   # classify, write nothing
+docker compose run --no-deps $R api python scripts/remove_photo_backgrounds.py --apply     # cut the cut/cut:dark rows
+docker compose run --no-deps $R api python scripts/remove_photo_backgrounds.py --apply --only-ids 101,102
 ```
 
-Длинные прогоны — из tmux. Повторный запуск идемпотентен: строки с `-nobg` в ключе
-пропускаются без обращения к хранилищу. Откат одной строки — вручную по CSV, SQL-ом вернуть
-`storage_key`/`thumbnail_key`/`variants` на старые значения (объект под старым ключом никуда не
-делся).
+`--dry-run` writes `nobg-review.csv` (UTF-8 with BOM, opens in Excel; per-row metrics
+`bgKind`, `borderBackgroundFraction`, `circularity`, `cornerWhiteness` for tuning
+thresholds) and `nobg-review.html` (before/after sheets for `cut` and `cut:dark`, skips
+by reason). Review `cut:dark` especially carefully. Re-runs are idempotent: rows with
+`-nobg` are skipped without touching storage. Roll back a row by setting
+`storage_key` / `thumbnail_key` / `variants` back to the old keys from the CSV.
 
-### Режим `--trim`: подравнять уже вырезанные
+Two maintenance modes walk only rows already marked `-nobg`:
 
-Для файлов, срезанных до того, как в срез добавился шаг обрезки по альфе (см. выше) — режим
-`--trim` проходит **только** по строкам с маркером `-nobg` и подравнивает уже существующие
-объекты, не создавая новых ключей: скачивается мастер (максимальный размер) `-nobg`-объекта,
-к нему применяется `trim_to_alpha`, и если размер не изменился (уже обрезан) — строка
-пропускается без записи. Иначе результат перекодируется на все актуальные размеры (300/600/1200)
-и пишется под той же базой ключа — оригинал без `-nobg` по-прежнему нетронут, это тот же план
-отката, что и у основного среза.
+- **`--trim`** re-trims cut images made before the trim step existed: downloads the
+  largest `-nobg` variant, applies the alpha trim, and rewrites all sizes under the same
+  key if the size changed (`trim-review.csv` / `.html`).
+- **`--revert-transparent-originals`** undoes cuts of originals that were already
+  transparent (the matte problem above). For each row it checks the **original**
+  (without `-nobg`) with the same transparency test; if the original was transparent,
+  the row is pointed back at the original's keys — missing original sizes are rebuilt
+  from the largest surviving one; if no original size survives, the row is left alone and
+  reported as `missing_original`. `-nobg` objects are not deleted
+  (`revert-review.csv`).
 
-```bash
-# ревью: ничего не пишет, только считает старый/новый размер
-docker compose run --no-deps -v /home/deploy/coinkeeper/migration-reports:/app/migration-reports \
-  api python scripts/remove_photo_backgrounds.py --trim --dry-run
+Both accept `--dry-run`, `--apply`, `--only-ids`, and are idempotent.
 
-# посмотреть migration-reports/trim-review.csv (старый/новый размер в пикселях, доля срезанных
-# полей) и migration-reports/trim-review.html (простыня до/после на выборке)
+## Serving
 
-# применить
-docker compose run --no-deps -v /home/deploy/coinkeeper/migration-reports:/app/migration-reports \
-  api python scripts/remove_photo_backgrounds.py --trim --apply
-```
+The API never streams image bytes. Every stored file is returned as a **presigned GET
+URL** (1 hour, `MediaUrlBuilder`), issued only for rows the viewer may see; hotlinks are
+returned as they are.
 
-Идемпотентно так же, как основной режим: повторный `--trim --apply` над уже подровненными
-строками ничего не пишет (в сводке `applied: 0`).
+### `S3_PUBLIC_ENDPOINT`
 
-### Режим `--revert-transparent-originals`: откат инцидента 2026-09
+The backend reaches MinIO at `S3_ENDPOINT=http://minio:9000`, a Docker-network name the
+browser can't resolve, and boto3 signs URLs for whatever host it was given. So when
+`S3_PUBLIC_ENDPOINT` is set (`https://<domain>/media`), a second boto3 client is used
+**only for signing** (`ObjectStorage.presign_client` in `app/core/storage.py`); reads and
+writes stay on `S3_ENDPOINT`. Locally it's unset: `docker-compose.dev.yml` publishes
+MinIO on `localhost:9000`.
 
-Проходит по тому же множеству строк, что и `--trim` (маркер `-nobg` в `storage_key`), но
-скачивает не сам вырезанный объект, а **оригинал** — ключ без `-nobg` — и применяет к нему
-тот же критерий, что теперь стоит в начале `classify()` (доля пикселей с alpha < 250 больше
-`ALREADY_TRANSPARENT_FRACTION_MIN`). Дальше по строке:
+Behind the reverse proxy, `/media/<bucket>/<key>` must reach MinIO as
+`/<bucket>/<key>` (path-style addressing). Caddy strips the prefix with `handle_path`
+(`infra.md`, "Caddy") and must **not** rewrite `Host`: the signature covers it
+(`X-Amz-SignedHeaders=host`).
 
-- прозрачности в оригинале не было — легитимный бело/тёмный срез, строка не трогается;
-- прозрачность была — строка повреждена инцидентом: `storage_key`/`thumbnail_key`/`variants`
-  переставляются обратно на ключи оригинала. Наличие вариантов оригинала 300/600/1200
-  проверяется в хранилище (HEAD, не GET) до правки строки; сохранившийся вариант остаётся как
-  есть (не перекодируется повторно), а отсутствующий — досчитывается из самого крупного
-  сохранившегося варианта и пишется под ключом оригинала. `-nobg`-объект при этом не удаляется:
-  мусор уборём отдельно, а откат отката остаётся тривиальным;
-- от оригинала не выжил ни один вариант — строка не трогается, попадает в `missing_original`,
-  без прерывания прогона.
-
-Идемпотентно так же: после отката строка лишается `-nobg` и в следующий прогон (любого из трёх
-режимов) уже не попадает.
-
-```bash
-# ревью: ничего не пишет, только проверяет оригиналы и печатает кандидатов на откат
-docker compose run --no-deps -v /home/deploy/coinkeeper/migration-reports:/app/migration-reports \
-  api python scripts/remove_photo_backgrounds.py --revert-transparent-originals --dry-run
-
-# посмотреть migration-reports/revert-review.csv (id, название, размеры, доля прозрачных
-# пикселей оригинала, статус) — HTML-простыня для этого режима не нужна
-
-# применить
-docker compose run --no-deps -v /home/deploy/coinkeeper/migration-reports:/app/migration-reports \
-  api python scripts/remove_photo_backgrounds.py --revert-transparent-originals --apply
-
-# точечный повтор по списку media_files.id
-docker compose run --no-deps -v /home/deploy/coinkeeper/migration-reports:/app/migration-reports \
-  api python scripts/remove_photo_backgrounds.py --revert-transparent-originals --apply \
-  --only-ids 101,102,103
-```
-
-Не запускать параллельно с `--trim` или обычным режимом — все три читают и пишут одни и те же
-строки `media_files` по одному и тому же `storage_key`.
-
-## Отдача
-
-Способ отдачи определяется происхождением (`source`), а не таблицей:
-
-- **Публичные каталожные** (`nbu`, `manual`) — напрямую из хранилища через CDN/reverse proxy,
-  с длинным `Cache-Control` (ключ содержит uuid, при замене файла меняется и ключ).
-- **Всё остальное** (`user_upload`, `ucoin`, любые фото личных позиций каталога) — presigned
-  URL с ограниченным сроком жизни, выдаётся только тому, кому запись видна.
-
-Через приложение байты не гоняем ни в одном случае.
-
-### `S3_PUBLIC_ENDPOINT` — presigned-ссылка должна открываться из браузера
-
-`presigned_get_url` подписывает URL клиентом boto3, и хост в этом URL — тот, что передан
-как `endpoint_url`. Бэкенд ходит в MinIO по `S3_ENDPOINT=http://minio:9000` — имени из
-docker-сети, браузер его не резолвит. Ссылка, подписанная на этот хост, в браузере не
-открывается, хотя сама подпись верна.
-
-Решение — второй boto3-клиент, только для подписи, с `endpoint_url = S3_PUBLIC_ENDPOINT`
-(`https://<домен>/media`), когда переменная задана (`app/core/storage.py`,
-`ObjectStorage.presign_client`); клиент для `put`/`get` внутри бэкенда остаётся на
-`S3_ENDPOINT`. Локально `S3_PUBLIC_ENDPOINT` не задают: `docker-compose.dev.yml` публикует
-порт MinIO на хост, браузер открывает `http://localhost:9000` напрямую.
-
-За реверс-прокси путь `/media/<bucket>/<key>` должен дойти до MinIO как
-`/<bucket>/<key>` — MinIO отдаёт объекты по path-style адресу, без префикса `/media`. Caddy
-срезает префикс через `handle_path` (`infra.md`, раздел «Caddy»), а `Host` не
-переписывает: presigned-подпись покрывает `Host`, и до MinIO должно дойти то же значение,
-на которое подписано (`X-Amz-SignedHeaders=host` в самой ссылке).
-
-**Рассмотренная и отклонённая альтернатива:** сделать бакет каталога публичным на чтение
-(policy readonly на префикс `catalog/`) и отдавать прямые URL без подписи — фото общего
-каталога и так публичные (`nbu`, `manual`, `ua_coins`). Отклонено: пришлось бы либо держать
-два пути отдачи (публичный для каталога, presigned для личных фото) в одном
-`MediaUrlBuilder`, либо заводить второй бакет под чужую политику — лишнее ветвление ради
-случая, который `S3_PUBLIC_ENDPOINT` закрывает без изменения модели доступа. Не потребовало
-и настройки MinIO под виртуальный хостинг (`MINIO_DOMAIN`/`MINIO_SERVER_URL`): адресация
-у нас path-style, а не по поддомену бакета, так что presigned-подпись не зависит от
-доменных настроек самого MinIO — только от `Host`, который передаёт реверс-прокси.
-
-## Выбор изображения для карточки
-
-Для одной роли (`obverse` / `reverse`) может существовать несколько записей: официальное фото
-НБУ, хотлинк с uCoin, собственная фотография пользователя. Порядок выбора:
-
-1. собственное фото пользователя для этого экземпляра (`user_upload`, его `owner_id`);
-2. официальное каталожное (`nbu` или `manual`);
-3. `ua_coins` — вторичный источник, но публичный;
-4. `ucoin` — **только если** смотрит тот, кто его импортировал;
-5. иначе плейсхолдер.
-
-## Роли изображений
-
-`obverse` (аверс), `reverse` (реверс), `edge` (гурт), `additional` (дополнительные).
-Для каталожной позиции — по одному изображению на роль `obverse`/`reverse`; `additional`
-может быть несколько.
-
-## Удаление
-
-Требует подтверждения пользователя и записывается в `audit_log` (ТЗ, раздел 12).
-Файл из хранилища удаляется отложенно, фоновой задачей — так проще откатиться при ошибке.
-
-## Лимиты
-
-На старте: не более 20 МБ загрузок на пользователя в сутки и не более 4 изображений
-на экземпляр коллекции. Значения в конфиге, меняются без правки кода.
+A public-read bucket for catalog photos was considered and rejected: it would need two
+serving paths (public and presigned) in one URL builder or a second bucket, while
+`S3_PUBLIC_ENDPOINT` solves the problem without changing the access model.

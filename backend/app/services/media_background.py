@@ -3,7 +3,7 @@
 Only a genuinely uniform background (white or, since proof coins are often
 shot against black felt, dark) and a genuinely round object are cut; a
 blister pack, a colored backdrop or a coin that touches the frame is left
-alone. See docs/media.md, "Удаление фона", for the rule and the
+alone. See docs/media.md, "Background removal", for the rule and the
 runbook. Pillow plus stdlib only, no opencv/rembg/numpy.
 
 `classify` decides; `cut_background` executes the decision, then trims the
@@ -89,7 +89,7 @@ ALREADY_TRANSPARENT_ALPHA_MAX = 250
 # black backdrop, flood-filled it, and cut a fresh alpha from its own mask --
 # discarding the real transparency and exposing whatever the matte used to
 # hide (gradients, shadows, crop leftovers). See docs/media.md,
-# "Удаление фона", and the `--revert-transparent-originals` runbook there.
+# "Background removal", and the `--revert-transparent-originals` runbook there.
 ALREADY_TRANSPARENT_FRACTION_MIN = 0.005
 
 # Edge softening on the final mask so the cut does not look scissored.

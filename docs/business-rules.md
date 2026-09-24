@@ -310,7 +310,7 @@ A clean-up tool, not a workflow. All conditions at once, else `409`:
   behavior for them (BR-4).
 - Deleting a user deletes their collection, expenses, photos and personal positions and
   never touches the shared catalog.
-- Deleting an image requires confirmation and is written to `audit_log`.
+- Deleting a photo takes effect immediately and is not audited (`media.md`).
 
 ## BR-11. (retired)
 

@@ -187,7 +187,7 @@ class UserSettings(Base):
 
 
 class UcoinCatalogSource(Base):
-    """Saved uCoin catalog sections for repeat import. Unused until stage 6."""
+    """Saved uCoin catalog sections for repeat import. Unused: uCoin import is deferred."""
 
     __tablename__ = "ucoin_catalog_sources"
 

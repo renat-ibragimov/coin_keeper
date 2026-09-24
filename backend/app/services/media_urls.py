@@ -1,7 +1,7 @@
 """Choosing and signing catalog images for API payloads.
 
 Selection order per role comes from docs/media.md: the viewer's own
-photo, then an official catalog one (nbu/manual), then a uCoin image — which is
+photo, then an official catalog one (nbu/manual), then ua_coins, then a uCoin image — which is
 only ever fetched for its importer, the repository already filters it out for
 everyone else. Stored files are served through presigned URLs; hotlinks are
 returned as they are.

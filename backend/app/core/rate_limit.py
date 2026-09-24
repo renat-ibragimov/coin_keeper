@@ -1,6 +1,6 @@
 """Redis-backed fixed-window rate limiting.
 
-Limits are the table in docs/auth.md. With registration open from day one
+Limits are the table in docs/auth.md, "Rate limits". With registration open from day one
 this is a release condition, not a later addition: an open service without it
 gets brute-forced overnight.
 """

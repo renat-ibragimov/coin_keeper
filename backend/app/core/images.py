@@ -73,11 +73,11 @@ def process_image(payload: bytes, *, remove_background: bool = True) -> Processe
     Raises ImageRejectedError for anything that is not an acceptable image;
     callers decide whether that is fatal or just a skipped row.
 
-    `remove_background` is the one point every ingest path (the Ukrainian
-    photo pipeline, and any future upload endpoint) shares, so a white,
+    `remove_background` is the one point every upload path (collection
+    photos, admin catalog photos) shares, so a white,
     round coin photo is cut to a transparent WebP as it comes in rather than
     needing a separate pass later — see app.services.media_background and
-    docs/media.md, "Удаление фона". A migration or other special
+    docs/media.md, "Background removal". A migration or other special
     path that must keep bytes exactly as given can pass False.
     """
     stripped = _validated_stripped(payload)

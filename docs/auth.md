@@ -1,329 +1,264 @@
-# 07. Аутентификация и владение данными
+# Authentication and data ownership
 
-## Объём на старте
+Accounts, sessions, roles, and who may read or write what. Endpoint contracts:
+`api.md`. Mail transport and env vars: `infra.md`.
 
-Решение зафиксировано: **регистрация открыта с первого дня**. Сервис публичный, любой может
-завести аккаунт сам — отдельного «закрытого периода» нет.
+---
 
-В MVP входит полный цикл работы с учётной записью:
+## Accounts
 
-- регистрация по email с заданием пароля после подтверждения адреса;
-- **обязательное подтверждение email** — аккаунт неактивен, пока пользователь не перешёл
-  по ссылке из письма;
-- вход, выход, обновление токена;
-- смена пароля;
-- **восстановление пароля** по ссылке из письма.
+Registration is **open** to anyone. The account lifecycle:
 
-Всё это требует рабочей отправки почты. Транспорт выбирается переменной `MAIL_BACKEND`:
-`console` пишет письмо в лог (локальная разработка и тесты, секреты не нужны), `smtp`
-отправляет по-настоящему — подробности и переменные в `infra.md`. Боевой SMTP
-настраивается в этапе 1, не позже (`11-roadmap.md`).
+- register with an email → verification email;
+- **email verification is mandatory**; the password is chosen when the link is used;
+- sign in, sign out, refresh the session;
+- change password; set a password (accounts created via Google have none);
+- forgot / reset password by email link;
+- sign in with Google and link Google to an existing account (below).
 
-Отложена двухфакторная аутентификация. Роли сверх `admin`/`user` тоже не нужны, но **схема
-закладывается сразу** — иначе потом переделывать миграции. **Вход через Google (OAuth) и
-линковка аккаунтов — теперь тоже часть MVP**, решение владельца 2026-09-15 (было
-«отложено» в более старой редакции этого раздела) — детали ниже, «Google OAuth и линковка
-аккаунтов».
+Mail goes through `MAIL_BACKEND`: `console` writes messages to the log (local work and
+tests, no secrets needed), `smtp` sends them (`infra.md`). Emails are English only for
+now (`backlog.md`).
 
-## Пароли
+`ALLOW_REGISTRATION` (default `true`) is an **emergency switch**, not a mode: if a wave of
+bot sign-ups hits, registration closes with one env var and no deploy. Google sign-up
+respects it too.
 
-- Хеширование — **argon2id** (`argon2-cffi`). Не bcrypt, не PBKDF2.
-- Минимум 10 символов. Проверка по списку скомпрометированных паролей — потом.
-- `password_hash` не покидает базу: не логируется, не сериализуется, не попадает в ответы API.
-- **Валидация одна на все пути создания пароля**: подтверждение email, сброс пароля, смена
-  пароля и скрипт миграции (`09-data-migration.md`). Послаблений для сидинга нет — аккаунт
-  владельца админский и сразу оказывается на публичном домене.
+## Passwords
 
-### Персональные данные в репозитории
+- Hashing: **argon2id** (`argon2-cffi`), `app/core/security.py`.
+- At least 10 characters (`password_min_length`). One validation for every path that
+  sets a password — verification, reset, change, set — with no relaxed variant anywhere.
+- `password_hash` never leaves the database: not logged, not serialized, not returned.
+- `password_hash` is `NULL` for an account without a password (Google-only). Password
+  sign-in is impossible until the user sets one in settings.
 
-Реальные email-адреса и пароли **не попадают в git никогда** — ни в документацию, ни в код,
-ни в тесты, ни в примеры команд. Репозиторий публичный, а адрес, единожды попавший
-в историю, остаётся в ней и после удаления файла.
+**No real personal data in the repository.** Real emails and passwords never go into
+git — docs, code, tests or example commands. Use placeholders (`<owner-email>`,
+`<admin-email>`); real values live in the server `.env` and GitHub secrets.
 
-В примерах — только плейсхолдеры: `<owner-email>`, `<admin-email>`. Настоящие значения
-живут в `.env` на сервере и в GitHub Secrets (`infra.md`). То же правило в
-`09-data-migration.md`, там оно про скрипты сидинга.
+## Sessions
 
-## Токены
-
-**JWT, два типа:**
-
-| Токен | Время жизни | Где хранится |
+| Token | Lifetime | Where it lives |
 |---|---|---|
-| access | 15 минут | в памяти фронтенда |
-| refresh | 30 дней | httpOnly Secure SameSite=Lax cookie |
+| access (JWT, HS256) | 15 min | frontend memory only; sent as `Authorization: Bearer` |
+| refresh (opaque) | 30 days | httpOnly, Secure, SameSite=Lax cookie |
 
-Access-токен передаётся в `Authorization: Bearer <token>`.
+- The refresh token travels **only** in the cookie: `/auth/refresh` and `/auth/logout`
+  have no body. It's never readable from JavaScript and never lands in logs.
+- Refresh tokens are stored as **sha256** in `refresh_tokens` (with `user_agent`, `ip`,
+  `expires_at`, `revoked_at`) and can be revoked.
+- **Rotation:** every refresh revokes the old token and issues a new one. Presenting an
+  already revoked token means it leaked → **all** of the user's sessions are revoked.
+- Password reset and password change also revoke all of the user's refresh tokens.
+- The signing secret comes from the environment.
 
-Refresh-токен передаётся **только в cookie** — ни в теле запроса, ни в заголовке. `/auth/refresh`
-и `/auth/logout` тела не имеют, сервер читает cookie сам. Так токен недоступен из JavaScript
-и не попадает в логи и историю запросов.
+## One-time tokens: email verification and password reset
 
-Refresh-токены хранятся в БД с возможностью отзыва:
+Table `auth_tokens` (`data-model.md`), stored as sha256 like refresh tokens; the raw
+token exists only in the email.
 
-```
-refresh_tokens
-  id          bigserial PK
-  user_id     bigint NOT NULL FK users ON DELETE CASCADE
-  token_hash  text NOT NULL UNIQUE     -- sha256 от токена, не сам токен
-  expires_at  timestamptz NOT NULL
-  revoked_at  timestamptz
-  user_agent  text
-  ip          inet
-  created_at  timestamptz NOT NULL DEFAULT now()
-```
-
-При обновлении — ротация: старый refresh отзывается, выдаётся новый. Попытка использовать
-уже отозванный токен означает компрометацию — отзываем все токены пользователя.
-
-Секрет для подписи — из переменной окружения, алгоритм HS256. В репозиторий не попадает.
-
-## Одноразовые токены: подтверждение email и сброс пароля
-
-Устроены по образцу `refresh_tokens` — таблица `auth_tokens` (`data-model.md`):
-в базе хранится **sha256 от токена**, а не сам токен. Сам токен уходит только в письмо.
-
-| Тип (`kind`) | Срок жизни | Что делает |
+| `kind` | Lifetime | Effect |
 |---|---|---|
-| `email_verify` | 24 часа | переводит `users.email_verified` в `true` |
-| `password_reset` | 1 час | разрешает задать новый пароль |
+| `email_verify` | 24 h | sets the password, marks the email verified, activates the account, signs in |
+| `password_reset` | 1 h | allows setting a new password |
 
-Правила:
+- Single use: `used_at` is set; checking and marking happen under a row lock, so two
+  concurrent requests can't both use it.
+- Issuing a new token of a kind invalidates the user's earlier unused ones of that kind.
+- At least 32 random bytes (`secrets.token_urlsafe`).
+- The transaction holding the new token commits **before** the email is sent. If mail
+  fails, the inactive account stays and the user can request a resend.
+- `/auth/forgot-password` and `/auth/resend-verification` answer the same whether or not
+  the address exists — the forms can't be used to probe for accounts.
+- **No password before verification.** Registering again with an unverified address just
+  sends a new link; only the mailbox owner chooses the password, when using it.
+- Registering again with an already verified address (including a Google-created one)
+  also answers `202` but creates nothing and sends nothing. The register screen explains
+  the options generically: sign in with Google and add a password in settings, or reset
+  the password.
 
-- Токен одноразовый: после использования проставляется `used_at`, повторный переход — ошибка.
-- Проверка и пометка токена выполняются под блокировкой строки БД, чтобы два
-  одновременных запроса не могли использовать его дважды.
-- Выдача нового токена того же типа гасит предыдущие невыполненные.
-- Токен длинный и случайный (не менее 32 байт из `secrets.token_urlsafe`).
-- Транзакция с новым токеном фиксируется до отправки письма. Если SMTP недоступен,
-  неподтверждённый аккаунт остаётся в БД и письмо можно запросить повторно.
-- Успешный сброс пароля **отзывает все refresh-токены** пользователя: если пароль сбрасывают,
-  значит доступ мог быть скомпрометирован.
-- Ответы `/auth/forgot-password` и `/auth/resend-verification` всегда одинаковы независимо
-  от того, существует ли адрес, — иначе форма превращается в проверялку регистраций.
-- До подтверждения email пароль не хранится. Повторная регистрация неподтверждённого
-  адреса отправляет новую ссылку, но пароль выбирает только получатель письма при
-  её использовании. Это также защищает старые неподтверждённые аккаунты: пароль,
-  заданный до обновления, заменяется при подтверждении.
-- Повторная регистрация уже подтверждённого аккаунта (включая созданный через Google)
-  также отвечает `202`, но не создаёт аккаунт и не отправляет письмо. Экран регистрации
-  объясняет это условно: владелец может войти через Google и добавить пароль в настройках
-  либо запросить сброс пароля на подтверждённый email.
+### Unverified and disabled accounts
 
-### Неподтверждённый аккаунт
+An unverified account has `is_active = false` and `email_verified = false`. It can't
+sign in, and any request with a token of such a user gets `403`
+(`email-not-verified` / `account-disabled`, `app/api/deps.py`).
 
-До перехода по ссылке:
+Unverified accounts are **not** cleaned up automatically — there's no purge job
+(`backlog.md`).
 
-- `users.is_active = false`, вход возвращает ошибку с предложением подтвердить адрес;
-- API возвращает `403` на всё, кроме `/auth/resend-verification` и самого подтверждения;
-- данные не создаются — аккаунт есть, но пользоваться им нельзя.
+## Guests
 
-Неподтверждённые аккаунты старше 30 дней удаляются фоновой задачей.
+Without a token, the shared catalog, coin cards, series and reference data are readable
+(`OptionalCurrentUser`). Guests get an allow-listed response
+(`PublicCatalogListItem` / `PublicCatalogCard`) that **can't** carry prices or anything
+private; filters and sorts that need an account (`owned`, `scope=own`, `archived`,
+sorting by price/purchase) return `422`. Everything else requires sign-in.
 
-## Эндпоинты
+## Rate limits
 
-Описаны в `api.md`, раздел «Аутентификация».
+Fixed windows in Redis (`app/core/rate_limit.py`). Several scopes per endpoint are
+normal; exceeding a limit returns `429` with `Retry-After`.
 
-## Ограничение частоты
+| Endpoint | Limit | Scope |
+|---|---|---|
+| `POST /auth/login` | 5 / 15 min | IP and email; both reset on success |
+| `POST /auth/register` | 3 / h | IP and email |
+| `POST /auth/refresh` | 30 / h | IP |
+| `POST /auth/forgot-password` | 3 / h | IP and email |
+| `POST /auth/resend-verification` | 3 / h | IP and email |
+| `POST /auth/reset-password` | 5 / h | IP |
+| Google `start` / `link/start` | 10 / h | IP |
+| Guest catalog listing / search / reference | 300 / 90 / 300 per min | IP (signed-in users are not limited) |
 
-Обязательно с первого дня, иначе публичный сервис перебирают за ночь:
+### Registration honeypot
 
-| Эндпоинт | Лимит |
+The register form has a hidden `website` field that people never see and autofill
+doesn't fill. If it's filled, the request gets the same `202` as success and nothing is
+created. It complements rate limiting, it doesn't replace it.
+
+## Google sign-in and account linking
+
+Google OpenID Connect, server-side authorization-code flow with PKCE, random `state` and
+`nonce` (`app/services/google_auth.py`, `app/api/v1/google_auth.py`).
+
+- `state` is one-use in Redis (10 min) **and** bound to the browser by an httpOnly
+  SameSite=Lax cookie.
+- The server verifies the ID token's signature, `aud`, `iss`, expiry, `nonce` and
+  `email_verified`. The Google identity is `sub`, not the email.
+- The client secret lives only on the server. Without `GOOGLE_CLIENT_ID` and
+  `GOOGLE_CLIENT_SECRET`, Google sign-in is hidden and disabled.
+- After success the app issues its own refresh cookie as usual.
+
+`auth_identities` maps `(provider, subject) → user_id`, unique per pair, one Google
+identity per user.
+
+**Resolution rules:**
+
+- A known `sub` signs into its linked account, even if the Google email changed.
+- A new `sub` with a free email creates a user. For `@gmail.com` and Google Workspace
+  (`hd` claim) addresses Google's verification is accepted and the user is signed in
+  immediately; any other domain gets our own verification email first.
+- A new `sub` whose email is already taken **creates nothing and links nothing**
+  (`/login?google=link-required`). The user signs in the usual way and starts linking
+  from settings. Linking requires a live session, the Google flow in the same browser,
+  and matching emails; the collection stays with the existing `user_id`.
+- Merging two existing users is not supported.
+
+**In the browser**, Google sign-in opens in a separate window so the original tab's
+history stays clean. After the callback, the window notifies the original tab via
+`BroadcastChannel` (a random id in `sessionStorage` ties the answer to this attempt); the
+tab refreshes its session from the cookie and closes the window. If a window can't be
+opened, the flow falls back to a same-tab redirect. With local Vite against the remote
+API the callback lands on the server's domain, so the full window flow is testable only
+on one origin.
+
+## Frontend session behavior
+
+- Sign-in, registration, password-reset request and "check your email" share one dialog
+  over the public site; old URLs (including Google error ones) open that dialog. Email
+  verification and reset-by-token stay separate screens (`ui.md`).
+- "Remember me" sets a flag in `localStorage` that allows restoring the session across
+  visits; without it the flag lives in `sessionStorage`, so a reload of the tab keeps the
+  session. Tokens themselves stay in memory and the httpOnly cookie. Sign-out clears
+  both flags. Anonymous requests never trigger a refresh.
+- A definitive auth failure clears user state and the query cache; a transient
+  network/server error during refresh does not sign the user out. Late refresh responses
+  and private responses from an ended session never restore it.
+- After a session expires, the user can sign in again and continue an unsaved purchase or
+  expense form: drafts are kept in the tab's memory for the same account and cleared on
+  voluntary sign-out or when a different account signs in. A reload discards them.
+
+## Data ownership
+
+The core decision is in `data-model.md`; here, what it means for access.
+
+**Shared — readable by everyone:** `countries`, `currencies`, `denominations`,
+`coin_series`, `materials`, `edge_types`, `quality_types`, `exchange_rates`,
+`catalog_items` with `created_by IS NULL`, `catalog_variants`, `market_price_snapshots`
+with `created_by IS NULL` (signed-in users only — guests get no prices), `media_files`
+from public sources (`media.md`).
+
+**Private — the owner only:** `collection_items`, `expenses`, `sales`,
+`purchase_offers`, `collection_goals`, `ucoin_catalog_sources`, `user_settings`,
+personal `storage_locations`, own `media_files`, and `catalog_items` /
+`market_price_snapshots` with `created_by = <owner>`.
+
+`catalog_items`, `market_price_snapshots` and `media_files` appear in both lists: a
+row's layer is decided by its own fields, not its table. That's why the visibility filter
+is mandatory in repositories.
+
+### Write rules
+
+| Action | Who |
 |---|---|
-| `POST /auth/login` | 5 попыток за 15 минут на IP и на email |
-| `POST /auth/register` | 3 за час на IP |
-| `POST /auth/refresh` | 30 за час на пользователя |
-| `POST /auth/forgot-password` | 3 за час на IP и на email |
-| `POST /auth/resend-verification` | 3 за час на IP и на email |
-| `POST /auth/reset-password` | 5 за час на IP |
+| Create, edit, archive / unarchive a **shared** catalog record | admin only |
+| Physically delete a shared record | admin, only if archived and unreferenced (`business-rules.md`, BR-10) |
+| Create a **personal** position | any signed-in user (`created_by` = self) |
+| Edit or delete a personal position | its author |
+| Add a price snapshot to a shared record | the central job only (`created_by = NULL`) |
+| Everything in private tables | the owner only |
 
-Реализация — на Redis, который и так есть под очереди задач.
+A user trying to change a shared record gets **`403`** — they can see it, they just may
+not edit it. Someone else's personal position (or collection item, or photo) is
+**`404`** — for them it doesn't exist; existence of private records is never revealed.
 
-Ограничение частоты входит в **критерий приёмки этапа 1** (`11-roadmap.md`): при открытой
-регистрации это не «потом добавим», а условие выхода в интернет.
+### Archived records
 
-### Honeypot в форме регистрации
+An archived shared record leaves the storefront, not the database. With `archived=true`,
+an admin sees all archived records; a regular user sees only those they own a
+collection item of (`CatalogRepository._archive_condition`).
 
-Форма регистрации содержит скрытое поле-приманку (например, `website`), невидимое для
-человека и не заполняемое браузерным автозаполнением. Заполнено — запрос отклоняется с тем
-же ответом, что и успешный, без создания пользователя. Дешёвая защита от простых ботов,
-дополняет rate limiting, но не заменяет его. Разметка — `ui.md`.
+### How it's enforced
 
-## Модель владения данными
-
-Ключевое решение из `data-model.md`, здесь — следствия для доступа.
-
-### Общее, читают все авторизованные
-
-`countries`, `currencies`, `denominations`, `coin_series`, `exchange_rates`,
-`catalog_items` с `created_by IS NULL`, `catalog_variants`,
-`market_price_snapshots` с `created_by IS NULL`, каталожные `media_files`
-с `source` = `nbu` или `manual`.
-
-### Личное, доступно только владельцу
-
-`collection_items`, `expenses`, `sales`, `purchase_offers`, `collection_goals`,
-`ucoin_catalog_sources`, `user_settings`, собственные `media_files`,
-а также `catalog_items` и `market_price_snapshots` с `created_by = <владелец>`.
-
-Три таблицы — `catalog_items`, `market_price_snapshots`, `media_files` — попадают в оба
-списка: слой записи определяется её собственными полями, а не таблицей. Именно поэтому
-фильтр видимости обязателен в репозиторийном слое (ниже).
-
-### Правила записи
-
-| Действие | Кто может |
-|---|---|
-| Создать запись **общего** каталога (`created_by IS NULL`) | только admin |
-| Изменить запись общего каталога | только admin |
-| **Архивировать / разархивировать** запись общего каталога | только admin |
-| Удалить запись общего каталога физически | только admin, и только если она уже архивирована и на неё нет ссылок |
-| Создать **личную** позицию каталога | любой авторизованный (`created_by` = он сам) |
-| Изменить или удалить личную позицию | только автор (или admin) |
-| Добавить снимок цены общей позиции | только системная задача (`created_by = NULL`) |
-| Добавить снимок цены личной позиции | её автор (`created_by` = он сам) |
-| Ручной ввод цены по любой видимой позиции | владелец, снимком с `created_by` = он сам |
-| Всё в личных таблицах | только владелец |
-
-Попытка пользователя изменить общую запись — `403`, а не `404`: запись он видит, просто не
-имеет права её править. Попытка обратиться к чужой личной позиции — `404`, её для него
-не существует.
-
-Убрать позицию из общего каталога — значит **архивировать** её, а не удалить: на ней висят
-данные чужих коллекций (`business-rules.md`, BR-10). Физическое удаление общей записи
-разрешено администратору только после архивации и только при полном отсутствии ссылок.
-
-### Видимость архивных записей
-
-Архивная общая позиция выпадает из витрины, но не из базы. Кто её видит:
-
-| Кто | Что видит при `archived=true` |
-|---|---|
-| admin | все архивные записи |
-| обычный пользователь | только те, где у него есть экземпляр |
-
-Это добавляет к фильтру видимости третье условие — рядом с `owner_id` и слоем записи,
-в том же репозиторийном слое:
+Filters live **in repositories**, never in routes — one forgotten
+`WHERE owner_id = …` in a route would leak someone's collection:
 
 ```sql
--- витрина каталога, по умолчанию
-WHERE NOT is_archived
-
--- явный запрос архива обычным пользователем
-WHERE is_archived
-  AND EXISTS (SELECT 1 FROM collection_items ci
-              WHERE ci.catalog_item_id = catalog_items.id AND ci.owner_id = :user_id)
-```
-
-### Как это обеспечивается
-
-Фильтры — **в репозиторийном слое**, а не в обработчиках роутов. Один пропущенный
-`WHERE owner_id = ...` в контроллере означает утечку чужой коллекции.
-
-Два фильтра, работающих рядом:
-
-```sql
--- личные сущности
+-- private entities
 WHERE owner_id = :user_id
-
--- каталог и снимки цен
+-- catalog and price snapshots
 WHERE created_by IS NULL OR created_by = :user_id
 ```
 
-Практически: базовый класс репозитория для личных сущностей принимает `user_id` в конструкторе
-и подставляет фильтр во все запросы. Репозиторий каталога принимает его же и подставляет
-фильтр видимости. Обойти их можно только сознательно.
+Repositories for private data take the user id in their constructor and apply the filter
+to every query; bypassing it has to be deliberate. Row-level security in Postgres isn't
+used; the schema doesn't preclude it.
 
-Проверка на уровне БД (Row Level Security) — избыточна на старте, но схема ей не противоречит,
-если понадобится.
-
-## Роли
+## Roles
 
 ```
-user   — обычный пользователь: читает общий каталог, ведёт свои личные позиции и коллекцию
-admin  — плюс: наполнение и правка общего каталога, принудительное обновление курсов,
-         просмотр журнала задач
+user   reads the shared catalog, manages own personal positions and collection
+admin  plus: shared-catalog maintenance (archive, drafts review), users and roles,
+       job runs, Telegram admin bot (admin.md)
 ```
 
-Аккаунт владельца создаётся администратором сразу — скриптом миграции
-(`09-data-migration.md`). Второй администратор регистрируется штатно через форму, а роль ему
-поднимает `backend/scripts/promote_admin.py --email <admin-email>`. Регистрация через форму
-здесь намеренная: это заодно проверка пути нового пользователя на боевом окружении.
+**Granting admin:**
 
-Интерфейса управления ролями в MVP нет — только этот скрипт.
+- **In the UI** (normal path): `/admin` → Users → role toggle,
+  `PATCH /admin/users/{id}/role` (`admin.md`). Only verified, active users can be
+  promoted; an admin can't demote themselves; the last admin can't be demoted. Every
+  change is written to `audit_log`.
+- **Bootstrap / recovery** — when there's no admin to click the button:
+  ```bash
+  docker compose run --no-deps api python scripts/promote_admin.py --email <admin-email>
+  docker compose run --no-deps api python scripts/promote_admin.py --email <admin-email> --demote
+  ```
+  The user must already exist and be verified (exit codes: 1 not found, 2 not verified).
+  The email is always an argument — never hardcoded. New admins register through the
+  normal form first, which doubles as a check of the new-user path.
 
-## Аварийный рубильник регистрации
+## Security baseline
 
-Переменная `ALLOW_REGISTRATION` (`infra.md`) по умолчанию `true`. Флаг сохраняется не как
-режим работы, а как **аварийный рубильник**: если пойдёт волна регистраций ботов, регистрацию
-можно закрыть одной переменной, не выкладывая код. Штатное состояние — открыто.
+- HTTPS everywhere with HSTS; certificates by Caddy (`infra.md`).
+- CORS only for the frontend origin (`CORS_ORIGINS`), never `*`.
+- No secrets in the repository; `.env.example` holds empty placeholders.
+- A failed sign-in never reveals whether the email exists.
+- All input is validated by Pydantic models, including string lengths.
 
-## Google OAuth и линковка аккаунтов
+## Not planned
 
-Google OpenID Connect использует серверный authorization-code flow с PKCE, случайными
-`state` и `nonce`. `state` одноразовый в Redis, ограничен 10 минутами и привязан к
-браузеру httpOnly SameSite=Lax cookie. Сервер проверяет подпись ID-токена Google,
-`aud`, `iss`, срок действия, `nonce`, `email_verified`; идентификатором Google служит
-`sub`, не email. Секрет клиента хранится только на сервере. После успешного входа
-приложение выдаёт собственную refresh-cookie и обновляет её через `/auth/refresh`.
-Из интерфейса вход через Google запускается в отдельном окне: исходная вкладка и её
-история переходов остаются на прежней странице. После callback окно сообщает исходной
-вкладке об успехе через `BroadcastChannel`, та обновляет сессию по refresh-cookie и
-закрывает окно. Случайный идентификатор в sessionStorage связывает ответ с конкретным
-запуском. Если браузер не позволяет открыть окно, остаётся обычный переход в той же
-вкладке. Для локального Vite с удалённым API callback идёт на домен сервера, поэтому
-полный оконный сценарий проверяется на едином серверном origin.
-
-Таблица `auth_identities` хранит `(provider, subject) → user_id` с уникальностью
-пары и одной Google-идентичностью на пользователя. `users.password_hash` может быть
-`NULL` только у аккаунта без пароля. Такой пользователь может задать пароль в своих
-настройках; вход по паролю до этого невозможен.
-
-Правила привязки:
-
-- Знакомый Google `sub` входит в уже привязанный аккаунт, даже если Google изменил email.
-- Новый `sub` и свободный email создают пользователя. Для Gmail и Google Workspace
-  подтверждённый Google email принимается; для стороннего домена отправляется наше
-  письмо подтверждения, и вход закрыт до перехода по ссылке.
-- Если email уже занят, новый аккаунт **не создаётся** и привязка по совпадению email
-  **не происходит**. Пользователь входит прежним способом и запускает привязку из
-  настроек. Требуются действующая сессия, Google OAuth в том же браузере и совпадение
-  подтверждённых адресов. Коллекция остаётся у прежнего `user_id`.
-- Объединение двух уже существующих пользователей и перенос коллекций не поддерживаются.
-
-Без `GOOGLE_CLIENT_ID` и `GOOGLE_CLIENT_SECRET` Google-вход скрыт и отключён.
-
-## Что откладываем
-
-| Функция | Когда |
+| Feature | Status |
 |---|---|
-| Двухфакторная аутентификация | не планируется |
-| Проверка пароля по спискам скомпрометированных | после MVP |
-
-## Безопасность — обязательный минимум
-
-- HTTPS везде, HSTS. Сертификат — Let's Encrypt через Caddy, см. `infra.md`.
-- CORS — только домен фронтенда, не `*`.
-- Никаких секретов в репозитории. `.env.example` с пустыми значениями — можно.
-- Ошибка входа не сообщает, существует ли email: всегда «неверный email или пароль».
-- Все входные данные валидируются Pydantic-моделями, включая длину строк.
-
-
-## Навигация и восстановление сессии на фронтенде (2026-09-24)
-
-Вход, регистрация, запрос сброса пароля и сообщение о письме используют общий диалог
-поверх публичного сайта. Старые адреса сохранены как совместимые входы в этот сценарий,
-включая адреса ошибок Google. Подтверждение email и смена пароля по токену остаются
-отдельными экранами с доступным возвратом на сайт. Правила переходов — в `ui.md`.
-
-«Запомнить меня» разрешает восстановление между посещениями через флаг в localStorage.
-Без галочки флаг хранится в sessionStorage: обновление текущей вкладки сохраняет вход.
-Сами токены по-прежнему только в памяти и httpOnly cookie; новые хранилища токенов не вводятся.
-При выходе оба флага удаляются. Анонимные запросы не запускают refresh сами по себе.
-
-Окончательный отказ авторизации очищает пользовательский стейт и кэш запросов;
-временная ошибка сети/сервера при refresh сама по себе не разлогинивает.
-Запоздавшие refresh-ответы и личные ответы от завершённой сессии не восстанавливают её.
-После истечения сессии можно повторно войти и продолжить редактирование покупки/расхода:
-черновики хранятся только в памяти вкладки, доступны тому же аккаунту и очищаются
-при добровольном выходе или входе в другой аккаунт. Перезагрузка вкладки их не сохраняет.
+| Two-factor authentication | not planned |
+| Checking passwords against breach lists | post-MVP |

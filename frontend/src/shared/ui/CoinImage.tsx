@@ -27,8 +27,7 @@ interface CoinImageProps {
  *
  * Many catalog items have no image at all, and part of the stored URLs point at
  * uCoin, which sits behind Cloudflare and usually refuses to serve the file. We
- * do not proxy or retry those (docs/media.md — the Ukrainian photos
- * come from the NBU in stage 6); a missing and an unreachable photo simply look
+ * do not proxy or retry those (docs/media.md, "Storage"); a missing and an unreachable photo simply look
  * the same, and neither shows a broken <img>.
  */
 export function CoinImage({ src, srcSet, alt, className, fit = 'contain' }: CoinImageProps) {

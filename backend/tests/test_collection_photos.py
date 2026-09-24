@@ -1,6 +1,6 @@
 """User photos of a collection instance: upload, replace, remove — and the
 one thing that must never happen, the catalog's own media staying untouched
-(docs/media.md, "Происхождение изображений").
+(docs/media.md, "Provenance and rights").
 
 Storage is an in-memory stand-in patched over both `_storage()` singletons
 that ever hand out a bucket client: `collection_photos` (where the service

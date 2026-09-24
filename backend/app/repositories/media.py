@@ -57,7 +57,7 @@ class MediaRepository:
 
         A user photo always hangs off `collection_item_id`, never off the
         catalog item it happens to be a purchase of (docs/media.md,
-        "Происхождение изображений") — so picking it for a catalog card or a
+        "User photos belong to the collection item") — so picking it for a catalog card or a
         collection listing means joining through the owner's own
         `collection_items`, not reading `catalog_item_id` off the row.
         """

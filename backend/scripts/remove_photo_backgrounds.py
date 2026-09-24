@@ -2,7 +2,7 @@
 
 One-off cleanup over `media_files` rows that hold their own `storage_key`
 (NBU, ua-coins, manual — anything we host; an `external_url`-only uCoin
-hotlink is never touched). See docs/media.md, "Удаление фона",
+hotlink is never touched). See docs/media.md, "Background removal",
 and app.services.media_background for the classifier this calls. Dark-branch
 cuts (proof coins on black felt/velvet) get their own `cut:dark` verdict and
 their own section in the HTML sheet -- that branch's flood-fill tolerance is
@@ -31,7 +31,7 @@ already-`-nobg` rows as --trim, but downloads each row's ORIGINAL (the key
 without `-nobg`) and applies the same already-transparent criterion
 classify() now uses; a row whose original truly had no transparency is a
 legitimate white/dark cut and is left alone. See docs/media.md,
-"Удаление фона", for the full runbook.
+"Background removal", for the full runbook.
 
     docker compose run --no-deps api python scripts/remove_photo_backgrounds.py \\
         --revert-transparent-originals --dry-run
