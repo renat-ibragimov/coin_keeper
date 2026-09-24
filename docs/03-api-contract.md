@@ -16,7 +16,7 @@ REST + JSON. Префикс `/api/v1`. Аутентификация — Bearer-�
 ## Маппинг старого IPC на REST
 
 В десктопной версии интерфейс общался с бэкендом через 35 методов `window.coinKeeper.*`.
-Полный список — `legacy/ui-strings.json`, ключ `api_methods`. Соответствие:
+Соответствие:
 
 | Старый метод | REST |
 |---|---|
@@ -133,8 +133,8 @@ GET /bootstrap
   }
 ```
 
-Структура взята из legacy `BootstrapPayload` (`legacy/reference-code/types.ts`) — она
-проверена практикой и покрывает весь дашборд.
+Структура взята из legacy `BootstrapPayload` — она проверена практикой и покрывает
+весь дашборд.
 
 `seriesBreakdown[].id` — id серии (`coin_series.id`), аддитивное поле: фронт использует
 его, чтобы сделать строку серии на Огляді ссылкой на `/collection/series/{id}` вместо
@@ -643,7 +643,7 @@ POST /collection
 **Фоновый перевод названия.** Ответ ничего не ждёт. Задача просит Haiku перевести название,
 определяет язык оригинала и заменяет только тот слот, который является переводом; слот на
 языке оригинала остаётся посимвольной копией введённого текста с пометкой `manual`. Промпт
-свой, не общий с местами хранения (`05-integrations.md`, раздел 11). При любой ошибке
+свой, не общий с местами хранения (`app/services/translation.py`). При любой ошибке
 остаётся оригинал. Без `ANTHROPIC_API_KEY` задача — no-op с предупреждением в лог.
 
 ### Справочники, отфильтрованные по своей коллекции
@@ -975,6 +975,61 @@ POST   /telegram/webhook      → 200 всегда
 любой другой код заставляет телеграм часами повторять тот же апдейт. Обрабатываются
 только `/start <код>` и `/last`, остальное молча игнорируется — ответ подтвердил бы
 постороннему, что бот жив.
+
+### Бот підтримки (публічний, `/support/telegram`)
+
+Окремий бот від адмінського: тут — саппорт-чат для будь-якого користувача (ідеї, питання,
+зв'язок з адмінами), а не сповіщення адмінів про прогони. Посилання на нього — у футері
+(`08-ui-map.md`).
+
+```
+GET  /support/telegram         → {url}                       // публічний, без входу
+POST /support/telegram/link    {sourcePath?} → {url}          // за логіном
+POST /support/telegram/webhook → 200 завжди
+```
+
+`GET` — статична публічна ланка для гостя. `POST` (авторизований) підмішує в ланку контекст
+користувача, `sourcePath` — необов'язкова позначка, зі скількох екрана прийшов запит.
+`503`, якщо бот не налаштований на сервері (`SUPPORT_TELEGRAM_*` відсутні). Вебхук — та сама
+схема секрету й завжди-200, що й у адмінського бота вище, окремий токен
+(`support_telegram_webhook_secret`), окремий обробник (`services/support.py`).
+
+### Користувачі (`/admin/users`)
+
+```
+GET   /admin/users?page&pageSize
+  → { items: [{id, email, displayName, role, isActive, emailVerified, createdAt, coinCount}],
+      total, page, pageSize,
+      summary: {totalUsers, collectors} }        // collectors — з хоча б однією монетою
+PATCH /admin/users/{id}/role  {role: "user" | "admin"}
+  → AdminUserOut (той самий один рядок, coinCount тут завжди 0 — не перераховується на PATCH)
+```
+
+Обидва — тільки роль admin, `403` іншим. `PATCH` — зі стандартними запобіжниками
+(`04-business-rules.md`): `409 cannot-demote-self` — собі роль не знімають, `409 last-admin`
+— останнього адміна в системі не знімають, `409 admin-user-ineligible` — підвищити можна
+тільки активного користувача з підтвердженим email.
+
+### Ревью чернеток каталогу (`/admin/proposals`)
+
+```
+GET    /admin/proposals?page&pageSize
+  → { items: [{status, card: CatalogCard}], total, page, pageSize }
+GET    /admin/proposals/{id}    → {status, card}         // 404, якщо не draft
+PUT    /admin/proposals/{id}/photos/{role}    (raw image body, ≤12 МБ)  → CatalogCard
+DELETE /admin/proposals/{id}/photos/{role}    → CatalogCard
+POST   /admin/proposals/{id}/approve          → CatalogCard        // draft → active
+POST   /admin/proposals/{id}/reject   {reason} → ArchiveStateOut   // draft → archived
+```
+
+Тільки роль admin. Список і картка бачать записи виключно зі `status = draft`
+(`repositories/catalog.py`, той самий фільтр, що ховає чернетки від публічної вітрини й
+пошуку — `04-business-rules.md`). `role` у шляху фото — `obverse`/`reverse`, той самий
+формат, що у звичайного завантаження фото каталогу. `approve`/`reject` — `409
+proposal-not-draft`, якщо запис уже не чернетка (повторний клік, паралельна дія іншого
+адміна); `reject` без непорожньої причини — `400`. Джерело чернеток — щоденний
+`nbu-catalog-sync` у coin-parser: нові випуски й оновлені офіційні дані потрапляють сюди
+`status = draft`, а не одразу у вітрину (`11-roadmap.md`, `13-admin.md`).
 
 ## Справочники
 
