@@ -243,7 +243,7 @@ class NewCatalogItemIn(CamelModel):
 
     * no `shared` — this record is always personal. The shared catalog is
       read-only for everyone but an admin editing it deliberately, and the
-      purchase form is not that place (CLAUDE.md).
+      purchase form is not that place (AGENTS.md).
     * no `originalLang` and no title translations — the language is detected
       and the two translated slots filled by the background translation job,
       marked `llm`, exactly as a storage location's are. A client cannot

@@ -62,7 +62,7 @@ def test_an_english_title_keeps_its_own_slot_verbatim() -> None:
 def test_a_third_language_fills_both_slots() -> None:
     """Russian is the usual case here: the Soviet part of the catalogue is
     stored in Russian because that is the issuer's own wording, and a title
-    typed in it is translated rather than copied (CLAUDE.md)."""
+    typed in it is translated rather than copied (docs/business-rules.md, BR-12)."""
     item = make_item("Ленинградский монетный двор")
     apply_title_translation(
         item,

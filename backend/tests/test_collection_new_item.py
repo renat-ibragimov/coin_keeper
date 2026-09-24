@@ -98,7 +98,7 @@ async def test_new_coin_creates_item_instance_and_expense(
         await db_session.execute(select(CatalogItem).where(CatalogItem.id == body["catalogItemId"]))
     ).scalar_one()
     # A personal item, never a shared one: the shared catalog stays read-only
-    # for a regular user whichever door the record comes through (CLAUDE.md).
+    # for a regular user whichever door the record comes through (AGENTS.md).
     assert item.created_by == ctx.id_a
     assert item.title_original == "Львівський оперний театр"
     assert item.issue_year == 2021

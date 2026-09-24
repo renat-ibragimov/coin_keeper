@@ -51,7 +51,7 @@ ignore = ["S101"]
 
 [tool.ruff.lint.per-file-ignores]
 # RUF001 is allowed in tests: assertions quote Ukrainian coin, country and
-# series names — data, which the language policy in CLAUDE.md exempts.
+# series names — data, which the language policy in AGENTS.md exempts.
 # Comments and docstrings (RUF002/RUF003) still must be plain English.
 "tests/*" = ["S105", "S106", "RUF001"]
 # Same exemption for the API test seed: Ukrainian coin and series names are data.

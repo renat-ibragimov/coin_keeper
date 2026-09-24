@@ -1,6 +1,6 @@
 """The two interface languages and how a name is chosen between them.
 
-Interface locales are 'uk' and 'en', Ukrainian by default (CLAUDE.md). Every
+Interface locales are 'uk' and 'en', Ukrainian by default (AGENTS.md). Every
 named catalog entity carries three slots, and the rule is the same everywhere:
 the slot for the requested locale, and the issuer's original when that slot is
 empty. There is no Russian slot to fall back to — for the Soviet part of the
