@@ -542,7 +542,7 @@ async def test_a_supporting_expense_can_name_a_coin(
     client: AsyncClient, ctx: SimpleNamespace
 ) -> None:
     """Grading or a holder may be about one particular coin, and the journal
-    has to show the link (docs/ui.md, «Гроші»)."""
+    has to show the link (docs/ui.md, "Money")."""
     headers = auth(ctx.token_a)
     created = await client.post(
         "/api/v1/expenses",

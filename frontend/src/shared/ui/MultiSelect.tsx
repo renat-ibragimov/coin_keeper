@@ -30,7 +30,7 @@ interface MultiSelectProps {
 /** Same look and keyboard model as `Select`, but toggling an option leaves
  *  the menu open and a checkbox marks each one — several countries, series,
  *  denominations, types or materials can be on at once (docs/ui.md,
- *  catalog/collection filters, 2026-09-12). An empty `value` means "every
+ *  "Filter panels"). An empty `value` means "every
  *  option", same as `Select`'s own leading "Усі" item — there is no
  *  separate all-of-them row to select. */
 export function MultiSelect({

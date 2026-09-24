@@ -49,7 +49,7 @@ import styles from './CollectionPage.module.css';
 // The filters a fresh /collection/coins (no query string at all) starts
 // from — reused as what the mobile drawer's own "Скинути" resets its draft
 // to, since that reset must not touch the real, applied filters until
-// "Застосувати" does (docs/ui.md: apply-on-confirm, phone only).
+// "Застосувати" does (docs/ui.md, "Filter panels").
 const EMPTY_FILTERS = parseCollectionFilters(new URLSearchParams());
 
 // Fixed column counts (1/2/3/5, CollectionPage.module.css) rather than an
@@ -84,7 +84,7 @@ export function CollectionPage() {
   // The phone's filters drawer edits this instead of the real, applied
   // filters directly — see CatalogPage.tsx for why. The desktop filters bar
   // is unaffected — it keeps applying straight to `filters` below
-  // (docs/ui.md: apply-on-confirm, phone only).
+  // (docs/ui.md, "Filter panels").
   const [draft, setDraft] = useState<CollectionFilters>(filters);
   const [drawerOpen, setDrawerOpen] = useState(false);
   useDismissable(drawerOpen, () => setDrawerOpen(false));

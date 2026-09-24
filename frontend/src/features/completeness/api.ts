@@ -27,7 +27,7 @@ export function fetchCompletenessSummary(
  *  bookmarked/shared link without fetching the whole dimension's list.
  *  `metalKind` matches whatever the list's own filter was set to, so the
  *  numbers on the detail screen agree with the row the user clicked
- *  (docs/ui.md, Комплектність). */
+ *  (docs/ui.md, "Completeness"). */
 export function fetchCompletenessGroup(
   groupBy: CompletenessGroupBy,
   selector: GroupSelector,

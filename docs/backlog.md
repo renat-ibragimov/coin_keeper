@@ -71,6 +71,15 @@ Mostly server state rather than repository code.
 
 ## Frontend
 
+- [ ] **Personal positions can't be edited or deleted in the UI.** The API supports it
+      (`PATCH`/`DELETE /catalog/{id}` for the author); no screen calls it.
+- [ ] **UI copy outside i18n.** The landing page (`features/landing/copy.ts`) and legal
+      pages (`app/legal/copy.ts`) keep text in TS objects, against the rule that every
+      user-facing string lives in `shared/i18n/{uk,en}.json`. Move it, or make the
+      exception explicit in `AGENTS.md`.
+- [ ] **Admins see drafts in the storefront.** Non-admin reads require `status =
+      'active'`, so admins get drafts mixed into `GET /catalog` and search, not only in
+      `/admin/proposals`. Confirm it's intended or filter them out.
 - [ ] **Hidden filters still live.** "Обсяг" (scope) and "Показати архівні" have no UI,
       but `useCatalogFilters` still reads them from the URL and sends them to the API.
       Either remove them fully or bring them back into the filter drawer.

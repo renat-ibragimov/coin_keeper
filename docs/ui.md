@@ -1,1410 +1,724 @@
-# 08. Карта интерфейса
+# UI
 
-Исходники React-интерфейса десктопной версии утрачены. Карта восстановлена из собранного
-бандла: навигация, названия экранов, 226 строк интерфейса и 35 методов API.
+Screens, navigation and the visual rules of the web frontend (`frontend/src`). UI copy
+lives in `frontend/src/shared/i18n/{uk,en}.json`; this document quotes a Ukrainian label
+only to identify a screen or control. Business rules: `business-rules.md` (BR-N).
+Endpoints: `api.md`.
 
-Это **не макет**, а перечень того, что было и работало. Визуальное решение делаем заново.
+---
 
-## Состояние экранов (этап 4, на 2026-09-03)
+## Screens and routes
 
-| Экран | Роут | Состояние |
+| Screen | Route | Access |
 |---|---|---|
-| Вход, регистрация, «Перевірте пошту», подтверждение адреса, восстановление пароля | `/login`, `/register`, `/check-email`, `/verify-email`, `/forgot-password`, `/reset-password` | **реализовано** (часть 1) |
-| Огляд (dashboard) | `/collection` | **реализовано** (часть 2) |
-| Мої монети (колекція): картки і список, фільтри, плитки | `/collection/coins` | **реализовано** (часть 3) |
-| Додати: покупка монети (в т. ч. нової) і ручні витрати | `/collection/add` | **реализовано** (2026-09-14) |
-| Редагувати покупку | `/collection/coins/:id/edit` | **реализовано** (часть 3) |
-| Комплектність (група за обраним полем — серія/рік/номінал/матеріал/гурт/якість, плюс фільтр за цінністю металу) та сторінка групи | `/collection/completeness`, `/collection/completeness/:groupBy/:value` | **реализовано** (часть 3, обобщено с «Серії» 2026-09-23) |
-| Гроші (витрати) | `/collection/money` | **реализовано** (часть 3) |
-| Каталог: картки, таблиця, фільтри зверху, каскад серій, пошук, пагінація (read-only) | `/catalog` | **реализовано** (часть 1, доработано промптом 2) |
-| Картка монети | `/catalog/:id` | **реализовано** (часть 2) |
-| Налаштування | `/settings` | **реализовано** (часть 3, аватарка 2026-09-14) |
-| Імпорт з uCoin | `/import` | **отложено после MVP; входы и заглушка сняты 2026-09-16** |
-| Адміністрування: фонові задачі, користувачі, ревью пропозицій монет | `/admin` | **реализовано** (этап 4.6, части 1/3/4) |
+| Landing | `/` | guests; signed-in users are redirected to `/collection` |
+| Overview ("Огляд") | `/collection` | everyone; guests see onboarding |
+| My coins ("Мої монети") | `/collection/coins` | everyone; guests see onboarding |
+| Completeness ("Комплектність") | `/collection/completeness` | everyone; guests see onboarding |
+| Completeness group detail | `/collection/completeness/:groupBy/:value` | signed in |
+| Money ("Гроші") | `/collection/money` | everyone; guests see onboarding |
+| Add ("Додати") — purchase or expense | `/collection/add` | signed in |
+| Edit purchase | `/collection/coins/:id/edit` | signed in |
+| Catalog | `/catalog` | everyone |
+| Coin card | `/catalog/:id` | everyone |
+| Settings | `/settings` | signed in |
+| Administration | `/admin` | admins; others are redirected to `/collection` |
+| Privacy policy, terms | `/privacy`, `/terms` | everyone |
+| Sign-in, registration, password reset request, "check your email" | `/login`, `/register`, `/forgot-password`, `/check-email` | open the auth dialog over a public page |
+| Email verification, password reset, Google completion | `/verify-email`, `/reset-password`, `/google-complete` | standalone compact screens |
 
-На `/` находится публичный лендинг Bakost с hero, примерами коллекции и расходов,
-двумя основными CTA и финальным приглашением создать коллекцию. CTA создания открывает
-регистрацию для гостя или `/collection` после входа; просмотр каталога ведёт в `/catalog`.
-В демо коллекции поиск, серия и год фильтруют позиции, счётчик показывает результат из
-трёх исходных монет (не число экземпляров), «За витратами / By amount spent» сортирует
-по затратам на покупку по убыванию. Информационные плашки перед контролами — обычный
-текст; строки таблиц не кликабельны. В расходах период ограничивает только график,
-категория — только журнал; общие показатели не зависят от этих контролов.
-Служебные подписи демо увеличены; локальные переменные тёмных поверхностей отделяют
-окна от фона, не меняя палитру продуктовых экранов. Таблицы прокручиваются локально
-на телефоне. Тёмный wordmark генерируется `frontend/scripts/build-brand.py`: буквы
-светлее, золотой щит и монета сохраняют исходные цвета; светлый asset не изменён.
+All routes are declared in `frontend/src/app/App.tsx`. After sign-in the user lands on
+the overview.
 
-Гость может открыть `/catalog/:id` и четыре корневых раздела коллекции;
-последние показывают по три обучающих слайда с примерами и постоянной кнопкой входа. Вход и регистрация с гостевых
-страниц открываются в общем модальном окне вместе с запросом восстановления пароля
-и сообщением о письме. Обычный вход оставляет на текущей странице; вход из действия
-«Добавить» продолжает переход к форме выбранной монеты, ничего не сохраняя автоматически.
-Прямые `/login`, `/register`, `/forgot-password`, `/check-email` открывают этот диалог
-поверх публичной страницы. Закрытие диалога оставляет сайт доступным; обработанный
-запрос входа удаляется из состояния истории, чтобы «Назад» не открывало его повторно.
-Личные формы остаются закрытыми.
+### Redirects
 
-При добровольном выходе публичные страницы и четыре корневых раздела коллекции
-сохраняют адрес и показывают гостевой интерфейс. Добавление/редактирование ведут
-в `/collection/coins`, подробная комплектность — в `/collection/completeness`,
-настройки/админка — на `/`. Диалог входа после выхода не открывается.
-При истечении сессии интерфейс переходит в гостевой режим и предлагает повторный
-вход с объяснением. Черновики добавления/редактирования покупок и расходов сохраняются
-только в памяти текущей вкладки для того же аккаунта; выход и смена аккаунта их очищают.
-Незавершённое сохранение автоматически не повторяется.
+Retired paths redirect and keep the query string:
 
-Ссылки из писем `/verify-email`, `/reset-password` и завершение Google `/google-complete`
-сохраняют самостоятельные адреса, но используют компактный экран с возвратом на сайт.
-Ошибки Google и указание проверить почту из OAuth-окна возвращаются в диалог исходной
-вкладки. Логотип и ссылки возврата на юридических страницах ведут гостя на главную.
-На десктопе подписи дат в выборе периода расходов стоят слева от полей, в одной
-строке с пресетами; мобильная раскладка с подписями сверху сохранена.
+- `/dashboard` → `/collection`
+- `/series`, `/collection/series` → `/collection/completeness`;
+  `/series/:id`, `/collection/series/:id` → `/collection/completeness/series/:id`
+- `/missing`, `/collection/missing` → `/catalog?owned=false` (the catalog's own
+  "not in collection" filter, same query format `useCatalogFilters` writes)
+- `/expenses` → `/collection/money`
+- `/collection/new`, `/collection/coins/new` → `/collection/add` (so old
+  `?catalogItemId=` links still work)
+- `/collection/:id/edit` → `/collection/coins/:id/edit`
+- any unknown path → `/catalog`
 
-Редиректы со старых путей (этап 4): `/dashboard` → `/collection`; `/series[/:id]` и
-`/collection/series[/:id]` → `/collection/completeness[/series/:id]` (2026-09-23, «Серії» →
-«Комплектність»); `/expenses` → `/collection/money`; `/collection/new` →
-`/collection/add` (2026-09-14); `/collection/coins/new` → `/collection/add` там же,
-query-строка сохраняется, поэтому старая ссылка `?catalogItemId=` работает как была;
-`/collection/:id/edit` → `/collection/coins/:id/edit`; неизвестный
-путь — на `/catalog`. `/missing` и `/collection/missing` (страница снесена, решение
-владельца 2026-09-07) → `/catalog` с фільтром `owned=false` — тим самим query-форматом,
-що каталог сам пише в адресу при виборі «Наявність: немає в колекції»
-(`useCatalogFilters`), без ланцюжка редиректів.
+---
 
-**Заглушки внутри готовых экранов** (осознанно, не забыто): загрузка фото в форме
-покупки (этап 6); кнопка «Ввести свою ціну» в карточке (этап 5);
-блок «Фото: офіційні з НБУ» в карточке — пока API не отдаёт `source` изображения; правка и
-удаление личной позиции из интерфейса — после демо. «Карта повноти» как отдельный вид
-каталога изъята из тумблера видов (промпт 2) до реализации — не заглушка, а сознательно
-убранный пункт: вернётся отдельной задачей.
+## Guest access and authentication
 
-Заглушка — экран `ComingSoon` с названием раздела и ссылкой в каталог.
+- **Guests** can browse the catalog, open coin cards (without prices and without the
+  ownership layer, BR-2 and `auth.md`), and open the four collection sections, which
+  show onboarding (see "Empty states") with a permanent sign-in button.
+- **Auth dialog.** Sign-in, registration, password reset request and the "check your
+  email" message open in one shared modal (`AuthDialog`) over the current page. A normal
+  sign-in keeps the user on the same page; sign-in started from an "add" action
+  continues to the purchase form for that coin without saving anything automatically.
+  Direct `/login`, `/register`, `/forgot-password`, `/check-email` open the same dialog
+  over a public page. Closing it leaves the site usable; the handled sign-in request is
+  removed from history state so "Back" doesn't reopen it.
+- **Registration** has a hidden honeypot field (`website`): invisible, out of tab
+  order, `autocomplete="off"`, `aria-hidden`. If filled, the form answers as on success
+  and nothing is created. Login errors never reveal whether an address exists; the reset
+  request answers the same either way.
+- **Email links** (`/verify-email`, `/reset-password`) and `/google-complete` keep their
+  own addresses and use a compact screen with a way back to the site. Google sign-in runs
+  in a separate window; its errors and "check your email" come back into the dialog of
+  the original tab.
+- **Sign-out.** Public pages and the four collection root sections keep their address
+  and switch to the guest view. Add/edit pages go to `/collection/coins`, the
+  completeness detail to `/collection/completeness`, settings and admin to `/`. The auth
+  dialog does not open after a voluntary sign-out.
+- **Session expiry** switches the UI to guest mode and offers to sign in again with an
+  explanation.
+- **Form drafts.** Unsaved add/edit forms for purchases and expenses are kept in memory
+  of the current tab for the same account (`sessionDrafts.ts`); sign-out or an account
+  change clears them. An interrupted save is never retried automatically.
 
-### Общие решения, принятые в коде
+---
 
-- **Навигация** (этап 4, шапка и мобильная нижняя панель переработаны 2026-09-09) —
-  двухконтекстная модель вместо плоских семи разделов. В шапке два основных пункта:
-  «Моя колекція» (`/collection`) и «Каталог» (`/catalog`); третий, «Адміністрування»
-  (`/admin`), виден только `user.role === 'admin'` и визуально отделён разделителем. Под
-  шапкой на всех `/collection/*` — вторая строка вкладок «Моя колекція»: Огляд, Монети,
-  Комплектність, Гроші (реализована внутри `AppLayout` по `location`, без отдельного лэйаута на
-  экран), вкладки центрированы по странице.
-  Справа — меню акаунта: заглушка-аватар (силует, фото поки немає — просто зарезервоване
-  місце під нього) + `displayName || email` (обрізається, якщо задовгий) + шеврон.
-  Дропдаун: аватар+ім'я+email зверху, рядок «Мова інтерфейсу» (UA/EN), рядок «Тема»
-  (тепер трипозиційна — світла/темна/**системна**, `ThemeProvider` стежить за
-  `prefers-color-scheme` наживо, поки вибрано «системна»), «Налаштування», «Адміністрування»
-  (адміну), «Вийти». На десктопі мова й тема **додатково** стоять окремими перемикачами в
-  шапці поруч з аватаркою (в дропдауні цей же рядок тоді ховається — не дублюється); на
-  телефоні вони лишаються тільки в дропдауні. Закривається тим же `useDismissable`, що
-  й мобільна шторка фільтрів.
-  Нижня панель на телефоні — контекстна, без «Ще»: поза «Моєю колекцією» (каталог,
-  картка монети) — два пункти, Каталог і Моя колекція; всередині «Моєї колекції» — п'ять,
-  Каталог, Огляд, Монети, Комплектність, **Гроші** (весь простір «Ще» звільнило перенесення
-  Налаштувань і Адміністрування в меню акаунта — ховати вже нічого). Після
-  входу користувач потрапляє на Огляд. Окремої сторінки «створити позицію каталогу» немає
-  й не буде, але **ручне створення особистої позиції є** — усередині форми покупки
-  (рішення власника 2026-09-14, скасовує рішення 2026-09-07 «особисті позиції лише через
-  імпорт»); у каталозі входів у створення позиції як не було, так і немає — він read-only
-  для користувача. Шапка «Мої монети» центрована (`PageHeader align="center"`): заголовок,
-  підзаголовок і дія «+ Додати покупку» (primary, `/collection/add`).
-- **Каталог, фильтры и CTA** (промпт 2): на десктопе боковой панели больше нет — фильтры
-  горизонтальной панелью под заголовком (пошук, «Країна», «Серія», «Рік», «Тип», «Наявність»,
-  сброс), второстепенные («Номінал», «Метал», «Обсяг», архивные) — за кнопкой «Ще фільтри»,
-  раскрытой сразу, если в URL активен хоть один из них. На < 900px панель прячется, остаётся
-  кнопка «Фільтри» → тот же `FiltersPanel`, но в выдвижной панели он работает с черновиком
-  (`draft`, локальный `useState`, копия применённых фильтров на момент открытия), а не с
-  применёнными фильтрами напрямую — кнопка «Показати результати» переносит черновик в URL
-  одним разом; закрытие без неё черновик отбрасывает. На десктопной панели изменение
-  применяется сразу же, как и раньше — черновик только на телефоне (правка 2026-09-09:
-  выбор страны, серии и годов по одному не должен требовать переоткрывать панель трижды).
-  Там же, в шторке, каждое поле — на всю ширину, а не по два в ряд: у поля своя выпадашка
-  (`Select`/`Combobox`, `min-width: 220px`), и поле уже её собственной выпадашки пускало ту
-  за край экрана. Фильтр «Серія» каскадный по
-  стране (`GET /series?countryId`), смена страны сбрасывает и серию, и номинал. Там, где
-  показывается серия монеты (плитка каталогу, таблиці каталогу й позицій, картка монети) и её
-  нет, а монета обігова — замість прочерку показуємо «Обігові монети» (дисплейна підстановка,
-  `seriesLabel`, рішення власника 2026-09-07, не окрема сутність і не участник фільтра «Серія»).
-  Тумблер видов —
-  только «Картки» и «Таблиця» (`?view=map` молча деградирует в `cards`). Выбор запоминается
-  для вошедшего пользователя в настройках аккаунта, с локальным кэшем
-  (`ck.viewMode.catalog` / `ck.viewMode.collection`). Для гостя каталог по умолчанию
-  открывается карточками; его ручной выбор хранится отдельно под
-  `ck.viewMode.catalog.guest`. При заходе без явного `?view=` подставляется
-  запомненное значение; ссылка с явным `?view=` всегда побеждает настройку.
-  На плитке и в таблице —
-  явный CTA: нет в коллекции → «Додати до колекції» на форму покупки с предвыбранной монетой;
-  есть в коллекции → статус «У моїй колекції» (+ «Додати ще екземпляр» на плитке). Вся плитка
-  и вся строка таблицы (кроме колонки действий) кликабельны по паттерну «растянутой ссылки» —
-  доступно с клавиатуры, средней кнопкой мыши и контекстным меню.
-- **Owned-подсветка в каталоге** (решение владельца 2026-09-07, по просьбе брата — чтобы монеты
-  из коллекции ловились боковым зрением при сканировании сетки/таблицы): и плитка, и строка
-  таблицы для монеты `owned` получают заметную зелёную тонировку поверхности (новый токен
-  `--color-owned-surface`, `color-mix` 25 % `--color-owned` поверх `--color-surface-raised`, свой
-  в каждой теме; поднято с исходных 5 % — на первый взгляд было незаметно, решение владельца
-  2026-09-07) плюс рамку/иконку в тон `--color-owned` (не `--color-owned-icon` — этот токен неизменен
-  между темами и не проходил бы 3:1 на тёмном фоне, `--color-owned` специально подобран под
-  контраст в каждой теме). В таблице — ещё и ведущая колонка с иконкой `CircleCheck` (lucide,
-  strokeWidth 1.75, `aria-label="У моїй колекції"`): цвет никогда не единственный носитель
-  информации. Ховер строки/плитки остаётся заметным: у плитки его ведёт `.card:hover` (те же
-  рамка и тень, что и всегда), в таблице — смешанный тон (`color-mix` тонировки с
-  `--color-row-hover`), чтобы подсветка не «съедала» ответ на ховер.
-- **Материал в списках каталога** (просьба владельца 2026-09-09: визуально одинаковые монеты
-  расходятся в цене, и по плитке непонятно почему). Значение считает общий
-  `shared/lib/coinMaterial.ts` — название из справочника (`composition.name`), затем
-  свободный текст (`material`), иначе пусто. Металл (`metalKind`) в списках не подставляется:
-  это фасет фильтра, а не материал; фолбек на него остался только на карточке монеты, где
-  строка подписана «Метал / матеріал». На плитке материал стоит справа от номинала, тоном
-  тише, и укорочен до двух слов (`shortMaterial`): «Сталь із латунним покриттям» → «Сталь…»,
-  полный текст — в тайтле. Хвостовое короткое слово отбрасывается вместе с остальными:
-  «Сталь із…» не говорит больше, чем «Сталь…», и читается хуже (решение владельца
-  2026-09-09). Порог — в символах, а не по списку предлогов: материал это данные, на языке
-  эмитента. В таблице — колонка «Матеріал» сразу после номинала, без сортировки (поля для
-  неё в API нет), длинное значение обрезается в две строки. Чтобы колонка влезла, «Монета»
-  ограничена 26 % ширины таблицы, а название монеты обрезается в две строки, как на плитке
-  (раньше колонка тянулась за самым длинным названием страницы); `min-width` таблицы — 980px.
-  Заголовки таблицы центрированы по всем колонкам, включая «Монета»: шапка читается одной
-  ровной полосой, а не левым названием и центрированным остатком. Центрирование — **глобальное
-  правило** `th { text-align: center }` в `tokens.css` (решение владельца 2026-09-09), а не
-  свойство отдельной таблицы: так же выглядят «Мої монети» и «Гроші». Модули таблиц не
-  переопределяют его — классы выравнивания (`.number` и т. п.) вешаются на ячейки, не на
-  заголовки. Значок сортировки в центрировании не участвует: с той стороны кнопки стоит
-  распорка в его ширину (`.sortButton::before`), поэтому по центру колонки стоит само
-  название, а не «название со стрелкой» — на коротком «Країна» смещение было особенно
-  заметно. Распорка, а не абсолютное позиционирование: шапка сохраняет одну высоту, и значок
-  не может налезть на соседнюю колонку.
+## Navigation and layout
 
-  Таблица «Мої монети» (`PositionTable`) получила то же лечение (2026-09-09): свои ширины
-  у каждой колонки, серия в две строки, название монеты — в **фиксированном** двухстрочном
-  окне, а не просто обрезанное. Разница с каталогом в том, что под названием здесь идёт
-  вторая строка («1965 · 1 рубль»), и без фиксированного окна строка с однострочным именем
-  была ниже строки с двустрочным. Плашка «В архіві» переехала на эту же вторую строку —
-  своей строкой она делала архивную позицию выше всех остальных.
+### Header and account menu
 
-  «Мої екземпляри» на карточке монеты под это правило не попадают: это не таблица, а список
-  записей, где подпись стоит **над своим значением** в каждой строке и выровнена с ним по
-  левому краю (`InstancesList`, грид с повторяющимися подписями, на узком экране — в две
-  колонки). Центрировать там нечего.
-- **Одна таблица на весь сайт** (решение владельца 2026-09-09: «давайте везде фиксить
-  таблицы и сделаем их консистентно»). `shared/ui/DataTable` — панель, шапка, ритм строк и
-  элемент сортировки; фича добавляет только ширины своих колонок и вид содержимого ячеек.
-  Так устроены все три таблицы: каталог, «Мої монети» и журнал «Гроші».
-  - **Сортируется каждая колонка**, в каждой таблице, одним и тем же `SortHeader`: клик по
-    уже сортирующей колонке переворачивает направление, по любой другой — начинает по
-    возрастанию. Состояние живёт в адресе (`?sort&order`), как фильтры. В каталоге и
-    «Моїх монетах» те же поля продублированы выпадашкой сортировки в тулбаре; у «Грошей»
-    тулбара нет, там только заголовки.
-  - **Выравнивание — одно правило на все таблицы**: по центру всё, кроме названий и
-    описаний; они слева (решение владельца 2026-09-09 — суммы справа рядом с
-    центрированным остальным выглядели неоднородно, так что вправо теперь не прижимается
-    ничего, и класса для этого в общем модуле нет). Заголовки центрирует `th` в
-    `tokens.css`. Попутно выяснилось, что в «Моїх монетах» и «Грошах» класс `.number`
-    висел и на `th`, и на `td`, но проигрывал по специфичности правилу `.table td` — то
-    есть суммы там и раньше не были прижаты вправо, просто это не бросалось в глаза.
-    Теперь выравнивание по умолчанию задаётся на `.table` и достаётся ячейкам по
-    наследованию, поэтому класс на ячейке всегда сильнее.
-  - **Ширины колонок заданы во всех трёх** таблицах — иначе таблица меряет текст каждой
-    страницы заново (см. ниже).
-- **Таблица каталога не должна дышать** (замечания владельца 2026-09-09). Ширины колонок
-  заданы явно (`%`, а колонка действий — в пикселях): без них таблица мерила текст каждой
-  страницы заново, и одна и та же серия ложилась то в две строки, то в три, а строки прыгали
-  по высоте между страницами. Серия и материал обрезаются двумя строками (`.clamped`), как и
-  название монеты, — высота строки одна на всю таблицу. Обе формы действия в строке («Додати
-  до колекції» и плашка «У моїй колекції +1») делят общую ширину `--catalog-action-width`,
-  иначе страница из плашек и страница из кнопок давали колонке разную ширину и сдвигали
-  остальные. Значки сортировки — один и тот же двойной шеврон во всех трёх состояниях
-  (`SortIcon`, геометрия lucide `chevrons-up-down`): у активной колонки подсвечена
-  соответствующая половина, у остальных обе приглушены. Раньше активная колонка получала
-  одиночную стрелку и заметно выбивалась из шапки. Отдельного словаря
-  материалов на фронте нет и не будет: локализованное название приходит с бэкенда
-  (`composition.name` из справочника `materials`), а `material` — это то, что написал
-  источник. Когда поле впервые показали, наружу вылезли технические токены из легаси-базы
-  (`nickel_silver`, `silver`) — чинили в данных миграцией `0007`, а не подстановкой на
-  клиенте (`data-model.md`, `materials`).
-- **Фильтр «Період» — один дропдаун вместо голых полей «Рік від/до»**
-  (`shared/ui/PeriodFilter.tsx`, решение владельца 2026-09-22: изначально поля висели прямо в
-  панели фильтров — сначала парой `Combobox`, потом как отдельный `Select` режима над отдельной
-  строкой полей; обе версии ломали выравнивание тулбара — либо строка полей торчала под
-  соседними колонками, либо режим и поля жили визуально порознь). Триггер и панель переиспользуют
-  хром `Select`/`MultiSelect` (`Select.module.css`: `.wrapper`/`.trigger`/`.menu`/`.list`/
-  `.option`), так фильтр не выбивается из ряда «Країна»/«Серія»/… Открытая панель — список из
-  трёх режимов (`Рік` / `Діапазон років` / `Діапазон дат`, каждый — кнопка в стиле `.option`, с
-  чекой у выбранного) и под ним поля активного режима: один `Combobox` для точного года, пара
-  `Combobox` для диапазона лет (тот же компонент и та же история его выбора, что раньше стояла
-  здесь — редактируемое поле со своей выпадашкой-подсказкой, `shared/ui/Combobox.tsx`), пара
-  текстовых полей плюс календарь `react-day-picker` для диапазона дат (ниже). Переключение режима
-  не обнуляет значения других режимов — они просто не рендерятся, пока не выбраны, так случайный
-  клик не стирает то, что уже ввели. Текст на самой кнопке-триггере — сводка значения (`1990`,
-  `1990–2010`, `06.09.2026–11.09.2026`) или, пока в активном режиме ничего не ввели, название
-  режима; поле — фиксированной ширины (210px), под самое длинное реалистичное содержимое
-  (полный диапазон дат), а не под текущий режим — раньше ширина скакала при каждом переключении и
-  двигала весь тулбар (owner's report, 2026-09-22). Список режимов и очистка — через
-  `catalog.periodClear`. Границы года считает то же `shared/lib/yearRange.ts`, что и раньше
-  (`computeYearBounds`/`buildYearList`), плюс `clampPeriod()` — клампит `year` или
-  `yearFrom`/`yearTo`, смотря какой режим активен, к границам новой страны при её смене (диапазон
-  дат не клампится — границы в годах, не в датах). Состояние — один объект
-  `period: { mode; year?; yearFrom?; yearTo?; dateFrom?; dateTo? }` (`shared/lib/periodFilter.ts`)
-  вместо двух отдельных `yearFrom`/`yearTo`; в URL те же ключи, что были, плюс
-  `year`/`dateFrom`/`dateTo` и необязательный `periodMode` (пишется только когда режим не «діапазон
-  років» — старые расшаренные ссылки с одними `yearFrom`/`yearTo` читаются как раньше). Режим
-  «Діапазон дат» фильтрует по `issue_date` с фолбэком на `issue_year`, когда точная дата не
-  указана — `issue_date_range_condition()` (`backend/app/repositories/catalog.py`, переиспользуется
-  `collection.py`), маппинг режима на query-параметры — `periodToApiParams()`
-  (`shared/lib/periodFilter.ts`), а не мимо-режимный `period.dateFrom`/`dateTo` напрямую: значения
-  неактивных режимов не обнуляются при переключении (выше), и наивное чтение утекло бы в запрос
-  даже когда активен «Рік»/«Діапазон років» (`docs/api.md`).
-- **Календарь диапазона дат — `react-day-picker` (10.0.1), первая внешняя UI-зависимость в
-  проекте** (решение владельца 2026-09-22, после `<input type="date">`: нативный календарь и
-  плейсхолдер берут язык из браузера/ОС, а не из переключателя `uk`/`en` — ни `lang` на элементе,
-  ни локаль браузера/контекста это не меняют, проверено вживую). `react-day-picker/locale` (`uk`,
-  `enUS`) переключает месяцы, дни недели и ARIA-подписи вместе с `i18n.language` по-настоящему;
-  текстовые поля рядом — со своим буфером ввода (`fromText`/`toText`, синхронизируются `useEffect`
-  от `value.dateFrom`/`dateTo`, тот же приём, что debounce поиска) — принимают дату и руками, в
-  формате `dd.MM.yyyy` (uk) / `MM/dd/yyyy` (en, `shared/lib/periodFilter.ts:periodDateFormat`).
-  Тема — переопределение `--rdp-*` поверх `@import 'react-day-picker/style.css'` (один раз,
-  `main.tsx`) значениями токенов проекта (`PeriodFilter.module.css`, `:global(.rdp-root)`) — тёмная
-  и светлая темы обе работают без отдельного блока, раз токены уже сами меняются по `data-theme`.
-  Шапка календаря — `captionLayout="dropdown"` (месяц и год — отдельные выпадашки), а не просто
-  стрелки «назад/вперёд»: каталог тянется до 1900-х, а щёлкать «предыдущий месяц» сотни раз до
-  нужного года — не способ (owner's report, 2026-09-22); границы выпадашки года — те же
-  `yearOptions`, что уже считает `computeYearBounds` для выбранной страны. Клик по дню в
-  календаре идёт не через встроенную логику `mode="range"` (`onSelect`) — она сама решает, какую
-  границу (от/до) двигать по принципу «какая ближе», без всякой подсказки — а через свой
-  `onDayClick` (`handleDayClick`), привязанный к `activeField`: клик в текстовое поле «від»/«до»
-  (`onFocus`) делает его активным, и следующий клик по календарю двигает именно его; над
-  календарём — подсказка `catalog.periodPickFrom`/`periodPickTo`, меняющаяся вместе с
-  `activeField`.
-- **Поиск в каталоге ищет по префиксу слова**, а не только по целому слову (решение владельца
-  2026-09-07: «Оде» должно находить «Одеса» без ввода слова целиком — в каталоге много монет,
-  посвящённых городам). Полнотекстовый поиск по названиям (`_title_prefix_condition`,
-  `backend/app/repositories/catalog.py`) строит `to_tsquery` с `:*` на каждом слове запроса вместо
-  `plainto_tsquery`; слова выделяются своим regex, а не летят в `to_tsquery` как есть — символы
-  синтаксиса tsquery (`&`, `(`, …), случайно введённые в поле поиска, игнорируются, а не валят
-  запрос 500-й. Поиск по стране и каталожным номерам — тот же `ILIKE '%…%'`, что и был, там
-  частичные совпадения уже работали.
-- **Действия, меняющие деньги, объясняют последствие**: удаление экземпляра говорит
-  «разом із витратою на покупку», форма покупки — «екземпляр і витрата створюються разом».
-  Расходы `coin_purchase` в «Гроші» только читаются.
-- **Заголовок позиции** — `title_{локаль} → titleOriginal`, и за оригиналом ничего нет.
-  Правило живёт в одном месте (`shared/lib/coinTitle.ts`) и применяется и в каталоге,
-  и в карточке; API отдаёт `title` по тому же правилу. Если показан перевод, карточка
-  называет и оригинал: «Оригінал: Рубль (російська)».
-- **Язык ответа** — клиент шлёт `Accept-Language` из текущей локали, и при её смене
-  кэш запросов сбрасывается целиком: каждое имя в закэшированном ответе на том языке,
-  на котором его запросили.
-- **Изображения** — один компонент `CoinImage`: отсутствующее фото и фото, которое не
-  удалось загрузить (uCoin за Cloudflare), выглядят одинаково — стилизованная монета в
-  цветах темы, без битых `<img>` и без повторных запросов к мёртвому адресу. Размер
-  выбирается по месту (`shared/lib/coinImage.ts`): список берёт 300 px, карточка 600,
-  лайтбокс 1200, и каждый предлагает следующий на 2x через `srcset`.
-- Везде, где показывается настоящее фото (плитки списков, миниатюры таблиц, карточка
-  монеты, лайтбокс) — `fit='contain'` (дефолт компонента): монета вписывается целиком,
-  ничего не обрезается по краям зоны. В плитке каталога половинки аверс/реверс —
-  квадраты (`.media` с `aspect-ratio: 2 / 1` и `gap: 2px` даёт две квадратные половины),
-  поэтому круглая монета заполняет квадрат от края до края, а некруглая вписывается по
-  высоте — предметы разной формы не выглядят разномасштабными рядом друг с другом.
-  Блендинга у `<img>` нет ни в одной теме — фото просто лежит на фоне карточки.
-  `remove_photo_backgrounds.py` (`media.md`) вырезает фон у большинства фото в
-  прозрачность, и такое фото ничего дополнительно не требует. Фото, которое прогон
-  пропустил (`skip:*`, ещё со сплошным фоном), показывает этот фон прямоугольником —
-  принятый компромисс до следующего прохода пайплайна, фронт его не маскирует ни в
-  светлой, ни в тёмной теме.
-- **Страны**: чипы фильтра — активные; в форме «Створити свою позицію» — поиск по всем
-  260 эмитентам, по любому из трёх имён и по коду.
-- **Строки интерфейса** — только в `shared/i18n/{uk,en}.json`; тест проверяет, что наборы
-  ключей совпадают (с учётом форм множественного числа).
-- **Деньги и даты** — форматируются хелперами `shared/lib/format.ts` из строк API,
-  цифры табличные.
-- **Единый паттерн пустых состояний** (обновлено 2026-09-24): у гостя и у
-  пользователя с `bootstrap.dashboard.isEmpty` четыре раздела («Огляд», «Монети»,
-  «Комплектність», «Гроші») показывают шапку без действий и одну карточку
-  `CollectionOnboarding`. В каждом разделе три слайда с пометкой «Приклад»:
-  обзор — показатели, сравнение затрат и оценки, прогресс серий; монеты — представления,
-  поиск и фильтры, экземпляры; комплектность — группировка, прогресс, недостающие монеты;
-  деньги — виды расходов, период графика, категории журнала. Числа демонстрационные,
-  клиентские, не участвуют в запросах и расчётах реальной коллекции.
-  Кнопка гостя «Увійти» открывает прежний диалог входа. У пользователя сохранены
-  «Перейти до каталогу» (`/catalog`) и «Додати монету» (`/collection/add`). Все действия
-  доступны сразу и на любом слайде. Реальные таблицы, фильтры и нулевые KPI в этом
-  состоянии не показываются. Загрузка, ошибки и пустая выдача фильтров не заменяются
-  обучением; критерий пустой коллекции остаётся прежним.
-- **Карточка знакомства**: общая ширина `100%; max-width: 560px`, поверхности и цвета
-  из токенов обеих тем. Слайды занимают общую CSS-сетку с одинаковыми зонами для примера
-  и пояснения; скрытые слайды исключены из дерева доступности и фокуса. Место для
-  постоянных действий зарезервировано и у гостя, и у владельца: размеры не меняются
-  между разделами и слайдами при одной ширине экрана. На телефоне зарезервировано также
-  место под длинные подзаголовки страниц. Стрелки и точки листают по кругу, клавиши
-  ←/→ и Home/End работают в блоке навигации; горизонтальный свайп не мешает вертикальной
-  прокрутке. Автоперелистывания нет. Смена раздела открывает его первый слайд.
-  Для остальных пустых состояний сохранён `EmptyState` (`shared/ui/States.tsx`),
-  включая прежний вариант `card` шириной до 480px.
-  Внутрішньоконтентні «нічого не знайдено» після
-  фільтрів/пошуку (каталог, «Мої монети», серії) лишаються без рамки (`variant="plain"`,
-  дефолт, на всю ширину). `EmptyState`/`ErrorState` більше не мають текстовий
-  гліф дефолтом — тільки іконки lucide, `strokeWidth={1.75}`, як у плиток. Одна сутність —
-  одна іконка (Огляд і Мої монети навмисно різні, щоб не дублювати іконку на сусідніх
-  вкладках):
+Two main contexts: **"Моя колекція"** (`/collection`) and **"Каталог"** (`/catalog`);
+**"Адміністрування"** (`/admin`) appears only for `role === 'admin'`, set apart by a
+divider.
 
-  | Страница / состояние                                              | Иконка              |
+The account menu (avatar or placeholder silhouette, `displayName || email`, chevron)
+holds: user block, interface language (UA/EN), theme (light / dark / system — "system"
+follows `prefers-color-scheme` live), Settings, Administration (admins), Sign out. On
+desktop, language and theme are also separate switches in the header and the duplicate
+rows are hidden from the menu; on phones they live only in the menu. Menus and drawers
+close on outside tap, item choice, route change and Escape (`shared/lib/useDismissable`).
+
+### Collection tabs and mobile bottom bar
+
+Every `/collection/*` page shows a second, centered row of tabs: Overview, Coins,
+Completeness, Money (rendered by `AppLayout` from the location).
+
+The phone bottom bar is contextual: outside "Моя колекція" (catalog, coin card) it has
+two items, Catalog and My collection; inside it has five — Catalog, Overview, Coins,
+Completeness, Money. It is fixed, height `--bottom-nav-inset` (56px +
+`env(safe-area-inset-bottom)`), with `viewport-fit=cover` and `100dvh`; content, toasts
+and modals are offset by the same inset.
+
+Page headers are centered everywhere (`PageHeader align="center"`): title, subtitle and
+actions stacked; the breadcrumb slot, where present, stays left-aligned.
+
+### Footer, support and donation
+
+`SiteFooter`: "made in Ukraine", copyright, links to `/privacy` and `/terms`, a support
+link and a donation button. The support link comes from the API (`/support/telegram`,
+or a personal `/support/telegram/link` for a signed-in user — `telegram-support.md`); on
+failure a toast says support is unavailable. The donation dialog links to the donation
+jar and shows a QR code (`qrcode.react`, lazy-loaded).
+
+### Page scrolling
+
+On desktop the page scrolls inside the area under the header (`AppLayout` →
+`.scrollArea`, `data-scroll-area`), not the window: the header is its own row, the
+scroll container has `overflow-y: auto` and `scrollbar-gutter: stable`. The gutter is
+therefore always reserved (no sideways jump between short and long screens or when a
+modal locks scrolling), and the header always reaches the window edge. On phones
+(`max-width: 900px`) the document scrolls again so the browser can collapse its address
+bar; the header is `position: sticky`.
+
+Scroll-to-top and background locking go through `shared/lib/pageScroll.ts`
+(`scrollPageToTop`, `lockPageScroll`), which find the live container — `ScrollToTop`,
+`Pagination`, `Modal` and `Lightbox` don't need to know which one it is.
+
+---
+
+## Visual system
+
+All colors, radii, shadows and motion are tokens in
+`frontend/src/shared/theme/tokens.css`; components never paint the theme by hand, so
+both themes stay in sync on every screen.
+
+### Themes
+
+Two equal themes, light by default, switchable in the header; the choice is remembered,
+and without one the app follows `prefers-color-scheme`.
+
+- **Light — "archive stone".** A neutral warm mineral background, ivory for raised cards,
+  charcoal-brown text, brass **only as an accent**, never on large surfaces. A light
+  neutral background is chosen for the coins: silver, copper and nickel read better on
+  it than on dark.
+- **Dark — graphite and blued steel.** All large surfaces are **pure neutral grey
+  (R = G = B)**; hierarchy comes from lightness only. Warmth comes only from "hardware":
+  brass accents, active navigation, buttons, focus, the coins themselves. Resting borders
+  are neutral steel (`--color-border`); brass marks only hover, focus, selected and
+  active states. No brown, coffee, leather or wood tones on surfaces.
+- **Surface ladder** (both themes): `bg` → `surface-sunken` → `surface` →
+  `surface-control` → `surface-raised` → `surface-hover`. Structural panels (filters,
+  charts, tables, overview columns) use `Card variant="panel"`: one step lower, smaller
+  radius, almost no shadow. Raised cards get a top-edge highlight and a two-layer shadow.
+- **Owned / absent colors.** `--color-owned` / `--color-absent` (text, per-theme for
+  contrast) and `--color-owned-icon` / `--color-absent-icon` (badge fills, same in both
+  themes) are separate from `--color-success` / `--color-danger`, which belong to
+  financial deltas and errors. `--color-owned-surface` tints owned catalog tiles and rows.
+
+### Typography
+
+- **Playfair Display** (`--font-display`) belongs to **content**: page titles, coin and
+  series names, auth screen titles, large price values, stat tile values. It is applied
+  explicitly (`.display` or an own `font-family`), never to all `h1–h3`.
+- **Source Sans 3** (`--font-body`) for all interface text: panel and dialog titles,
+  form sections, tabs, buttons, table headers, labels, helper text.
+- Numbers are always `tabular-nums`.
+- Any font must have full Ukrainian coverage (`є ї ґ`, apostrophe).
+
+### Texture, decoration, motion
+
+- **Page texture:** one seamless 256×256 WebP tile per theme
+  (`frontend/src/assets/textures/`), drawn once globally by `body::before` in
+  `tokens.css` (`position: fixed`, under `#root`). Opacity `--page-texture-opacity`
+  (0.055 light, 0.065 dark) — above ~0.1 the grain reads as noise. Off under
+  `prefers-reduced-data: reduce` and `forced-colors: active`. The texture belongs to the
+  page background only: header, cards, panels, tables, fields, menus and modals paint
+  opaque surfaces over it.
+- **Decoration:** CSS and SVG only, no heavy raster backgrounds. Gradients only as the
+  material of a control (the primary button), not as scene decoration. No glass
+  (`backdrop-filter`), glows or halos behind coins; the photo stand is a plain surface.
+- **Motion:** CSS transitions only, 120–180 ms (`--duration-fast`, `--duration-normal`,
+  `--ease-standard`); hover lift ≤ 2px, coin photo zoom 1.5–2.5%. No continuous
+  animation or springs. `prefers-reduced-motion: reduce` disables motion globally except
+  `.motion-essential` (the spinner).
+
+### Scrollbar
+
+One global style in `tokens.css`: 8px, rounded thumb `--color-border-strong`
+(`--color-text-muted` on hover), transparent track, no arrow buttons. Blink ignores all
+`::-webkit-scrollbar-*` rules once `scrollbar-width` is set, so the standard properties
+live under `@supports not selector(::-webkit-scrollbar)` (Firefox only). No screen styles
+its own scrollbar.
+
+### Icons
+
+`lucide-react` everywhere, `strokeWidth={1.75}`; never text glyphs (`×`, `✓`, `☰`,
+`↑`…) for things that have an icon. Color is never the only carrier of meaning: owned
+status also has an icon and an accessible label.
+
+---
+
+## Shared patterns
+
+### Filter panels
+
+The catalog and "Мої монети" share one shell (`FiltersShell` / `FiltersToolbar` in
+`shared/ui`): a framed row of fields, a row of active-filter chips, and a bottom line
+with "shown X of Y", view switch, sort field and direction. Filter state lives in the
+URL (`useCatalogFilters`, `useCollectionFilters`), so links and "Back" keep it.
+
+- **Desktop:** fields apply immediately.
+- **Phones (< 900px) — apply-on-confirm:** fields hide behind a "Фільтри" button that
+  opens a drawer. The drawer edits a local **draft** copied from the applied filters when
+  it opens; "Застосувати" writes the draft to the URL at once, closing without it
+  discards the draft. Each field is full width in the drawer so its dropdown fits.
+- **Catalog fields:** search, country, series (cascades from the chosen countries,
+  `GET /series?countryId`; changing the country resets series and denomination; the
+  series list has its own search box), period (see below), denomination, type
+  (circulation / collector / commemorative / other), metal, metal kind
+  (precious / base), availability (owned / missing; signed-in only).
+  `scope` (`all | shared | own`) and `archived=true` are read from the URL but have no
+  control (see "Not built").
+- **"Мої монети" fields:** the same set plus **grade** (fixed `GRADES` list). Grade
+  selects positions that have at least one purchase with that grade, while the
+  position's aggregates still count all its purchases. Country, series and denomination
+  lists come from `GET /collection/countries`, `/series`, `/denominations` — only what
+  the user owns.
+- **Catalog search** matches word prefixes (`to_tsquery` with `:*` per word, built
+  server-side; tsquery syntax characters are ignored). Country and catalog numbers match
+  as substrings.
+- **Selects:** `Select`, `MultiSelect` and `Combobox` share one chrome
+  (`Select.module.css`). A select can take `triggerLabel` (show custom content in the
+  trigger) and `active` (highlight a non-default pick). `Combobox` = free typing plus a
+  suggestion list.
+
+### Period filter
+
+`shared/ui/PeriodFilter.tsx`: one dropdown in the filter row instead of loose year
+fields. The panel lists three modes — **year**, **year range**, **date range** — and
+under it the active mode's fields: one `Combobox` for a year, two for a range, two text
+inputs plus a `react-day-picker` calendar for dates.
+
+- Switching mode doesn't clear other modes' values; only the active mode is sent
+  (`periodToApiParams()` in `shared/lib/periodFilter.ts`), so hidden values never leak
+  into the query.
+- The trigger shows a summary (`1990`, `1990–2010`, `06.09.2026–11.09.2026`) or the mode
+  name; its width is fixed (210px) so the toolbar doesn't jump.
+- Year bounds come from `shared/lib/yearRange.ts` (`computeYearBounds`,
+  `buildYearList`); `clampPeriod()` clamps year values to the new country's bounds when
+  the country changes (dates aren't clamped).
+- URL keys: `year`, `yearFrom`, `yearTo`, `dateFrom`, `dateTo`, and `periodMode`
+  (written only when the mode isn't "year range", so old `yearFrom`/`yearTo` links still
+  work). Date range filters by `issue_date`, falling back to `issue_year` (`api.md`).
+- **Calendar:** `react-day-picker` with its `uk` / `enUS` locales, because the native
+  date input takes its language from the browser, not from the app. Text inputs accept
+  `dd.MM.yyyy` (uk) / `MM/dd/yyyy` (en). Themed by overriding `--rdp-*` with project
+  tokens. Month and year are dropdowns (`captionLayout="dropdown"`), the year range is the
+  country's year bounds. Day clicks move the boundary whose text field was focused last
+  (`activeField`), not whichever is closer; a hint above the calendar says which.
+
+### Tables
+
+One table component for the whole site, `shared/ui/DataTable`: panel, header, row
+rhythm and the sort control. Features add only column widths and cell content. Used by
+the catalog table, "Мої монети" (`PositionTable`) and the Money journal.
+
+- **Every column sorts**, with the same `SortHeader`: clicking the active column flips
+  direction, another column starts ascending. State lives in the URL (`?sort&order`).
+  The catalog and "Мої монети" also offer the sort fields in the toolbar dropdown.
+- **Sort icon:** one double chevron (`SortIcon`) in all states; the active half is
+  highlighted. A spacer of the icon's width on the other side (`.sortButton::before`)
+  keeps the label itself centered.
+- **Alignment:** everything centered except names and descriptions (left). Headers are
+  centered by the global `th { text-align: center }` in `tokens.css`; the default
+  alignment is set on `.table` and inherited, so a class on a cell always wins.
+- **Fixed geometry:** every column has an explicit width, and long text (coin name,
+  series, material) is clamped to two lines, so row height doesn't change between pages.
+  In "Мої монети" the coin name sits in a fixed two-line box above its second line
+  ("1965 · 1 рубль"), and the "archived" badge sits on that second line.
+- Whole rows are links (stretched-link pattern: keyboard, middle click and context menu
+  work), except the actions column.
+
+### Coin images
+
+One component, `CoinImage`. A missing photo and a photo that failed to load look the
+same: a stylized coin in theme colors — no broken `<img>`, no retries of a dead URL.
+Size by place (`shared/lib/coinImage.ts`): lists 300px, card 600px, lightbox 1200px,
+each offering the next size as 2x in `srcset`; `loading="lazy"`. Real photos use
+`fit='contain'`: nothing is cropped. No `mix-blend-mode` in either theme — photos lie
+on the card surface. Most photos have transparent backgrounds (`media.md`, background
+removal); a few still show their solid background as a rectangle, and the frontend
+doesn't mask that.
+
+### Coin titles, material and response language
+
+- **Title** = `title_<locale>` → `titleOriginal` (`shared/lib/coinTitle.ts`); the API
+  sends `title` by the same rule. When a translation is shown, the card also names the
+  original and its language (BR-12).
+- **Material** in lists comes from `shared/lib/coinMaterial.ts`: dictionary name
+  (`composition.name`), else free text (`material`), else nothing. `metalKind` is a
+  filter facet, not a material — only the coin card falls back to it. On catalog tiles
+  the material is shortened to two words (`shortMaterial`), full text in the tooltip.
+  There is no material dictionary on the frontend.
+- **Series fallback:** where a series is shown and a circulation coin has none, the UI
+  shows "Обігові монети" (`seriesLabel`, display only, not a filter value).
+- **Response language:** the client sends `Accept-Language` from the current locale and
+  clears the whole query cache when the locale changes.
+
+### Money and dates
+
+Formatted by `shared/lib/format.ts` from API strings, tabular numerals. The secondary
+currency (`USD`/`EUR` setting) is shown small next to UAH (`shared/lib/secondaryAmount.ts`,
+BR-6).
+
+### Empty states
+
+- **Empty collection** — a guest, or a user whose `bootstrap.dashboard.isEmpty` is true
+  (no instances and no personal positions). The same criterion on every screen, no local
+  heuristics. The four sections (Overview, Coins, Completeness, Money) then show a header
+  without actions and one `CollectionOnboarding` card with three example slides marked
+  "Приклад" (overview: KPIs, spend vs value, series progress; coins: views, search and
+  filters, instances; completeness: grouping, progress, missing coins; money: expense
+  kinds, chart period, journal categories). Numbers are demo data on the client. Guests
+  get "Увійти" (opens the auth dialog); users get "Перейти до каталогу" and "Додати
+  монету". Real tables, filters and zero KPIs are not rendered. Loading, errors and empty
+  filter results are never replaced by onboarding.
+- **Onboarding card:** `width: 100%; max-width: 560px`; slides share one CSS grid so the
+  card never changes size between slides or sections; hidden slides are out of the
+  accessibility tree and focus order. Arrows and dots loop; ←/→ and Home/End work;
+  horizontal swipe doesn't block vertical scroll; no autoplay; changing section opens
+  its first slide.
+- **Other empty states** use `EmptyState` (`shared/ui/States.tsx`); "nothing found"
+  after filters or search is borderless and full width (`variant="plain"`). Icons:
+
+  | State | Icon |
   |---|---|
-  | Огляд колекції                                                    | `LayoutDashboard`   |
-  | Мої монети                                                        | `Coins`             |
-  | Комплектність (порожній «Мої», кнопка «Показати всі»)            | `Layers`            |
-  | Гроші                                                             | `Wallet`             |
-  | «Нічого не знайдено» после фильтров/поиска (Мої монети, Каталог, Комплектність) | `SearchX` |
-  | Заглушки «Незабаром» (`ComingSoon`)                               | `Hourglass`          |
-  | Ошибка (`ErrorState`)                                             | `CircleAlert`  |
-  | Дефолт `EmptyState` (где иконка не задана явно)                   | `CircleDashed` |
+  | Overview | `LayoutDashboard` |
+  | My coins | `Coins` |
+  | Completeness ("Мої" empty, "show all") | `Layers` |
+  | Money | `Wallet` |
+  | Nothing found after filters/search | `SearchX` |
+  | `ComingSoon` placeholder | `Hourglass` |
+  | `ErrorState` | `CircleAlert` |
+  | `EmptyState` default | `CircleDashed` |
 
-> **О языке восстановленных строк.** Все 226 строк из бандла — **русские и английские**:
-> десктопная версия говорила на этих двух языках. Веб-версия говорит на **украинском и
-> английском**. Поэтому английские строки переиспользуются как есть, а **украинские пишутся
-> заново** — это отдельная работа этапа 4 (`11-roadmap.md`), а не перевод по ходу вёрстки.
-> Русские строки восстановленного бандла остаются справочником смысла: они точно
-> описывают, что делает каждый элемент. В приложение они не попадают.
->
-> Русские формулировки ниже приводятся именно как такой справочник — это цитаты из legacy,
-> а не тексты будущего интерфейса.
+### Destructive actions
 
----
+Actions that change money say what else happens: deleting an instance says the purchase
+expense goes with it (BR-10); the purchase form says instance and expense are created
+together. Deleting an instance or a purchase invalidates the same set of queries
+(`COLLECTION_DEPENDENT_KEYS`, includes expenses), so every aggregate refreshes together.
 
-## Визуальное направление
+### Localization
 
-Рамки для этапа 4. Не макет и не дизайн-система — набор решений, которые приняты заранее,
-чтобы вёрстка не начиналась с их обсуждения.
-
-### Светлая тема «архивный камень» — канон MVP
-
-**Уточнено визуальным рефрешем 2026-09-07.** До рефреша тема была кремовой, и фон,
-панель, карточка и утопленный блок различались только светлотой одного и того же оттенка:
-ничего не отделяло приподнятую карточку от подложки, а общее впечатление уходило в
-«ванильное» и кулинарное. Теперь основа — нейтральный тёплый минеральный фон (заметно
-темнее прежнего и без сильной подкраски), слоновая кость для приподнятых карточек,
-угольно-коричневый текст, латунь **только как акцент**, а не как цвет больших
-поверхностей. Серифная типографика остаётся, но у контентных заголовков (см. «Шрифты»).
-
-Обязательное требование к светлой теме — видимая, но сдержанная лестница поверхностей:
-
-`bg` → `surface-sunken` → `surface` → `surface-control` → `surface-raised` → `surface-hover`
-
-Тень отмечает высоту только там, где высота осмысленна; в остальном разделяют цвет и
-рамка. Структурная панель (фильтры, графики, таблицы, колонки обзора) — `variant="panel"`
-у `Card`: поверхность на ступень ниже, меньший радиус, почти без тени. Приподнятая
-карточка — подсветка верхней грани плюс двухслойная тень (контактная и мягкая рассеянная),
-без ореола.
-
-### Тёмная тема — камень и вороненая сталь
-
-**Исправлено 2026-09-07, после первого прогона рефреша.** Первая версия тёмной темы вышла
-тёплой до коричневого: `#11100e`, `#191713`, `#332d25` — во всех больших поверхностях
-красный канал заметно выше синего, и кабинет читался как шоколад, кофе и тёмное дерево.
-Правильное направление — **почти чёрный вулканический камень, антрацит, графит, вороненая
-сталь**. Требование к большим поверхностям жёсткое: зелёный и синий каналы **не ниже**
-красного, иерархия строится **светлотой**, а не добавлением красного или жёлтого.
-
-Тепло в тёмной теме приходит только от фурнитуры: латунные акценты, активная навигация,
-кнопки, фокус, сами монеты и отдельные семантические значения. Заливка карточки или
-панели тёплой быть не может. Обычная рамка — нейтральная сталь (`--color-border`), латунь
-— только ховер, фокус, выбранное и активное состояние; латунь не может быть рамкой покоя
-у каждой карточки.
-
-**Уточнено 2026-09-07 по скриншоту каталога.** Первая попытка «уйти от коричневого»
-ушла в противоположную сторону: шапка и панель фильтров были `#0d0f10`, карточки —
-`#141719`, то есть синего на 3–5 больше красного. На таких уровнях это не мелочь, а
-перекос в 20–25 %, и при нейтральном фоне страницы (`#090909`) шапка читалась синей, а
-карточки — серой плитой. Правило теперь жёстче и проще: **все большие поверхности —
-чистый нейтральный серый, R = G = B**. Нейтральный не может уехать ни в синеву, ни
-обратно в коричневый, а характер теме дают текстура, тёплый цвет текста и латунная
-фурнитура, а не подкраска заливок. Иерархия — только светлотой, шагами в несколько
-уровней от почти чёрного:
-
-`bg #050505` → `sunken #070707` → `surface #0b0b0b` (шапка, панели) →
-`control #0d0d0d` (поля) → `raised #111111` (карточки) → `hover #181818`,
-рамки `#262626` / `#454545`.
-
-Тёмная тема — **вторая, равноправная**, и получает ту же лестницу и ту же систему высот.
-Золото в ней не светится; ярких жёлтых CTA нет. Обе темы получаются из одного набора
-компонентов: каждый экран собирается из токенов, а не красится вручную. Эталоны обеих тем
-— в `docs/references/` (`*_light.webp` / `*_dark.webp`, десктоп и мобильный вариант).
-Переключатель — в шапке, выбор запоминается; без выбора берётся `prefers-color-scheme`.
-
-**Известный компромисс.** Часть каталожных фотографий ещё несёт белую студийную подложку
-(конвейер среза фона прошёл не всё, `media.md`). На новом, менее бледном фоне
-они контрастнее, чем раньше. Маскировать это блендингом (`mix-blend-mode`) мы не
-возвращаемся: блендинг тонировал все корректные фотографии ради нескольких необработанных.
-Правильное решение — доделать конвейер, а не прятать симптом.
-
-Выбор светлого фона не только эстетический. **Монеты — металл**, и на светлом нейтральном
-фоне серебро, медь и нейзильбер читаются заметно лучше: тёмный фон гасит блики и делает
-серебро и мельхиор неразличимыми. Каталог из тысяч фотографий монет — главный экран
-приложения, и фон подбирается под него, а не наоборот.
-
-Отсюда же требование к фону: **нейтральный**, без сильного цветового тона. Кремовый —
-это тёплый оттенок белого, а не бежевый: сильная подкраска исказит восприятие цвета
-металла.
-
-### Мобильная вёрстка — требование к каждому экрану
-
-Критерий готовности MVP — «владелец пользуется приложением **с телефона**»
-(`scope.md`). Поэтому мобильная вёрстка не адаптация вдогонку, а условие приёмки
-каждого экрана.
-
-Практически: каждый экран проектируется **сразу в одноколоночном варианте**, и только
-потом разворачивается на широкий. Не наоборот. Таблица каталога на телефоне — не
-горизонтальная прокрутка на восемь колонок, а карточки; фильтры — не боковая панель,
-а раскрывающийся блок.
-
-Экран, который «пока сделаем для десктопа, потом адаптируем», в этап 4 не засчитывается.
-
-### Шрифты
-
-Серифная антиква для заголовков и названий, что-то нейтральное для цифр и интерфейсных
-подписей. Цифры — обязательно **моноширинные по ширине знака** (`tabular-nums`): суммы
-и годы стоят в колонках и не должны прыгать.
-
-**Уточнено рефрешем 2026-09-07.** Playfair Display больше не назначается всем `h1/h2/h3`
-глобально — он подключается элементу явно (`.display` или собственный `font-family`) и
-принадлежит **контенту**: название страницы, монеты, серии, заголовки экранов входа,
-крупное значение цены, значение в плитке метрики. **Интерфейсные** заголовки и подписи —
-Source Sans 3: заголовки панелей и виджетов, секции форм, заголовки диалогов, вкладки,
-кнопки, шапки таблиц, подписи фильтров и полей, вспомогательный текст. Смешивать нельзя:
-серифный заголовок панели — типичный признак, что тексту приписали вес, которого у него
-нет.
-
-**Проверка кириллицы — до начала вёрстки.** Много красивых серифных шрифтов имеют
-латиницу и обрубленную кириллицу. Проверяются украинские глифы `є ї ґ` и апостроф — они
-выпадают чаще всего, и обнаружить это на готовых экранах дороже всего. Шрифт без полного
-украинского набора не рассматривается, каким бы удачным он ни был.
-
-### Декор
-
-Лёгкие текстуры и орнаменты допустимы — «бумажность» на них и держится, — но только
-**CSS и SVG**: градиенты, шумы, тонкие линейные орнаменты. Никаких тяжёлых растровых
-подложек: приложение открывают с телефона, часто с мобильного трафика, и фоновая картинка
-на пару мегабайт съест бюджет загрузки, который нужен фотографиям монет.
-
-**Сужено рефрешем 2026-09-07.** Градиент допустим только как материал контрола (мелкий
-вертикальный перепад на primary-кнопке) — не как декорация сцены. Радиальная «подсветка
-витрины» под монетой на карточке монеты убрана: подставка для фото — чистая поверхность,
-рамка и минимальная тень, а единственный объект, который тянет взгляд, — сама монета.
-Ни стеклянных плашек с `backdrop-filter`, ни свечения, ни подложек-кругов за монетами.
-
-**Текстура фона (добавлено 2026-09-07).** У фона страницы есть микротекстура — один
-бесшовный тайл 256×256 в WebP на тему (`frontend/src/assets/textures/`, ~12 КБ на обе).
-Рисуется **одним глобальным слоем** `body::before` в `tokens.css`: `position: fixed`,
-`z-index: 0` под `#root` (`z-index: 1`), `background-repeat: repeat` в родном размере.
-Ни один экран не добавляет текстуру себе — все маршруты наследуют её автоматически, а
-переключение `data-theme` меняет тайл мгновенно, без перезагрузки.
-
-Текстура принадлежит **только фону страницы**. Шапка, нижняя панель, карточки, панели,
-таблицы, поля, кнопки, дропдауны, модалки и плашки под фото красят свои непрозрачные
-поверхности поверх неё и остаются чистыми. Никакого `z-index: -1` (слой пропадёт за
-фоном body), никакой прозрачности на `#root` или контейнерах приложения, никакого
-`cover`, фильтров и анимации. Отключается при `prefers-reduced-data: reduce` и
-`forced-colors: active`.
-
-Непрозрачность — `--page-texture-opacity`, по теме: **0.055** в светлой, **0.065** в
-тёмной. Держим её на тихом краю осознанно. Светлый тайл специально сведён тон-в-тон с
-`--color-bg` (средние по каналам 198.7/190.2/177.2 против 200/191/175), то есть его
-непрозрачность меняет только амплитуду зерна и **не сдвигает утверждённый светлый цвет**
-— поднимать её технически безопасно, но пробовали 0.28 и откатили (решение владельца
-2026-09-07): примерно после 0.1 зерно перестаёт читаться как материал и начинает
-читаться как цифровые помехи. Тёмный тайл заметно светлее своего фона, поэтому его слой
-поднимает грунт, и `--color-bg` в тёмной теме занижен с учётом этого: `#040505` плюс
-зерно дают видимые ≈`#070707`.
-
-**Скролбар (добавлено 2026-09-09).** Скролбар в приложении один и описан **глобально**
-в `tokens.css`: тонкий (8px), скруглённый ползунок цвета `--color-border-strong` (при
-наведении — `--color-text-muted`), прозрачная дорожка, без стрелок-кнопок. Ни один экран
-не стилизует скролбар себе — и страница, и внутренние области прокрутки (список серий на
-дашборде, выпадающие списки, модалки) получают его автоматически.
-
-Ловушка Blink: если задан `scrollbar-width`, движок **игнорирует все правила
-`::-webkit-scrollbar-*`**. Из-за неё стилизация сначала не работала вовсе — рисовался
-платформенный `thin` со стрелками и жёлобом в 11px. Стандартные свойства поэтому лежат
-под `@supports not selector(::-webkit-scrollbar)`: они достаются Firefox, а Chrome и
-Safari идут по псевдоэлементам.
-
-**Прокрутка живёт не в окне, а в области под шапкой** (`AppLayout` → `.scrollArea`,
-`data-scroll-area`). Шапка — отдельный ряд шелла высотой в одну шапку (`flex: none`,
-иначе flex сжимает её под длинным контентом), ниже — контейнер с `overflow-y: auto` и
-`scrollbar-gutter: stable`. Что это даёт:
-
-- место под скролбар зарезервировано всегда, поэтому содержимое не прыгает вбок, когда
-  короткий экран сменяется длинным или когда модалка блокирует прокрутку;
-- жёлоб при этом лежит **внутри контента, на грунте страницы**, и пока он пуст — не
-  виден: на экране без прокрутки нет ни ползунка, ни полосы;
-- шапка вне контейнера прокрутки и всегда идёт до края окна.
-
-Так вышло не сразу: прокрутка окна давала жёлоб во всю высоту окна, мимо шапки, и он
-обрезал её на 8px на каждом экране, включая те, где скроллить нечего. Закрасить жёлоб не
-получается ничем из документа — проверено в Chrome 150: ни фиксированный элемент с
-`right: 0`, ни элемент шириной `100vw`, ни фоновая картинка холста туда не доезжают.
-Единственная краска, попадающая в жёлоб, — **цвет фона** самого контейнера прокрутки;
-на грунте страницы он совпадает с фоном вокруг, поэтому пустой жёлоб и не читается.
-
-На телефоне (`max-width: 900px`) прокрутка возвращается документу: внутренний скроллер
-мешал бы браузеру схлопывать адресную строку, а чинить там нечего — мобильные скролбары
-накладные, места не занимают. Шапка держится своим `position: sticky`.
-
-Из-за переезда прокрутки «наверх» и блокировка фона живут в `shared/lib/pageScroll.ts`
-(`scrollPageToTop`, `lockPageScroll`) — они сами находят живой контейнер, поэтому
-`ScrollToTop`, `Pagination`, `Modal` и `Lightbox` не знают, окно это или область.
-
-**Движение.** Только CSS-переходы, 120–180 мс, общие токены `--duration-fast`,
-`--duration-normal`, `--ease-standard`. Подъём при наведении — максимум 2 px, увеличение
-фотографии монеты — 1.5–2.5 %. Никакой непрерывной анимации, пружин и отскоков. При
-`prefers-reduced-motion: reduce` движение выключается глобально; исключение — спиннер
-(класс `.motion-essential`), который иначе перестал бы что-либо сообщать.
-
-### Чего не делаем
-
-- Не рисуем разделы и экраны под отложенные функции — меню MVP из шести пунктов.
-- Не рисуем тему руками поверх компонентов: цвет, радиус, тень — только через токены,
-  иначе вторая тема расходится с первой на каждом экране.
-- Не заводим дизайн-систему с нуля: берём готовую основу и перекрашиваем под тему.
-- Не возвращаем кремовую светлую тему и не поднимаем латунь до цвета больших
-  поверхностей: латунь — акцент.
-- Не возвращаем в тёмную тему коричневые, кофейные, шоколадные, «кожаные», деревянные и
-  бордовые оттенки поверхностей. Проверка простая: мысленно убрать золотые кнопки и
-  фотографии монет — то, что осталось, должно читаться графитом, а не шоколадом.
-- Не кладём текстуру на карточки, контролы, таблицы, модалки, дропдауны и шапку — только
-  на фон страницы, одним глобальным слоем.
-- Не рисуем текстовыми глифами то, для чего есть иконка: `×`, `↺`, `☰`, `↑`, `↓`, `✕`,
-  `✓`, `←`, `→`, `⇅`, `⤢`, `☾`, `☀` — это `lucide-react`, доступные подписи при этом не
-  меняются.
+UI strings live in `shared/i18n/{uk,en}.json`; `i18n.test.ts` checks the key sets match
+(plural forms aside). Language switches without reload; default `uk`, stored in
+`user_settings.locale`. Exception: the long-form copy of the landing page
+(`features/landing/copy.ts`) and the legal pages (`app/legal/copy.ts`) is kept in typed
+`uk`/`en` objects next to those pages.
 
 ---
 
-## Навигация
+## Landing page
 
-В legacy было семь разделов, боковое меню (`aria-label="Главная навигация"`).
-**В меню MVP — шесть:**
-
-| id | Английский (переносим) | Русский (справочник legacy) | В меню MVP |
-|---|---|---|---|
-| `dashboard` | Overview | Обзор | да |
-| `catalog` | Catalog | Каталог | да |
-| `series` | Series | Серии | да |
-| `collection` | Collection | Коллекция | да |
-| `missing` | Missing | Не хватает | видалено — каталог з фільтром `owned=false` замість окремого розділу (рішення власника 2026-09-07) |
-| `sales` | Sales | Продажи | **нет — отложен** |
-| `settings` | Settings | Настройки | да |
-
-Украинские подписи разделов пишутся заново в этапе 4.
-
-Заголовок на дашборде — приветствие с именем и подзаголовок «Ваша коллекция в деталях».
-На остальных экранах — название раздела.
-
-Глобальный поиск в шапке: «Найти монету, серию или страну».
-Кнопка «Добавить» — создание **личной** позиции каталога (`business-rules.md`, BR-2).
-
-Переключатель языка украинский / английский, по умолчанию украинский.
-
-Тема в legacy была тёмная: фон `#08090b`, акцент — тёплое золото. **Канон — светлая
-«бумажная»**, тёмная — вторая равноправная, обе через токены; переключатель темы и языка
-в шапке — см. «Визуальное направление» выше.
-
-`sales` в меню нет: функция отложена (`scope.md`). Разделов под другие отложенные
-функции — целей, предложений о покупке, обменов, хранения — в меню тоже нет: пустой пункт,
-который ничего не открывает, хуже отсутствующего.
+`/` for guests (`features/landing`): hero, collection and expense demos, two main CTAs
+and a closing invitation. "Create collection" opens registration for a guest (or goes to
+`/collection` when signed in); "browse catalog" goes to `/catalog`. The collection demo
+filters its three sample coins by search, series and year and sorts by amount spent;
+the expense demo's period limits only its chart and category limits only its journal.
+Demo tables scroll horizontally on phones and rows aren't clickable. The dark wordmark
+is generated by `frontend/scripts/build-brand.py` (`npm run brand`): lighter letters,
+original gold shield and coin.
 
 ---
 
-## Вход, регистрация, восстановление доступа
+## Catalog
 
-Экранов не было в legacy — десктопная версия работала без учётных записей. Делаем с нуля
-по `auth.md`.
+`/catalog` — the storefront of the shared catalog plus the user's personal positions
+(BR-2), read-only. Only records of a `catalog_confirmed` country appear here (BR-13a).
 
-- **Вход** — email, пароль, ссылки «Забыли пароль?» и «Создать аккаунт». Ошибка входа
-  никогда не сообщает, существует ли адрес.
-- **Регистрация** — email, пароль, имя (необязательно). В форме есть **скрытое
-  honeypot-поле** (`website`): невидимое для человека, вне таб-порядка,
-  `autocomplete="off"`, `aria-hidden="true"`. Заполнено — форма отвечает как при успехе,
-  аккаунт не создаётся.
-- **«Проверьте почту»** — экран после регистрации: аккаунт создан, но неактивен, пока не
-  перейти по ссылке из письма. Кнопка «Отправить письмо ещё раз» с обратным отсчётом,
-  чтобы не долбить кнопку.
-- **Подтверждение адреса** — экран, на который ведёт ссылка из письма. Успех → пользователь
-  сразу авторизован. Токен просрочен или использован → предложение запросить новое письмо.
-- **Восстановление пароля** — форма с email и экран «письмо отправлено» (одинаковый ответ
-  независимо от того, есть такой адрес или нет), затем экран ввода нового пароля по ссылке
-  из письма.
+- **Views:** cards and table (`?view=cards|table`; `?view=map` falls back to cards). The
+  choice is stored in account settings for signed-in users, with a local cache
+  (`ck.viewMode.catalog` / `ck.viewMode.collection`); guests default to cards and keep
+  their choice under `ck.viewMode.catalog.guest`. An explicit `?view=` always wins.
+- **Page size** 30 in the card grid (a multiple of 1/2/3/5 columns).
+- **CTA on tile and row:** not owned → "Додати до колекції" (purchase form with the coin
+  preselected); owned → "У моїй колекції" status (plus "Додати ще екземпляр" on the
+  tile). Both forms of the action share `--catalog-action-width` so the column doesn't
+  change width between pages. Guests get an add button that opens the auth dialog.
+- **Owned highlight:** owned tiles and rows get `--color-owned-surface` (25% owned color
+  over the raised surface) plus an owned-color frame/icon; the table has a leading
+  `CircleCheck` column with an accessible label. Hover stays visible on top of the tint.
+- **Tiles:** obverse and reverse side by side as two squares (`.media` 2:1, 2px gap), so
+  a round coin fills its square; material to the right of the denomination.
+- **Table:** Coin (≤ 26% width), country, series, year, denomination, material, and the
+  rest; `min-width` 980px.
+- **Personal positions** carry an "own" badge. There is no create or edit entry in the
+  catalog — personal positions are created from the purchase form.
+- **Archived records** are hidden unless `archived=true` is in the URL; then admins see
+  the whole archive and users only archived records they own an instance of (BR-10).
 
----
+### Catalog KPI tiles
 
-## Обзор (dashboard)
-
-Плитки показателей:
-
-- **Вложения** — потрачено на монеты, сопутствующие расходы, всего на хобби
-- **Стоимость сейчас** — оценка коллекции по последним ценам, разница с вложениями
-  («минус», «% к вложенному»)
-- **Собрано** — позиций каталога, экземпляров, процент комплектности
-- **Не хватает** — осталось собрать, оценка бюджета, доля недостающих без цены
-- **Курсы НБУ** — USD и EUR с датой обновления, индикатор «Обновлено»
-- **География** — разбивка по странам, переключатель «стоимость по странам»
-- **Сводка по сериям** — ближайшие к завершению
-- Блок «Следующий этап» — подсказка о следующем действии
-
-Ссылки «Открыть полный каталог», «Открыть страны и серии».
-
-### Как реализовано (часть 2)
-
-Всё из одного `GET /bootstrap`, без дополнительных запросов.
-
-- Заголовок «Огляд колекції» и подзаголовок центрированы через `PageHeader
-  align="center"`; подзаголовок — фиксированный текст «Усі важливі цифри та
-  прогрес моєї колекції в одному місці.», без e-mail пользователя.
-  `align="center"` — решение владельца для всех экранов, не только для Огляду:
-  Монети, Каталог, Комплектність, Гроші и екран деталей групи тоже на нём (заголовок/
-  подзаголовок/дії стопкою по центру; `above`-слот с хлібними крихтами,
-  где он есть, остаётся выключенным влево).
-- Четыре плитки, **каждая — ссылка целиком** (растянутый `Link`, а не `div` с
-  `onClick`: клавиатура и середня кнопка миші працюють), строго равной ширины:
-  «Монет у колекції» (`collectionItems`) → `/collection/coins`; «Разом витрачено»
-  (`totalSpendUah`, третім рядком — «у т. ч. супутні витрати: …» з `relatedSpendUah`)
-  → `/collection/money`; «Поточна оцінка» (`marketValueUah`) → `/collection/money`;
-  «Різниця» (`marketValueUah − totalSpendUah`, третім рядком — відсоток) →
-  `/collection/money` — та сама різниця, що і в «Фінанси» нижче
-  (наприклад, `+2 520 ₴` / `+135,2 %`), рішення власника 2026-09-23 розвести її
-  в окрему плитку замість підрядка під «Поточною оцінкою». Плитки «Не вистачає»
-  та «Комплектність (%)» прибрано з цього ряду тим самим рішенням — сторінка
-  «Комплектність» (`/collection/completeness`) і фільтр `?owned=false` каталогу
-  нікуди не поділися, просто це вже не KPI Огляду. Блок «Розподіл за країнами»
-  ниже по странице никуда не делся — країни остались, просто не в KPI.
-  Все четыре плитки одной высоты. Иконки — `lucide-react`
-  (`Coins`/`Wallet`/`TrendingUp`/`Scale`), выровнены по центру плитки вровень с
-  цифрой значения (`StatTile`, `shared/ui`); плотный паддинг плиток задан в
-  самом `StatTile`, поэтому Огляд і Монети рендерят плитки одного размера без
-  экранных переопределений.
-- «Мої серії» вместо «Улюблених серій» из мока (и вместо прежнего
-  «Найближчі до завершення», решение владельца 2026-09-07): весь список начатых
-  серий пользователя (зібрано ≥ 1) из `seriesBreakdown`, без обрезки до 6 —
-  у пользователя с собранными сериями гордость за них больше не спрятана.
-  Сортировка прежняя, по убыванию доли завершённости; полностью собранные серии
-  (кольцо 100 %) остаются в списке, но идут в самом конце, а не наверху —
-  «ближе к завершению» уже нечего сказать про готовую серию. Серия, к которой
-  не куплено ни одной монеты, в списке не появляется вовсе — пустая строка не
-  несёт смысла для «моїх серій». С `id` серии, прогресс-кольцом «X з Y». Строка
-  серии целиком кликабельна (тот же паттерн растянутой ссылки, что в картках
-  каталога) → `/collection/completeness/series/{id}`. Миниатюры недостающих монет — часть 3.
-  Контейнер списка растягивается на всю высоту карточки (`.stackCardGrow` —
-  та же, что выравнивает «Курси НБУ» по низу правой колонки, решение владельца
-  2026-09-07: фиксированные 300px оставляли пустой хвост под коротким списком,
-  когда карточка вытягивалась по сетке): короткий список просто занимает всю
-  доступную высоту без скролла, длинный — прокручивается в её пределах, тонкий
-  стилизованный скролбар (с 2026-09-09 — общий для всего приложения, см. «Декор»).
-  Пустое состояние («Ще не почато жодної серії.») — только
-  когда начатых серий нет вовсе; ссылка «Усі серії» остаётся в заголовке блока.
-- Контекстный CTA «До завершення серії … / Переглянути відсутні» под списком
-  убран (промпт 15б) как дублирующий: ссылки строк серій вже ведуть на сторінку
-  серії, де є все потрібне.
-- Ліва колонка («Найближчі…») і права («Фінанси» + «Курси НБУ») вирівняні по
-  висоті сіткою (`align-items: stretch`): картка, якій дістається зайва
-  висота — ліворуч єдина картка колонки, праворуч «Курси НБУ» (не «Фінанси»,
-  та лишається контентної висоти) — розтягується, щоб низ обох колонок
-  збігався (промпт 16).
-- Финансы: витрачено на монети + супутні = разом; поточна оцінка; різниця и % — считаются
-  на клиенте как `оцінка − витрачено`; бюджет на відсутнє с пометкой «без ціни: N».
-  **Динамики за период** («+12 340 за 30 днів») нет и не будет в MVP: истории оценок
-  коллекции нет. Источники цен — UA-Coins и НБУ, никаких «NGC».
-- Курсы USD и EUR с датой из `exchangeRates`; нет курса — «немає даних».
-- Розподіл за країнами: `owned з count` и доля, компактно, с полоской; ряд на
-  всю ширину контенту під колонками (як ряд KPI), а не в лівій колонці
-  (промпт 16).
-- `isEmpty` → три примера обзора в `CollectionOnboarding`, с постоянными кнопками
-  «Перейти до каталогу» / «Додати монету» (см. «Загальні рішення»).
-- Wishlist / Trades / Notes / Storage с мока — отложены (`scope.md`), не рисуются.
-- Загрузка — скелетоны той же формы; ошибка — `ErrorState` с повтором.
-- Мобильная: одна колонка, плитки 2×2.
+`CatalogSummaryTiles` from `GET /catalog/summary`: owned / total, missing (with "no
+price: N" when some are unpriced), spent on coins, budget to complete. Computed with the
+same filters as the list **except `owned`**, so the tiles always show both sides of the
+coverage ratio. Not links. Shown only to a signed-in user with at least one coin
+(`dashboard.collectionItems > 0`); otherwise the endpoint isn't called.
 
 ---
 
-## Каталог
+## Coin card
 
-Основной рабочий экран.
+`/catalog/:id` (`features/catalog/card/CoinCardPage.tsx`). Data: `GET /catalog/{id}`,
+`GET /catalog/{id}/prices`, `GET /catalog/{id}/collection-items` (the viewer's own
+instances only). The card opens by direct link regardless of storefront rules (BR-13).
 
-**Фильтры:**
-- Страна (плюс быстрые кнопки для частых, например «США»)
-- Год: «Все годы», список, состояние «Годы не найдены»
-- Номинал
-- Тип монет: «Обиходные» / «Коллекционные» / Все
-- Металл: «Драгоценные» / «Не драгоценные» / «Не указан» / «Любой металл»
-- Наличие: «В наличии» / «В каталоге» / «Не хватает»
-- Поиск: «Название, серия, страна, год, KM#»
-
-**Виды отображения** (переключатель «Вид каталога»):
-- таблица
-- карточки с фотографиями (пустое состояние — «Ничего не найдено»)
-- «Карта визуальной полноты» / «Карта полноты» — сетка, наглядно показывающая пробелы
-
-**Колонки таблицы:** Монета, Страна, Серия, Год, Номинал, Наличие, Куплено за, Цена сейчас.
-Сортировка по каждой.
-
-**Массовые действия:**
-- «Обновить цену» — **только для личных позиций**. У позиции общего каталога кнопки нет,
-  вместо неё подпись «Цена обновляется автоматически» с датой последнего снимка
-  (`business-rules.md`, BR-7)
-- «Обновление цен фильтра» — проходит только по личным позициям пользователя, с прогрессом
-  `N/M`, кнопкой «Остановить», состояниями «Останавливаем обновление цен…»,
-  «Обновление цен остановлено.»
-- «Экспортировать текущий фильтр в Excel» — после MVP, решение владельца 2026-09-15
-  (`scope.md`); текст ниже — восстановленный legacy-экран, при реализации сверить
-- Проверки: «В текущем фильтре нет монет для обновления цены», «…для экспорта»
-
-**Пагинация:** «Показано N из M записей», «Показать все», «Назад» / «Вперёд».
-
-### KPI-плитки (2026-09-23)
-
-Чотири плитки над списком (`CatalogSummaryTiles`, `GET /catalog/summary`) — «Є» (owned/total),
-«Не вистачає» (з підказкою «без ціни: N», якщо є непроцінені), «Витрачено на монети»,
-«Треба докупити» (бюджет відсутнього). Порахований з тими самими фільтрами, що застосовано
-до списку, тому завжди узгоджений з тим, що показано під плитками — окремий набір від
-плиток Огляду/«Мої монети» (`CollectionSummaryTiles`), бо це про сам каталог
-(є/не вистачає/треба докупити), а не про колекцію власника в цілому (рішення власника
-2026-09-23). `owned`-фільтр списку свідомо не звужує плитки: інакше вибір «не вистачає»
-обнулив би саму плитку, покликану показати обидва боки цього співвідношення. Не посилання
-(на відміну від інших рядів плиток) — переходити нікуди, а лінк на `/catalog` скинув би ті
-самі фільтри, що дали ці цифри.
-
-Показуються тільки увійшовшому власнику з хоча б однією монетою в колекції
-(`dashboard.collectionItems > 0` з `GET /bootstrap`); гостю або свіжому акаунту без монет
-плитки не рендеряться, і `GET /catalog/summary` не запитується взагалі.
-
-### Пустой результат — не тупик
-
-Состояние «Ничего не найдено» и результат поиска, где нужной монеты нет, **обязаны
-предлагать выход**, а не заканчивать разговор:
-
-> Не нашли монету в каталоге? Создайте свою позицию или импортируйте выгрузку с uCoin.
-
-Легаси-текст описывает целевое состояние с двумя кнопками — «Создать свою позицию» и
-«Импортировать выгрузку»; формулировка нейтральная не просто так: пользователь не «чинит
-пробел в каталоге», а заводит свою запись (`scope.md`). **В MVP кнопка одна** —
-«Создать свою позицию»: импорт uCoin перенесён после MVP решением владельца 2026-09-15,
-вторая кнопка появится вместе с ним.
-
-### Общие и личные позиции в списке
-
-Личные позиции идут в общей выдаче наравне с остальными, но помечены — значком или
-подписью «Моя позиция». По ним доступны правка и удаление; у общих этих действий нет.
-Фильтр видов: «Все» / «Общий каталог» / «Мои позиции» (параметр `scope`,
-`api.md`).
-
-Это правило работает только внутри страны с подтверждённым каталогом
-(`countries.catalog_confirmed`, `business-rules.md`, BR-13a), и только в самом списке
-каталога. Сегодня подтверждена одна Украина. Позиция любой другой страны — хоть общая с
-затравки, хоть только что заведённая пользователем личная, хоть уже купленная — в списке
-каталога и поиске не появляется вовсе, ни при каком `scope`. Она никуда не девается:
-открывается по прямой ссылке, видна в «Моя колекція» как обычно — и, в отличие от самого
-каталога, видна в «Комплектність» и в Огляді/дашборді тоже: те экраны про личную коллекцию
-пользователя, а не про витрину каталога, гейт `catalog_confirmed` на них не действует.
-
-### Архивные позиции
-
-Витрина каталога показывает только активные позиции. Архивных в обычной выдаче нет — ни в
-списке, ни в поиске, ни в счётчике «показано N из M».
-
-Отдельный переключатель «Показать архивные» (параметр `archived`) доступен всем, но
-показывает разное: администратору — весь архив, обычному пользователю — **только те
-архивные позиции, где у него есть экземпляр**. Это нужно, чтобы человек мог найти свою
-монету, даже если позицию убрали из каталога.
-
-Архивные строки в списке приглушены и помечены — значком и подписью с причиной.
+- **Header:** breadcrumbs and a Back button that follows history (so catalog filters in
+  the URL survive; on a direct link it goes to the catalog). Title per the title rule,
+  subtitle "denomination · country · year", badges for own position and archived.
+- **Archived banner** on top, with `archiveReason`: the record left the catalog and
+  completeness, and the user's coins, purchases and price history are kept.
+- **Photos:** obverse and reverse via `CoinImage`; "enlarge" opens the lightbox, only
+  for a side that has a file.
+- **Sections**, all visible at once (no tabs): description (only when the record has
+  `descriptions`; general paragraph plus obverse/reverse columns, current locale with
+  fallback to the other), specifications (only filled fields, grouped: identity, issue,
+  technical, catalog numbers — KM# / UC# / Numista on one line, mintage actual or
+  announced with a note), price history, and the viewer's instances (only when owned).
+- **Ownership block:** a status sentence with a round icon badge (`CircleCheck` /
+  `CircleMinus`) — "you have this coin" / "not in your collection"; quantity; bought for
+  and current value only when owned (value = price × quantity; the headline cost
+  includes supporting expenses per the setting, BR-4); the action "Додати до колекції"
+  or "Додати ще екземпляр", both to `/collection/add?catalogItemId=`. The current-price
+  block is framed, with source and date.
+- **Price history:** an interactive `lightweight-charts` chart — wheel zoom, drag,
+  range presets (1M / 6M / 1Y / all); the line uses regular snapshots; suspect snapshots
+  (`isSuspect`) and the viewer's own (`isOwn`) are separate markers and don't affect the
+  axis scale; a tooltip at the cursor shows date, price, source, grade and flags.
+  Source names are localized (`sources.*`).
+- **Instances** (`InstancesList`): a list, not a table — each row repeats its labels
+  above the values, two columns on narrow screens. Purchase date first with quantity
+  under it, seller, price in the purchase currency (and UAH if different), rate as
+  "X ₴ per 1 $", grade, note, and actions: edit (`/collection/coins/{id}/edit`) and
+  delete (`DeleteInstanceDialog`, which names the coin and says the purchase expense is
+  deleted too).
+- **Guests** see the catalog part; price and ownership blocks show a locked state with
+  sign-in.
+- **Not found** (someone else's personal position or no such record) → a not-found
+  state with a link to the catalog.
+- **Admins** see `ProposalActions` on a `draft` card (see "Coin proposals").
 
 ---
 
-## Карточка монеты
+## My coins ("Мої монети")
 
-Открывается из каталога, есть режим отдельной страницы.
+`/collection/coins`. `GET /collection` returns **positions**, not purchases: one tile or
+row per catalog item, with all its purchases aggregated (`api.md`). Individual purchases
+are edited and deleted on the coin card.
 
-- Крупные фото аверса и реверса, увеличение по клику
-  («Увеличить аверс», «Закрыть увеличенное фото»)
-- Характеристики: страна, серия, год, номинал, металл, материал, разновидность,
-  каталожный номер, гурт
-- Наличие и количество
-- «Куплено за» / «Оценка сейчас» / «Средняя цена»
-- История цен графиком, «Источник цены», «Загрузка истории цен»
-- Список экземпляров и покупок
-- Действия: «Добавить покупку», «Продать» — для любой видимой позиции.
-  «Редактировать», «Обновить цену», «Обновить фотографию», «Удалить монету» — **только для
-  личных позиций**. У общей позиции этих кнопок нет: она принадлежит общему каталогу и
-  правится администратором
-- Ручной ввод цены доступен и по общей позиции: своя цена видна только автору и не меняет
-  саму запись каталога
-- Если фотография пришла с uCoin и её загрузил не текущий пользователь — вместо неё
-  плейсхолдер «фото нет» (`media.md`)
-
-Ошибка удаления: «Нельзя удалить монету с покупками».
-
-### Как реализовано (часть 2)
-
-Данные: `GET /catalog/{id}`, `GET /catalog/{id}/prices`,
-`GET /catalog/{id}/collection-items` (экземпляры текущего пользователя — отдельный
-эндпоинт, у `GET /collection` нет фильтра по позиции).
-
-- Хлебные крошки «Каталог / Картка монети» и кнопка «Назад»: она идёт по истории,
-  поэтому фильтры каталога (они в URL) сохраняются; по прямой ссылке — просто в каталог.
-- Заголовок по общему правилу, подзаголовок «номінал · країна · рік», бейджи
-  «Моя позиція» и «Архівна». Архивная — плашка сверху с причиной и текстом из этого
-  документа.
-- Аверс/реверс через `CoinImage` (целиком, не обрезая), «Збільшити» → лайтбокс;
-  кнопка есть только у стороны с адресом файла.
-- Ниже героя — не табы, а последовательность всегда видимых секций-карточек: «Опис»
-  (если у записи есть `descriptions`), «Характеристики», «Історія цін», «Мої екземпляри»
-  (только если монета в коллекции). Каждый раздел открыт сразу, скрывать за
-  переключателем нечего.
-- «Опис» — текст парсера coin-collector (`CatalogCard.description`, докс
-  `data-model.md`) на текущей локали интерфейса с запасным вариантом на другую,
-  если для запрошенной текста нет: абзац `general`, ниже — «Аверс»/«Реверс» в две
-  колонки, если для них есть текст. Секция целиком отсутствует, если у записи нет
-  `descriptions` (парсер её ещё не коснулся).
-- Характеристики двумя колонками, **только заполненные**: країна, серія, рік, дата
-  випуску, номінал, метал, матеріал, різновид, підтип, художники, скульптори
-  (`CatalogCard.designers`/`sculptors`, кілька імен через кому), каталожні номери
-  (KM# / UC# / Numista одной строкой), тираж (фактический, иначе заявленный с пометкой),
-  діаметр, вага, товщина, форма, гурт, орієнтація.
-- Правая колонка: «У моїй колекції» — заголовком статус-речення терміном з каталогу
-  («✓ Монета є у вашій колекції» / «Цієї монети немає у вашій колекції»), нижче — статус
-  (бейдж), кількість; «Куплено за / Поточна оцінка» (оценка = ціна × кількість) — только
-  при наличии экземпляров; «Дії»: кнопка залежить від стану — «+ Додати до колекції»
-  (`catalog.addToCollection`) без монети, «Додати ще екземпляр» (`catalog.addAnotherCopy`)
-  з монетою — обидві ведуть на `/collection/add?catalogItemId=` (часть 3), «Ввести
-  свою ціну» — неактивна до этапа 5; инфобокс о видимости цен (совпадает с
-  `business-rules.md`, BR-7).
-  Статус-заголовок — с круглым бейджем-иконкой слева (`lucide-react`,
-  `CircleCheck`/`CircleMinus`) и цветным текстом: заливка бейджа
-  (`--color-owned-icon`/`--color-absent-icon`) и цвет заголовка
-  (`--color-owned`/`--color-absent`) — отдельная, более насыщенная пара токенов,
-  не переиспользует `--color-success`/`--color-danger` (те заняты финансовыми
-  дельтами, бейджами, ошибками). Заливка бейджа не меняется между темами, гало
-  вокруг него — `color-mix()` от той же заливки, текст заголовка адаптируется
-  под тему для контраста. «Актуальна ціна» — обособленный блок с рамкой и
-  скруглением (не просто линии сверху/снизу). Кнопка CTA крупнее (`padding`,
-  `font-size`), чем стандартный `Button` — только на этой карточке.
-- «Історія цін» — интерактивный график на `lightweight-charts` (TradingView), а не
-  самописный SVG (2026-09-13): зум колесом мыши, перетаскивание, быстрый выбор
-  диапазона («1М/6М/1Р/Усі»); линия по обычным снимкам, подозрительные (`isSuspect`)
-  не входят в неё и не влияют на автомасштаб оси — отдельный маркер, свои (`isOwn`) —
-  тоже отдельный маркер; кастомный тултип у курсора: дата, ціна, джерело, стан,
-  «моя ціна»/«підозріла ціна»; пусто — «Цін ще немає». Названия источников
-  локализованы (`sources.*`).
-- «Мої екземпляри та покупки»: дата покупки основным значением первой ячейки, кількість
-  вторичной строкой под ней (показывается всегда, а не только при >1 — у большинства
-  позиций кількість = 1, и информативнее дата), продавець, ціна в валюте покупки
-  (и в гривне, если валюта другая), курс как «X ₴ за 1 $» (зарезервирован под привязку
-  к историческому курсу НБУ на дату покупки, `docs/backlog.md`), стан, нотатка,
-  дії — «Редагувати» (на `/collection/coins/{id}/edit`) і «Видалити»
-  (`DeleteInstanceDialog`, той самий діалог, що й раніше викликався із сітки
-  колекції; підтвердження називає монету карткою, бо сама покупка назви не несе).
-  Видалення інвалідовує запити картки й колекції одним і тим самим набором ключів
-  (`COLLECTION_DEPENDENT_KEYS`), щоб агрегати позиції на «Мої монети» оновилися разом
-  зі списком екземплярів; пусто — «Ще немає».
-- 404 (чужая личная позиция или нет такой) — «Позицію не знайдено» со ссылкой в каталог.
-
-Расхождения с моками `card_*`: «Середня ціна» — такого агрегата в API нет, убрана;
-«Grade (Your)» — грейдинг отложен; подпись курса на моке перевёрнута, показываем
-«X ₴ за 1 $»; блок «Фото: офіційні з НБУ» скрыт, пока у изображения в API нет `source`
-(появится с задачей НБУ, этап 6); «Переглянути всі екземпляри» — вместе с экраном
-коллекции в части 3.
-
-### Плашка архивной позиции
-
-Если позиция архивирована, карточка **открывается как обычно** — со всеми характеристиками,
-фотографиями, историей цен, экземплярами и покупками. Сверху появляется заметная, но не
-тревожная плашка:
-
-> **Позиция архивирована:** снята с выпуска НБУ.
-> Ваша монета, покупка и история цен сохранены. Позиция больше не показывается в каталоге
-> и не учитывается в комплектности серии.
-
-Тон здесь важен: ничего не потеряно и делать ничего не нужно. Формулировка объясняет ровно
-два следствия — уход из витрины и из подсчёта комплектности, — и явно говорит, что данные
-на месте. Причина подставляется из `archiveReason`.
-
-Ссылка «Что это значит?» ведёт на соответствующий раздел справки
-(`product.md`).
-
-**У администратора** в карточке дополнительно: «Архивировать» с обязательным полем причины
-у активной общей позиции и «Вернуть в каталог» у архивной. Физическое удаление общей
-позиции в интерфейсе не даём вовсе — это редкая операция «прибраться за опечаткой»,
-её место в админской консоли, а не в карточке рядом с обычными кнопками.
+- **Filters:** see "Filter panels".
+- **KPI tiles** (`CollectionSummaryTiles`, shared with the overview): coins in
+  collection, total spent, current value, difference — from `GET /collection/summary`
+  with the page's filters, so without filters they equal the overview.
+- **Tile** (`PositionCard`): a large obverse (unlike the catalog's pair), grade badge
+  (one grade, several joined with " · ", none → no badge), quantity, spent, current value
+  (or "no price"), last purchase, and a "new release" badge for an issue date within the
+  last 30 days (`shared/lib/recentRelease.ts`). The whole tile links to the coin card; the
+  one action is "+ Додати ще екземпляр" (`?catalogItemId=`).
+- **Table** (`PositionTable`): coin, country, series, quantity, spent, current value,
+  last purchase, grade; whole row links to the coin; no row actions.
+- **Sort:** last purchase (`lastAcquisitionDate`), name, amount (`totalSpendUah`).
 
 ---
 
-## Коллекция
+## Add ("Додати")
 
-Только свои монеты. Те же фильтры, что в каталоге, но по умолчанию «В наличии».
-Показывает количество, сумму покупки, текущую оценку.
+`/collection/add` — one page for everything that costs money. The first field is
+**type**: "coin purchase" (default) or any manual expense category (`MANUAL_CATEGORIES`),
+written to the URL (`?type=coin_purchase`, `?type=delivery`, …). Fields that mean the
+same on both sides — amount/price, currency, date, seller, note — survive a type change
+(`carried.ts`). Layout: a centered column, the selected coin block (`SelectedCoin`,
+shared with the edit page) and a 640px form card.
 
-**Добавление покупки:**
-- Способ добавления: «Единое добавление» / «Открыть ручной ввод» / «Прочитать ссылку»
-- Поля: количество, «Цена за одну, грн.», «Сумма покупки», «Дата покупки»,
-  «Продавец» («Аукцион, магазин или имя»), «Комментарий»
-  («Заметка: состояние, доставка, торг…»)
-- Валюта: в legacy жёстко «Гривна · UAH» — **в вебе должен быть выбор**, см.
-  `business-rules.md`, BR-4
+### Coin purchase branch
 
-### Как реализовано
+1. **Country** — searchable select over all issuers (`GET /countries?scope=all`),
+   Ukraine first.
+2. **Coin name** — a text field with live suggestions within that country
+   (`GET /catalog/lookup`, 300 ms debounce, from two characters; BR-13a exceptions).
+   Suggestions show photo, name, country · year · denomination and own / owned badges.
+   Country comes first because a name alone ("10") means nothing. The field is `text`,
+   not `search` (Chrome clears search inputs on Escape).
+3. **Suggestion picked** → the form collapses to the coin block, photos, "choose another
+   coin" and the purchase fields.
+4. **No suggestion** → the **"about the coin"** block opens for a new personal position:
+   year\*, denomination, series, coin type\*, material\*, metal; under "more details":
+   mintage, weight, diameter, thickness, edge, strike quality, shape, **one catalog
+   number** field (stored in `catalog_number`), and three descriptions (general,
+   obverse, reverse → `descriptions` in the request locale). Required: country, name,
+   year, type, material.
+   - Material, denomination and series are `Combobox` (dictionary + free text); edge and
+     quality are dictionary-only `Select` (BR-14). Year is a `Combobox`, newest first.
+   - Sent as **one** `POST /collection` with a nested `newCatalogItem` (BR-4).
+5. From the catalog, `?catalogItemId=N` preselects the coin and skips the search.
 
-`GET /collection` отдаёт **позиції**, не покупки: сітка й таблиця «Мої монети»
-показують по одному рядку на кожну каталожну монету, всі покупки якої згруповано
-(`api.md`). Деталі окремих покупок живуть на картці монети, у «Мої
-екземпляри» — там і редагування, і видалення.
+- **Unit price starts at 0** (coins found in change or received as gifts exist); the zero
+  is selected on focus so typing replaces it. An emptied field still asks for a number.
+- **Own photos:** hovering obverse/reverse shows "change photo" (a small permanent button
+  on touch screens); it opens the circular crop dialog (`CoinPhotoCropDialog`). For a new
+  coin there are two "+ photo" placeholders. Photos are kept in form state and uploaded
+  with sequential `PUT`s after `POST /collection` succeeds — no server-side drafts
+  (`media.md`).
 
-- **Панель фільтрів** — та сама оболонка (`FiltersShell`/`FiltersToolbar`,
-  `shared/ui`), що й у каталозі: рамка з полями зверху, ряд чипсів активних
-  фільтрів, нижній рядок «Показано X з Y» + перемикач виду + сортування +
-  напрямок. На < 900px поля ховаються за кнопкою «Фільтри» у той самий
-  висувний дровер, що в каталозі. Поля: пошук, країна, серія, роки від/до,
-  номінал, тип, метал, **стан** (свій для колекції, значення — фіксований
-  список `GRADES`). Стан фільтрує по покупках: позиція потрапляє у видачу,
-  якщо хоча б одна її покупка має такий стан, але агрегати рахуються по
-  **всіх** покупках позиції — фільтр не обрізає картку, а лише відбирає, які
-  позиції показати цілком. Довідники країна/серія/номінал — не загальні
-  каталожні (`GET /countries` тощо), а власні `GET /collection/countries` /
-  `/series` / `/denominations`: тільки те, чим користувач реально володіє
-  (`api.md`) — каталог продовжує використовувати загальні ручки
-  без змін.
-- **Плитка позиції** (`PositionCard`) — великий аверс (свідома відмінність від
-  каталогу, де половинки аверс/реверс), бейдж стану (один стан — сам, кілька —
-  через « · », немає жодного — бейджа немає), рядки «Кількість» (`N шт.`),
-  «Витрачено», «Поточна оцінка» (або «Ціни немає»), «Остання покупка» (або
-  «—»). Нотатки на картці не показуються — вони належать покупкам. Кнопок
-  «Редагувати»/«Видалити» немає: уся картка — розтягнуте посилання на картку
-  монети, знизу одна дія «+ Додати ще екземпляр» → форма нової покупки з
-  передвибраною монетою (`?catalogItemId=`).
-- **Таблиця позицій** (`PositionTable`) — колонки Монета/Країна/Серія/
-  Кількість/Витрачено/Поточна оцінка/Остання покупка/Стан, рядок цілком —
-  розтягнуте посилання на монету (як у таблиці каталогу), дій у рядку немає.
-- Сортування «За останньою покупкою» (`lastAcquisitionDate`, було «За датою
-  покупки») / «За назвою» / «За сумою» (`totalSpendUah`).
-- **KPI-плитки** (2026-09-23) — ті самі чотири плитки, що на Огляді
-  (`CollectionSummaryTiles`: «Монет у колекції», «Разом витрачено», «Поточна оцінка»,
-  «Різниця»), тільки замість нефільтрованого знімку `GET /bootstrap` рахуються
-  `GET /collection/summary` з активними фільтрами сторінки — без фільтрів числа збігаються
-  з Оглядом, з фільтрами звужуються разом зі списком під ними. Той самий гейт, що в
-  каталозі: тільки увійшовшому власнику, порожня колекція без жодного фільтра плиток не
-  показує (єдиний паттерн порожніх станів, `### Порожні стани для нового користувача`).
+### Supporting expenses in the purchase
 
----
+A collapsed "related expenses" block at the end of both purchase variants (BR-4). Each
+row: category · amount · currency, with a remove button; date and seller come from the
+purchase. Opening the block adds the first row; "add another" adds more. A row with an
+untouched amount is ignored; an unreadable or zero amount is a field error (zero is not
+allowed here). Sent in the same `POST /collection` as `extraExpenses`. In Money these
+rows are ordinary manual expenses linked to the coin; deleting one never touches the
+coin.
 
-## Додати (`/collection/add`)
+### Expense branch
 
-Одна страница на всё, что стоит денег. Решение владельца 2026-09-14: до этого покупка
-жила на `/collection/coins/new`, расход — в модалке на «Грошах», а монету, которой нет в
-каталоге, записать было нечем вовсе (импорт с uCoin — этап 6), и человек упирался в тупик.
-Теперь вход один, а первое поле формы — **«Тип»**: «Покупка монети» (по умолчанию) плюс все
-ручные категории расходов из `MANUAL_CATEGORIES`. Тип пишется в адрес
-(`?type=coin_purchase` / `?type=delivery` …), поэтому на любую ветку можно дать ссылку.
+Amount, currency, date, seller, description; the category is the type selector. An
+optional **related coin** block: a coin name field with the same suggestions across all
+issuers (no country step) that only **links** an existing shared or own record
+(`catalogItemId`) and never creates one. The picked coin shows both as the large block
+above the form and as a short line inside the related-coin block, each with "choose
+another coin".
 
-**Общие поля переживают смену типа** (`CarriedValues`): сумма/цена, валюта, дата,
-продавець, нотатка/опис. Они означают одно и то же по обе стороны переключателя, и
-заставлять перенабирать их — верный способ отучить человека вести учёт.
+### Entry points
 
-Вёрстка — та же центрированная колонка, что у формы покупки после рефреша: шапка страницы,
-под ней (когда монета уже выбрана) её назва, рядок фактів, аверс/реверс, и карточка формы
-шириной 640px. Обе страницы берут этот блок из одного компонента `SelectedCoin`, чтобы он
-не разъехался.
-
-**Своё фото монети (2026-09-14).** Наведення на аверс/реверс показує олівець і підпис
-«Змінити фото» (тач-екрани — маленька постійна кнопка в кутку, `@media (hover: none)`):
-клік відкриває той самий кроп-діалог, що й аватарка (`CoinPhotoCropDialog`, коло-прицівник,
-на сервер іде квадрат). На «Про монету» (монета «з нуля») — два таких самих плейсхолдери
-«+ Фото» замість готового фото. Фото копляться в стані форми і йдуть на сервер
-послідовними `PUT`-ами вже після успішного `POST /collection` — чернеток на сервері немає
-(`api.md`, `media.md`).
-
-### Ветка «Покупка монети»
-
-1. **Країна** — `Select searchable` по **всем** ~260 эмитентам (`GET /countries?scope=all`),
-   Украина первой (`sort_order = 0`), остальные по алфавиту в локали, поиск внутри
-   выпадашки.
-2. **Назва монети** — текстовое поле с живыми подсказками внутри выбранной страны
-   (`GET /catalog/lookup`, дебаунс 300 мс, от двух символов). Саджест — фото, назва,
-   країна · рік · номінал, бейджі «Моя позиція» / «У моїй колекції». Порядок полей не
-   декоративный: название само по себе ничего не значит, монета «10» есть у половины мира,
-   и страна первой делает поиск и читаемым, и точным. Поле — обычный `text`, не `search`:
-   Chrome очищает search-инпут по Escape, а здесь в поле лежит имя монеты, а не запрос.
-3. **Саджест выбран** → форма схлопывается в прежний вид: шапка монеты, фото, «Обрати іншу
-   монету» и привычная форма покупки. Этот вид не менялся.
-4. **Саджеста нет, человек пишет своё** → под названием раскрывается блок **«Про монету»**.
-   Сразу видно: рік\*, номінал, серія, тип монети\*, матеріал\*, метал. Под «Більше
-   деталей» — тираж, вага, діаметр, товщина, гурт, якість карбування, форма, **каталожний
-   номер** и три описания: **Опис**, **Опис аверса**, **Опис реверса**. Обязательных полей
-   пять: країна, назва, рік, тип, матеріал; год обязателен, потому что колонка `NOT NULL` и
-   на ней держится комплектность серий.
-
-   Вводный текст блока про личную коллекцию, а не про каталог («Цієї монети ще немає —
-   запишемо її разом із покупкою, і вона з'явиться у вашій колекції»), и списка обязательных
-   полей в нём нет: звёздочки на самих полях и так всё говорят, а перечень дублировал их и
-   устаревал при каждой правке (решение владельца 2026-09-14).
-
-   **Каталожный номер — одно поле, не три.** KM#, UC# и Numista остались колонками, которые
-   заполняет конвейер из источника, знающего систему нумерации; у человека номер один, и
-   спрашивать, чей он, — значит получить три пустых поля (тот же скриншот). Пишется в
-   `catalog_items.catalog_number` (миграция `0019`), последним в цепочке, которую карточка
-   и так читала.
-
-   **Три описания вместо «нотатки про монету».** Ложатся в `descriptions` под локаль
-   запроса, в ту самую форму, что зафиксирована в `data-model.md`; `notes` форма больше
-   не пишет — это заметка о записи, а не описание монеты.
-   - **Матеріал**, **номінал** и **серія** — по одному `Combobox` на каждое: список
-     справочника плюс свободный ввод (правка владельца 2026-09-14 — до неё номинал и серия
-     для страны без справочника показывались неактивными полями с извинением).
-     Совпало со строкой справочника — уходит id, не совпало —
-     текст. Своя серия при этом только показывается: комплектность считается по общим
-     сериям, о чём поле и пишет в подсказке (`business-rules.md`, BR-14).
-   - **Гурт** и **якість** — только выпадашки словарей (`GET /edge-types`,
-     `GET /quality-types`): вписанное от руки значение никогда не совпало бы с тем, что
-     пишет парсер.
-   - **Рік випуску** — тот же `Combobox`, что режим «Рік»/«Діапазон років» фильтра «Період» в
-     каталоге: список по годам этой страны плюс свободный ввод, от свежего года к старому.
-   - Отправляется это одним запросом `POST /collection` с вложенным `newCatalogItem`
-     (`api.md`), а не двумя подряд: иначе упавшая покупка оставляла бы позицию
-     без экземпляра.
-5. Вход из каталога `?catalogItemId=N` работает как раньше: тип «покупка», монета уже
-   разрешена, шаг поиска пропущен.
-
-**Ціна за шт. починається з нуля** (решение владельца 2026-09-14) — и это про обе ветки
-покупки, с найденной монетой и с новой. Пустое поле отбрасывало назад с ошибкой «Вкажіть
-ціну числом, не менше 0» каждого, кто нашёл монету в сдаче или получил её от друзей, а
-таких немало. Ноль в поле выделяется при фокусе, поэтому набранная цена заменяет его, а не
-приклеивается сбоку («0250»); уже введённую цену фокус не трогает. Валидация осталась:
-очищенное поле по-прежнему просит число.
-
-**«Пов'язані витрати»** — свёрнутый блок внизу формы, последним перед кнопками, в обеих
-ветках покупки (решение владельца 2026-09-14, обратная сторона «Пов'язаної монети» в ветке
-расходов). Доставку, холдер или грейдинг раньше приходилось заводить вторым заходом через
-«Гроші», а это значит — чаще всего не заводить вовсе.
-
-- строка: **категорія · сума · валюта** и крестик. Дату и продавца блок не спрашивает — они
-  у покупки уже есть;
-- свёрнут по умолчанию; разворот сразу даёт первую строку, ссылка «Додати ще витрату»
-  добавляет следующие;
-- строка, в которой сумму не трогали, просто игнорируется при отправке; вписанная, но
-  нечитаемая или нулевая — ошибка на самом поле. Ноль здесь запрещён, в отличие от цены
-  монеты: бесплатная монета бывает, бесплатная доставка в графе расходов — это незаполненное
-  поле;
-- уходит всё одним `POST /collection` (поле `extraExpenses`), в одной транзакции с монетой.
-
-В журнале «Гроші» эти строки — обычные ручные расходы, привязанные к монете: те же иконки
-редактирования и удаления, и **удаление такой строки монету не трогает**
-(`business-rules.md`, BR-4).
-
-### Ветка расходов
-
-Прежняя форма расхода (сумма, валюта, дата, продавець, опис) — но категория не
-дублируется, её роль играет «Тип» сверху. Плюс необязательный блок **«Пов'язана монета»**:
-одно поле «Назва монети» с той же живой подсказкой, но здесь она только **ссылается** на
-существующую позицию — общую или свою личную — и ничего не создаёт. Страны в блоке нет
-(решение владельца 2026-09-14): в расходе монета уже известна по названию, а лишний
-обязательный шаг только мешал — поиск идёт по всем эмитентам сразу.
-
-Выбранная монета уходит в `catalogItemId` и показывается **дважды**: большой шапкой над
-формой (как в покупке) и короткой строкой «назва / країна · рік · номінал» внутри самого
-блока. Дублирование намеренное — шапка далеко от поля, по которому только что кликнули, и
-владелец не сразу замечал, что выбор сработал. Ссылка «Обрати іншу монету» есть в обоих
-местах и очищает ссылку. `seriesId` в интерфейсе не выводим.
-
-### Точки входа
-
-Все кнопки «Додати монету» (до 2026-09-23 — «+ Додати покупку») по приложению (колекція,
-Огляд, Комплектність, пустые состояния, плитки и таблицы каталога, картка монети) ведут на
-`/collection/add`, с `?catalogItemId=` там, где монета известна. «+ Додати витрату» на
-`/collection/money` — переход на
-`/collection/add?type=other` вместо прежней модалки. Редактирование существующего расхода
-осталось модалкой на самой странице «Гроші» (решение владельца 2026-09-14): править одну
-строку журнала удобнее, не уходя со списка.
+Every "Додати монету" button (collection, overview, completeness, empty states, catalog
+tiles and rows, coin card) goes to `/collection/add`, with `?catalogItemId=` when the
+coin is known. "+ Додати витрату" on Money goes to `/collection/add?type=other`. Editing
+an existing expense stays a modal on the Money page.
 
 ---
 
-## Комплектність
+## Overview ("Огляд")
 
-`/collection/completeness` (до 2026-09-23 — «Серії», список только по сериям; список
-переиспользован под произвольную группировку, см. `api.md` §«Комплектность»).
-Тулбар: пошук за лейблом групи, фільтр країни, перемикач полів групування (`groupBy` —
-серія/рік/номінал/матеріал/гурт/якість карбування), випадашка «Цінність металу» (поведінка —
-нижче, у «Порожні стани»), перемикач скоупу «Мої»/«Усі», сортування (за відсотком
-комплектності / за вартістю).
+`/collection`, all from one `GET /bootstrap`.
 
-Кожен рядок — кільце прогресу (`ProgressRing`, % комплектності), назва групи (посилання на
-екран деталей), країна й період під назвою, і чотири показники праворуч: «Зібрано» (owned/
-total), «Витрачено», «Вартість» (поточна ринкова), «Бракує». Клік по рядку веде на
-`/collection/completeness/:groupBy/:value`, перенісши поточні `countryId`/`metalKind` у запит
-екрана деталей (2026-09-24) — щоб числа на екрані деталей збігалися з тим, що показував
-рядок, а не скидалися до неспрямованого зрізу.
-
-Екран деталей групи має власний тулбар — країна, цінність металу, перемикач «тільки наявні» —
-успадкований від списку як стартові значення, але незалежний від нього: можна звузити далі, не
-повертаючись назад (`GET /completeness/group`/`/completeness/items`, параметри `metalKind` і
-`owned`, `api.md`).
-
-### Порожні стани для нового користувача
-
-Критерий — `dashboard.isEmpty` з `GET /bootstrap` («ні екземплярів, ні особистих
-позицій»), той самий на всіх екранах; локальних евристик на кшталт «нуль рядків на цій
-сторінці» немає ніде.
-
-- **Монети** (`/collection/coins`): при пустой коллекции — три примера в
-  `CollectionOnboarding`, кнопки каталога и добавления монеты. Реальные KPI, фильтры
-  и действия шапки не рендерятся (см. единый паттерн выше).
-- **Комплектність** (огляд екрана — вище, `## Комплектність`): випадашка «Цінність металу»
-  — фільтр, що звужує будь-яке з полів групування одразу, а не окреме вимірювання зі своїм
-  списком груп — навмисно не `groupBy`, щоб не тримати дві різні точки входу до того самого
-  поняття (рішення власника 2026-09-23, після короткого досвіду з `groupBy=metal` як окремим
-  табом). Тригер називає обраний пункт замість того, щоб завжди показувати «Цінність
-  металу», і підсвічується, коли активне значення відмінне від «усі» (`active`-пропс
-  спільного `Select`); привид-лейбл резервує ширину лейбла за замовчуванням, щоб тулбар не
-  перегортався при зміні вибору (2026-09-24). Порожня колекція цілком (`isEmpty`) —
-  карточка знакомства `CollectionOnboarding` + «Перейти до каталогу» / «Додати монету», решта
-  екрана (тулбар, список) не рендериться — той самий паттерн, що і скрізь. Якщо груп
-  обраного поля/країни немає зовсім (каталог порожній під цим зрізом, а не колекція) —
-  окремий EmptyState «Записів поки немає». Всередині непорожньої колекції екран за
-  замовчуванням показує сегмент **«Мої»** (`scope=mine`, у URL не пишеться) — групи, де
-  `owned > 0`; перемикач поруч веде на **«Усі»** (`scope=all`), чисто клієнтський фільтр
-  без нового запиту. Якщо в користувача взагалі немає розпочатих груп обраного поля,
-  «Мої» показує свій EmptyState «Ще нічого не почато» з кнопкою «Показати всі», що
-  перемикає скоуп. Пошук зліва від фільтра країни звужує видимий список за лейблом групи
-  (дебаунс 400 мс, без реєстру), діє всередині вибраного скоупу; якщо нічого не знайдено —
-  загальний `catalog.emptyTitle`/`emptyText` («Нічого не знайдено»).
-- **Гроші** (`/collection/money`): при пустой коллекции — три примера расходов в
-  `CollectionOnboarding`, кнопки каталога и добавления монеты. Реальные KPI, графики,
-  категории и действие шапки
-  не рендеряться (єдиний паттерн, «Загальні рішення»). Стан «покупок немає, супутні
-  витрати додайте вручну» — окремий,
-  для непорожньої колекції без жодної витрати: кнопка «+ Додати витрату» в шапці
-  лишається (це не «порожня сторінка кабінету» в сенсі єдиного паттерна), плашка й далі
-  без рамки, зі своїм CTA.
+- **Header:** centered title and a fixed subtitle.
+- **Four equal KPI tiles**, each a stretched link: coins in collection
+  (`collectionItems`) → My coins; total spent (`totalSpendUah`, with related spend as a
+  third line) → Money; current value (`marketValueUah`) → Money; difference
+  (`marketValueUah − totalSpendUah` and %) → Money. Icons `Coins` / `Wallet` /
+  `TrendingUp` / `Scale`; `StatTile` sets its own compact padding.
+- **My series:** every series with at least one owned coin (`seriesBreakdown`, no limit,
+  BR-9), sorted by completion descending with finished series last; a progress ring
+  "X of Y" and the nearest missing count. Each row links to
+  `/collection/completeness/series/{id}`. The list fills the card height and scrolls
+  within it. Empty state only when no series is started.
+- **Finance** (right column): spent on coins + related = total; current value;
+  difference and % (computed on the client); missing budget with "no price: N". No
+  period dynamics — there's no history of valuations.
+- **NBU rates:** USD and EUR with their date from `exchangeRates`; missing → "no data".
+  The rates card stretches so both columns end level (`align-items: stretch`).
+- **By country:** `owned of count`, share and a bar; a full-width row under the columns.
+- Loading → skeletons of the same shape; error → `ErrorState` with retry. Phones: one
+  column, KPI tiles 2×2.
 
 ---
 
-## Гроші
+## Completeness ("Комплектність")
 
-Фінансовий журнал хобі: покупки монет (`coin_purchase`) падають сюди автоматично з
-колекції, супутні витрати заводяться вручну. Рішення власника (2026-09-07): додати
-графіки на recharts, оживити KPI, вичистити таблицю. Двоколонкова грошова схема
-лишається без змін — вона зарезервована під прив'язку до курсу НБУ на дату покупки
-(`docs/backlog.md`). Уточнення власника 2026-09-09: друга колонка — **долари**, а не
-гривня: сенс у тому, щоб дивитися витрати у валюті, яка не йде з-під ніг.
+`/collection/completeness` — completeness grouped by any field (BR-5; `api.md`,
+`/completeness/*`).
 
-- **KPI-ряд** (4 плитки, сітка як на «Мої монети»): «Разом на хобі», «На монети»,
-  «Супутні витрати», «Цього місяця» (іконка `CalendarDays`) — підказка показує дельту
-  до минулого місяця (`+X ₴ до минулого місяця` / `−X ₴ …`), а якщо минулого місяця
-  витрат не було зовсім — «минулого місяця витрат не було».
-- **Період графіків** (`ExpensesPeriodPicker`, 2026-09-13): плашки «1М/3М/6М/1Р»
-  (за замовчуванням — 1Р) плюс два поля дат для довільного діапазону; вибір плашки
-  перераховує дати від сьогодні (той самий місячний зсув, що й на бекенді), ручна
-  правка дати знімає підсвітку плашки. `dateFrom > dateTo` — валідація на фронті
-  (запит не йде, під плашками текст помилки), той самий кейс на бекенді — `422`.
-- **Графіки** (`GET /expenses/chart-summary?dateFrom&dateTo`, поля `byPeriod`/
-  `byCategory` — на відміну від `GET /expenses/summary`, чиї `byMonth`/`byCategory`
-  завжди фіксовані вікна (12 місяців / увесь час) і живлять тільки KPI-плитки й чипси
-  категорій під таблицею; показуються, тільки якщо в користувача взагалі є витрати —
-  інакше порожній стан сторінки лишається головним): ряд із двох карток (сітка ~2:1,
-  на <900px — стовпчиком), стиль карток — той самий, що й у решти сторінки
-  (`surface-raised`, рамка, `radius-lg`), кожна з `aria-label`.
-  - «Витрати за період» — вертикальний stacked bar; гранулярність підбирає бекенд —
-    по днях, якщо діапазон ≤31 дня, інакше по місяцях (обидва — нулями там, де витрат
-    не було, вісь суцільна): низ — монети, верх — супутні. Вісь X через
-    `interval="preserveStartEnd"` — прибирає підписи, що не влазять, замість їх
-    накладання (актуально і для ~30 денних барів, і для широкого довільного діапазону
-    в багато місяців). Тултип показує суми обох частин і підсумок.
-  - «За категоріями» — донат із легендою (категорія, сума, частка %) **за той самий
-    діапазон**, що й перший графік; одна категорія — все одно повне кільце; діапазон
-    без жодної витрати — текст «За цей період витрат не було.» замість порожнього
-    кільця.
-  - Тултип приклеен к курсору (решение владельца 2026-09-09). По умолчанию recharts
-    везёт коробку к новому месту 400 мс, а у края полотна перебрасывает её на
-    противоположную сторону курсора — прыжок примерно на её высоту вверх, когда
-    курсор идёт вниз. График 260px, тултип ~130px, так что порог переброса приходится
-    на середину полотна: вертикальную слежку не починить, её надо отключать. Отключены
-    обе: `isAnimationActive={false}` и `allowEscapeViewBox={{ x: false, y: true }}` —
-    коробка идёт за курсором кадр в кадр, у нижнего края свисает на подписи оси, а не
-    прыгает. По горизонтали прижим к краю оставлен, иначе она уезжает за карточку.
-    `wrapperStyle={{ zIndex: 1 }}` — обёртка легенды тоже позиционирована и идёт в DOM
-    позже, без этого тултип подлезал под её подписи.
-  - Кольори графіків не хардкодяться: під час рендеру читаються токени теми
-    (`--color-accent` як основа плюс похідні відтінки через `color-mix`,
-    `--color-text-muted`/`--color-border` для сітки й підписів) і перечитуються при
-    зміні теми (`useChartPalette`, ключується на `theme` з `useTheme`).
-- **«+ Додати витрату»** (шапка й порожній стан) — перехід на
-  `/collection/add?type=other`, а не модалка (2026-09-14). Модалка лишилася тільки для
-  **редагування** наявної витрати: правити один рядок журналу зручніше, не йдучи зі списку.
-- **Таблиця**: колонка «Опис» для `coin_purchase` — назва монети (`coinTitle` з
-  `ExpenseOut`) посиланням на картку монети (`/catalog/:id`), фолбек «з покупки монети»
-  лишається, тільки якщо `coinTitle` відсутній. Для ручної витрати, до якої прив'язали
-  монету (`catalogItemId`), під описом з'являється друга, приглушена стрічка — назва тієї
-  монети посиланням: прив'язку, яку людина зробила у формі, має бути видно (2026-09-14).
-  Колонки «Вартість» і друга, доларова — без змін.
-
-  Уточнення 2026-09-09 (зауваження власника: «якийсь прочерк у кінці таблиці не ясно
-  навіщо»): прочерк у комірці дій прибрано — він читався як відсутнє значення. Обидві
-  безіменні колонки отримали заголовки: «Дії» та «У доларах».
-- **Дії — олівець і кошик у кожному рядку** (рішення власника 2026-09-14, ті самі іконки,
-  що в «Моїх екземплярах»). До цього для рядків із покупок колонка була порожня: витрата
-  `coin_purchase` належить покупці й через `/expenses` не редагується (409,
-  `business-rules.md`, BR-4). Це пояснювало порожнечу, але не виправдовувало її —
-  рядок усе одно про покупку, яку людина зробила, і саме її вона хоче поправити. Тому
-  іконки в таких рядках працюють **не з витратою, а з екземпляром**:
-  - олівець → `/collection/coins/{collectionItemId}/edit`, форма покупки; `from` у стані
-    роута повертає назад у «Гроші» разом із фільтрами й сторінкою;
-  - кошик → той самий `DeleteInstanceDialog`, що й на картці монети. Він прямо каже, що
-    монету буде видалено **разом із витратою на покупку** — інакше й не можна, витрата
-    похідна (п. 10). Журнал оновлюється сам: `COLLECTION_DEPENDENT_KEYS` містить
-    `expenses`.
-
-  Рядок покупки без `collectionItemId` (екземпляр зник, `ON DELETE SET NULL` як
-  запобіжник) лишається без дій — редагувати нема чого. Ручні витрати ті самі дві іконки
-  відкривають як раніше: модалку правки й підтвердження видалення самої витрати.
-- **Пустая коллекция** (`collectionEmpty`): шапка без «+ Додати витрату» и
-  `CollectionOnboarding` с примерами расходов. Реальные KPI, графики и категории
-  не рендерятся; сохранены кнопки «Перейти до каталогу» / «Додати монету». Стан «покупок немає, супутні
-  витрати додайте вручну» — окремий, для
-  непорожньої колекції без жодної витрати; KPI/графіки/чипси в ньому теж не показуються
-  (нема даних для них), але шапка з «+ Додати витрату» й плашка без рамки зі своїм CTA
-  лишаються — це не «порожня сторінка кабінету» в сенсі єдиного паттерна.
+- **Toolbar:** search by group label (400 ms debounce), country filter, `groupBy`
+  switch (series / year / denomination / material / edge / strike quality), a
+  **metal-kind** select, scope "Мої" / "Усі", sort (by completion % / by value).
+- **Metal kind is a filter, not a grouping:** it narrows whichever `groupBy` is active.
+  Its trigger names the current pick and is highlighted when not "all" (`active`); an
+  invisible copy of the default label reserves its width so the toolbar never re-wraps
+  (`MetalKindSelect`).
+- **Scope:** "Мої" (default, not written to the URL) shows groups with `owned > 0`;
+  "Усі" (`scope=all`) shows every group — a client-side filter, no new request. If no
+  group is started, "Мої" shows "nothing started yet" with a "show all" button.
+- **Rows:** progress ring, group name (link), country and period, and four numbers —
+  collected (owned/total), spent, current value, missing. Opening a row carries the
+  current `countryId` and `metalKind` into the detail screen so its numbers match the
+  row.
+- **Detail screen** (`/collection/completeness/:groupBy/:value`): its own toolbar —
+  country, metal kind, "owned only" — seeded from the list but independent. Tiles come
+  from `GET /completeness/items`, never from `GET /catalog` (BR-13a). "Open in catalog"
+  appears only for `groupBy=series` when the country is `catalogConfirmed`; otherwise a
+  note says only the personal collection is shown.
+- Empty collection → onboarding; no groups at all for the chosen field/country → "no
+  records yet"; nothing matches the search → the generic "nothing found".
 
 ---
 
-## Продажи
+## Money ("Гроші")
 
-**В MVP не делаем** — таблица `sales` пуста, функция не использовалась.
-Экран существовал: «В наличии» → «Записать продажу» → «Архив», с возможностью
-«Вернуть в коллекцию». Пустое состояние: «История продаж пока пуста».
+`/collection/money` — the hobby's financial journal. Coin purchases (`coin_purchase`)
+appear automatically; other expenses are entered by hand.
 
-Описание сохранено для будущей реализации.
-
----
-
-## Настройки (`/settings`)
-
-Дві колонки. Ліва — картка «Профіль»: бейдж ролі («Адміністратор»/«Користувач»), аватарка
-(`AvatarSection`), email (тільки читання), ім'я (зберігається по Enter або втраті фокусу,
-незмінене значення запиту не шле — той самий патерн, що й у «Місце зберігання» нижче),
-зміна пароля (`PasswordForm`; акаунт без пароля, заведений тільки через Google, замість
-«поточний пароль» одразу просить новий), і — тільки якщо Google-вхід увімкнено на бекенді —
-підключення Google-акаунта («Вхід через Google» → «Підключити Google-акаунт» або текст, що
-вже підключено; адреса Google має збігатися з адресою акаунта).
-
-Права колонка — дві картки:
-
-- **«Вигляд»**: тема (світла/темна/системна, ті самі три позиції, що в шапці), мова
-  інтерфейсу (uk/en, застосовується одразу — не форма з кнопкою «Зберегти»), вторинна
-  валюта для сум (USD/EUR).
-- **«Каталог і колекція»**: вигляд за замовчуванням окремо для каталогу і для «Мої монети»
-  (картки/таблиця), стан за замовчуванням для нової покупки (`GRADES`), перемикач «Показувати
-  монети у сувенірній упаковці окремою карткою», перемикач «Враховувати супутні витрати
-  (доставку, холдери, грейдинг) у вартості колекції» (той самий `includeSupportingExpenses`,
-  що в `api.md`), і місце зберігання за замовчуванням — `Combobox` зі списком уже
-  використаних назв, додаванням нової (Enter на введеному тексті) і видаленням користувацької
-  назви через підтвердження (`ConfirmDialog`, тільки для `custom`-записів).
-
-Усі перемикачі й селекти на сторінці зберігаються по одному — окремий запит на кожну зміну,
-без загальної кнопки «Зберегти».
-
-Бэкапи, синхронізація з uCoin, перевірка посилань і імпорт Excel з legacy-мока в веб не
-переносились: бэкапи — інфраструктурна задача (`infra.md`), решта — відкладений
-функціонал (`scope.md`, імпорт uCoin і ручне оновлення цін — «Після MVP»).
+- **KPI tiles:** total on the hobby, on coins, related, this month (with the delta to
+  last month, or "no spending last month").
+- **Chart period** (`ExpensesPeriodPicker`): presets 1M / 3M / 6M / 1Y (default 1Y) plus
+  two date fields; a preset recomputes the dates from today, a manual date clears the
+  preset highlight. `dateFrom > dateTo` is validated on the client (no request) and
+  rejected by the backend with `422`. On desktop the date labels sit left of the fields
+  on the preset row; on phones they sit above.
+- **Charts** from `GET /expenses/chart-summary?dateFrom&dateTo`, shown only if the user
+  has any expenses (`recharts`, two cards ~2:1, stacked under 900px):
+  - spending by period — stacked bars, coins below and related above; daily for ranges
+    ≤ 31 days, monthly otherwise, with zero-filled gaps; X-axis
+    `interval="preserveStartEnd"`;
+  - by category — a donut with legend (category, amount, share) for the same range; an
+    empty range shows a text instead of an empty ring.
+  - Tooltips follow the cursor exactly (`isAnimationActive={false}`,
+    `allowEscapeViewBox={{ x: false, y: true }}`, `wrapperStyle={{ zIndex: 1 }}`).
+  - Chart colors are read from theme tokens at render and re-read on theme change
+    (`useChartPalette`).
+  - `GET /expenses/summary` (fixed windows) feeds only the KPI tiles and category chips.
+- **Table:** description — for `coin_purchase` the coin title links to its card; a
+  manual expense linked to a coin shows the coin as a second, muted link line. Amount in
+  UAH and a USD column (headed), and an "Actions" column.
+- **Row actions — pencil and bin on every row.** For manual expenses they edit (modal)
+  and delete the expense. For purchase rows they act on the **instance**: pencil →
+  `/collection/coins/{collectionItemId}/edit` (returns to Money with filters and page),
+  bin → `DeleteInstanceDialog`, which deletes the coin together with its purchase expense
+  (BR-10). A purchase row without `collectionItemId` has no actions.
+- **"+ Додати витрату"** (header and empty state) → `/collection/add?type=other`.
+- **Empty collection** → onboarding. A non-empty collection with no expenses keeps the
+  header action and shows a borderless notice with its own CTA; KPIs and charts are not
+  rendered.
 
 ---
 
-## Адміністрування (`/admin`)
+## Settings
 
-Раздел для роли admin; обычный пользователь на маршруте получает редирект на «Мою
-колекцію», а каждый эндпоинт за экраном проверяет роль отдельно. Решения и объём —
-`admin.md`. Три вкладки (`?section=jobs|users|proposals`, за замовчуванням
-«Фонові задачі»): «Фонові задачі», «Користувачі», «Пропозиції монет».
+`/settings`, two columns; every control saves on its own (one request per change, no
+"Save" button).
 
-### Фонові задачі
-
-Таблица прогонов, свежие сверху: состояние, задача,
-начало, длительность, строка самоотчёта. Фильтр по задаче появляется, когда отчитывалась
-больше чем одна.
-
-Состояния окрашены: «Успішно» — зелёный, «Частково» — жёлтый, «Помилка» — красный,
-«Виконується» — нейтральный. Из этого правила есть одно исключение, и оно содержательное:
-прогон, который висит в «Виконується» дольше шести часов, показывается жёлтым с подписью
-«Схоже, зупинилася — прогін так і не завершився». Сторожа у нас пока нет (`admin.md`,
-2.7), и это единственное место, где убитая посреди работы задача вообще видна: сама она
-о своей смерти сообщить не может.
-
-Клик по состоянию открывает карточку прогона: время начала и конца, длительность, дата
-данных, код возврата, строка самоотчёта, счётчики задачи парами «имя — значение» и
-подробности — те есть только у неудачных прогонов, у нормальных отчёт в одну строку
-(`admin.md`, 2.4).
-
-Пустое состояние — «Прогонів ще немає»: до первого ночного прогона экран не выглядит
-сломанным.
-
-### Сповіщення в Telegram
-
-Карточка над списком: состояние («Підключено» / «Не підключено») и одна кнопка.
-«Підключити Telegram» открывает бота в новой вкладке по ссылке с одноразовым кодом и
-показывает подсказку «натисніть Start». Дальше чат подключает себя сам — через вебхук, о
-котором браузер узнать не может, поэтому экран в это время опрашивает статус раз в три
-секунды и сам сообщает об успехе. Отключение — той же кнопкой на месте.
-
-Chat id на экран не передаётся: он там не нужен.
-
-### Користувачі
-
-Дві плитки зверху («Усього користувачів», «Почали колекцію» — з підказкою «Додали хоча б
-одну монету») і таблиця нижче: користувач (ім'я/email), дата реєстрації, статус пошти
-(«Підтверджено»/«Не підтверджено»), кількість монет, роль з кнопкою «Зробити адміном» /
-«Зняти роль» поруч. Кнопка вимкнена для самого себе (`isSelf`) і для підвищення користувача
-без активного акаунта чи підтвердженої пошти (`cannotPromote`) — той самий запобіжник, що
-на бекенді (`api.md`). Немає порожнього/помилкового спеціального стану поза
-загальним `ErrorState`/скелетоном — список користувачів порожнім не буває.
-
-### Пропозиції монет
-
-Сітка карток монет (`CoinCard` у режимі `review`) — ті самі чернетки, що `status=draft`
-(`api.md`). Порожній стан — «Пропозицій ще немає» / «Тут з'являться пропозиції
-нових монет від парсера та користувачів». Клік по картці веде на звичайну картку монети
-(`/catalog/:id`); саме там, а не в сітці, показуються дії.
-
-На картці монети зі статусом `draft` під контентом з'являється панель для admin
-(`ProposalActions`) — «Ця монета очікує перевірки» і три кнопки: «Опублікувати» (approve),
-«Відхилити» (reject — підтвердження діалогом «Монету буде переміщено до архіву. Цю дію не
-можна скасувати з цього екрана»; причина завжди фіксована — «Відхилено адміністратором»,
-вільного поля вводу немає) і «Редагувати» (олівець). Редагування відкриває модалку з тими
-самими полями, що форма додавання нової монети (`NewCoinFields`): країна, назва, рік,
-номінал, серія, матеріал, тираж, вага/діаметр/товщина, гурт, якість карбування, форма,
-каталожний номер, описи, фото аверса/реверса (заміна чи видалення). «Зберегти й
-опублікувати» одним запитом оновлює поля, потім фото, потім публікує — саме в цьому
-порядку. Після будь-якої дії (публікація, відхилення, збереження й публікація) — тост і
-перехід назад на `/admin?section=proposals`.
+- **Profile:** role badge, avatar (`AvatarSection`, circular crop), email (read-only),
+  display name (saved on Enter or blur, unchanged value sends nothing), password change
+  (`PasswordForm`; a Google-only account sets a new password without the current one),
+  and — when Google sign-in is enabled on the backend — linking a Google account (its
+  address must match the account's).
+- **Appearance:** theme (light / dark / system), interface language (applies at once),
+  secondary currency (USD / EUR).
+- **Catalog and collection:** default view for the catalog and for My coins, default
+  grade for new purchases (`GRADES`), show packaged variants as separate cards (BR-15),
+  count supporting expenses in collection value (`includeSupportingExpenses`, BR-4), and
+  the default storage location — a `Combobox` of used names, Enter adds a new one, a
+  custom name can be deleted after confirmation (BR-16).
 
 ---
 
-## Что переносим, а что делаем иначе
+## Administration
 
-| Переносим | Делаем иначе |
-|---|---|
-| Структуру из 7 разделов | Продажи — после MVP |
-| Набор фильтров каталога | Бэкапы убираем из интерфейса |
-| Карту полноты — удачная находка | Кнопки «Пройти блокировку» на сервере не работают, см. `integrations.md` |
-| Прогресс и остановку массовых операций | Валюта покупки — с выбором, а не только гривна |
-| Структуру карточки монеты | **Канон меняем**: legacy был тёмный, канон — светлый «бумажный»; тёмная остаётся второй темой |
-| — | Обязательная мобильная вёрстка: legacy был десктопный (минимум 1120 px), каждый экран проектируется одноколоночным |
-| — | Меню из шести разделов вместо семи: `sales` отложен |
-| Английские строки из бандла | Украинские строки пишем заново: legacy говорил по-русски |
-| Экран каталога целиком | Общий каталог только читается; правка — у личных позиций |
-| — | Экраны входа, регистрации и восстановления пароля: в legacy учётных записей не было |
+`/admin`, admins only (`admin.md`). Three tabs via `?section=jobs|users|proposals`,
+default jobs.
 
-## Требования к фронтенду
+### Background jobs
 
-- **Мобильная вёрстка с первого дня**: каждый экран проектируется одноколоночным и только
-  потом разворачивается на широкий. Не адаптация вдогонку — см. «Визуальное направление».
-- Две темы, светлая «бумажная» — канон. Цвета, радиусы и тени задаются токенами
-  (`frontend/src/shared/theme/tokens.css`), компоненты о теме не знают.
-- Шрифты проверены на украинских глифах `є ї ґ` до начала вёрстки.
-- PWA: манифест, иконки, установка на домашний экран. Оффлайн-редактирование не поддерживаем.
-- **Украинский и английский**, переключение без перезагрузки, по умолчанию украинский
-  (`user_settings.locale`). Строки — в файлах локализации, не в коде.
-- Виртуализация длинных списков: каталог — тысячи позиций.
-- Все длинные операции показывают прогресс и позволяют отмену.
-- Изображения — `loading="lazy"`, превью в списках, оригинал только в карточке.
+Job runs, newest first: state, job, start, duration, the one-line self-report; a job
+filter appears once more than one job has reported. States are colored: success green,
+partial yellow, error red, running neutral. A run stuck in "running" for over six hours
+shows yellow with a "looks stopped" note — a killed job can't report its own death.
+Clicking the state opens the run card (`JobRunDialog`): start/end, duration, data date,
+exit code, report, counters as name–value pairs, and details (only failed runs have
+them, `admin.md`). Empty → "no runs yet".
+
+### Telegram notifications
+
+A card above the list (`TelegramCard`): connected / not connected and one button.
+"Connect" opens the bot in a new tab with a one-time code and asks to press Start; the
+chat connects itself via the webhook, so the screen polls the status every 3 seconds and
+reports success. Disconnect is the same button. The chat id never reaches the browser.
+
+### Users
+
+Two tiles (total users, users who added at least one coin) and a table: user, sign-up
+date, email verified, coin count, role with "make admin" / "remove role". The button is
+disabled for oneself (`isSelf`) and for promoting an inactive or unverified account
+(`cannotPromote`) — the same guards as the backend (`api.md`).
+
+### Coin proposals
+
+A grid of `draft` records (`CoinCard` in `review` mode). Empty → "no proposals yet".
+Clicking a card opens the regular coin card, where `ProposalActions` shows "awaiting
+review" and three actions: **publish**; **reject** (confirmation dialog; the record is
+archived with a fixed reason, no free text); **edit** — a modal with the same fields as
+the new-coin form (`NewCoinFields`) plus obverse/reverse photo replace/remove.
+"Save and publish" updates fields, then photos, then publishes, in that order. After any
+action: a toast and back to `/admin?section=proposals`.
+
+---
+
+## Legal pages
+
+`/privacy` and `/terms` (`app/legal/LegalPage.tsx`), content in `app/legal/copy.ts` per
+locale. For guests, the logo and back links lead to the landing page.
+
+---
+
+## Not built
+
+Deliberately absent from the UI (see `product.md`, "Out of scope", and `backlog.md`):
+
+- **Edit or delete a personal position.** The API supports it (`PATCH` / `DELETE
+  /catalog/{id}`, BR-10), but no screen offers it; `PATCH /catalog/{id}` is used only by
+  the admin proposal editor.
+- **Archive / unarchive a shared record** — API only, no admin UI.
+- **Catalog `scope` and "show archived" controls** — the parameters work from the URL,
+  there is no control for them.
+- **Manual price entry and per-position price refresh** (BR-7), completeness map view,
+  sales, uCoin import, Excel export, collecting goals.
+- **Offline mode.** The PWA manifest and icons ship (installable); there is no service
+  worker.
+- **List virtualization** — lists are paginated instead.

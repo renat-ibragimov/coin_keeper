@@ -113,7 +113,7 @@
  * not a target — CSS Grid's auto row sizing has no way to bound this column
  * by its sibling's own (unconstrained) height, so without a cap a very long
  * list would just grow the whole row instead of scrolling (docs/ui.md,
- * owner's call 2026-09-07: the previous 300px cap sat well under the finance
+ * "Overview": the previous 300px cap sat well under the finance
  * column's usual height and left a gap below it; this one comfortably clears
  * it in the common case, so scrolling only kicks in for an unusually long
  * list). */
