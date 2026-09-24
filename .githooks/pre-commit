@@ -1,0 +1,31 @@
+#!/bin/sh
+# Fast format/lint on staged files only — the same tools CI runs first
+# (docs/development.md, "Git hooks"). Full checks still run in CI.
+root=$(git rev-parse --show-toplevel)
+PATH="$PATH:$HOME/.local/bin"
+status=0
+
+py=$(git diff --cached --name-only --diff-filter=ACMR -- 'backend/*.py' | sed 's|^backend/||')
+if [ -n "$py" ]; then
+    if command -v uv >/dev/null 2>&1; then
+        (cd "$root/backend" && echo "$py" | xargs uv run --quiet ruff format --check) || status=1
+        (cd "$root/backend" && echo "$py" | xargs uv run --quiet ruff check) || status=1
+    else
+        echo "pre-commit: uv not found, backend lint skipped" >&2
+    fi
+fi
+
+fe=$(git diff --cached --name-only --diff-filter=ACMR -- 'frontend/*' | sed 's|^frontend/||' \
+    | grep -E '\.(ts|tsx|js|mjs|cjs|jsx|css|json|md|html)$')
+if [ -n "$fe" ]; then
+    if [ -x "$root/frontend/node_modules/.bin/prettier" ]; then
+        (cd "$root/frontend" && echo "$fe" | xargs node_modules/.bin/prettier --check --ignore-unknown) || status=1
+    else
+        echo "pre-commit: frontend/node_modules missing, prettier skipped" >&2
+    fi
+fi
+
+if [ $status -ne 0 ]; then
+    echo "pre-commit: fix with 'uv run ruff format' / 'npm run format', then re-stage." >&2
+fi
+exit $status

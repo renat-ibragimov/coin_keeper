@@ -19,6 +19,10 @@ Enable once per clone:
 git config core.hooksPath .githooks
 ```
 
+`.githooks/pre-commit` runs `ruff format --check` + `ruff check` on staged backend files
+and Prettier on staged frontend files — the first steps CI runs, in seconds. It checks
+the files as they are in the working tree.
+
 `.githooks/commit-msg` runs `tools/docs_check.py commit-msg`: it blocks a commit that
 changes code mapped in `docs/doc-map.toml` without staging the matching document, checks
 doc references in the staged files, and rejects Russian in the message. If the change
