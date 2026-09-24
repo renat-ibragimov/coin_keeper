@@ -1,5 +1,5 @@
 """GET /catalog/summary: the "Каталог" KPI tiles, scoped to the same
-filters GET /catalog accepts, except `owned` (docs/08-ui-map.md, decided
+filters GET /catalog accepts, except `owned` (docs/ui.md, decided
 2026-09-23 -- the tiles show both sides of the coverage ratio no matter
 which availability toggle narrows the visible list)."""
 

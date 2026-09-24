@@ -263,7 +263,7 @@ async def test_a_rectangular_photo_is_skipped_and_left_alone(
 async def test_an_already_transparent_original_is_skipped_not_recut(
     db_session: AsyncSession, rpb: ModuleType
 ) -> None:
-    """Regression guard for the 2026-09 incident: see docs/06-media-storage.md.
+    """Regression guard for the 2026-09 incident: see docs/media.md.
 
     Feeding the main --apply pass a source that already carries meaningful
     transparency must not flatten it to RGB and read its matte as a dark

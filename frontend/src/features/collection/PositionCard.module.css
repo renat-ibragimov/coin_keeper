@@ -1,6 +1,6 @@
 /* The same card language as the catalogue tile (CoinCard.module.css) — this
  * page prioritises ownership and value metadata inside it, not a second
- * visual system around it (docs/08-ui-map.md). */
+ * visual system around it (docs/ui.md). */
 .card {
   position: relative;
   display: flex;
@@ -121,7 +121,7 @@
 
 /* Fixed two-line window, same as the catalog card: everything below the
  * title (series, meta, facts) starts at the same height regardless of how
- * long the coin's name is (docs/08-ui-map.md). */
+ * long the coin's name is (docs/ui.md). */
 .title {
   display: -webkit-box;
   -webkit-box-orient: vertical;

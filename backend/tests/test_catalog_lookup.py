@@ -2,7 +2,7 @@
 
 Same visibility as the catalog listing, one deliberate difference: the
 storefront rule is off, so a country the collector picked out of the full
-list finds what the shared catalog holds for it (docs/04-business-rules.md,
+list finds what the shared catalog holds for it (docs/business-rules.md,
 §13, and the note there about the purchase form).
 """
 

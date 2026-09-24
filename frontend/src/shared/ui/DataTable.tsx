@@ -10,7 +10,7 @@ interface DataTableProps {
 
 /**
  * The site's one table: a structural panel with a header strip and a row
- * rhythm shared by every listing (docs/08-ui-map.md). Columns, and the look of
+ * rhythm shared by every listing (docs/ui.md). Columns, and the look of
  * what sits inside a cell, stay with the feature that owns the data.
  */
 export function DataTable({ minWidth, children }: DataTableProps) {

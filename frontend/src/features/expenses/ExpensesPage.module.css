@@ -31,7 +31,7 @@
 }
 
 /* A compact filter, not a call to action: pill-shaped but on the control
- * surface, at filter weight and filter size (docs/08-ui-map.md). */
+ * surface, at filter weight and filter size (docs/ui.md). */
 .chip {
   display: inline-flex;
   align-items: center;

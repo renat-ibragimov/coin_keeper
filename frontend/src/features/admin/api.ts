@@ -18,7 +18,7 @@ export const PAGE_SIZE = 20;
  * A run still open long after it should have closed is how a dead job shows
  * up here: nothing reports its own death, so an unclosed row is the evidence.
  * Six hours is comfortably longer than the nightly price pass has ever taken
- * and far shorter than the day between two of them (docs/13-admin.md, 2.7).
+ * and far shorter than the day between two of them (docs/admin.md, 2.7).
  */
 export const STALE_AFTER_MS = 6 * 60 * 60 * 1000;
 

@@ -13,7 +13,7 @@ export const METAL_KINDS: MetalKind[] = ['unknown', 'precious', 'base'];
  * Everything "Про монету" collects, as the strings the inputs hold.
  *
  * Edge and quality are dictionary ids, not free text: both have had a
- * dictionary of their own since 2026-09-12 (docs/04-business-rules.md, §14),
+ * dictionary of their own since 2026-09-12 (docs/business-rules.md, §14),
  * and a typed-in edge would never match what the catalogue parser stores.
  *
  * Material, denomination and series are the other way round — each is one
@@ -42,7 +42,7 @@ export interface CoinFields {
    *  it belongs to (owner, 2026-09-14). */
   catalogNumber: string;
   /** The coin in the collector's own words — three parts, as the catalogue's
-   *  own `descriptions` column is shaped (docs/02-data-model.md). */
+   *  own `descriptions` column is shaped (docs/data-model.md). */
   description: string;
   descriptionObverse: string;
   descriptionReverse: string;

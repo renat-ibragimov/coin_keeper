@@ -6,7 +6,7 @@ ISO 3166-1 countries; the historical issuers are written by hand, because
 ISO 3166-3 carries no names and CLDR resolves those codes to the successor
 state (SU answers "Russia", YU answers "Serbia").
 
-Visibility follows docs/04-business-rules.md: `is_active` drives the storefront
+Visibility follows docs/business-rules.md: `is_active` drives the storefront
 (country chips, the default shared catalogue), while the personal-item form
 offers every country regardless. Only Ukraine is seeded active; a country the
 database already holds keeps whatever state it has.

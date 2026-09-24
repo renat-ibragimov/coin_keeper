@@ -91,7 +91,7 @@ export function fetchOwnedMaterials(countryId?: number): Promise<CoinMaterial[]>
 /** Presets plus this owner's own, localized names — for the purchase form's
  *  storage-location suggestions and the settings page's management list. A
  *  name is a free-form suggestion, not an id the client has to track: a new
- *  one is created server-side the moment it is used (docs/04-business-rules.md).
+ *  one is created server-side the moment it is used (docs/business-rules.md).
  *  `custom` marks the ones the owner added themselves — only those delete. */
 export function fetchStorageLocations(): Promise<StorageLocation[]> {
   return api<StorageLocation[]>('/collection/storage-locations');
@@ -125,7 +125,7 @@ export function updateCollectionItem(
   return api<CollectionItem>(`/collection/${id}`, { method: 'PATCH', body });
 }
 
-/** Deletes the linked purchase expense as well (docs/04-business-rules.md, rule 10). */
+/** Deletes the linked purchase expense as well (docs/business-rules.md, rule 10). */
 export function deleteCollectionItem(id: number): Promise<void> {
   return api<void>(`/collection/${id}`, { method: 'DELETE' });
 }

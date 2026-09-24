@@ -17,7 +17,7 @@
 }
 
 /* A form section names an interface step, so it stays in the body face at
- * UI-panel weight (docs/08-ui-map.md). */
+ * UI-panel weight (docs/ui.md). */
 .sectionTitle {
   font-size: 18px;
   padding-bottom: var(--space-2);

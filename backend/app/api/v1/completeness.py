@@ -1,5 +1,5 @@
 """Completeness endpoints: completeness grouped by an arbitrary catalog field
-(docs/03-api-contract.md)."""
+(docs/api.md)."""
 
 from __future__ import annotations
 

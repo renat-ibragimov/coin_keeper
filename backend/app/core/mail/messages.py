@@ -1,7 +1,7 @@
 """Email bodies.
 
-English only for now; Ukrainian copy arrives with the frontend localisation in
-stage 4 (docs/11-roadmap.md).
+English only: there is no Ukrainian version yet, although the interface
+defaults to Ukrainian (docs/backlog.md).
 """
 
 from __future__ import annotations

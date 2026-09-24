@@ -1,9 +1,8 @@
 # CoinKeeper backend
 
-FastAPI + PostgreSQL + Redis. Stages 1–3 of `docs/11-roadmap.md`: the schema,
-authentication, the deployment contour, the legacy data migration, and the
-catalog / collection / expenses / series / bootstrap API. Background jobs and
-external price sources arrive in stage 5.
+FastAPI + PostgreSQL + Redis. Scheduled jobs (rates, prices, NBU catalog sync)
+are not here — they run in the separate `coin-parser` repository and report to
+this API. Local setup and the CI check list: `../docs/development.md`.
 
 Specifications live in `../docs/`. When code and documentation disagree, the
 documentation is wrong only if it is fixed in the same change.
@@ -87,7 +86,7 @@ would send real mail is a broken test.
 
 `S3_ENDPOINT` (`http://minio:9000`) only resolves inside the docker network. On
 the server, `S3_PUBLIC_ENDPOINT` must be set to the public media path
-(`https://<domain>/media`, see `.env.example` and `docs/06-media-storage.md`) so
+(`https://<domain>/media`, see `.env.example` and `docs/media.md`) so
 that presigned URLs point somewhere a browser can reach. After a deploy that
 touches `S3_PUBLIC_ENDPOINT` or the Caddy `/media/*` block, confirm both legs
 by hand:
@@ -126,7 +125,7 @@ the repository is public.
 Classic (non-ML) cleanup over `media_files` rows that already hold their own
 `storage_key` — a white, round coin photo is cut to a transparent WebP; a
 rectangular blister pack or a colored background is left alone. Rule and
-runbook detail: `../docs/06-media-storage.md`, "Removing the background". The
+runbook detail: `../docs/media.md`, "Removing the background". The
 classifier is `app/services/media_background.py`; the command line is
 `scripts/remove_photo_backgrounds.py`.
 
@@ -209,10 +208,10 @@ and left alone, so a second `--trim --apply` over the same rows applies nothing.
 ## Admin title editing
 
 Admin title editing (`titleUk`/`titleEn`/`titleOriginal` on a shared record)
-is the existing `PATCH /catalog/{id}` — see `../docs/03-api-contract.md`,
+is the existing `PATCH /catalog/{id}` — see `../docs/api.md`,
 "Editing names": it now always stamps `*_source = 'manual'` and rejects an
 empty string. No new endpoint, no new screen — the admin-mode edit form on
-the record page is a backlog item (`../docs/BACKLOG.md`), the API contract
+the record page is a backlog item (`../docs/backlog.md`), the API contract
 is already there.
 
 ## Layout
@@ -222,7 +221,7 @@ app/api/           routes, dependencies, RFC 7807 problem responses
 app/services/      use cases (authentication)
 app/repositories/  data access
 app/models/        SQLAlchemy models — the whole schema, including tables the
-                   MVP does not use yet (docs/01-scope-mvp.md)
+                   MVP does not use yet (docs/scope.md)
 app/schemas/       Pydantic v2, camelCase on the wire
 app/core/          settings, security, rate limiting, mail backends, logging
 app/reference_data/ countries, denomination units, materials — data and parsers,

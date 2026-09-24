@@ -2,7 +2,7 @@
 
 The second administrator registers through the normal form — that is a
 deliberate test of the new-user path — and only then gets the role here.
-See docs/09-data-migration.md.
+See docs/auth.md.
 
     python scripts/promote_admin.py --email <admin-email>
     python scripts/promote_admin.py --email <admin-email> --demote

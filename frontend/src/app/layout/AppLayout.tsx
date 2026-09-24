@@ -37,7 +37,7 @@ const COLLECTION_TABS = [
   { to: '/collection/money', key: 'nav.expenses', end: false },
 ] as const;
 
-/** Outside "Моя колекція": just the two top-level places (docs/08-ui-map.md). */
+/** Outside "Моя колекція": just the two top-level places (docs/ui.md). */
 const MOBILE_PLAIN = [
   { to: '/catalog', key: 'nav.catalog', end: false, icon: LayoutGrid },
   { to: '/collection', key: 'nav.myCollection', end: false, icon: Heart },
@@ -115,7 +115,7 @@ export function AppLayout() {
         <div className={styles.controls}>
           {/* Standalone on desktop, where there's room beside the avatar;
               folded into the account menu below on the phone instead
-              (docs/08-ui-map.md). */}
+              (docs/ui.md). */}
           <div className={styles.headerSwitches}>
             <LocaleSwitcher />
             <ThemeSwitcher />
@@ -270,7 +270,7 @@ export function AppLayout() {
       {/* Everything below the header scrolls in here rather than in the
           window, so the scrollbar and its reserved gutter never reach the
           header — data-scroll-area is what shared/lib/pageScroll.ts steers by
-          (docs/08-ui-map.md). On the phone layout the CSS hands scrolling
+          (docs/ui.md). On the phone layout the CSS hands scrolling
           back to the document. */}
       <div className={styles.scrollArea} data-scroll-area>
         {inCollection ? (

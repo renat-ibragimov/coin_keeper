@@ -1,4 +1,4 @@
-# HTTPS with automatic certificates (docs/10-infra.md).
+# HTTPS with automatic certificates (docs/infra.md).
 {$DOMAIN} {
 	handle /api/* {
 		# One megabyte over the 12 MB an image upload may carry
@@ -13,7 +13,7 @@
 
 	# S3_PUBLIC_ENDPOINT signs URLs as https://<domain>/media/<bucket>/<key>;
 	# handle_path strips /media so MinIO sees its own path-style /<bucket>/<key>
-	# (docs/06-media-storage.md). The Host header passes through unchanged,
+	# (docs/media.md). The Host header passes through unchanged,
 	# which is what the presigned signature was computed against.
 	handle_path /media/* {
 		reverse_proxy minio:9000

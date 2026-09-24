@@ -1,6 +1,6 @@
 """Authentication use cases.
 
-Implements docs/07-auth.md: open registration with mandatory email
+Implements docs/auth.md: open registration with mandatory email
 verification, argon2id passwords, short access tokens plus rotating refresh
 tokens, and password recovery.
 """
@@ -92,7 +92,7 @@ class AuthService:
         """One rule for every path that sets a password.
 
         Registration, reset, change and the migration script all land here;
-        there is no relaxed variant for seeding (docs/07-auth.md).
+        there is no relaxed variant for seeding (docs/auth.md).
         """
         if len(password) < self._settings.password_min_length:
             raise WeakPasswordError(self._settings.password_min_length)

@@ -1,4 +1,4 @@
-"""Shared Pydantic configuration: camelCase on the wire (docs/03-api-contract.md)."""
+"""Shared Pydantic configuration: camelCase on the wire (docs/api.md)."""
 
 from __future__ import annotations
 

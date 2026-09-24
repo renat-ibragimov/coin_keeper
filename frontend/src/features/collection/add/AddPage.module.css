@@ -5,7 +5,7 @@
 }
 
 /* Centred like the purchase page it grew out of: the coin, then the form
-   under it, both in one column (docs/08-ui-map.md). */
+   under it, both in one column (docs/ui.md). */
 .content {
   display: flex;
   flex-direction: column;

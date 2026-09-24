@@ -112,7 +112,7 @@ export function CompletenessDetailPage() {
   const country = countriesQuery.data?.find((row) => row.id === group?.countryId);
   // Neither "confirmed" nor "not confirmed" is the right guess while this is
   // still loading -- rendering nothing until it's known avoids a flash from
-  // one to the other (docs/04-business-rules.md, §13a).
+  // one to the other (docs/business-rules.md, §13a).
   const confirmedKnown = countriesQuery.data !== undefined && group !== undefined;
   const catalogConfirmed = country?.catalogConfirmed === true;
   const notFound =

@@ -21,7 +21,7 @@ interface SelectProps {
   onChange: (event: { target: { value: string } }) => void;
   disabled?: boolean;
   'aria-label'?: string;
-  /** Adds a text filter at the top of the menu, for lists too long to scan (docs/08-ui-map.md: series). */
+  /** Adds a text filter at the top of the menu, for lists too long to scan (docs/ui.md: series). */
   searchable?: boolean;
   searchPlaceholder?: string;
   /** Centers the field label over the control, for a toolbar of narrow columns (catalog filters). */
@@ -29,12 +29,12 @@ interface SelectProps {
   /** Shows this instead of the selected option's own content -- a menu-button
    *  style trigger whose text names the filter itself and never changes with
    *  the pick, only the checkmark in the open list does (Комплектність's
-   *  metal-kind filter, docs/08-ui-map.md: owner's call, 2026-09-23, also
+   *  metal-kind filter, docs/ui.md: owner's call, 2026-09-23, also
    *  keeps the trigger's width constant across every option). */
   triggerLabel?: ReactNode;
   /** Highlights the trigger as carrying a non-default pick, for a filter
    *  whose triggerLabel doesn't otherwise change with the selection
-   *  (Комплектність's metal-kind filter, docs/08-ui-map.md). */
+   *  (Комплектність's metal-kind filter, docs/ui.md). */
   active?: boolean;
   children: ReactNode;
 }
@@ -64,7 +64,7 @@ function parseOptions(children: ReactNode): SelectOption[] {
 
 /** A themed replacement for the native <select>: same open-menu-of-<option>s
  *  API, but the menu is our own listbox so it never shows the browser's
- *  system highlight colour (docs/08-ui-map.md, catalog toolbar). */
+ *  system highlight colour (docs/ui.md, catalog toolbar). */
 export function Select({
   label,
   error,

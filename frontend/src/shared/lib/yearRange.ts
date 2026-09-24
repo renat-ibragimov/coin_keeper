@@ -18,8 +18,8 @@ function fallbackBounds(): YearBounds {
  * minYear/maxYear when any of them has coins at all, otherwise the span
  * across every country in the loaded list (countries with no coins
  * skipped), otherwise 1900..this year — an empty or bound-less directory
- * still has to render two workable dropdowns (docs/03-api-contract.md,
- * docs/08-ui-map.md). An empty `countryIds` means "every country", the same
+ * still has to render two workable dropdowns (docs/api.md,
+ * docs/ui.md). An empty `countryIds` means "every country", the same
  * as no selection did before country became multi-select (2026-09-12).
  */
 export function computeYearBounds(countries: CountryOut[], countryIds: number[]): YearBounds {

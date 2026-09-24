@@ -9,7 +9,7 @@ export interface ImageSources {
 }
 
 /**
- * Which stored size belongs where (docs/06-media-storage.md):
+ * Which stored size belongs where (docs/media.md):
  * a listing shows the preview, a card the medium, the lightbox the large.
  *
  * The srcSet offers the next size up at 2x, so a retina screen gets the

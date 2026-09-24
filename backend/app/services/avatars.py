@@ -3,7 +3,7 @@
 Deliberately outside the `media_files` machinery: that table's CHECK ties
 every file to a catalog or collection item, and its source/role columns answer
 questions a face does not raise. One column, one key, one size — see migration
-0020 and docs/06-media-storage.md for the key layout.
+0020 and docs/media.md for the key layout.
 
 `user_out` is the single place a UserOut is built, so every response that
 carries a user carries the signed avatar URL with it. A second hand-rolled

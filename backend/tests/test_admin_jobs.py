@@ -1,4 +1,4 @@
-"""Reading job runs in the admin section (docs/13-admin.md, part 1)."""
+"""Reading job runs in the admin section (docs/admin.md, part 1)."""
 
 from __future__ import annotations
 

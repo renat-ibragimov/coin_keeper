@@ -6,12 +6,12 @@ fit to browse as *the* catalogue. Unlike `is_active` it has no escape hatch:
 (`app/repositories/catalog.py`, `app/repositories/series.py`) now require it
 unconditionally, on top of their existing active/personal/owned checks —
 a country a user has personal positions or instances in still never
-surfaces in the shared catalogue until this flips (docs/04-business-rules.md,
+surfaces in the shared catalogue until this flips (docs/business-rules.md,
 §13a). The owner's own coins from such a country stay fully visible in their
 collection; only the catalogue listings are gated.
 
 Only Ukraine is confirmed today, matching the one country the catalogue
-project has actually finished (docs/11-roadmap.md). Every other country,
+project has actually finished. Every other country,
 including the ones the legacy migration seeded as shared (USA, USSR), starts
 unconfirmed and stays out of catalogue listings until confirmed by hand.
 

@@ -1,4 +1,4 @@
-"""Wire types for background job runs (docs/13-admin.md)."""
+"""Wire types for background job runs (docs/admin.md)."""
 
 from __future__ import annotations
 

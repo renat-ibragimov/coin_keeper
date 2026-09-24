@@ -1,6 +1,6 @@
 """Completeness use cases: completeness grouped by an arbitrary catalog field
 (series, year, denomination, material, edge, quality), generalizing the
-per-series summary (docs/03-api-contract.md)."""
+per-series summary (docs/api.md)."""
 
 from __future__ import annotations
 

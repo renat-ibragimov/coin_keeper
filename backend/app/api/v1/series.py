@@ -1,4 +1,4 @@
-"""Series endpoints (docs/03-api-contract.md)."""
+"""Series endpoints (docs/api.md)."""
 
 from __future__ import annotations
 

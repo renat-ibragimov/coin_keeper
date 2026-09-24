@@ -58,7 +58,7 @@ export function PurchaseFormPage() {
   const currenciesQuery = useQuery({ queryKey: ['currencies'], queryFn: fetchCurrencies });
 
   // What PUT/DELETE last answered, so both sides repaint without a refetch
-  // of the whole coin (docs/06-media-storage.md) — every response already
+  // of the whole coin (docs/media.md) — every response already
   // carries the fresh truth for both, so one slot supersedes the instance
   // query's own image fields entirely once anything has been uploaded or
   // removed. `ownership` tracks which side is the owner's own photo, since

@@ -26,7 +26,7 @@ interface CatalogTableProps {
 // page's own text, so the same series wrapped onto two lines on one page and
 // three on the next, and rows changed height from page to page. The actions
 // column is measured in pixels rather than in a share of the table: it holds a
-// button in one state and a status pill in the other (docs/08-ui-map.md).
+// button in one state and a status pill in the other (docs/ui.md).
 const COLUMNS: { key: string; sort?: SortField; className?: string }[] = [
   { key: 'tableCoin', sort: 'title', className: styles.coinColumn },
   { key: 'tableCountry', sort: 'country', className: styles.countryColumn },

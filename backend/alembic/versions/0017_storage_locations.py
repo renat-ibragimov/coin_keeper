@@ -2,7 +2,7 @@
 
 Owner's call (2026-09-13): "Місце зберігання" gets its own dictionary table
 instead of free text, so it can be bilingual (a collector's own custom entry
-gets translated in the background, docs/04-business-rules.md) and reused
+gets translated in the background, docs/business-rules.md) and reused
 across purchases instead of drifting into a dozen near-duplicate spellings.
 A single system preset (`owner_id IS NULL`, "Вдома") ships with the
 migration — it fits almost everyone and stays undeletable; anything else,

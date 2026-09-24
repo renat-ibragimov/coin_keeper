@@ -1,6 +1,6 @@
 # Project workflow: triggers and parameters only. The logic lives in the
 # reusable workflow, which will move to its own repository once a second
-# project needs it (docs/10-infra.md).
+# project needs it (docs/infra.md).
 name: CI
 
 on:
@@ -24,7 +24,7 @@ jobs:
       node-version: "22"
       # Only main reaches the server; pull requests stop after build.
       deploy: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
-      # The central Caddy serves the bundle from here (docs/10-infra.md).
+      # The central Caddy serves the bundle from here (docs/infra.md).
       frontend-deploy-path: /srv/coinkeeper/frontend
       site-url: https://coins.renat-ibragimov.com
     secrets: inherit

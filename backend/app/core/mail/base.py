@@ -1,6 +1,6 @@
 """Mail transport abstraction.
 
-Two backends, chosen by MAIL_BACKEND (docs/10-infra.md): "console" writes the
+Two backends, chosen by MAIL_BACKEND (docs/infra.md): "console" writes the
 whole message to the log so local development and tests need no secrets,
 "smtp" actually sends. Everything above this layer is identical either way.
 """

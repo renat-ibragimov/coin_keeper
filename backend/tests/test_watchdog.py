@@ -1,5 +1,5 @@
 """The watchdog script: a job that never reported must not stay silent
-(docs/13-admin.md, 2.7)."""
+(docs/admin.md, 2.7)."""
 
 from __future__ import annotations
 

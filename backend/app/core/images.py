@@ -1,4 +1,4 @@
-"""Image processing rules from docs/06-media-storage.md.
+"""Image processing rules from docs/media.md.
 
 Three sizes, one format. A listing shows a coin at about 150 px, a card at
 about 300, and the lightbox as large as the screen allows; serving one file for
@@ -77,7 +77,7 @@ def process_image(payload: bytes, *, remove_background: bool = True) -> Processe
     photo pipeline, and any future upload endpoint) shares, so a white,
     round coin photo is cut to a transparent WebP as it comes in rather than
     needing a separate pass later — see app.services.media_background and
-    docs/06-media-storage.md, "Удаление фона". A migration or other special
+    docs/media.md, "Удаление фона". A migration or other special
     path that must keep bytes exactly as given can pass False.
     """
     stripped = _validated_stripped(payload)

@@ -58,7 +58,7 @@ export function FiltersPanel({
   // selected (docs/03). In "year range" mode each field additionally narrows
   // against the other's current value, so "до" never suggests a year before
   // "від" and vice versa. All year fields stay free-text inputs — the list
-  // is a suggestion, not a constraint (docs/08-ui-map.md).
+  // is a suggestion, not a constraint (docs/ui.md).
   const yearBounds = computeYearBounds(countries, filters.countryIds);
   const yearList = buildYearList(yearBounds);
   const yearFromList = buildYearList({

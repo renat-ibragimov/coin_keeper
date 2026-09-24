@@ -58,7 +58,7 @@ import styles from './ExpensesPage.module.css';
 const DEPENDENT_KEYS = ['expenses', 'bootstrap'];
 
 // Widths of their own, so the columns stay put from page to page (the same
-// rule as the other two tables, docs/08-ui-map.md).
+// rule as the other two tables, docs/ui.md).
 const SORTABLE_COLUMNS: { key: string; sort: ExpenseSort; className: string | undefined }[] = [
   { key: 'expenses.date', sort: 'date', className: styles.dateColumn },
   { key: 'expenses.category', sort: 'category', className: styles.categoryColumn },
@@ -68,7 +68,7 @@ const SORTABLE_COLUMNS: { key: string; sort: ExpenseSort; className: string | un
 ];
 
 /** Only editing opens here now: "+ Додати витрату" leads to `/collection/add`,
- *  where the same form sits beside the purchase one (docs/08-ui-map.md). */
+ *  where the same form sits beside the purchase one (docs/ui.md). */
 type Editor = { mode: 'closed' } | { mode: 'edit'; expense: ExpenseOut };
 
 /** The type selector's default for an expense recorded from this page. */
@@ -94,7 +94,7 @@ export function ExpensesPage() {
   const [editor, setEditor] = useSessionDraft<Editor>('expenses:editor', { mode: 'closed' });
   const [deleting, setDeleting] = useState<ExpenseOut | null>(null);
   // A purchase row deletes the coin, not the expense — the expense goes with
-  // it (docs/04-business-rules.md, rule 10), so it uses the collection's own
+  // it (docs/business-rules.md, rule 10), so it uses the collection's own
   // dialog, which says exactly that.
   const [deletingPurchase, setDeletingPurchase] = useState<{
     id: number;
@@ -394,7 +394,7 @@ export function ExpensesPage() {
                   ))}
                   {/* By the NBU rate on the expense's own date, so the spending
                       reads in a currency that does not move under your feet
-                      (docs/BACKLOG.md). Nothing sorts by it yet. */}
+                      (docs/backlog.md). Nothing sorts by it yet. */}
                   <th className={styles.usdColumn}>
                     {t('expenses.amountSecondaryHeader', {
                       currency: t(`common.currencyNames.${secondaryCurrency}`),
@@ -461,7 +461,7 @@ export function ExpensesPage() {
                             owned by the purchase, so its icons lead to the
                             instance — editing opens the purchase form, and
                             deleting removes the coin together with this very
-                            row (docs/04-business-rules.md, rule 4). Only a
+                            row (docs/business-rules.md, rule 4). Only a
                             purchase whose instance is somehow gone has
                             nothing to offer. */}
                         {fromPurchase ? (

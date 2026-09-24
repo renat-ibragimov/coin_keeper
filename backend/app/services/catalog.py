@@ -1,6 +1,6 @@
 """Catalog use cases: listing, cards, price history, CRUD and archiving.
 
-Permission semantics (docs/07-auth.md): an invisible item — someone else's
+Permission semantics (docs/auth.md): an invisible item — someone else's
 personal record — is a 404; a visible shared record the user may not touch is
 a 403.
 """
@@ -109,7 +109,7 @@ class BadReferenceError(CatalogError):
 
 
 def display_title(item: CatalogItem, locale: str = DEFAULT_LOCALE) -> str:
-    """title_{locale} → title_original (docs/04-business-rules.md)."""
+    """title_{locale} → title_original (docs/business-rules.md)."""
     return pick_name(locale, uk=item.title_uk, en=item.title_en, original=item.title_original)
 
 
@@ -158,7 +158,7 @@ def quality_type_out(quality_type: QualityType | None, locale: str) -> CoinQuali
 def _descriptions_json(
     locale: str, *, general: str | None, obverse: str | None, reverse: str | None
 ) -> dict[str, object] | None:
-    """The `descriptions` column as docs/02-data-model.md fixes its shape:
+    """The `descriptions` column as docs/data-model.md fixes its shape:
     every locale key and every part key present, `null` where there is no
     text. Nothing typed at all leaves the column NULL — an untouched row,
     not a row full of nulls."""
@@ -178,7 +178,7 @@ def _descriptions_json(
 
 def description_out(descriptions: dict[str, object] | None, locale: str) -> CoinDescriptions | None:
     """Text for the requested locale, falling back to the other one where the
-    parser found nothing to write there (docs/02-data-model.md)."""
+    parser found nothing to write there (docs/data-model.md)."""
     if not descriptions:
         return None
     other = "en" if locale == "uk" else "uk"
@@ -247,7 +247,7 @@ class CatalogService:
         """`require_confirmed=False` is for a caller about the user's own
         collection rather than the catalogue browse experience (a series
         screen) -- never from a request filter, see storefront_visible()
-        (app/repositories/catalog.py, docs/04-business-rules.md §13a).
+        (app/repositories/catalog.py, docs/business-rules.md §13a).
         `apply_storefront=False` goes one further and is the typeahead's
         alone: see the same function's docstring."""
         settings = await self._users.get_settings(self._user.id)
@@ -334,7 +334,7 @@ class CatalogService:
                 * instance.quantity
             )
             # The rate on THIS instance's own purchase date, not today's --
-            # what it cost then, not a live estimate (docs/BACKLOG.md,
+            # what it cost then, not a live estimate (docs/backlog.md,
             # NBU rates follow-up).
             usd_rate, eur_rate = (
                 (
@@ -381,7 +381,7 @@ class CatalogService:
 
         Returns the row rather than a card on purpose: the caller is
         CollectionService, which goes on to create the instance and the
-        purchase expense before anything is committed (docs/04-business-rules.md,
+        purchase expense before anything is committed (docs/business-rules.md,
         rule 4). Both language slots start out holding the typed text, exactly
         as a new storage location does, and the background job replaces the
         one that is a translation rather than a copy.
@@ -535,7 +535,7 @@ class CatalogService:
 
     async def _delete_personal(self, item: CatalogItem) -> None:
         """A personal item goes away with the author's own coins and their
-        purchase expenses, in one transaction (docs/04-business-rules.md, 10).
+        purchase expenses, in one transaction (docs/business-rules.md, 10).
         """
         collection = CollectionRepository(self._session, owner_id=self._user.id)
         instances = await collection.list_for_item(item.id)
@@ -632,7 +632,7 @@ class CatalogService:
             "title_en_source": item.title_en_source,
             "variety": item.subtype,
             # A named number wins; the unattributed one is the fallback a
-            # hand-entered coin brings (docs/02-data-model.md).
+            # hand-entered coin brings (docs/data-model.md).
             "catalog_number": (
                 item.catalog_km or item.catalog_uc or item.catalog_numista or item.catalog_number
             ),
@@ -714,7 +714,7 @@ async def translate_title_in_background(item_id: int) -> None:
     Every early return is logged. A silent no-op leaves the record showing the
     collector's own wording in both language slots forever, with nothing in
     the interface to explain why -- the only way to notice is a log line (the
-    same lesson as storage locations, docs/04-business-rules.md, п. 16).
+    same lesson as storage locations, docs/business-rules.md, п. 16).
     """
     api_key = get_settings().anthropic_api_key
     if not api_key:

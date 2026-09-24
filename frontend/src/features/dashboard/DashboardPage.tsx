@@ -125,7 +125,7 @@ function DashboardBody({ data }: { data: BootstrapOut }) {
                         · {t('dashboard.nearestMissing', { count: entry.missing })}
                       </div>
                       {/* Thumbnails of the missing coins need their own request
-                          (docs/11-roadmap.md, part 3) — this row leaves room for them. */}
+                          — this row leaves room for them. */}
                     </div>
                   </li>
                 ))}

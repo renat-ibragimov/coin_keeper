@@ -25,7 +25,7 @@ export const MANUAL_CATEGORIES: ExpenseCategory[] = [
 
 export const ALL_CATEGORIES: ExpenseCategory[] = ['coin_purchase', ...MANUAL_CATEGORIES];
 
-/** Every column of the journal sorts (docs/08-ui-map.md). */
+/** Every column of the journal sorts (docs/ui.md). */
 export const EXPENSE_SORTS = ['date', 'category', 'description', 'vendor', 'amount'] as const;
 export type ExpenseSort = (typeof EXPENSE_SORTS)[number];
 

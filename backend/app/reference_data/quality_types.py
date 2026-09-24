@@ -3,7 +3,7 @@
 Seeded from what the confirmed (Ukrainian) catalogue actually contains: six
 values, populated in `catalog_items.quality` by a one-off pass whose script
 is no longer in the repository, and never surfaced in the API or the
-interface until now (docs/04-business-rules.md, rule 14).
+interface until now (docs/business-rules.md, rule 14).
 """
 
 from __future__ import annotations

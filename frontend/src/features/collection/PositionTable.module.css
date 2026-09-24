@@ -4,7 +4,7 @@
 
 /* Fixed shares rather than whatever this page's text happens to measure, so
  * the columns stay put from page to page and every row keeps one height —
- * the same treatment as the catalogue table (docs/08-ui-map.md). */
+ * the same treatment as the catalogue table (docs/ui.md). */
 .coinColumn {
   width: 26%;
 }
@@ -69,7 +69,7 @@
 /* A fixed two-line window, not a clamp: the name is followed by a meta line
  * here, so between them a one-line and a two-line name gave the row two
  * different heights. Short names leave the second line empty instead
- * (docs/08-ui-map.md, same rule as the tile card's title). */
+ * (docs/ui.md, same rule as the tile card's title). */
 .coinTitle {
   display: -webkit-box;
   -webkit-box-orient: vertical;

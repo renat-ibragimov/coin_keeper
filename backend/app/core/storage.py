@@ -1,4 +1,4 @@
-"""S3-compatible object storage (MinIO locally, docs/06-media-storage.md)."""
+"""S3-compatible object storage (MinIO locally, docs/media.md)."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class ObjectStorage:
     `presign_client` signs against `S3_PUBLIC_ENDPOINT` when the caller sets
     one — the docker-network endpoint used for `put`/`get` is not reachable
     from a browser, so a presigned GET must be signed for the public host
-    instead (docs/06-media-storage.md). Absent that setting, both operations
+    instead (docs/media.md). Absent that setting, both operations
     share the same client.
     """
 

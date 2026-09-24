@@ -29,7 +29,7 @@ type ExtraExpenseIn = NonNullable<CollectionItemCreate['extraExpenses']>[number]
  * curiosity and submits should not be stopped. A row with something typed in
  * it is a real intention, so an unreadable or non-positive amount is an error
  * on that row — zero included, unlike the coin's own price (`gt=0` on the
- * server, docs/03-api-contract.md).
+ * server, docs/api.md).
  */
 export function collectExtraExpenses(rows: ExtraExpenseRow[]): {
   values: ExtraExpenseIn[];

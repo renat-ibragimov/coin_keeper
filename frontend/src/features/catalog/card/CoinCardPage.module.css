@@ -96,7 +96,7 @@
 /* A display plinth, not a vitrine: one clean surface, a quiet border, the
  * shared lit top edge and a minimal shadow. The spotlight gradient that used
  * to pool behind the coin is gone — the only thing on this page that should
- * draw the eye is the coin itself (docs/08-ui-map.md). */
+ * draw the eye is the coin itself (docs/ui.md). */
 .photoFrame {
   position: relative;
   display: block;
@@ -227,11 +227,11 @@ button.photoFrame {
 
 /* A solid badge with a soft halo a few shades lighter than its own fill —
  * color-mix keeps the halo in step with the theme automatically instead of
- * a second pair of light/dark tokens (docs/08-ui-map.md). */
+ * a second pair of light/dark tokens (docs/ui.md). */
 /* Integrated, not badge-like: the solid disc stays — it is what makes the
  * state legible at a glance next to its heading — but loses the soft halo
  * that made it read as a sticker pasted onto the card, and comes down a size
- * so the price below it stays the loudest thing here (docs/08-ui-map.md). */
+ * so the price below it stays the loudest thing here (docs/ui.md). */
 .statusIcon {
   display: grid;
   place-items: center;
@@ -282,7 +282,7 @@ button.photoFrame {
 
 /* Recessed into the card, not another card floating inside it: a surface
  * below the card's own, an inset top shadow instead of a drop shadow, and a
- * radius one step smaller than its parent (docs/08-ui-map.md). It grows into
+ * radius one step smaller than its parent (docs/ui.md). It grows into
  * whatever vertical room .sidebarCard has left — a square card is often
  * taller than its fixed-height rows need — and space-between spreads its
  * three lines across that room instead of bunching them in the middle. */
@@ -343,7 +343,7 @@ button.photoFrame {
 /* The one number this whole card exists to answer, and still the strongest
  * text in the sidebar — but a solid brass rather than a gold gradient fill,
  * and sized to sit under the two coin photographs instead of shouting over
- * them (docs/08-ui-map.md). lining-nums: Playfair Display's default oldstyle
+ * them (docs/ui.md). lining-nums: Playfair Display's default oldstyle
  * figures dip "5"/"7"/"9" below the baseline, which reads as a misalignment
  * in a number this size. */
 .priceValue {

@@ -168,7 +168,7 @@ def test_circle_on_white_is_still_plain_cut() -> None:
 
 
 def test_transparent_corners_over_a_black_matte_are_left_alone() -> None:
-    """Regression guard for the 2026-09 incident (docs/06-media-storage.md).
+    """Regression guard for the 2026-09 incident (docs/media.md).
 
     An RGBA source whose corners are transparent (alpha=0) over an arbitrary
     black matte must never reach the dark-background flood fill: its corners

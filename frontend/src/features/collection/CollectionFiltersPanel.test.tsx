@@ -148,7 +148,7 @@ describe('CollectionFiltersPanel multi-select', () => {
 });
 
 describe('CollectionFiltersPanel year fields', () => {
-  /** The period fields live behind the "Період" dropdown now (docs/08-ui-map.md). */
+  /** The period fields live behind the "Період" dropdown now (docs/ui.md). */
   function openPeriodPanel() {
     fireEvent.click(screen.getByRole('button', { name: 'Період' }));
   }

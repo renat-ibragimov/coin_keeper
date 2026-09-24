@@ -1,4 +1,4 @@
-"""Owner-scoped expense data access (docs/07-auth.md)."""
+"""Owner-scoped expense data access (docs/auth.md)."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ class ExpenseFilters:
     category: ExpenseCategory | None = None
     date_from: date | None = None
     date_to: date | None = None
-    # Every column of the journal sorts (docs/08-ui-map.md).
+    # Every column of the journal sorts (docs/ui.md).
     sort: str = "date"  # date | category | description | vendor | amount
     order: str = "desc"
 
@@ -66,7 +66,7 @@ def _rate_on_expense_date(code: str) -> ColumnElement[Decimal]:
 
 def _amount_usd() -> ColumnElement[Decimal]:
     """The UAH amount converted by the USD rate on the expense's OWN date --
-    what it cost then, not a live estimate (docs/BACKLOG.md, NBU rates
+    what it cost then, not a live estimate (docs/backlog.md, NBU rates
     follow-up). NULL (no rate that far back) when there simply is none;
     SQL division by NULL yields NULL rather than raising."""
     return _amount_uah() / _rate_on_expense_date("USD")

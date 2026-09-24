@@ -6,7 +6,7 @@ import { defineConfig } from 'vitest/config';
 // The dev server proxies /api to production, so local development talks to
 // the real backend without CORS exceptions: cookies flow because the browser
 // sees a same-origin request. VITE_API_BASE stays a relative /api/v1 in both
-// dev and production builds (docs/10-infra.md — Caddy serves the same origin).
+// dev and production builds (docs/infra.md — Caddy serves the same origin).
 export default defineConfig({
   plugins: [react()],
   resolve: {

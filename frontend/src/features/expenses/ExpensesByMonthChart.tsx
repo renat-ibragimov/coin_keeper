@@ -125,7 +125,7 @@ export function ExpensesByMonthChart({ data, granularity, locale, palette }: Pro
             pointer moves down, since the box is half as tall as the chart. No
             animation and a free vertical axis mean it simply trails the
             pointer; near the bottom it hangs over the axis instead of jumping
-            (docs/08-ui-map.md). */}
+            (docs/ui.md). */}
         <Tooltip
           cursor={{ fill: palette.grid, opacity: 0.25 }}
           isAnimationActive={false}

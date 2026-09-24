@@ -4,9 +4,9 @@ Every query in this repository carries the visibility filter
 (created_by IS NULL OR created_by = :user_id) and, unless the archive is
 explicitly requested, the verbatim `NOT is_archived` predicate that the partial
 indexes expect. Routes never assemble these conditions themselves
-(docs/07-auth.md, docs/02-data-model.md).
+(docs/auth.md, docs/data-model.md).
 
-Listings additionally carry `storefront_visible()` (docs/04-business-rules.md,
+Listings additionally carry `storefront_visible()` (docs/business-rules.md,
 §13): a record from a deactivated country drops out of listings and
 aggregates unless it is personal or already owned. The single-item card and
 its price/instance sub-resources are exempt on purpose — see that function's
@@ -72,7 +72,7 @@ class CatalogFilters:
     metal_kinds: list[MetalKind] | None = None
     edge_type_ids: list[int] | None = None
     quality_type_ids: list[int] | None = None
-    # The "без значення" bucket a completeness group (docs/03-api-contract.md,
+    # The "без значення" bucket a completeness group (docs/api.md,
     # /completeness/items) asks for — a plain `*_ids` filter cannot express
     # "this column IS NULL".
     series_id_is_null: bool = False
@@ -105,7 +105,7 @@ class CatalogRow:
     price_source: str | None
     price_observed_at: datetime | None
     source_url: str | None
-    # Card-only: the listing never selects these (docs/08-ui-map.md).
+    # Card-only: the listing never selects these (docs/ui.md).
     edge_type: EdgeType | None = None
     quality_type: QualityType | None = None
 
@@ -149,7 +149,7 @@ def _search_vector() -> ColumnElement[Any]:
 
 
 def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> ColumnElement[bool]:
-    """Storefront visibility for a shared catalog record (docs/04-business-rules.md, §13, §13a).
+    """Storefront visibility for a shared catalog record (docs/business-rules.md, §13, §13a).
 
     A record shows when its country is active, when it is the user's own
     personal item, or when the user already holds at least one instance of
@@ -211,7 +211,7 @@ def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> Colum
 
 
 def snapshot_visible_to(user_id: int) -> ColumnElement[bool]:
-    """Price snapshot visibility (docs/04-business-rules.md, rule 7)."""
+    """Price snapshot visibility (docs/business-rules.md, rule 7)."""
     return or_(
         MarketPriceSnapshot.created_by.is_(None),
         MarketPriceSnapshot.created_by == user_id,
@@ -307,8 +307,8 @@ def issue_date_range_condition(
 ) -> ColumnElement[bool] | None:
     """`issue_date` within [date_from, date_to], or NULL with `issue_year`
     inside the same range's years — a coin whose exact issue date isn't
-    recorded still matches a date-range filter by year (docs/03-api-contract.md,
-    docs/02-data-model.md: `issue_date` nullable, `issue_year` NOT NULL).
+    recorded still matches a date-range filter by year (docs/api.md,
+    docs/data-model.md: `issue_date` nullable, `issue_year` NOT NULL).
     `None` when neither bound is set, so callers can skip it like any other
     absent filter.
     """
@@ -453,7 +453,7 @@ class CatalogRepository:
 
         # The rate on each instance's OWN acquisition date, not today's --
         # this is what was spent then, not a mix of purchase cost and a
-        # live rate (docs/BACKLOG.md, NBU rates follow-up). Division by
+        # live rate (docs/backlog.md, NBU rates follow-up). Division by
         # NULL (no rate that far back) yields NULL, which SUM simply skips
         # rather than propagating -- a handful of missing rates cannot
         # blank out an otherwise-known total.
@@ -528,7 +528,7 @@ class CatalogRepository:
     def _material_name(self) -> ColumnElement[str | None]:
         """What the listing shows in "Матеріал": the dictionary name in the
         reader's language, and the record's own free text where the dictionary
-        has no row for it (docs/08-ui-map.md)."""
+        has no row for it (docs/ui.md)."""
         name = Material.name_uk if self._locale == LOCALE_UK else Material.name_en
         return func.coalesce(name, CatalogItem.material)
 
@@ -567,7 +567,7 @@ class CatalogRepository:
         each expense's own rate. By `catalog_item_id`, not `collection_item_id`
         — this is the item's total across every purchase, regardless of
         whether a given row has been backfilled onto its purchase
-        (docs/04-business-rules.md, rule 4; docs/03-api-contract.md)."""
+        (docs/business-rules.md, rule 4; docs/api.md)."""
         amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
         return (
             select(func.sum(amount_uah))
@@ -679,7 +679,7 @@ class CatalogRepository:
     async def summary(
         self, filters: CatalogFilters, *, require_confirmed: bool = True
     ) -> CatalogSummaryData:
-        """Completeness of the catalog's own KPI tiles (docs/08-ui-map.md):
+        """Completeness of the catalog's own KPI tiles (docs/ui.md):
         the same filters as `list_items`, but `owned` is deliberately
         dropped -- the tiles show both sides of the coverage ratio
         regardless of which availability toggle currently narrows the list
@@ -832,7 +832,7 @@ class CatalogRepository:
     async def year_bounds_by_country(self) -> dict[int, tuple[int, int]]:
         """`(min issue_year, max issue_year)` per country, over the same
         scope a default (non-archived) listing would show — feeds the year
-        filter's dropdown bounds (docs/03-api-contract.md)."""
+        filter's dropdown bounds (docs/api.md)."""
         query = (
             select(
                 CatalogItem.country_id,

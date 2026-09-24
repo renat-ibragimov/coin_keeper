@@ -1,4 +1,4 @@
-"""The owner's own photos of a collection instance (docs/06-media-storage.md).
+"""The owner's own photos of a collection instance (docs/media.md).
 
 This is the one place that ever writes a `user_upload` row for a coin, and it
 can only ever write one scoped to `collection_item_id` + `owner_id` — never to
@@ -125,7 +125,7 @@ class CollectionPhotoService:
 
     async def _owned_instance(self, owner: User, item_id: int) -> CollectionItem:
         """Scoped by owner, not just existence: another account's instance id
-        answers not-found exactly like a missing one (docs/07-auth.md)."""
+        answers not-found exactly like a missing one (docs/auth.md)."""
         instance = await self._session.get(CollectionItem, item_id)
         if instance is None or instance.owner_id != owner.id:
             raise CollectionItemNotFoundError

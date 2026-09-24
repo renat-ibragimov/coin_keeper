@@ -20,7 +20,7 @@ export function Pagination({ page, pageCount, onChange }: PaginationProps) {
   // number (a URL search param or, e.g. CompletenessDetailPage, local state) — the
   // page landing at the top of the new results is a property of pagination
   // itself, not something each screen has to remember to wire up
-  // (docs/08-ui-map.md).
+  // (docs/ui.md).
   const goTo = (next: number) => {
     onChange(next);
     scrollPageToTop();

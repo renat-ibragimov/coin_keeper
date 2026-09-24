@@ -1,4 +1,4 @@
-"""Collection endpoints (docs/03-api-contract.md)."""
+"""Collection endpoints (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -339,7 +339,7 @@ async def set_photo(
     envelope, and a repeated upload of the same bytes lands on the same key.
 
     Always a new `media_files` row bound to this collection item, never a
-    write to the catalog's own media (docs/06-media-storage.md) — the
+    write to the catalog's own media (docs/media.md) — the
     invariant lives in CollectionPhotoService, not here.
     """
     declared = request.headers.get("content-length")

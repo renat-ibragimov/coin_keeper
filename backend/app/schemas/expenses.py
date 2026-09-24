@@ -1,4 +1,4 @@
-"""Expense payloads (docs/03-api-contract.md)."""
+"""Expense payloads (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ class ExpenseCreate(CamelModel):
     category: ExpenseCategory
     # Strictly positive, unlike a purchase price: a coin can honestly cost
     # nothing (a gift, an unknown price), a delivery or an album cannot
-    # (docs/03-api-contract.md). The column's own CHECK stays `>= 0` — it
+    # (docs/api.md). The column's own CHECK stays `>= 0` — it
     # also guards the coin_purchase rows this endpoint never writes.
     amount: Decimal = Field(gt=0)
     currency: str = Field(min_length=3, max_length=3)

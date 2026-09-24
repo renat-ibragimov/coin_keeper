@@ -1,7 +1,7 @@
 """Job run reporting: the machine-facing side of the admin section.
 
 Not under /admin -- nobody signs in here. The caller is a scheduled job in a
-container of its own, authenticated by a shared token (docs/13-admin.md).
+container of its own, authenticated by a shared token (docs/admin.md).
 """
 
 from __future__ import annotations

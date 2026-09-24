@@ -6,7 +6,7 @@ import type { PeriodFilterValue } from '@/shared/lib/periodFilter';
 import { hasPeriodValue, parsePeriod, serializePeriod } from '@/shared/lib/periodFilter';
 
 // Every column of the table sorts, and the toolbar offers the same list
-// (docs/08-ui-map.md); the order here is the order of the columns.
+// (docs/ui.md); the order here is the order of the columns.
 export const COLLECTION_SORTS = [
   'release',
   'title',
@@ -49,7 +49,7 @@ function intParam(params: URLSearchParams, key: string): number | undefined {
 
 /** Every occurrence of a repeated query key (`countryId=1&countryId=2`),
  *  parsed and de-duplicated — the same shape the catalog's own multi-select
- *  filters use (docs/03-api-contract.md, 2026-09-12). */
+ *  filters use (docs/api.md, 2026-09-12). */
 function intListParam(params: URLSearchParams, key: string): number[] {
   const seen = new Set<number>();
   for (const raw of params.getAll(key)) {

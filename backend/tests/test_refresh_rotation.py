@@ -1,4 +1,4 @@
-"""Refresh token rotation and reuse detection (docs/07-auth.md)."""
+"""Refresh token rotation and reuse detection (docs/auth.md)."""
 
 from __future__ import annotations
 

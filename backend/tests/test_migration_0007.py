@@ -118,7 +118,7 @@ async def test_a_bare_metal_is_now_a_code_too(
     migrated_connection: AsyncConnection,
 ) -> None:
     """ "silver"/"gold" are dictionary codes as of 2026-09-12 (no fineness in
-    the dictionary at all, docs/04-business-rules.md, §13a), so a bare metal
+    the dictionary at all, docs/business-rules.md, §13a), so a bare metal
     now resolves the same way "nickel_silver" always did."""
     assert await row(migrated_connection, 903) == {"material": None, "composition": "silver"}
 

@@ -1,4 +1,4 @@
-"""Structured JSON logging to stdout (docs/10-infra.md)."""
+"""Structured JSON logging to stdout (docs/infra.md)."""
 
 from __future__ import annotations
 

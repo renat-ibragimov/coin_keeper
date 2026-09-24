@@ -1,4 +1,4 @@
-"""Health endpoint (docs/10-infra.md)."""
+"""Health endpoint (docs/infra.md)."""
 
 from __future__ import annotations
 

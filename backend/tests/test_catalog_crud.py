@@ -155,7 +155,7 @@ async def test_admin_title_edit_sets_manual_source_and_validates_nonempty(
 ) -> None:
     """PATCH-ing a shared record's names is an admin operation, and whatever
     it writes is provenance 'manual', never the pipeline's 'official' or
-    'llm' (docs/02-data-model.md; docs/05-integrations.md, part C).
+    'llm' (docs/data-model.md; docs/integrations.md, part C).
     """
     refs = ctx.refs
     shared = await make_catalog_item(
@@ -288,7 +288,7 @@ async def test_delete_shared_rules(
 async def test_descriptions_and_artists_columns_round_trip(
     db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """coin-collector's fixed JSON shape (docs/02-data-model.md): a column can
+    """coin-collector's fixed JSON shape (docs/data-model.md): a column can
     be NULL whole, but once set, keys inside it are always present, even when
     the value at a key is null (an unmatched English card, say).
     """

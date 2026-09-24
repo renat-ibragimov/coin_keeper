@@ -46,7 +46,7 @@ interface Tooltip {
  * Price history on an interactive lightweight-charts area series: mouse-wheel
  * zoom and drag-to-pan come from the library for free, plus a quick-range
  * strip (1М/6М/1Р/Усі). Suspect snapshots are excluded from the plotted line
- * and the price scale's autoscale (docs/05-integrations.md) — one bad price
+ * and the price scale's autoscale (docs/integrations.md) — one bad price
  * used to stretch the whole axis and flatten the real trend into a "worm" —
  * and shown instead as a separate, differently-coloured marker.
  */

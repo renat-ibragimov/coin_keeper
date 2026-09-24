@@ -1,4 +1,4 @@
-"""Authentication endpoints (docs/03-api-contract.md, docs/07-auth.md)."""
+"""Authentication endpoints (docs/api.md, docs/auth.md)."""
 
 from __future__ import annotations
 

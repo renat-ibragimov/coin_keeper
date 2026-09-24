@@ -1,7 +1,7 @@
 /* Language and theme live as two rows inside the account dropdown
  * (AppLayout.tsx), not as standalone header buttons — one control shell
  * shared between them: the same surface, border, radius and height
- * (docs/08-ui-map.md). */
+ * (docs/ui.md). */
 .locales {
   display: inline-flex;
   align-items: center;

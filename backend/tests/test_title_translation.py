@@ -96,7 +96,7 @@ def test_an_unusable_reply_is_rejected_before_it_reaches_a_row(payload: object) 
 
 
 def test_the_coin_prompt_is_not_the_storage_location_one() -> None:
-    """Two phrases, two prompts (docs/05-integrations.md, раздел 11): coin
+    """Two phrases, two prompts (docs/integrations.md, раздел 11): coin
     names are full of proper nouns, and the rules that protect them have no
     business in a prompt about where a coin is kept."""
     from app.services.translation import COIN_TITLE_SYSTEM_PROMPT, SYSTEM_PROMPT

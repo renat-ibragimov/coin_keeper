@@ -1,7 +1,7 @@
 """Data access for the user's collection and its linked expenses.
 
 Every query is scoped to the owner passed to the constructor — the isolation
-rule lives here, not in the routes (docs/07-auth.md).
+rule lives here, not in the routes (docs/auth.md).
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ class CollectionFilters:
     material_ids: list[int] | None = None
     metal_kinds: list[MetalKind] | None = None
     grade: str | None = None
-    # Every column of the "Мої монети" table sorts (docs/08-ui-map.md).
+    # Every column of the "Мої монети" table sorts (docs/ui.md).
     sort: str = "release"
     order: str = "desc"
 
@@ -126,7 +126,7 @@ class CollectionRepository:
         # A position is a catalog item the owner holds at least one purchase
         # of; the grade filter narrows that to items with a matching purchase
         # but never drops the position's other purchases from its aggregates
-        # (docs/03-api-contract.md: grade filtering shows the whole position).
+        # (docs/api.md: grade filtering shows the whole position).
         conditions: list[ColumnElement[bool]] = [self._owns_catalog_item()]
         if filters.grade is not None:
             conditions.append(self._owns_catalog_item(grade=filters.grade))
@@ -182,7 +182,7 @@ class CollectionRepository:
         """Delivery, holder, grading... summed for this position, converted at
         each expense's own rate — the same figure the coin card shows
         (`CatalogRepository._supporting_expenses_uah`), so "Мої монети" and
-        the coin card agree on what a position cost (docs/04-business-rules.md,
+        the coin card agree on what a position cost (docs/business-rules.md,
         rule 4)."""
         amount_uah = Expense.amount * func.coalesce(Expense.rate_uah, 1)
         return (
@@ -300,7 +300,7 @@ class CollectionRepository:
         )
 
     async def summary(self, filters: CollectionFilters) -> CollectionSummaryData:
-        """The KPI tiles on "Мої монети" (docs/08-ui-map.md), scoped to the
+        """The KPI tiles on "Мої монети" (docs/ui.md), scoped to the
         page's own filters — the same conditions `list_positions` uses, just
         aggregated instead of paginated. With no filters at all these
         conditions match the whole collection, so the numbers agree with
@@ -400,7 +400,7 @@ class CollectionRepository:
     async def list_owned_countries(self) -> Sequence[Country]:
         """Countries the owner holds at least one purchase from — the
         filters panel on "Мої монети" offers only what could possibly match,
-        not the whole shared reference list (docs/03-api-contract.md)."""
+        not the whole shared reference list (docs/api.md)."""
         query = (
             select(Country)
             .where(self._owns_via(CatalogItem.country_id == Country.id))
@@ -419,7 +419,7 @@ class CollectionRepository:
     async def owned_year_bounds_by_country(self) -> dict[int, tuple[int, int]]:
         """`(min issue_year, max issue_year)` per country, over catalog items
         the owner holds at least one purchase of — feeds the "Мої монети"
-        year filter's dropdown range (docs/03-api-contract.md)."""
+        year filter's dropdown range (docs/api.md)."""
         query = (
             select(
                 CatalogItem.country_id,
@@ -467,7 +467,7 @@ class CollectionRepository:
     async def list_owned_materials(self, country_id: int | None = None) -> Sequence[Material]:
         """Materials the material filter offers on "Мої монети" — only what
         the owner actually has, regardless of which countries the catalogue
-        project has confirmed (docs/04-business-rules.md, §13a, §14)."""
+        project has confirmed (docs/business-rules.md, §13a, §14)."""
         catalog_condition = CatalogItem.composition_id == Material.id
         if country_id is not None:
             catalog_condition = and_(catalog_condition, CatalogItem.country_id == country_id)
@@ -553,7 +553,7 @@ class CollectionRepository:
         self, instance_ids: Sequence[int]
     ) -> dict[int, Decimal]:
         """Delivery, holder, grading... booked to each of these purchases via
-        collection_item_id — not the item-wide total (docs/03-api-contract.md).
+        collection_item_id — not the item-wide total (docs/api.md).
         A purchase not in the result has none linked."""
         if not instance_ids:
             return {}

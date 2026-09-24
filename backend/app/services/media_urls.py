@@ -1,6 +1,6 @@
 """Choosing and signing catalog images for API payloads.
 
-Selection order per role comes from docs/06-media-storage.md: the viewer's own
+Selection order per role comes from docs/media.md: the viewer's own
 photo, then an official catalog one (nbu/manual), then a uCoin image — which is
 only ever fetched for its importer, the repository already filters it out for
 everyone else. Stored files are served through presigned URLs; hotlinks are
@@ -40,7 +40,7 @@ class CoinImage:
 
     A page picks by where it shows the coin — a listing takes the preview, a
     card the medium, the lightbox the large — and uses the next size up for a
-    dense screen (docs/06-media-storage.md).
+    dense screen (docs/media.md).
     """
 
     preview: str | None = None
@@ -140,7 +140,7 @@ async def images_by_catalog_item(
 
     Shared by the catalog listing/card and the collection listing: both show
     "the viewer's own coin, with their own photo first" for the same set of
-    catalog items (docs/06-media-storage.md, "Choosing the card photo")
+    catalog items (docs/media.md, "Choosing the card photo")
     — one query pair and one ranking, so the two screens cannot
     quietly start disagreeing about which photo wins.
     """

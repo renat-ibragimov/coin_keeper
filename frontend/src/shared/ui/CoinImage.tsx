@@ -17,7 +17,7 @@ interface CoinImageProps {
   /**
    * `contain` (default) shows the whole photo, never cropping a coin at the
    * frame's edge; `cover` fills the frame instead. Nothing in the app opts
-   * into `cover` today (docs/08-ui-map.md).
+   * into `cover` today (docs/ui.md).
    */
   fit?: 'cover' | 'contain';
 }
@@ -27,7 +27,7 @@ interface CoinImageProps {
  *
  * Many catalog items have no image at all, and part of the stored URLs point at
  * uCoin, which sits behind Cloudflare and usually refuses to serve the file. We
- * do not proxy or retry those (docs/06-media-storage.md — the Ukrainian photos
+ * do not proxy or retry those (docs/media.md — the Ukrainian photos
  * come from the NBU in stage 6); a missing and an unreachable photo simply look
  * the same, and neither shows a broken <img>.
  */

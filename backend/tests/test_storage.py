@@ -1,4 +1,4 @@
-"""app.core.storage — presigning against a public endpoint (docs/06-media-storage.md).
+"""app.core.storage — presigning against a public endpoint (docs/media.md).
 
 Client construction and URL signing are both local computation, no network
 call — these run as plain unit tests, no MinIO required.

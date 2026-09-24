@@ -51,7 +51,7 @@
 
 /* A raised row, not a padded rectangle: the progress ring anchors it on the
  * left, the name and metrics align tightly against it, and the whole thing
- * lifts by a single pixel on hover (docs/08-ui-map.md). */
+ * lifts by a single pixel on hover (docs/ui.md). */
 .row {
   position: relative;
   display: grid;

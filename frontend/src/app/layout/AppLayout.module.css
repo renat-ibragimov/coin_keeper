@@ -55,7 +55,7 @@
      height of a long page it would be squeezed to a fraction of its own. */
   flex: none;
   /* A structural surface with a crisp, quiet edge — the header belongs to
-   * the page frame, not to the content stack (docs/08-ui-map.md). */
+   * the page frame, not to the content stack (docs/ui.md). */
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   position: sticky;
@@ -66,7 +66,7 @@
 /* Centered on the header's own box, not on the leftover space between the
    logo and the account controls — those two are rarely the same width, and
    centering in the gap between them drifts from the page content's true
-   center below (docs/08-ui-map.md). */
+   center below (docs/ui.md). */
 .nav {
   display: flex;
   gap: var(--space-2);
@@ -77,7 +77,7 @@
 }
 
 /* A restrained surface change plus accent text marks the active section —
- * no oversized brass capsule behind the label (docs/08-ui-map.md). */
+ * no oversized brass capsule behind the label (docs/ui.md). */
 .navLink {
   padding: 7px 12px;
   border-radius: var(--radius-sm);
@@ -178,7 +178,7 @@
 
 /* The empty seat for a photo the app doesn't have yet — a plain silhouette
  * on a recessed disc, not a coloured initial, so it reads as "no photo set"
- * rather than as a deliberate monogram (docs/08-ui-map.md). */
+ * rather than as a deliberate monogram (docs/ui.md). */
 .avatar {
   flex: none;
   display: inline-flex;
@@ -446,7 +446,7 @@
   }
 
   /* Not colour alone: the active tab also carries a brass rule along the
-   * bar's own top edge (docs/08-ui-map.md). */
+   * bar's own top edge (docs/ui.md). */
   .bottomLinkActive {
     position: relative;
     color: var(--color-accent-strong);

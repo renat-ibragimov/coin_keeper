@@ -1,4 +1,4 @@
-"""Reads and writes over job_runs (docs/13-admin.md)."""
+"""Reads and writes over job_runs (docs/admin.md)."""
 
 from __future__ import annotations
 

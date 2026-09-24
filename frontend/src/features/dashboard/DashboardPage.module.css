@@ -42,7 +42,7 @@
   /* Without this, a grid item's content-based ("max-content") size wins the
    * row's auto height regardless of align-items: stretch, and the scrolling
    * series list below never gets to cap itself against the sibling column —
-   * the row just grows to fit every row instead (docs/08-ui-map.md). */
+   * the row just grows to fit every row instead (docs/ui.md). */
   min-height: 0;
 }
 
@@ -76,7 +76,7 @@
 }
 
 /* A widget heading names an interface area, so it stays in the body face at
- * UI-panel size (docs/08-ui-map.md). */
+ * UI-panel size (docs/ui.md). */
 .cardTitle {
   font-size: 18px;
   margin-bottom: var(--space-2);
@@ -112,7 +112,7 @@
  * with more it scrolls within that height. The max-height is a safety cap,
  * not a target — CSS Grid's auto row sizing has no way to bound this column
  * by its sibling's own (unconstrained) height, so without a cap a very long
- * list would just grow the whole row instead of scrolling (docs/08-ui-map.md,
+ * list would just grow the whole row instead of scrolling (docs/ui.md,
  * owner's call 2026-09-07: the previous 300px cap sat well under the finance
  * column's usual height and left a gap below it; this one comfortably clears
  * it in the common case, so scrolling only kicks in for an unusually long

@@ -9,7 +9,7 @@ from app.schemas.base import CamelModel
 
 class CountryOut(CamelModel):
     """`name` is the country in the requested locale; the slots are all there
-    too, so a form can search by any of them (docs/03-api-contract.md)."""
+    too, so a form can search by any of them (docs/api.md)."""
 
     id: int
     code: str | None
@@ -21,7 +21,7 @@ class CountryOut(CamelModel):
     collect_variants: bool
     is_active: bool
     # Whether the general catalog counts this country as "the catalogue"
-    # (docs/04-business-rules.md §13a) — GET /catalog hides everything of an
+    # (docs/business-rules.md §13a) — GET /catalog hides everything of an
     # unconfirmed country, however much of it a user personally owns. The
     # series screens read this to explain that gap instead of just looking
     # broken (owner-reported, 2026-09-13).

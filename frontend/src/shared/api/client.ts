@@ -1,12 +1,12 @@
 /** Thin fetch wrapper for the CoinKeeper API.
  *
- * - The access token lives in memory only (docs/07-auth.md); the refresh
+ * - The access token lives in memory only (docs/auth.md); the refresh
  *   token never reaches this code — it travels in an httpOnly cookie.
  * - A 401 on an authorised request triggers one refresh attempt through the
  *   cookie endpoint, then the original request is retried.
  * - RFC 7807 problem responses are parsed into a typed ApiError.
  * - Every request carries the interface language: the API answers with names
- *   in that locale (docs/03-api-contract.md).
+ *   in that locale (docs/api.md).
  */
 
 const API_BASE: string = import.meta.env.VITE_API_BASE ?? '/api/v1';
@@ -171,7 +171,7 @@ export function toQuery(
     if (Array.isArray(value)) {
       // Repeated keys (?countryId=1&countryId=2) — the shape a multi-select
       // filter sends and the backend's list[int] query params read
-      // (docs/03-api-contract.md, 2026-09-12).
+      // (docs/api.md, 2026-09-12).
       for (const item of value) search.append(key, String(item));
       continue;
     }

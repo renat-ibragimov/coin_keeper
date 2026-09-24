@@ -1,6 +1,6 @@
 """Telegram transport abstraction.
 
-Two backends, chosen by whether a bot token is configured (docs/10-infra.md):
+Two backends, chosen by whether a bot token is configured (docs/infra.md):
 without one, messages go to the log, so local development and tests need no
 secret and can never reach a real chat. Everything above this layer is the
 same either way -- the mail module works on the same principle.

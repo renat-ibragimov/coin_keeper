@@ -3,7 +3,7 @@
 The admin bot needs somewhere to keep the chats it may write to. They are not
 configured by hand: an administrator presses a button in the admin section,
 gets a one-time code and a t.me link, and pressing Start hands the code back
-through the webhook (docs/13-admin.md, 2.5). Hence the third auth_tokens kind
+through the webhook (docs/admin.md, 2.5). Hence the third auth_tokens kind
 -- the one-time machinery for email confirmation and password resets already
 does exactly what a link code needs, hash and expiry included.
 

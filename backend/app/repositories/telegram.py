@@ -1,4 +1,4 @@
-"""Reads and writes over telegram_recipients (docs/13-admin.md)."""
+"""Reads and writes over telegram_recipients (docs/admin.md)."""
 
 from __future__ import annotations
 

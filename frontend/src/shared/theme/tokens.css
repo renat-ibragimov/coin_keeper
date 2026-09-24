@@ -92,7 +92,7 @@
   --color-success-soft: #d4dac6;
   /* A solid fill for the "in collection" state row — bolder than
    * --color-success-soft (a badge tint), matching the visual weight of the
-   * brass CTA it replaces (docs/08-ui-map.md). */
+   * brass CTA it replaces (docs/ui.md). */
   --color-success-strong: #47563a;
   --color-success-edge: #333f29;
   --color-on-success: #f3f0e5;
@@ -160,12 +160,12 @@
 
   /* Drop-shadow (not box-shadow) for the coin photo/placeholder itself: it
    * traces the coin's own silhouette so it reads as an object resting on
-   * its plaque, not a floating panel (docs/08-ui-map.md). */
+   * its plaque, not a floating panel (docs/ui.md). */
   --shadow-coin: drop-shadow(0 2px 2px rgba(35, 27, 18, 0.24))
     drop-shadow(0 8px 10px rgba(35, 27, 18, 0.16));
   /* The same silhouette shadow, a little deeper — what a coin picks up when
    * its card is hovered. The card lifts, the coin does not move or grow;
-   * only the shadow under it opens up (docs/08-ui-map.md). */
+   * only the shadow under it opens up (docs/ui.md). */
   --shadow-coin-hover: drop-shadow(0 3px 3px rgba(35, 27, 18, 0.26))
     drop-shadow(0 11px 14px rgba(35, 27, 18, 0.2));
 
@@ -445,7 +445,7 @@ body::before {
 
 /* The display serif is opt-in per element, not a blanket rule on headings:
  * a panel heading that names an interface function is UI typography and
- * stays in the body face (docs/08-ui-map.md). Content headings — page
+ * stays in the body face (docs/ui.md). Content headings — page
  * titles, coin and series names — add .display or their own font-family. */
 h1,
 h2,
@@ -478,12 +478,12 @@ button {
  * reads as one even strip instead of following each column's own alignment.
  * Global on purpose — a table component has no business deciding this, and
  * none of them override it: alignment classes go on the cells, not the
- * headers (docs/08-ui-map.md). */
+ * headers (docs/ui.md). */
 th {
   text-align: center;
 }
 
-/* Sums and years sit in columns and must not wiggle (docs/08-ui-map.md). */
+/* Sums and years sit in columns and must not wiggle (docs/ui.md). */
 .tabular {
   font-variant-numeric: tabular-nums;
 }

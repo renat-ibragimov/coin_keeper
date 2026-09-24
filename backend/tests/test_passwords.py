@@ -1,4 +1,4 @@
-"""Password change and recovery (docs/07-auth.md)."""
+"""Password change and recovery (docs/auth.md)."""
 
 from __future__ import annotations
 

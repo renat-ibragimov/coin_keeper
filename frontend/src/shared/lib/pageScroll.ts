@@ -5,7 +5,7 @@
  * fixed row and everything below it scrolls inside the shell's own scroll
  * area, so the scrollbar never runs past the header and its reserved gutter
  * sits on the page ground, where it is invisible until there is something to
- * scroll (docs/08-ui-map.md). On the phone layout the document scrolls as
+ * scroll (docs/ui.md). On the phone layout the document scrolls as
  * usual — an inner scroller would stop the browser's URL bar from collapsing.
  *
  * Both helpers below address whichever of the two is live, so callers never

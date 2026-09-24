@@ -43,7 +43,7 @@ import styles from './CatalogPage.module.css';
 // The filters a fresh /catalog (no query string at all) starts from — reused
 // as what the mobile drawer's own "Скинути" resets its draft to, since that
 // reset must not touch the real, applied filters until "Застосувати" does
-// (docs/08-ui-map.md: apply-on-confirm, phone only).
+// (docs/ui.md: apply-on-confirm, phone only).
 const EMPTY_FILTERS = parseFilters(new URLSearchParams());
 
 const SORT_LABELS: Record<SortField, string> = {
@@ -90,7 +90,7 @@ export function CatalogPage() {
   // picking a country, let alone gone on to its series and years. Opening
   // the drawer seeds it from the applied filters; only "Застосувати" copies
   // it across. The desktop filters bar is unaffected — it keeps applying
-  // straight to `filters` below (docs/08-ui-map.md: apply-on-confirm, phone only).
+  // straight to `filters` below (docs/ui.md: apply-on-confirm, phone only).
   const [draft, setDraft] = useState<CatalogFilters>(filters);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // The overlay handles the outside press itself; Escape and navigation come from the hook.

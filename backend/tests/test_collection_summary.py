@@ -1,5 +1,5 @@
 """GET /collection/summary: the "Мої монети" KPI tiles, scoped to the same
-filters GET /collection accepts (docs/08-ui-map.md)."""
+filters GET /collection accepts (docs/ui.md)."""
 
 from __future__ import annotations
 

@@ -1,6 +1,6 @@
 """Redis-backed fixed-window rate limiting.
 
-Limits are the table in docs/07-auth.md. With registration open from day one
+Limits are the table in docs/auth.md. With registration open from day one
 this is a release condition, not a later addition: an open service without it
 gets brute-forced overnight.
 """
@@ -66,7 +66,7 @@ async def hit(limit: RateLimit, scope: str) -> None:
     """Count one attempt against `scope`, raising once the window is full.
 
     `scope` is what the limit is applied to: an IP address, an email address or
-    a user id. Several scopes per endpoint are normal, see docs/07-auth.md.
+    a user id. Several scopes per endpoint are normal, see docs/auth.md.
     """
     redis = get_redis()
     key = f"rl:{limit.name}:{scope}"

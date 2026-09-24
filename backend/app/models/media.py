@@ -27,7 +27,7 @@ class MediaFile(Base):
         ENUM(MediaRole, name="media_role", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
     )
-    # Provenance drives visibility, see docs/06-media-storage.md.
+    # Provenance drives visibility, see docs/media.md.
     source: Mapped[MediaSource] = mapped_column(
         ENUM(MediaSource, name="media_source", values_callable=lambda e: [m.value for m in e]),
         nullable=False,
@@ -36,7 +36,7 @@ class MediaFile(Base):
     license: Mapped[str | None] = mapped_column(Text)
     attribution: Mapped[str | None] = mapped_column(Text)
     # The largest stored size and the preview; `variants` has all of them,
-    # keyed by the long side in pixels (docs/06-media-storage.md).
+    # keyed by the long side in pixels (docs/media.md).
     storage_key: Mapped[str | None] = mapped_column(Text)
     external_url: Mapped[str | None] = mapped_column(Text)
     thumbnail_key: Mapped[str | None] = mapped_column(Text)

@@ -70,7 +70,7 @@ RequestLocale = Annotated[str, Depends(request_locale)]
 
 
 def client_ip(request: Request) -> str:
-    """Caddy sits in front and sets X-Forwarded-For (docs/10-infra.md)."""
+    """Caddy sits in front and sets X-Forwarded-For (docs/infra.md)."""
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         return forwarded.split(",")[0].strip()
@@ -166,7 +166,7 @@ async def require_job_token(
     settings: AppSettings,
     token: Annotated[str | None, Header(alias="X-Job-Token")] = None,
 ) -> None:
-    """Authenticates a scheduled job reporting on itself (docs/13-admin.md).
+    """Authenticates a scheduled job reporting on itself (docs/admin.md).
 
     Not a user and not a session: the caller is a container on the same docker
     network holding a shared secret. Compared in constant time, and an unset

@@ -86,7 +86,7 @@ async def seed_reference(session: AsyncSession) -> ReferenceData:
     usa = await country_by_code(session, "US")
     # Only Ukraine is seeded active and catalog_confirmed; the storefront
     # tests expect both, and catalog_confirmed is orthogonal to what most of
-    # them actually exercise (docs/04-business-rules.md, §13a).
+    # them actually exercise (docs/business-rules.md, §13a).
     usa.is_active = True
     usa.catalog_confirmed = True
     await session.flush()

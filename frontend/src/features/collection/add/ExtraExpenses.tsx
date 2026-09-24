@@ -29,7 +29,7 @@ interface ExtraExpensesProps {
  * was bought, which until now meant going to «Гроші» afterwards and writing it
  * down a second time — which is to say, usually not writing it down at all
  * (owner's call, 2026-09-14). The whole lot goes in the same request as the
- * purchase (`extraExpenses`, docs/03-api-contract.md).
+ * purchase (`extraExpenses`, docs/api.md).
  *
  * The date and the seller are not asked for again: an expense recorded here
  * takes both from the purchase. What comes back is an ordinary manual expense

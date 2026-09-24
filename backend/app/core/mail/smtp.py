@@ -1,4 +1,4 @@
-"""SMTP backend for the server (Resend or Postmark, docs/10-infra.md)."""
+"""SMTP backend for the server (Resend or Postmark, docs/infra.md)."""
 
 from __future__ import annotations
 

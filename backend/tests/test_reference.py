@@ -155,7 +155,7 @@ async def test_denominations_filtered_by_country(
 async def test_confirmed_scope_is_a_harder_gate_than_active(
     client: AsyncClient, db_session: AsyncSession, mail_outbox: list
 ) -> None:
-    """docs/04-business-rules.md, §13a: `scope=confirmed` is the catalog's
+    """docs/business-rules.md, §13a: `scope=confirmed` is the catalog's
     own filter panel — active but unconfirmed is not enough."""
     refs = await seed_reference(db_session)
     await set_country_catalog_confirmed(db_session, refs.usa, confirmed=False)
@@ -181,7 +181,7 @@ async def test_confirmed_denominations_require_a_visible_catalog_item(
 ) -> None:
     """§13a's confirmed-scope gate applies per denomination, not just per
     country: a denomination row can outlive every catalog item that used to
-    reference it (Ukraine pipeline merges/reassigns, docs/05-integrations.md),
+    reference it (Ukraine pipeline merges/reassigns, docs/integrations.md),
     and the catalog's filter panel must not offer it once nothing matches."""
     refs = await seed_reference(db_session)
     _, token = await register_and_verify(client, mail_outbox)
@@ -224,7 +224,7 @@ async def test_coin_dictionaries_for_the_add_form(
 
     Wider than `GET /catalog/materials`, which narrows a filter to what a
     confirmed coin actually uses: this form describes a coin that does not
-    exist yet (docs/03-api-contract.md)."""
+    exist yet (docs/api.md)."""
     await seed_reference(db_session)
     _, token = await register_and_verify(client, mail_outbox)
     headers = {"Authorization": f"Bearer {token}"}

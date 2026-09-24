@@ -27,7 +27,7 @@ export function fetchCompletenessSummary(
  *  bookmarked/shared link without fetching the whole dimension's list.
  *  `metalKind` matches whatever the list's own filter was set to, so the
  *  numbers on the detail screen agree with the row the user clicked
- *  (docs/08-ui-map.md, Комплектність). */
+ *  (docs/ui.md, Комплектність). */
 export function fetchCompletenessGroup(
   groupBy: CompletenessGroupBy,
   selector: GroupSelector,
@@ -40,7 +40,7 @@ export function fetchCompletenessGroup(
 }
 
 /** The detail screen's own tiles -- shared or personal, regardless of the
- *  country's catalog_confirmed (docs/04-business-rules.md §13a). Deliberately
+ *  country's catalog_confirmed (docs/business-rules.md §13a). Deliberately
  *  not `fetchCatalog(...)`: that's the catalogue browse experience's harder
  *  gate, which hides a user's own coins of a country the catalogue project
  *  hasn't confirmed yet. `owned` is the detail screen's own filter (narrows

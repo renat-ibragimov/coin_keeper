@@ -51,7 +51,7 @@ function intParam(params: URLSearchParams, key: string): number | undefined {
 
 /** Every occurrence of a repeated query key (`countryId=1&countryId=2`),
  *  parsed and de-duplicated — the same shape `?countryId=` list the backend
- *  reads (docs/03-api-contract.md, multi-select filters, 2026-09-12). */
+ *  reads (docs/api.md, multi-select filters, 2026-09-12). */
 function intListParam(params: URLSearchParams, key: string): number[] {
   const seen = new Set<number>();
   for (const raw of params.getAll(key)) {

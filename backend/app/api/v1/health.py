@@ -1,4 +1,4 @@
-"""Health endpoint: reports each dependency separately (docs/10-infra.md)."""
+"""Health endpoint: reports each dependency separately (docs/infra.md)."""
 
 from __future__ import annotations
 

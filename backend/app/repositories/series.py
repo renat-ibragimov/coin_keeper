@@ -2,9 +2,9 @@
 
 Series are a shared reference, but listings only surface storefront-visible
 ones — a deactivated country's series disappears unless the user already
-owns something in it (docs/04-business-rules.md, §13). The summary, once a
+owns something in it (docs/business-rules.md, §13). The summary, once a
 series is reached, counts every catalog item visible to the user, active in
-both the numerator and the denominator (docs/04-business-rules.md, rule 5).
+both the numerator and the denominator (docs/business-rules.md, rule 5).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from app.repositories.localization import localized
 
 
 def series_storefront_visible(user_id: int) -> ColumnElement[bool]:
-    """Storefront visibility for a series (docs/04-business-rules.md, §13).
+    """Storefront visibility for a series (docs/business-rules.md, §13).
 
     A series is visible when its country is active, or when the user already
     owns at least one instance of a catalog item that belongs to it — an
@@ -103,7 +103,7 @@ class SeriesRepository:
     async def get_visible(self, series_id: int) -> CoinSeries | None:
         """The series if storefront-visible to the user, else None: unlike
         `/catalog/{id}`, a direct series summary follows the same rule as the
-        listing (docs/04-business-rules.md, §13)."""
+        listing (docs/business-rules.md, §13)."""
         query = select(CoinSeries).where(
             CoinSeries.id == series_id, series_storefront_visible(self._user_id)
         )

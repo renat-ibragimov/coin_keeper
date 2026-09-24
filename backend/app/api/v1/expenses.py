@@ -1,4 +1,4 @@
-"""Expense endpoints (docs/03-api-contract.md)."""
+"""Expense endpoints (docs/api.md)."""
 
 from __future__ import annotations
 

@@ -61,7 +61,7 @@ export function ExpensesByCategoryChart({ data, locale, palette }: Props) {
               pointer moves down, since the box is half as tall as the chart. No
               animation and a free vertical axis mean it simply trails the
               pointer; near the bottom it hangs over the axis instead of jumping
-              (docs/08-ui-map.md). */}
+              (docs/ui.md). */}
           <Tooltip
             isAnimationActive={false}
             allowEscapeViewBox={{ x: false, y: true }}

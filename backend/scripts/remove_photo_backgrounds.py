@@ -2,7 +2,7 @@
 
 One-off cleanup over `media_files` rows that hold their own `storage_key`
 (NBU, ua-coins, manual — anything we host; an `external_url`-only uCoin
-hotlink is never touched). See docs/06-media-storage.md, "Удаление фона",
+hotlink is never touched). See docs/media.md, "Удаление фона",
 and app.services.media_background for the classifier this calls. Dark-branch
 cuts (proof coins on black felt/velvet) get their own `cut:dark` verdict and
 their own section in the HTML sheet -- that branch's flood-fill tolerance is
@@ -30,7 +30,7 @@ fresh (wrong) alpha over whatever that matte was hiding. It walks the same
 already-`-nobg` rows as --trim, but downloads each row's ORIGINAL (the key
 without `-nobg`) and applies the same already-transparent criterion
 classify() now uses; a row whose original truly had no transparency is a
-legitimate white/dark cut and is left alone. See docs/06-media-storage.md,
+legitimate white/dark cut and is left alone. See docs/media.md,
 "Удаление фона", for the full runbook.
 
     docker compose run --no-deps api python scripts/remove_photo_backgrounds.py \\
@@ -750,7 +750,7 @@ td, th {{ border: 1px solid #ccc; padding: 0.25rem 0.5rem; }}
 <h2>Cut, dark background ({len(cut_dark_rows)})</h2>
 <p>Reviewed separately: the dark branch's flood-fill tolerance is deliberately
 tight (mirrored proof fields), so a false negative is expected sooner here
-than a false positive -- still worth a closer look per docs/06-media-storage.md.</p>
+than a false positive -- still worth a closer look per docs/media.md.</p>
 {dark_cards}
 <h2>Skipped ({len(skipped_rows)})</h2>
 <table>

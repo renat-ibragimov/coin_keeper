@@ -1,4 +1,4 @@
-"""Access to media rows, restricted by provenance (docs/06-media-storage.md)."""
+"""Access to media rows, restricted by provenance (docs/media.md)."""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ class MediaRepository:
         which catalog item each belongs to.
 
         A user photo always hangs off `collection_item_id`, never off the
-        catalog item it happens to be a purchase of (docs/06-media-storage.md,
+        catalog item it happens to be a purchase of (docs/media.md,
         "Происхождение изображений") — so picking it for a catalog card or a
         collection listing means joining through the owner's own
         `collection_items`, not reading `catalog_item_id` off the row.

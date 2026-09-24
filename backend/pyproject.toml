@@ -62,7 +62,7 @@ ignore = ["S101"]
 # Country endonyms, denomination words and the material phrases the sources
 # print are data too, same exemption as the reconnaissance parsers.
 "app/reference_data/*" = ["RUF001", "RUF002", "RUF003"]
-# The admin bot's own wording is Ukrainian by decision (docs/13-admin.md, 2.6):
+# The admin bot's own wording is Ukrainian by decision (docs/admin.md, 2.6):
 # it is not part of the application interface and has no locale files to live
 # in. Only the message strings are exempt -- comments and docstrings in this
 # module stay plain English like everywhere else.

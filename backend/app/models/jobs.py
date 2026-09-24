@@ -1,4 +1,4 @@
-"""Background job runs: one row per run of a scheduled job (docs/13-admin.md)."""
+"""Background job runs: one row per run of a scheduled job (docs/admin.md)."""
 
 from __future__ import annotations
 

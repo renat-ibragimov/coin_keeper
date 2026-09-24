@@ -1,4 +1,4 @@
-"""Reporting a background job run (docs/13-admin.md, part 1).
+"""Reporting a background job run (docs/admin.md, part 1).
 
 The reporter is a container, not a person: these cases cover the token, the
 open/close pair and the awkward paths a nightly cron actually produces --
@@ -49,7 +49,7 @@ async def test_open_and_finish_a_run(client: AsyncClient) -> None:
     assert finished["exitCode"] == 0
     assert finished["stats"]["inserted"] == 321
     assert finished["runDate"] == "2026-09-10"
-    # A good run says its one line and nothing more (docs/13-admin.md, 2.4).
+    # A good run says its one line and nothing more (docs/admin.md, 2.4).
     assert finished["details"] is None
 
 

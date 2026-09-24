@@ -18,7 +18,7 @@
   max-width: 720px;
 }
 
-/* Explains the gap left by an unconfirmed country (docs/04-business-rules.md
+/* Explains the gap left by an unconfirmed country (docs/business-rules.md
  * §13a) instead of a misleading "Open in the catalog" button and an empty
  * grid that looks like the page is broken (owner-reported, 2026-09-13). */
 .notConfirmedNotice {

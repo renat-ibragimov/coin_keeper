@@ -1,4 +1,4 @@
-"""Catalog payloads (docs/03-api-contract.md)."""
+"""Catalog payloads (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ class CoinImageOut(CamelModel):
 
 class CoinDescriptions(CamelModel):
     """The coin-collector parser's text for the requested locale
-    (docs/02-data-model.md). Any of the three may still be null — the parser
+    (docs/data-model.md). Any of the three may still be null — the parser
     writes the key regardless of whether it found text for it."""
 
     general: str | None
@@ -92,7 +92,7 @@ class CatalogListItem(CamelModel):
     purchase_total_eur: Money | None
     # Delivery, holder, grading... — everything but coin_purchase, summed
     # across all of the owner's purchases of this item. Never folded into
-    # purchase_total_uah (docs/03-api-contract.md).
+    # purchase_total_uah (docs/api.md).
     supporting_expenses_uah: Money | None
     obverse_image: CoinImageOut | None
     reverse_image: CoinImageOut | None
@@ -134,7 +134,7 @@ class CatalogCard(CatalogListItem):
 
 class CatalogSummaryOut(CamelModel):
     """The "Каталог" KPI tiles, scoped to whatever filters the browse screen
-    currently carries (docs/08-ui-map.md)."""
+    currently carries (docs/ui.md)."""
 
     total: int
     owned: int
@@ -231,7 +231,7 @@ class CatalogItemCreate(CamelModel):
     catalog_number: str | None = Field(default=None, max_length=100)
     notes: str | None = Field(default=None, max_length=4000)
     # Admin only: create the record in the shared catalog instead of a
-    # personal item. Regular users get a 403 (docs/03-api-contract.md).
+    # personal item. Regular users get a 403 (docs/api.md).
     shared: bool = False
 
 
@@ -239,7 +239,7 @@ class NewCatalogItemIn(CamelModel):
     """A personal catalog item entered by hand on the "Додати" form.
 
     A subset of CatalogItemCreate, not that schema itself, and the three
-    differences are the point (docs/03-api-contract.md, `POST /collection`):
+    differences are the point (docs/api.md, `POST /collection`):
 
     * no `shared` — this record is always personal. The shared catalog is
       read-only for everyone but an admin editing it deliberately, and the
@@ -288,7 +288,7 @@ class NewCatalogItemIn(CamelModel):
     catalog_number: str | None = Field(default=None, max_length=100)
     # The coin described in the collector's own words, in the language of the
     # request. Stored in `descriptions` under that locale, in the shape
-    # docs/02-data-model.md fixes — not in `notes`, which is a note about the
+    # docs/data-model.md fixes — not in `notes`, which is a note about the
     # record rather than a description of the coin.
     description: str | None = Field(default=None, max_length=4000)
     description_obverse: str | None = Field(default=None, max_length=4000)
@@ -314,7 +314,7 @@ class CatalogItemUpdate(CamelModel):
     original_lang: str | None = Field(default=None, min_length=2, max_length=8)
     # min_length=1 rather than the create schema's "may be absent": a translated
     # slot is either untouched (field omitted) or replaced with real text, never
-    # set to an empty string (docs/03-api-contract.md, admin title editing).
+    # set to an empty string (docs/api.md, admin title editing).
     title_uk: str | None = Field(default=None, min_length=1, max_length=500)
     title_en: str | None = Field(default=None, min_length=1, max_length=500)
     issue_year: int | None = Field(default=None, ge=1, le=2200)
@@ -382,7 +382,7 @@ class CatalogCollectionItemOut(CamelModel):
     total_eur: Money | None
     # Delivery, holder, grading... booked to this exact purchase via
     # collection_item_id; null for a pre-backfill purchase with none linked,
-    # even if the item as a whole has some (docs/03-api-contract.md).
+    # even if the item as a whole has some (docs/api.md).
     supporting_expenses_uah: Money | None
     storage_location: str | None
     notes: str | None

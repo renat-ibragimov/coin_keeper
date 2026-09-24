@@ -1,6 +1,6 @@
 /* A raised card, and the coin on it is the brightest thing in the grid: the
  * card itself only has to sit clearly above the page ground and stay out of
- * the photo's way (docs/08-ui-map.md). */
+ * the photo's way (docs/ui.md). */
 .card {
   position: relative;
   display: flex;
@@ -77,7 +77,7 @@
 
 /* Owned coins catch the eye scanning the grid: a faint green tint on the
  * card's own surface plus a matching border, on top of the existing footer
- * status row (never colour alone, docs/08-ui-map.md). Only the resting
+ * status row (never colour alone, docs/ui.md). Only the resting
  * border changes — .card:hover above already restyles it to the same brass
  * used everywhere else, so the hover lift stays exactly as noticeable as on
  * any other card. */
@@ -89,7 +89,7 @@
 /* No background of its own: the coins sit directly on the card's own
  * surface (var(--color-surface-raised) from .card) so the tile reads as one
  * piece instead of an image plaque stacked on a content block
- * (docs/08-ui-map.md). 2/1 so the obverse/reverse pair comes out roughly
+ * (docs/ui.md). 2/1 so the obverse/reverse pair comes out roughly
  * square per side, and generous padding gives --shadow-coin room to read as
  * the coins resting on the card rather than floating edge-to-edge. */
 .media {
@@ -101,7 +101,7 @@
    * such intrinsic size, so single-photo/placeholder cards ended up with a
    * shorter media area than two-photo ones, throwing off row alignment
    * lower in the card. Pinning it to 0 makes aspect-ratio the only input
-   * (docs/08-ui-map.md). */
+   * (docs/ui.md). */
   min-height: 0;
   padding: var(--space-2) var(--space-2) var(--space-1);
   align-items: center;
@@ -124,7 +124,7 @@
  * after the first (the two-photo case in CoinImages, obverse then reverse)
  * is pulled left to overlap it slightly — a light touch, not a collage;
  * z-index puts the obverse on top, reverse behind, matching how a coin
- * reads left-to-right (docs/08-ui-map.md). */
+ * reads left-to-right (docs/ui.md). */
 .image {
   position: relative;
   z-index: 2;
@@ -149,7 +149,7 @@
 /* Explicit z-index (higher than .image's, above) so it stays above the coin
  * photos — the bigger, overlapping coins reach far
  * enough into the top-left corner that the badge would otherwise sit
- * half-hidden behind them (docs/08-ui-map.md). */
+ * half-hidden behind them (docs/ui.md). */
 .mediaBadges {
   position: absolute;
   z-index: 3;
@@ -176,7 +176,7 @@
 /* One line for the two facts that explain a price gap between coins that look
  * alike in the grid: face value left, material right and quieter. The material
  * is already cut to two words (shortMaterial); the ellipsis here is the
- * backstop for a single very long word (docs/08-ui-map.md). */
+ * backstop for a single very long word (docs/ui.md). */
 .specs {
   display: flex;
   align-items: baseline;
@@ -205,7 +205,7 @@
  * instead of pushing the meta line down. Font-size stays constant on
  * purpose — a title that shrinks to fit would still misalign the row next
  * to a card whose (differently long) title fits at full size
- * (docs/08-ui-map.md). */
+ * (docs/ui.md). */
 .title {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -256,7 +256,7 @@
 
 /* Elevated above the stretched title-link overlay (z-index:1) so a click
  * actually reaches the series page instead of the coin's own detail page
- * (docs/08-ui-map.md). */
+ * (docs/ui.md). */
 .seriesLink {
   position: relative;
   z-index: 2;
@@ -277,7 +277,7 @@
 /* Elevated above the stretched title-link overlay (z-index:1, see
  * .titleLinkStretched below), same as .action — otherwise a click meant for
  * the source link would be swallowed by the card's own "open detail page"
- * overlay instead of reaching the external URL (docs/08-ui-map.md). */
+ * overlay instead of reaching the external URL (docs/ui.md). */
 .footer {
   position: relative;
   z-index: 2;
@@ -331,7 +331,7 @@
 
 /* Same footprint as the "add to collection" button below it (42px), so the
  * footer never changes height between the owned and not-owned states
- * (docs/08-ui-map.md). */
+ * (docs/ui.md). */
 .ownedRow {
   display: flex;
   align-items: center;

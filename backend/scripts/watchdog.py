@@ -1,13 +1,13 @@
 """The sentinel cron: alarms when an expected job never showed up.
 
-docs/13-admin.md, 2.7. A run that finished badly already explains itself in
+docs/admin.md, 2.7. A run that finished badly already explains itself in
 the chat the moment it closes (app/api/v1/jobs.py); this script exists for
 the other failure -- a run that never opened at all, because the container
 that schedules it is dead, cron itself never fired, or the network between it
 and this API is gone. Nothing reports that on its own, so something has to
 come and look.
 
-No ARQ, on purpose (docs/13-admin.md, "Open questions", decided 2026-09-15):
+No ARQ, on purpose (docs/admin.md, "Open questions", decided 2026-09-15):
 this is a periodic check, not a queued task with retries, so a second cron
 entry calling this script is the whole mechanism -- it will not move to ARQ
 even once ARQ exists in the project for something else.

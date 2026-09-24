@@ -49,7 +49,7 @@ import styles from './CollectionPage.module.css';
 // The filters a fresh /collection/coins (no query string at all) starts
 // from — reused as what the mobile drawer's own "Скинути" resets its draft
 // to, since that reset must not touch the real, applied filters until
-// "Застосувати" does (docs/08-ui-map.md: apply-on-confirm, phone only).
+// "Застосувати" does (docs/ui.md: apply-on-confirm, phone only).
 const EMPTY_FILTERS = parseCollectionFilters(new URLSearchParams());
 
 // Fixed column counts (1/2/3/5, CollectionPage.module.css) rather than an
@@ -84,7 +84,7 @@ export function CollectionPage() {
   // The phone's filters drawer edits this instead of the real, applied
   // filters directly — see CatalogPage.tsx for why. The desktop filters bar
   // is unaffected — it keeps applying straight to `filters` below
-  // (docs/08-ui-map.md: apply-on-confirm, phone only).
+  // (docs/ui.md: apply-on-confirm, phone only).
   const [draft, setDraft] = useState<CollectionFilters>(filters);
   const [drawerOpen, setDrawerOpen] = useState(false);
   useDismissable(drawerOpen, () => setDrawerOpen(false));
@@ -123,7 +123,7 @@ export function CollectionPage() {
     placeholderData: keepPreviousData,
   });
   // Scoped to what the user actually owns — not the catalog-wide reference
-  // lists (docs/03-api-contract.md), so the key namespace differs from the
+  // lists (docs/api.md), so the key namespace differs from the
   // catalog's own ['countries']/['series', ...]/['denominations', ...].
   const countriesQuery = useQuery({
     queryKey: ['collection', 'countries'],
@@ -152,7 +152,7 @@ export function CollectionPage() {
   const shown = page ? page.items.length + (page.page - 1) * GRID_PAGE_SIZE : 0;
   const dashboard = bootstrapQuery.data?.dashboard;
   const includeSupportingExpenses = bootstrapQuery.data?.settings.includeSupportingExpenses ?? true;
-  // docs/03-api-contract.md: emptiness is the server's isEmpty from bootstrap
+  // docs/api.md: emptiness is the server's isEmpty from bootstrap
   // (no coins and no personal items), not a locally derived "zero rows" guess.
   const collectionEmpty = dashboard?.isEmpty === true && !hasActiveFilters(filters);
 

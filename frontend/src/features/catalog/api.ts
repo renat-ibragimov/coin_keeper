@@ -140,7 +140,7 @@ export function fetchCurrencies(): Promise<CurrencyOut[]> {
  * Not `GET /catalog`: this route drops the storefront rule, so a coin of a
  * country the catalogue project has not confirmed is still findable by name —
  * the country dropdown offers every issuer there has ever been
- * (docs/03-api-contract.md).
+ * (docs/api.md).
  */
 export function lookupCatalog(
   q: string,
@@ -152,7 +152,7 @@ export function lookupCatalog(
 
 /** The whole composition dictionary, for the "Про монету" material field —
  *  wider than `fetchCatalogMaterials`, which offers only what a confirmed
- *  coin actually uses (docs/03-api-contract.md). */
+ *  coin actually uses (docs/api.md). */
 export function fetchAllMaterials(): Promise<CoinMaterial[]> {
   return api<CoinMaterial[]>('/materials');
 }

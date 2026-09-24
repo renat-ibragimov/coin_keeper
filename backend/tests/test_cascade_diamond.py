@@ -13,7 +13,7 @@ succeed in one statement, leaves nothing orphaned, and does not touch the
 shared catalog — and, separately, that the foreign key still refuses to leave a
 coin without its catalog item.
 
-See docs/02-data-model.md, the section on NO ACTION versus RESTRICT.
+See docs/data-model.md, the section on NO ACTION versus RESTRICT.
 """
 
 from __future__ import annotations

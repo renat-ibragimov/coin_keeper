@@ -3,7 +3,7 @@
 coin_purchase expenses are owned by the purchase transaction
 (app/services/collection.py): creating, editing or deleting them directly
 through /expenses is refused, otherwise the 1:1 between instances and their
-purchase expenses would silently break (docs/04-business-rules.md, rule 4).
+purchase expenses would silently break (docs/business-rules.md, rule 4).
 """
 
 from __future__ import annotations
@@ -295,7 +295,7 @@ class ExpenseService:
 
     async def _amount_usd_for(self, expense: Expense) -> Decimal | None:
         """The rate on the expense's OWN date, not today's -- what it cost
-        then (docs/BACKLOG.md, NBU rates follow-up). None if NBU has no
+        then (docs/backlog.md, NBU rates follow-up). None if NBU has no
         rate that far back, rather than a live-rate guess."""
         usd_rate = await self._rates.rate_on("USD", expense.expense_date)
         if usd_rate is None:

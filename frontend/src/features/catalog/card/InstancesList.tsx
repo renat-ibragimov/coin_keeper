@@ -36,7 +36,7 @@ interface InstancesListProps {
   /** Where the "add to collection" CTA in the empty state should lead. */
   addHref: string;
   /** The coin's own title, for the delete-confirmation text — instances
-   *  carry no title of their own (docs/03-api-contract.md). */
+   *  carry no title of their own (docs/api.md). */
   coinTitle: string;
   /** The catalog item's own obverse photo — instances have no photo of their
    *  own yet, so every row shows the same coin picture. */
@@ -173,7 +173,7 @@ export function InstancesList({
               const coinTotalApprox =
                 coinTotalSecondary !== null ? Number(coinTotalSecondary) : null;
               // No per-currency breakdown exists for a supporting expense
-              // (docs/03-api-contract.md) — converted at today's live rate
+              // (docs/api.md) — converted at today's live rate
               // instead, same compromise as a row's current value.
               const extraExpensesApprox =
                 extraExpenses !== null ? toSecondary(extraExpenses, secondaryRate) : null;

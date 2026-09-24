@@ -1,6 +1,6 @@
 /* A segmented control: the track is a recessed strip, the selected segment a
  * small raised chip on it. Selection reads from surface, border and accent
- * text together — never from colour alone (docs/08-ui-map.md). */
+ * text together — never from colour alone (docs/ui.md). */
 .tabs {
   display: inline-flex;
   border: 1px solid var(--color-border);

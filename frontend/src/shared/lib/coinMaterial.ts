@@ -12,7 +12,7 @@ export interface MaterialedItem {
  * Nothing at all when the record says nothing. The metal kind is a filter
  * facet, not a material, so a listing leaves the slot empty rather than
  * printing "Недорогоцінний" in the place of a material — only the coin page,
- * which labels the row, falls back to it (docs/08-ui-map.md).
+ * which labels the row, falls back to it (docs/ui.md).
  */
 export function coinMaterial(item: MaterialedItem): string | null {
   const composition = item.composition?.name.trim();
@@ -32,7 +32,7 @@ export function coinMaterial(item: MaterialedItem): string | null {
  * Two words, and a trailing short one goes too: "Сталь із…" says nothing more
  * than "Сталь…" and reads worse (owner, 2026-09-09). Measured in characters
  * rather than against a list of prepositions — the material is data, in
- * whatever language the issuer writes (docs/08-ui-map.md).
+ * whatever language the issuer writes (docs/ui.md).
  */
 const WORDS_ON_A_CARD = 2;
 const SHORTEST_WORD_WORTH_KEEPING = 3;

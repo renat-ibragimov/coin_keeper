@@ -4,7 +4,7 @@ Backs the "show souvenir-packaging coins as their own card" toggle in
 account settings. Off by default: `GET /catalog` hides any
 `catalog_items` row whose `packaging_of_id` (0011) points at another item
 unless the viewing user has this set, per-user rather than global because
-which cards feel like noise is a matter of taste (docs/04-business-rules.md).
+which cards feel like noise is a matter of taste (docs/business-rules.md).
 
 Revision ID: 0012
 Revises: 0011

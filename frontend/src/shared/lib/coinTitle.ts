@@ -12,7 +12,7 @@ export interface TitledItem {
  *
  * The original is the issuer's own wording and is never translated, so it is
  * the only fallback there is — there is no Russian slot behind it
- * (docs/04-business-rules.md). The API already sends `title` computed by the
+ * (docs/business-rules.md). The API already sends `title` computed by the
  * same rule; the helper keeps the rule in one place on the client for screens
  * that compose the name themselves (the card heading, the browser tab).
  */

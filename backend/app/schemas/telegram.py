@@ -1,4 +1,4 @@
-"""Wire types for the admin bot (docs/13-admin.md)."""
+"""Wire types for the admin bot (docs/admin.md)."""
 
 from __future__ import annotations
 

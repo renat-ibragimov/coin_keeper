@@ -1,6 +1,6 @@
 """The admin bot: linking a chat, answering it, and reporting into it.
 
-Linking is the whole security model (docs/13-admin.md, 2.5). Anyone can find
+Linking is the whole security model (docs/admin.md, 2.5). Anyone can find
 the bot and press Start; what they cannot do is present a one-time code issued
 to a signed-in administrator, and without one the update is ignored in
 silence -- not refused, which would confirm the bot is alive.
@@ -185,7 +185,7 @@ async def queue_new_user_notification(
 ) -> None:
     """Tell every linked admin chat that an account just became real.
 
-    Fired once, at verification (docs/13-admin.md, part 3) -- not at
+    Fired once, at verification (docs/admin.md, part 3) -- not at
     registration, which an unconfirmed or bot-filled address would reach too
     easily and turn the chat into noise.
     """

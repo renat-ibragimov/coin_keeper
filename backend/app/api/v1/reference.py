@@ -1,6 +1,6 @@
 """Reference endpoints: countries, denominations, coin dictionaries, currencies.
 
-Contract: docs/03-api-contract.md.
+Contract: docs/api.md.
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ async def list_countries(
     the catalog's own filter panel — a harder, separate gate (§13a).
 
     `minYear`/`maxYear` are the issue-year bounds of the catalog items
-    actually visible to this user in that country (docs/03-api-contract.md) —
+    actually visible to this user in that country (docs/api.md) —
     feeds the year filter's dropdown range, not a global catalog fact.
     """
     await enforce_public_read(rate_limit.PUBLIC_REFERENCE, user, ip)
@@ -133,7 +133,7 @@ async def list_materials(
 async def list_edge_types(
     session: DbSession, _user: CurrentUser, locale: RequestLocale
 ) -> list[CoinEdgeType]:
-    """The edge dictionary behind `edgeTypeId` (docs/04-business-rules.md, §14)."""
+    """The edge dictionary behind `edgeTypeId` (docs/business-rules.md, §14)."""
     rows = await ReferenceRepository(session, locale).list_edge_types()
     return [CoinEdgeType(id=row.id, code=row.code, name=_localised(row, locale)) for row in rows]
 

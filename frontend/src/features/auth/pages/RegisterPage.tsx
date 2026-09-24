@@ -31,7 +31,7 @@ export function RegisterForm({
 
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
-  const [website, setWebsite] = useState(''); // honeypot, docs/07-auth.md
+  const [website, setWebsite] = useState(''); // honeypot, docs/auth.md
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 

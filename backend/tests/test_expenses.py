@@ -518,7 +518,7 @@ async def test_a_supporting_expense_of_zero_is_rejected(
     client: AsyncClient, ctx: SimpleNamespace
 ) -> None:
     """Unlike a purchase price, which may honestly be zero (a gift), a
-    delivery or an album that cost nothing is a typo (docs/03-api-contract.md)."""
+    delivery or an album that cost nothing is a typo (docs/api.md)."""
     headers = auth(ctx.token_a)
     body = {
         "category": "delivery",
@@ -542,7 +542,7 @@ async def test_a_supporting_expense_can_name_a_coin(
     client: AsyncClient, ctx: SimpleNamespace
 ) -> None:
     """Grading or a holder may be about one particular coin, and the journal
-    has to show the link (docs/08-ui-map.md, «Гроші»)."""
+    has to show the link (docs/ui.md, «Гроші»)."""
     headers = auth(ctx.token_a)
     created = await client.post(
         "/api/v1/expenses",

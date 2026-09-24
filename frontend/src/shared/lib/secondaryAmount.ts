@@ -11,7 +11,7 @@ export function pickSecondary<T>(usd: T, eur: T, currency: SecondaryCurrency): T
 }
 
 /** The live secondary-currency/UAH rate from bootstrap's exchangeRates
- *  (docs/03-api-contract.md), the same feed the dashboard's rate tiles use —
+ *  (docs/api.md), the same feed the dashboard's rate tiles use —
  *  null if NBU has none yet. Only ever the right choice for a CURRENT value:
  *  it has no purchase date of its own to look up a historical rate for. */
 export function secondaryRateFrom(

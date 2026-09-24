@@ -1,7 +1,7 @@
 """Series use cases.
 
 Series are part of the shared catalog: there are no personal series, and
-creating one is an admin operation (docs/03-api-contract.md, docs/04, rule 2).
+creating one is an admin operation (docs/api.md, docs/04, rule 2).
 """
 
 from __future__ import annotations

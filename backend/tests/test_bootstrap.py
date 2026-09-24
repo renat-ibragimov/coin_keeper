@@ -191,7 +191,7 @@ async def test_series_breakdown_has_no_cap_and_keeps_the_true_total(
 async def test_dashboard_hides_a_deactivated_country_from_aggregates(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/04-business-rules.md, §13: the dashboard KPIs match what the
+    """docs/business-rules.md, §13: the dashboard KPIs match what the
     catalog and series listings show once a country is deactivated."""
     refs = ctx.refs
     await set_country_active(db_session, refs.usa, active=False)
@@ -235,7 +235,7 @@ async def test_dashboard_hides_a_deactivated_country_from_aggregates(
 async def test_dashboard_still_counts_an_unconfirmed_country(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/04-business-rules.md, §13a: the `catalog_confirmed` gate is
+    """docs/business-rules.md, §13a: the `catalog_confirmed` gate is
     `GET /catalog`-only. The dashboard is the user's own collection overview,
     so it keeps counting an unconfirmed country's coins the user owns —
     deliberately diverging from what `GET /catalog` itself would show

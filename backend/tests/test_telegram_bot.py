@@ -1,6 +1,6 @@
 """The admin bot: linking a chat, the webhook, and reports going out.
 
-The security story is the point of most of these (docs/13-admin.md, 2.5):
+The security story is the point of most of these (docs/admin.md, 2.5):
 anyone can find the bot and press Start, so what matters is that nothing
 happens without a one-time code issued to a signed-in administrator.
 """

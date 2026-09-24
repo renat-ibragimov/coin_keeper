@@ -88,7 +88,7 @@ class AuthIdentity(Base):
 
 
 class RefreshToken(Base):
-    """Stores the sha256 of the token, never the token itself (docs/07-auth.md)."""
+    """Stores the sha256 of the token, never the token itself (docs/auth.md)."""
 
     __tablename__ = "refresh_tokens"
 
@@ -145,12 +145,12 @@ class UserSettings(Base):
         Text, nullable=False, default="UNC", server_default="UNC"
     )
     # On by default: a souvenir-packaging card (catalog_items.packaging_of_id
-    # points at the bare coin, docs/04-business-rules.md) shows in catalog
+    # points at the bare coin, docs/business-rules.md) shows in catalog
     # listings until the viewer opts out.
     show_packaging_variants: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )
-    # Cross-device preferences (docs/03-api-contract.md): the client keeps a
+    # Cross-device preferences (docs/api.md): the client keeps a
     # localStorage copy for instant paint before this row is fetched, but
     # this is the value that survives a new browser or device.
     theme: Mapped[str] = mapped_column(
@@ -163,16 +163,16 @@ class UserSettings(Base):
         Text, nullable=False, default="cards", server_default="cards"
     )
     # The primary amount stays UAH everywhere (it is the ledger currency —
-    # every purchase and expense converts to it, docs/04-business-rules.md);
+    # every purchase and expense converts to it, docs/business-rules.md);
     # this only picks which already-computed historical/live conversion
     # ("≈ $" today) shows alongside it. USD or EUR only: NBU rate history
-    # covers just those two (docs/03-api-contract.md).
+    # covers just those two (docs/api.md).
     secondary_currency: Mapped[str] = mapped_column(
         Text, nullable=False, default="USD", server_default="USD"
     )
     # Whether delivery/holder/grading count toward "Куплено загалом" and the
     # value-change figure, or stay a separate informational line next to
-    # them (docs/04-business-rules.md, rule 4). On by default.
+    # them (docs/business-rules.md, rule 4). On by default.
     include_supporting_expenses: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default="true"
     )

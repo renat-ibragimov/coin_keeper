@@ -62,7 +62,7 @@ class CollectionItem(Base):
     # NO ACTION, not RESTRICT: the rule "no deleting an item that has coins"
     # lives in the service layer, so this key is only a backstop — and unlike
     # RESTRICT, NO ACTION can be deferred if a future transaction needs to
-    # re-point coins between catalog items. See docs/02-data-model.md.
+    # re-point coins between catalog items. See docs/data-model.md.
     catalog_item_id: Mapped[int] = mapped_column(
         ForeignKey("catalog_items.id", ondelete="NO ACTION"), nullable=False
     )
@@ -135,7 +135,7 @@ class Expense(Base):
     # supporting expense (delivery, holder, grading...) SET NULL *is* the
     # intended behavior: the service never deletes it, so this FK is how
     # deleting the instance detaches it without losing the money spent.
-    # docs/04-business-rules.md, rules 4 and 10.
+    # docs/business-rules.md, rules 4 and 10.
     collection_item_id: Mapped[int | None] = mapped_column(
         ForeignKey("collection_items.id", ondelete="SET NULL")
     )

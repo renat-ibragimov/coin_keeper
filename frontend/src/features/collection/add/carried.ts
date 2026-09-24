@@ -7,7 +7,7 @@ import { todayIso } from '@/shared/lib/format';
  * purchase calls them price / currency / date / seller / note, an expense
  * amount / currency / date / vendor / description. Someone who typed the
  * sum and the date and then realised they had picked the wrong type should
- * not have to type them again (docs/08-ui-map.md).
+ * not have to type them again (docs/ui.md).
  */
 export interface CarriedValues {
   amount: string;

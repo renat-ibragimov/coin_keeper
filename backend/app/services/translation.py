@@ -1,4 +1,4 @@
-"""One short phrase, translated by Claude Haiku (docs/05-integrations.md).
+"""One short phrase, translated by Claude Haiku (docs/integrations.md).
 
 Single calls for single user-typed phrases, meant to run detached from the
 request in a FastAPI BackgroundTask right after the row is saved: never block

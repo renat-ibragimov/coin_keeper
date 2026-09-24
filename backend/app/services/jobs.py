@@ -1,7 +1,7 @@
 """Job run reporting: a scheduled job tells the application what it did.
 
 The reporter is the job itself, running elsewhere -- the nightly price step
-lives in the coin-parser repository and its own container (docs/13-admin.md).
+lives in the coin-parser repository and its own container (docs/admin.md).
 It opens a run before starting and closes it with the outcome, so this service
 is deliberately thin: it stores what it is told and does not second-guess the
 counters.

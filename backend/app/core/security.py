@@ -1,6 +1,6 @@
 """Password hashing, JWT access tokens and opaque token generation.
 
-Rules come from docs/07-auth.md: argon2id for passwords, HS256 for access
+Rules come from docs/auth.md: argon2id for passwords, HS256 for access
 tokens, and only sha256 digests of refresh and one-time tokens reach the
 database.
 """

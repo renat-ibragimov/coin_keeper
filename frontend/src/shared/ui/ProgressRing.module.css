@@ -11,7 +11,7 @@
 }
 
 /* A muted track and restrained brass on it: the ring is a reading, not a
- * highlight (docs/08-ui-map.md). */
+ * highlight (docs/ui.md). */
 .track {
   fill: none;
   stroke: var(--color-border);

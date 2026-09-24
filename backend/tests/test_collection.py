@@ -431,8 +431,8 @@ async def test_date_range_filter(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
     """`dateFrom`/`dateTo` narrow by `issue_date`, falling back to `issue_year`
-    when a position's coin only has the year (docs/03-api-contract.md,
-    docs/02-data-model.md) — the same rule `GET /catalog` follows.
+    when a position's coin only has the year (docs/api.md,
+    docs/data-model.md) — the same rule `GET /catalog` follows.
     """
     refs = ctx.refs
     exact_date_in_range = await make_catalog_item(
@@ -568,7 +568,7 @@ async def test_position_carries_supporting_expenses_separate_from_the_spend(
 ) -> None:
     """`totalSpendUah` stays coin-only; `supportingExpensesUah` is the
     position's delivery/holder/grading total, same split as the coin card
-    (docs/03-api-contract.md)."""
+    (docs/api.md)."""
     item = await db_session.get(CatalogItem, ctx.item_id)
     assert item is not None
     instance = await add_collection_item(

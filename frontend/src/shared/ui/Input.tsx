@@ -23,7 +23,7 @@ export function Input({
   id,
   className,
   // Off by default: almost nothing here is a login field, and the browser's
-  // own memory of unrelated past inputs (docs/08-ui-map.md) has nothing to
+  // own memory of unrelated past inputs (docs/ui.md) has nothing to
   // do with a display name, a note, or a storage location. Login/register/
   // password screens pass their own real value and win, since this is a
   // default on a named prop, not a value forced after the spread below.

@@ -73,7 +73,7 @@ function decimalOrNull(value: string): string | null {
 /**
  * Resolves what was typed into a dictionary-or-own-words field: the id of the
  * row whose name it matches, or the text itself when nothing matches. Never
- * both, and an empty field is neither (docs/04-business-rules.md, §14).
+ * both, and an empty field is neither (docs/business-rules.md, §14).
  */
 function matchByName<T extends { id: number }>(
   rows: T[] | undefined,
@@ -96,13 +96,13 @@ function matchByName<T extends { id: number }>(
  * the currency, the date, the seller and the note survive switching between
  * them (`CarriedValues`) — they mean the same thing on both sides, and
  * retyping them is the kind of friction that makes people stop recording
- * things (docs/08-ui-map.md).
+ * things (docs/ui.md).
  *
  * The purchase branch is the interesting one. A coin is found by country and
  * then by name; picking a suggestion collapses the form into the usual
  * purchase view for that catalog item. Typing a name the catalog does not
  * have opens "Про монету" instead, and the purchase then carries the coin
- * with it in a single request (docs/03-api-contract.md, `newCatalogItem`).
+ * with it in a single request (docs/api.md, `newCatalogItem`).
  */
 export function AddPage() {
   const { t, i18n } = useTranslation();
@@ -126,7 +126,7 @@ export function AddPage() {
   const [extraErrors, setExtraErrors] = useState<ExtraExpenseErrors>({});
 
   // Held in the form until the purchase itself is saved: there is no
-  // instance id to upload against yet (docs/06-media-storage.md — no server
+  // instance id to upload against yet (docs/media.md — no server
   // drafts). Keyed by side, not a fixed pair, so "no photo picked" needs no
   // sentinel value.
   const [pendingPhotos, setPendingPhotos] = useSessionDraft<Partial<Record<CoinSide, Blob>>>(
@@ -253,7 +253,7 @@ export function AddPage() {
     },
   });
 
-  /** Either a reference to a catalog item or the coin itself (docs/03-api-contract.md). */
+  /** Either a reference to a catalog item or the coin itself (docs/api.md). */
   function purchaseBody(values: PurchaseValues): CollectionItemCreate {
     // Already validated by `validateExtras` — the submission would not have
     // got this far otherwise, so the rows can be read straight off.
@@ -272,7 +272,7 @@ export function AddPage() {
   function newCatalogItem(): NewCatalogItem {
     // Material, denomination and series are each one field over "the
     // dictionary, or your own words": a typed value that matches a row goes
-    // as that row's id, anything else goes as text (docs/03-api-contract.md).
+    // as that row's id, anything else goes as text (docs/api.md).
     const material = matchByName(materialsQuery.data, coinFields.material, (row) => row.name);
     const denomination = matchByName(
       denominationsQuery.data,

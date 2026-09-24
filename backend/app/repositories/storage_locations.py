@@ -1,4 +1,4 @@
-"""Data access for the storage-location dictionary (docs/02-data-model.md)."""
+"""Data access for the storage-location dictionary (docs/data-model.md)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Shared wire types: money as strings, paginated envelopes (docs/03-api-contract.md)."""
+"""Shared wire types: money as strings, paginated envelopes (docs/api.md)."""
 
 from __future__ import annotations
 

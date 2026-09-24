@@ -120,7 +120,7 @@ function LocaleCacheReset() {
 /**
  * The app never restores scroll position across navigations — a new route
  * should land at the top, not wherever the previous page was scrolled to
- * (docs/08-ui-map.md).
+ * (docs/ui.md).
  *
  * Keyed on pathname alone, not the query string: a search-string change on
  * the SAME path covers both "a new page of results" (pagination) and "the

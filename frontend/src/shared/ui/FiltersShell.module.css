@@ -1,6 +1,6 @@
 /* One structural panel, built into the page: the hierarchy inside it comes
  * from label treatment and the recessed controls, not from extra wrappers or
- * a heading (docs/08-ui-map.md). */
+ * a heading (docs/ui.md). */
 .panel {
   display: flex;
   flex-direction: column;
@@ -116,7 +116,7 @@
    * flush against the page's own edge padding, which on a phone lands right
    * inside iOS's edge-swipe-back zone. A tap on the leftmost control (the
    * view switch) then reads as a system back-swipe and leaves the page
-   * instead of switching it (docs/08-ui-map.md). The extra inset only has
+   * instead of switching it (docs/ui.md). The extra inset only has
    * to clear that zone; nothing here is meant to look indented. */
   .toolbar {
     padding-left: var(--space-2);

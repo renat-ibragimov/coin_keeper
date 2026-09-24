@@ -24,7 +24,7 @@ function readStoredView(key: string): ViewMode | undefined {
 /**
  * Remembers which view (cards or table) the viewer last picked for a page.
  *
- * `user_settings.{catalog,collection}_view_mode` (docs/03-api-contract.md) is
+ * `user_settings.{catalog,collection}_view_mode` (docs/api.md) is
  * the value that survives a new browser or device; localStorage is only a
  * fast local cache so a returning visit doesn't wait on the network before
  * picking a default. The URL stays authoritative over both: an explicit

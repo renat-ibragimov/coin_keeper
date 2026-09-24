@@ -2,7 +2,7 @@
 
 `POST /collection` with `newCatalogItem` creates the personal catalog item,
 the instance and the coin_purchase expense in one transaction
-(docs/04-business-rules.md, rule 4). What the tests here are actually about
+(docs/business-rules.md, rule 4). What the tests here are actually about
 is that "one transaction" — a purchase rejected for a missing rate must not
 leave a coin nobody bought behind.
 """
@@ -134,7 +134,7 @@ async def test_new_coin_creates_item_instance_and_expense(
 async def test_missing_rate_leaves_no_catalog_item_behind(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """The whole reason the request is composite (docs/03-api-contract.md)."""
+    """The whole reason the request is composite (docs/api.md)."""
     before = await _catalog_count(db_session)
     response = await client.post(
         "/api/v1/collection",
@@ -298,7 +298,7 @@ async def test_a_coin_of_a_country_with_no_dictionaries_keeps_its_own_words(
 ) -> None:
     """An Austrian 5 euro: the denominations table has nothing for that
     country and neither does the series list, so both are typed in
-    (docs/04-business-rules.md, §14, owner 2026-09-14)."""
+    (docs/business-rules.md, §14, owner 2026-09-14)."""
     austria = await country_by_code(db_session, "AT")
     coin = coin_payload(
         austria.id,
@@ -342,7 +342,7 @@ async def test_a_hand_entered_coin_describes_itself_in_three_parts(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
     """The form collects one catalogue number and three descriptions; the
-    descriptions land in `descriptions` in the shape docs/02-data-model.md
+    descriptions land in `descriptions` in the shape docs/data-model.md
     fixes — both locales, all three parts, null where there is no text."""
     coin = coin_payload(
         ctx.refs.ukraine.id,
@@ -386,7 +386,7 @@ async def test_a_coin_described_nowhere_leaves_the_column_untouched(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
     """NULL means "the parser has not been here", and a row of nulls does
-    not mean that (docs/02-data-model.md)."""
+    not mean that (docs/data-model.md)."""
     response = await client.post(
         "/api/v1/collection",
         json=purchase(coin_payload(ctx.refs.ukraine.id)),

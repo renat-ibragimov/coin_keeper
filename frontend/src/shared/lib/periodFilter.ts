@@ -22,7 +22,7 @@ function intOrUndefined(raw: string | null): number | undefined {
 
 /**
  * Parses the period.* query params shared by the catalog and collection
- * filters (docs/03-api-contract.md). A missing `periodMode` falls back to
+ * filters (docs/api.md). A missing `periodMode` falls back to
  * "yearRange" when `yearFrom`/`yearTo` are present — the shape every link
  * shared before this filter existed already has — and to the empty default
  * otherwise, so old links keep resolving to the same listing.
@@ -65,7 +65,7 @@ export function serializePeriod(params: URLSearchParams, period: PeriodFilterVal
  * exact year collapses to a one-year `yearFrom`/`yearTo`, "year range" sends
  * them as-is, and "date range" sends `dateFrom`/`dateTo` instead — narrowing
  * by `issue_date` with a fallback to `issue_year` when a coin only has the
- * year (docs/03-api-contract.md). One function, not one per mode: a caller
+ * year (docs/api.md). One function, not one per mode: a caller
  * that read `dateFrom`/`dateTo` straight off `period` would leak a stale
  * date range into the request even while mode is "year" — switching modes
  * keeps the other modes' own values around instead of clearing them

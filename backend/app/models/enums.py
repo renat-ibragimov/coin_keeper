@@ -1,6 +1,6 @@
 """Database enum types.
 
-Values mirror docs/02-data-model.md exactly; the native PostgreSQL type names are
+Values mirror docs/data-model.md exactly; the native PostgreSQL type names are
 used by the initial migration.
 """
 
@@ -30,7 +30,7 @@ class MediaRole(enum.StrEnum):
 
 
 class MediaSource(enum.StrEnum):
-    """Where an image came from. Drives visibility, see docs/06-media-storage.md."""
+    """Where an image came from. Drives visibility, see docs/media.md."""
 
     USER_UPLOAD = "user_upload"
     UCOIN = "ucoin"
@@ -40,7 +40,7 @@ class MediaSource(enum.StrEnum):
 
 
 class TranslationSource(enum.StrEnum):
-    """Where a translated name came from (docs/02-data-model.md).
+    """Where a translated name came from (docs/data-model.md).
 
     Only the translated slots carry it: `*_original` is the issuer's own
     wording and is never translated, so it has no source.

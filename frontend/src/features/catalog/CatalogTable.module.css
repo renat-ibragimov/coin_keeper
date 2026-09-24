@@ -4,7 +4,7 @@
 
 /* Owned rows catch the eye scanning the table, same tint as the catalog's
  * card grid; the leading icon column below carries the same information as
- * text/icon, not colour alone (docs/08-ui-map.md). An owned row must still
+ * text/icon, not colour alone (docs/ui.md). An owned row must still
  * visibly answer a hover, but without losing its green tint entirely, so it
  * hands the shared table a blended tone of its own rather than fighting it
  * for the rule. */
@@ -54,7 +54,7 @@
 /* Fixed shares rather than whatever this page's text happens to measure: the
  * columns then stay put from page to page and rows keep one height. They add
  * up to less than the full width — what is left goes to the actions column,
- * whose button is the widest thing in it (docs/08-ui-map.md). */
+ * whose button is the widest thing in it (docs/ui.md). */
 .coinColumn {
   width: 24%;
 }
@@ -117,7 +117,7 @@
 
 /* Same two-line window as the grid card's title: the coin column is capped
  * (.coinColumn) so a long name clamps with an ellipsis instead of stretching
- * the column and squeezing the columns beside it (docs/08-ui-map.md). */
+ * the column and squeezing the columns beside it (docs/ui.md). */
 .coinTitle {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -145,7 +145,7 @@
 }
 
 /* Country and series read as context for the coin name, not competition
- * for it — a quieter tone than the primary text (docs/08-ui-map.md). */
+ * for it — a quieter tone than the primary text (docs/ui.md). */
 .secondary {
   color: var(--color-text-secondary);
 }
@@ -172,7 +172,7 @@
 
 /* Same shape as the grid card's owned footer, scaled down for a table row:
  * one pill, "+1" felt as an inset action on it rather than a second button
- * (docs/08-ui-map.md). */
+ * (docs/ui.md). */
 .ownedPill {
   display: inline-flex;
   align-items: center;

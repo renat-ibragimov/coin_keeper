@@ -36,7 +36,7 @@
 }
 
 /* Touch: a finger needs the full 44px even where a mouse is happy with 42
- * (docs/08-ui-map.md — every screen is a phone screen first). */
+ * (docs/ui.md — every screen is a phone screen first). */
 @media (pointer: coarse) {
   .md {
     min-height: 44px;

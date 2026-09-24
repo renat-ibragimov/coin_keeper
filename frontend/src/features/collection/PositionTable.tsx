@@ -24,7 +24,7 @@ interface PositionTableProps {
 
 // Widths of their own, for the same reason as the catalogue table: measured
 // per page, the same series wrapped onto a different number of lines from one
-// page to the next and rows changed height with it (docs/08-ui-map.md).
+// page to the next and rows changed height with it (docs/ui.md).
 const COLUMNS: { key: string; sort: CollectionSort; className: string | undefined }[] = [
   { key: 'catalog.tableCoin', sort: 'title', className: styles.coinColumn },
   { key: 'catalog.tableCountry', sort: 'country', className: styles.countryColumn },
@@ -87,7 +87,7 @@ export function PositionTable({
                     </Link>
                     {/* The badge rides on the meta line rather than under it: a
                      * line of its own made an archived position's row taller
-                     * than every other (docs/08-ui-map.md). */}
+                     * than every other (docs/ui.md). */}
                     <span className={styles.coinMeta}>
                       {[String(item.year), item.denomination].filter(Boolean).join(' · ')}
                       {isRecentRelease(item.issueDate) ? (

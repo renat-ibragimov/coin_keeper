@@ -1,4 +1,4 @@
-"""Rate limiting (docs/07-auth.md).
+"""Rate limiting (docs/auth.md).
 
 Enforced from day one: registration is open, so an unprotected login endpoint
 would be brute-forced overnight.

@@ -1,6 +1,6 @@
 """Application settings, sourced only from environment variables.
 
-Mirrors the configuration block in docs/10-infra.md. Nothing here has a real
+Mirrors the configuration block in docs/infra.md. Nothing here has a real
 value as a default: secrets come from the environment, never from the code.
 """
 
@@ -27,14 +27,14 @@ class Settings(BaseSettings):
     # --- object storage ---
     s3_endpoint: str = Field(alias="S3_ENDPOINT")
     # Signs presigned URLs against a browser-reachable host instead of the
-    # docker-network one, when the two differ (docs/06-media-storage.md).
+    # docker-network one, when the two differ (docs/media.md).
     s3_public_endpoint: str | None = Field(default=None, alias="S3_PUBLIC_ENDPOINT")
     s3_bucket: str = Field(default="coinkeeper-media", alias="S3_BUCKET")
     s3_access_key: str = Field(alias="S3_ACCESS_KEY")
     s3_secret_key: str = Field(alias="S3_SECRET_KEY")
     s3_region: str = Field(default="us-east-1", alias="S3_REGION")
 
-    # --- auth, docs/07-auth.md ---
+    # --- auth, docs/auth.md ---
     allow_registration: bool = Field(default=True, alias="ALLOW_REGISTRATION")
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     refresh_cookie_name: str = "coinkeeper_refresh"
     cookie_secure: bool = Field(default=True, alias="COOKIE_SECURE")
 
-    # --- mail, docs/10-infra.md ---
+    # --- mail, docs/infra.md ---
     mail_backend: Literal["console", "smtp"] = Field(default="console", alias="MAIL_BACKEND")
     smtp_host: str = Field(default="", alias="SMTP_HOST")
     smtp_port: int = Field(default=587, alias="SMTP_PORT")
@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     )
     uacoins_base: str = Field(default="https://www.ua-coins.info", alias="UACOINS_BASE")
 
-    # --- admin telegram bot, docs/13-admin.md ---
+    # --- admin telegram bot, docs/admin.md ---
     # No token means the bot is switched off: messages go to the log and the
     # webhook refuses everything, so a dev machine can never reach a real chat.
     telegram_bot_token: str = Field(default="", alias="TELEGRAM_BOT_TOKEN")
@@ -82,7 +82,7 @@ class Settings(BaseSettings):
     support_telegram_setup_secret: str = Field(default="", alias="SUPPORT_TELEGRAM_SETUP_SECRET")
     support_telegram_link_ttl_minutes: int = 15
 
-    # --- job reporting, docs/13-admin.md ---
+    # --- job reporting, docs/admin.md ---
     # Shared with the coin-parser container, which reads it from the same
     # .env this stack uses. Empty means job reporting is switched off and the
     # internal endpoint refuses everything.

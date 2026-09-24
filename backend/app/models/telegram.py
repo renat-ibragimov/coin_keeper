@@ -1,4 +1,4 @@
-"""Who the admin bot talks to (docs/13-admin.md, 2.5)."""
+"""Who the admin bot talks to (docs/admin.md, 2.5)."""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ class TelegramRecipient(Base):
 
     A row can only appear through a one-time link code issued to a signed-in
     administrator, which is what keeps strangers out: anyone can find the bot
-    and press Start, but without a code nothing happens (docs/13-admin.md).
+    and press Start, but without a code nothing happens (docs/admin.md).
     """
 
     __tablename__ = "telegram_recipients"

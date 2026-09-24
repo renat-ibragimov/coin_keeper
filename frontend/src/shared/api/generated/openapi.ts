@@ -119,7 +119,7 @@ export interface paths {
         /**
          * Create Telegram Link
          * @description A one-time code wrapped in a t.me link. Pressing Start in that chat is
-         *     what actually connects it (docs/13-admin.md, 2.5).
+         *     what actually connects it (docs/admin.md, 2.5).
          */
         post: operations["create_telegram_link_api_v1_admin_telegram_link_post"];
         delete?: never;
@@ -402,7 +402,7 @@ export interface paths {
          *
          *     The same rows `GET /catalog` returns and the same layer visibility —
          *     shared records plus the user's own personal items, active ones only —
-         *     with the storefront rule switched off entirely (docs/04-business-rules.md,
+         *     with the storefront rule switched off entirely (docs/business-rules.md,
          *     §13). The field sits under a country the collector just chose out of every
          *     issuer there has ever been, so a coin of a country the catalogue project
          *     has not confirmed still has to be findable by name; not finding it means a
@@ -427,7 +427,7 @@ export interface paths {
         /**
          * List Catalog Materials
          * @description Materials the material filter offers on `GET /catalog` — only what a
-         *     `catalog_confirmed` item actually uses (docs/04-business-rules.md, §14).
+         *     `catalog_confirmed` item actually uses (docs/business-rules.md, §14).
          */
         get: operations["list_catalog_materials_api_v1_catalog_materials_get"];
         put?: never;
@@ -677,7 +677,7 @@ export interface paths {
          *     envelope, and a repeated upload of the same bytes lands on the same key.
          *
          *     Always a new `media_files` row bound to this collection item, never a
-         *     write to the catalog's own media (docs/06-media-storage.md) — the
+         *     write to the catalog's own media (docs/media.md) — the
          *     invariant lives in CollectionPhotoService, not here.
          */
         put: operations["set_photo_api_v1_collection__item_id__photos__role__put"];
@@ -903,7 +903,7 @@ export interface paths {
          *     the catalog's own filter panel — a harder, separate gate (§13a).
          *
          *     `minYear`/`maxYear` are the issue-year bounds of the catalog items
-         *     actually visible to this user in that country (docs/03-api-contract.md) —
+         *     actually visible to this user in that country (docs/api.md) —
          *     feeds the year filter's dropdown range, not a global catalog fact.
          */
         get: operations["list_countries_api_v1_countries_get"];
@@ -970,7 +970,7 @@ export interface paths {
         };
         /**
          * List Edge Types
-         * @description The edge dictionary behind `edgeTypeId` (docs/04-business-rules.md, §14).
+         * @description The edge dictionary behind `edgeTypeId` (docs/business-rules.md, §14).
          */
         get: operations["list_edge_types_api_v1_edge_types_get"];
         put?: never;
@@ -1547,7 +1547,7 @@ export interface components {
         /**
          * CoinDescriptions
          * @description The coin-collector parser's text for the requested locale
-         *     (docs/02-data-model.md). Any of the three may still be null — the parser
+         *     (docs/data-model.md). Any of the three may still be null — the parser
          *     writes the key regardless of whether it found text for it.
          */
         CoinDescriptions: {
@@ -1607,7 +1607,7 @@ export interface components {
         /**
          * CollectionItemCreate
          * @description A purchase of a coin the catalog already has, or of one it does not
-         *     (docs/03-api-contract.md, `POST /collection`).
+         *     (docs/api.md, `POST /collection`).
          *
          *     `newCatalogItem` is what the "Додати" form sends when the collector typed
          *     a name the catalog search did not find: the personal item, the instance
@@ -1739,7 +1739,7 @@ export interface components {
          *
          *     The grid and table listing shows positions, not individual purchases —
          *     those live in the per-purchase CollectionItemOut, reachable one at a
-         *     time via GET/PATCH/DELETE /collection/{id} (docs/03-api-contract.md).
+         *     time via GET/PATCH/DELETE /collection/{id} (docs/api.md).
          */
         CollectionPositionOut: {
             /** Catalogitemid */
@@ -1787,7 +1787,7 @@ export interface components {
         /**
          * CountryOut
          * @description `name` is the country in the requested locale; the slots are all there
-         *     too, so a form can search by any of them (docs/03-api-contract.md).
+         *     too, so a form can search by any of them (docs/api.md).
          */
         CountryOut: {
             /** Id */
@@ -2216,7 +2216,7 @@ export interface components {
          * @description A personal catalog item entered by hand on the "Додати" form.
          *
          *     A subset of CatalogItemCreate, not that schema itself, and the three
-         *     differences are the point (docs/03-api-contract.md, `POST /collection`):
+         *     differences are the point (docs/api.md, `POST /collection`):
          *
          *     * no `shared` — this record is always personal. The shared catalog is
          *       read-only for everyone but an admin editing it deliberately, and the
@@ -2578,7 +2578,7 @@ export interface components {
         /**
          * StorageLocationOut
          * @description A name, not an id: the client never tracks storage-location ids
-         *     (docs/04-business-rules.md). `custom` is true for the owner's own entry —
+         *     (docs/business-rules.md). `custom` is true for the owner's own entry —
          *     only those can be deleted; the four system presets cannot.
          */
         StorageLocationOut: {
@@ -2623,7 +2623,7 @@ export interface components {
         };
         /**
          * TranslationSource
-         * @description Where a translated name came from (docs/02-data-model.md).
+         * @description Where a translated name came from (docs/data-model.md).
          *
          *     Only the translated slots carry it: `*_original` is the issuer's own
          *     wording and is never translated, so it has no source.

@@ -1,6 +1,6 @@
 """Read access to shared reference tables.
 
-Reference data is common to everyone (docs/07-auth.md), so unlike the catalog
+Reference data is common to everyone (docs/auth.md), so unlike the catalog
 repositories nothing here is scoped to a user.
 """
 
@@ -34,7 +34,7 @@ class ReferenceRepository:
         self, *, active_only: bool = True, confirmed_only: bool = False
     ) -> Sequence[Country]:
         """Active countries drive the storefront; the personal-item form asks
-        for all of them (docs/04-business-rules.md). `confirmed_only` is the
+        for all of them (docs/business-rules.md). `confirmed_only` is the
         catalog's own filter panel — a harder, separate gate (§13a): only a
         `catalog_confirmed` country is worth offering there at all."""
         query = select(Country)
@@ -64,7 +64,7 @@ class ReferenceRepository:
         `CatalogRepository.list_confirmed_materials`: offer only what a
         catalog item actually visible to this user could match, not the
         whole shared dictionary (a denomination can go orphaned when items
-        get merged/reassigned in the Ukraine pipeline, see docs/05-integrations.md)."""
+        get merged/reassigned in the Ukraine pipeline, see docs/integrations.md)."""
         query = select(Denomination).where(Denomination.is_active)
         if country_id is not None:
             query = query.where(Denomination.country_id == country_id)
@@ -99,7 +99,7 @@ class ReferenceRepository:
         Wider than `GET /catalog/materials`, which offers only what a
         confirmed item actually uses: that one narrows a filter to what can
         be found, this one fills a form where the coin does not exist yet
-        (docs/03-api-contract.md)."""
+        (docs/api.md)."""
         name = Material.name_uk if self._locale == LOCALE_UK else Material.name_en
         result = await self._session.execute(select(Material).order_by(name))
         return result.scalars().all()

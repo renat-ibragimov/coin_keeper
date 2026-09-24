@@ -1,6 +1,6 @@
 """User photos of a collection instance: upload, replace, remove — and the
 one thing that must never happen, the catalog's own media staying untouched
-(docs/06-media-storage.md, "Происхождение изображений").
+(docs/media.md, "Происхождение изображений").
 
 Storage is an in-memory stand-in patched over both `_storage()` singletons
 that ever hand out a bucket client: `collection_photos` (where the service
@@ -182,7 +182,7 @@ async def test_upload_replace_and_remove_an_instance_photo(
 
 def transparent_circle_png(*, size: int = 900) -> bytes:
     """A round, browser-cropped coin photo: opaque circle, transparent corners
-    (docs/06-media-storage.md — the round crop's own alpha channel)."""
+    (docs/media.md — the round crop's own alpha channel)."""
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     ImageDraw.Draw(image).ellipse((0, 0, size - 1, size - 1), fill=(40, 90, 160, 255))
     buffer = io.BytesIO()

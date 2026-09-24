@@ -3,7 +3,7 @@
  * the same sort control (owner, 2026-09-09 — three tables had drifted into
  * three sets of paddings and one of them had no sorting at all). A feature
  * keeps only what is its own: column widths and the look of its cells'
- * content (docs/08-ui-map.md). */
+ * content (docs/ui.md). */
 .scroll {
   overflow-x: auto;
   border: 1px solid var(--color-border);

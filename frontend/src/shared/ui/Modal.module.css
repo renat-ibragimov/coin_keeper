@@ -47,7 +47,7 @@
 }
 
 /* A dialog heading names an interface action, so it stays in the body face
- * (docs/08-ui-map.md). */
+ * (docs/ui.md). */
 .title {
   font-size: 20px;
 }

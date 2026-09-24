@@ -1,6 +1,6 @@
 /* A raised card with a deliberately minimal shadow: four of these sit in a
  * row and a full card shadow on each turns the row into a ledge of boxes
- * (docs/08-ui-map.md). */
+ * (docs/ui.md). */
 .tile {
   display: flex;
   gap: var(--space-3);

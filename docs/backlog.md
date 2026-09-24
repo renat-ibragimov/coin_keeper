@@ -1,5 +1,49 @@
 # Backlog — замечания и отложенные задачи
 
+## Production hardening (open)
+
+Operational work left after the MVP. Most of it is server state, not repository code.
+
+- [ ] **Backups.** No backup script, cron or CI step exists; only manual `pg_dump`
+      before risky migrations. Needs scheduled Postgres + MinIO backups off the server.
+- [ ] **Restore check.** No restore script or test. A backup counts only once it has
+      been restored and record counts compared.
+- [ ] **Watchdog cron.** `backend/scripts/watchdog.py` is ready (`admin.md`); the
+      server crontab entry isn't installed yet.
+- [ ] **Security checklist.** Done: Postgres/Redis/MinIO ports closed in prod compose,
+      CORS limited to the frontend origin. Not done: unattended security upgrades;
+      firewall and key-only SSH not verified; no deep audit of secrets in logs.
+- [ ] **Real SMTP.** Confirm the server runs a real `MAIL_BACKEND`, not `console`, so a
+      stranger can register, get the email and verify (`infra.md`).
+- [ ] **dev/prod split.** Prod `numismatics.bakost.club`, dev stays on
+      `coins.renat-ibragimov.com`; duplicate DB and media; first promotion = the
+      Ukrainian catalog and the owner's collection; match records by `source_key`, not
+      `id` (`infra.md`).
+- [ ] **Repository move** to `bakost-numismatics`: rename the `coinkeeper` identifier
+      (packages, containers, image, compose, CI secrets); decide public vs private.
+- [ ] **Ukrainian emails.** Verification and reset emails are English only
+      (`backend/app/core/mail/messages.py`), while the interface defaults to
+      Ukrainian. Send them in the user's locale.
+- [ ] **PWA service worker** — manifest and icons ship; there's no offline cache.
+      Close without it unless offline use is wanted.
+
+## Deferred features (post-MVP)
+
+Not scheduled. Pick up only on an explicit decision.
+
+| Feature | Note |
+|---|---|
+| Shared-catalog editor in `/admin` | `edited_fields`, audit log, all locales, archiving from UI. Admins can already `PATCH /catalog/{id}` without UI or audit. |
+| Promote a personal position to the shared catalog | once it's clear what users create |
+| Merge shared-catalog duplicates, re-pointing instances | until then duplicates are archived with a reason |
+| uCoin import (Excel, coin or section by URL) | on user request only, never scheduled |
+| Collection export to Excel | |
+| Manual market price entry, price refresh for personal positions | the central daily UA-Coins job stays |
+| Sales, collecting goals, purchase offers, varieties | if a need appears |
+| Numista | only with the user's own API key; would cover US and USSR prices |
+| Other countries on the Ukrainian template (US next) | via `coin-parser` |
+| Mobile apps (React Native / Expo) | after the API stabilises |
+
 Плоский список «замечено → что сделать → когда». Пополняется по ходу; закрытые
 пункты помечаются ✅ с коммитом. Клод-код: если трогаешь экран/модуль, к которому
 относится пункт, — закрой его тем же изменением и отметь здесь.
@@ -112,7 +156,7 @@
       этапом с Playwright (импорт по ссылке uCoin) — пересмотреть: апгрейд тарифа
       или отдельный сервер.
 - [ ] Compose центрального Caddy (`/srv/caddy`) — вне репы. Задокументировать
-      в `10-infra.md` его содержимое и монты (Caddyfile, frontend `:ro`).
+      в `infra.md` его содержимое и монты (Caddyfile, frontend `:ro`).
 
 ## Данные и источники
 
@@ -148,13 +192,13 @@
       `missing original` (легаси-США июньской миграции, схема имён без
       размерных вариантов, `legacy-N.webp`). Владелец пока не просит («штаты
       соберу отдельно»).
-- [ ] Хвосты доки/валидаций по этапу 4.5: `docs/06-media-storage.md`
+- [ ] Хвосты доки/валидаций по этапу 4.5: `docs/media.md`
       синхронизировать с фиксом видимости фото ua-coins (не сделано тем же
       коммитом — нарушение правила «доки живут вместе с кодом»); ридеру
       link-CSV — добавить проверку существования `itemId` (сейчас
       FK-трейсбек); шумный грамматический разнобой банкнот («видана/випущена»)
       — поправить при разборе банкнот.
-- [ ] `photo-upgrade` (`05-integrations.md`, раздел 13) довесок отчёта —
+- [ ] `photo-upgrade` (`integrations.md`, раздел 13) довесок отчёта —
       дубли `title_original` + `issue_year` в 2+ активных записях («Український
       борщ» ×2 и подобные) — разобрать руками после первого боевого прогона:
       это либо настоящий дубль (в `merge.py`), либо два разных выпуска с
@@ -181,7 +225,7 @@
       `commemorative` вручную SQL-ом в обход `circ-reclassify` — NBU-связи у
       них нет вообще, `is_nbu_linked` их не видит и не увидит.
 - [x] ✅ **Фикс: `circulation` была загрязнена памятными NBU-связанными
-      монетами, 2026-09-04.** Эвристика `groupFor` (`04-business-rules.md`,
+      монетами, 2026-09-04.** Эвристика `groupFor` (`business-rules.md`,
       п.11) отправляла в `circulation` юбилейные обиходные 1 грн (2004–2016) и
       карбованцевые памятные 1995–1996 — обе группы уже связаны с
       нумизматическим каталогом НБУ. Добавлен шаг `circ-reclassify` (первый в
@@ -189,7 +233,7 @@
       предохранитель (`OurItem.is_nbu_linked` / `catalog.nbu_linked_ids()`) во
       всех остальных пяти шагах — NBU-связанная запись не кандидат моста, не
       занимает слот в `circ-gaps`, не трогается `circ-titles`/`circ-mintage`/
-      `circ-photos` (`05-integrations.md`, раздел 10). Попутно —
+      `circ-photos` (`integrations.md`, раздел 10). Попутно —
       `circ_nbu.pick_card` теперь сравнивает заголовки после NFC-нормализации
       и схлопывания nbsp. Прогнан в бою вместе с прогоном выше (191 запись).
 - [x] ✅ **Фикс: 1 гривня 2004–2016 несла фото чужого дизайна, 2026-09-04.**
@@ -226,7 +270,7 @@
       (луганская пробная партия) вместо 610 000 300. `usable_count` теперь
       складывает записи без метки образца по ключу; записи с меткой
       (переход гривны 2018/2001 года — единственная в таблице) по-прежнему
-      выбираются `subtype`, не складываются (`05-integrations.md`, раздел
+      выбираются `subtype`, не складываются (`integrations.md`, раздел
       10). Рычаг `--circ-refresh-mintage` (`backend/README.md`) пересчитывает
       и перезаписывает уже заполненные боевые записи; довогон против базы
       владельца ещё не выполнен — см. «Остаточные хвосты» ниже. Заодно
@@ -242,7 +286,7 @@
       готова, миграция не понадобилась), фикс `type_for`/subtype и
       `circ_mintage._PATTERN_BY_SUBTYPE`, `jubilee-bridge`, `ua_coins_id` в
       `circ_types.py`, `inventory-b` — код и тесты готовы
-      (`05-integrations.md`, раздел 10, подраздел «Варианты, тройка 2018
+      (`integrations.md`, раздел 10, подраздел «Варианты, тройка 2018
       года…»; `backend/README.md`, шаги 3b/7/8). Боевой прогон против базы
       владельца ещё не выполнен — три пункта ниже требуют реальных данных,
       которых у разработки нет.
@@ -267,11 +311,11 @@
       при явном лидере (одна разовая чистка, не конвейер); apply переиспользует
       `merge.apply_merges` как есть — перенос экземпляров, личных снимков цены
       и фото, архивация, идемпотентность. Код и тесты готовы
-      (`05-integrations.md`, раздел 10, подраздел «merge-b»; `backend/README.md`,
+      (`integrations.md`, раздел 10, подраздел «merge-b»; `backend/README.md`,
       шаг 9). Боевой прогон против базы владельца — за владельцем, как и
       остальные шаги части B.
 - [ ] Витринные чипы стран должны сверяться с фактом `is_active` (см.
-      `02-data-model.md`, раздел `countries`): в базе владельца активны ТРИ
+      `data-model.md`, раздел `countries`): в базе владельца активны ТРИ
       страны (id 1, 2, 3), не только Украина — найдено той же диагностикой
       2026-09-05, что и `merge-b` выше. Код витрины не менялся, только
       задокументирован факт; проверить при следующей работе над чипами
@@ -285,7 +329,7 @@
       (`100_1996`, `1-grivnya-zrazka-2018-roku`) несут только одну карточку
       до 2018 года, и это фото орнаментного дизайна 1995–2003. Механизм
       фолбэка на ua-coins.info готов (`circ_types.CoinType.ua_coins_id`,
-      `05-integrations.md`, раздел 10), но реальный id монеты на
+      `integrations.md`, раздел 10), но реальный id монеты на
       ua-coins.info не найден живьём 2026-09-05: сам сайт недоступен из
       среды разработки, а его копия в `catalog/all/all` через Wayback Machine
       не содержит отдельной строки обычной обиходной 1 гривні вообще —
@@ -304,7 +348,7 @@
       `circ-variants-review.csv` на ручное имя;
       3) `jubilee-bridge` против шести реальных записей — живая разведка
       2026-09-05 не нашла НБУ-карточки номиналом 1 гривня ни для одной из
-      шести тем (см. `05-integrations.md`, раздел 10) — возможно, поиск
+      шести тем (см. `integrations.md`, раздел 10) — возможно, поиск
       придётся расширять против настоящего `title_original` записи, а не
       только против темы из документа;
       4) девять позиций без ячейки в таблице Википедии — мост их не связал,
@@ -331,7 +375,7 @@
 - [x] ✅ Права на фото: НБУ разрешает использование «виключно з посиланням на
       першоджерело» — `attribution` заполняется всегда и показывается под фото; фото
       ua-coins берутся только там, где у НБУ своего нет, и тоже с подписью
-      (`06-media-storage.md`).
+      (`media.md`).
 - [x] ✅ Ревью `bridge-review.csv` снято как неактуальное вместе с удалением
       одноразового конвейера (см. запись выше) — ~160 пар на решение относились
       к тому боевому прогону 2026-09-04, инструмента для их разбора больше нет.
@@ -358,13 +402,13 @@
       (`title_uk`/`title_en` пуст или уже `llm`), русский `title_original`
       заменяется сгенерированным `title_uk` (сама русская строка остаётся только
       в CSV-отчёте `--translate-out`). Официальные и ручные названия не трогает.
-      `05-integrations.md`, раздел 11; `backend/README.md`. Нужен
+      `integrations.md`, раздел 11; `backend/README.md`. Нужен
       `ANTHROPIC_API_KEY` в `.env` — боевой прогон против ~80 записей и шести
       юбилейных 1 гривень (id 1330–1335) за владельцем.
 - [x] ✅ **Admin-правка названий (`titleUk`/`titleEn`/`titleOriginal`) — API готово
       (2026-09-05).** Существующий `PATCH /catalog/{id}` теперь ставит
       `*_source = 'manual'` при правке перевода и отклоняет пустую строку `422`-м
-      (`app/services/catalog.py`, `app/schemas/catalog.py`). `03-api-contract.md`,
+      (`app/services/catalog.py`, `app/schemas/catalog.py`). `api.md`,
       раздел «Правка названий».
 - [ ] Admin-правка названий: экран. Контракт и права готовы (см. выше), на
       странице записи в admin-режиме ещё нет формы правки трёх названий — по
@@ -382,7 +426,7 @@
 - [x] ✅ **Курсы НБУ: HTTP-клиент и ежедневное обновление, 2026-09-13.** Не в
       `coin_keeper` — модуль `collector/rates/` в отдельном репозитории
       `coin-parser` (тот же принцип, что уже применён к ценам UA-Coins,
-      `05-integrations.md`, раздел 1): `nbu_rates.py` — диапазонный запрос
+      `integrations.md`, раздел 1): `nbu_rates.py` — диапазонный запрос
       к `bank.gov.ua/NBUStatService`, по одному на валюту (USD, EUR);
       `update_rates.py` — `INSERT ... ON CONFLICT DO UPDATE` в
       `exchange_rates`, свежий ответ НБУ всегда перезаписывает
@@ -453,7 +497,7 @@
 ## Переезд в новую репу и разнесение dev/prod (часть MVP — решение владельца 2026-09-15)
 
 Раньше был блоком «когда MVP готов» — решением владельца 2026-09-15 весь этот блок
-внутри MVP, не постMVP-хвост (`docs/HANDOFF.md`, §3). Целевая схема — `10-infra.md`.
+внутри MVP, не постMVP-хвост (`docs/HANDOFF.md`, §3). Целевая схема — `infra.md`.
 
 - [ ] Новое имя репы (`bakost-numismatics`), домен (`numismatics.bakost.club`
       или короткий алиас), технический идентификатор `coinkeeper` → новый

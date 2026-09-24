@@ -1,4 +1,4 @@
-"""RFC 7807 problem responses (docs/03-api-contract.md)."""
+"""RFC 7807 problem responses (docs/api.md)."""
 
 from __future__ import annotations
 

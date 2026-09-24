@@ -3,7 +3,7 @@
 The formulas come from the legacy desktop app's getDashboardSnapshot/
 getFinanceSummary, with the multi-user filters applied:
 owner_id on personal tables, the visibility filter on catalog and snapshots,
-active-only completeness (docs/04-business-rules.md, rules 5, 8, 9), and
+active-only completeness (docs/business-rules.md, rules 5, 8, 9), and
 storefront visibility on every catalog-wide aggregate (§13). Unlike
 `GET /catalog`, the dashboard does not require a confirmed country (§13a):
 it is the user's own collection overview, not the catalogue browse

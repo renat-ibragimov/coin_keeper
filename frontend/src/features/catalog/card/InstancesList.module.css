@@ -48,7 +48,7 @@
   border-bottom: none;
 }
 
-/* The row doubles as the edit shortcut (docs/08-ui-map.md): a soft highlight
+/* The row doubles as the edit shortcut (docs/ui.md): a soft highlight
  * on hover is what tells a visitor the whole row is clickable, not just the
  * icon buttons at its end. */
 .row {
@@ -117,7 +117,7 @@
 }
 
 /* Square, icon-only — the labelled edit/delete buttons this replaces ate
- * the width three other columns needed (docs/08-ui-map.md). */
+ * the width three other columns needed (docs/ui.md). */
 .iconButton {
   padding: 6px;
   min-width: 32px;

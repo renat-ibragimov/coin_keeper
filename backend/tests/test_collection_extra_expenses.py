@@ -2,7 +2,7 @@
 
 `POST /collection` takes an `extraExpenses` list — delivery, a holder, a
 grading fee — and writes them in the same transaction as the coin
-(docs/04-business-rules.md, rule 4). Two properties are what these tests are
+(docs/business-rules.md, rule 4). Two properties are what these tests are
 for: nothing is written at all if any rate in the request is missing, and what
 comes out the other end is an ordinary manual expense, so deleting it later
 leaves the coin exactly where it was.
@@ -279,7 +279,7 @@ async def test_deleting_the_instance_detaches_but_keeps_the_delivery(
 ) -> None:
     """Unlike `coin_purchase`, a supporting expense is never deleted by the
     service — `collection_item_id`'s `ON DELETE SET NULL` detaches it on its
-    own, and the money stays in the journal (docs/04-business-rules.md,
+    own, and the money stays in the journal (docs/business-rules.md,
     rules 4 and 10)."""
     created = await client.post(
         "/api/v1/collection",
@@ -306,7 +306,7 @@ async def test_coin_purchase_cannot_be_listed_as_an_extra(
     client: AsyncClient, ctx: SimpleNamespace
 ) -> None:
     """The purchase writes its own coin_purchase row; a second one would double
-    the coin spending on every chart (docs/04-business-rules.md, rule 6)."""
+    the coin spending on every chart (docs/business-rules.md, rule 6)."""
     response = await client.post(
         "/api/v1/collection",
         json=purchase(

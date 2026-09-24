@@ -6,7 +6,7 @@ dimensions, so N groups cost the same three queries regardless of how many
 there are — unlike the series screen's per-series loop.
 
 Completeness: both sides of the fraction over active items visible to the
-user (docs/04-business-rules.md, rule 5). Money counts an instance of an
+user (docs/business-rules.md, rule 5). Money counts an instance of an
 archived item too (rule 10) — the same split `SeriesRepository.summary()`
 makes between the "active" and the "any state" predicate sets.
 """

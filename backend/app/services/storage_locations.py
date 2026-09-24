@@ -1,5 +1,5 @@
 """Storage-location dictionary: a handful of system presets plus whatever
-each owner types the first time (docs/04-business-rules.md).
+each owner types the first time (docs/business-rules.md).
 
 Never a direct CRUD resource for the client: a name typed into the purchase
 form or into settings is resolved here, transparently creating a personal
@@ -33,7 +33,7 @@ class StorageLocationNotFoundError(Exception):
 
 class StorageLocationForbiddenError(Exception):
     """Raised for a preset (owner_id IS NULL): shared across every account,
-    so no single user can delete one (docs/04-business-rules.md — the same
+    so no single user can delete one (docs/business-rules.md — the same
     read-only-shared-record rule as the catalog, applied to this dictionary)."""
 
 
@@ -150,7 +150,7 @@ async def translate_in_background(location_id: int) -> None:
     Every early return is logged: a silent no-op here means the location
     keeps showing the owner's typed text in both language slots forever,
     with nothing in the UI to explain why -- the only way to notice is a
-    log line (docs/04-business-rules.md, п. 16, incident 2026-09-13).
+    log line (docs/business-rules.md, п. 16, incident 2026-09-13).
     """
     api_key = get_settings().anthropic_api_key
     if not api_key:

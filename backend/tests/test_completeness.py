@@ -203,7 +203,7 @@ async def test_group_metal_kind_filter_narrows_the_summary(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
     """The metalKind filter must also reach GET /completeness/group, not only
-    /summary (docs/08-ui-map.md: Комплектність carries its filters from the
+    /summary (docs/ui.md: Комплектність carries its filters from the
     group list into the group's own detail screen)."""
     refs = ctx.refs
     series = refs.fauna
@@ -362,7 +362,7 @@ async def test_summary_metal_kind_filter_applies_to_every_dimension(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
     """The metalKind filter narrows any dimension's counts, not only the
-    "metal" groupBy tab itself (docs/08-ui-map.md: Комплектність toolbar)."""
+    "metal" groupBy tab itself (docs/ui.md: Комплектність toolbar)."""
     refs = ctx.refs
     gold_2020 = await make_catalog_item(
         db_session,

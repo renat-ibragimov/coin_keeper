@@ -1,5 +1,5 @@
 """Completeness payloads: completeness grouped by an arbitrary catalog field,
-generalizing the per-series summary (docs/03-api-contract.md)."""
+generalizing the per-series summary (docs/api.md)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Collection payloads (docs/03-api-contract.md)."""
+"""Collection payloads (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from app.schemas.common import Money, Rate
 
 class StorageLocationOut(CamelModel):
     """A name, not an id: the client never tracks storage-location ids
-    (docs/04-business-rules.md). `custom` is true for the owner's own entry —
+    (docs/business-rules.md). `custom` is true for the owner's own entry —
     only those can be deleted; the four system presets cannot."""
 
     name: str
@@ -28,7 +28,7 @@ class StorageLocationCreate(CamelModel):
 
 class CollectionSummaryOut(CamelModel):
     """The "Мої монети" KPI tiles, scoped to the page's own filters
-    (docs/08-ui-map.md) — same shape as the dashboard's unfiltered snapshot,
+    (docs/ui.md) — same shape as the dashboard's unfiltered snapshot,
     narrowed by whatever `CollectionFilters` the caller passed."""
 
     collection_items: int
@@ -44,7 +44,7 @@ class CollectionPositionOut(CamelModel):
 
     The grid and table listing shows positions, not individual purchases —
     those live in the per-purchase CollectionItemOut, reachable one at a
-    time via GET/PATCH/DELETE /collection/{id} (docs/03-api-contract.md).
+    time via GET/PATCH/DELETE /collection/{id} (docs/api.md).
     """
 
     catalog_item_id: int
@@ -91,7 +91,7 @@ class CollectionItemOut(CamelModel):
     thumbnail_url: str | None = None
     market_price_uah: Money | None = None
     # This instance's own photo where the owner uploaded one, the catalog's
-    # otherwise (docs/06-media-storage.md) — the edit page's SelectedCoin
+    # otherwise (docs/media.md) — the edit page's SelectedCoin
     # renders these, not the catalog card's, so a sibling purchase's photo
     # never appears on the wrong instance.
     obverse_image: CoinImageOut | None = None
@@ -143,7 +143,7 @@ class ExtraExpenseIn(CamelModel):
 
 class CollectionItemCreate(CamelModel):
     """A purchase of a coin the catalog already has, or of one it does not
-    (docs/03-api-contract.md, `POST /collection`).
+    (docs/api.md, `POST /collection`).
 
     `newCatalogItem` is what the "Додати" form sends when the collector typed
     a name the catalog search did not find: the personal item, the instance

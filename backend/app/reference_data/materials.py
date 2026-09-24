@@ -83,7 +83,7 @@ BARE_METAL_WORDS: dict[str, str] = {"silver": "срібло", "gold": "золо�
 # free-text `material` column from before this dictionary covered every
 # category the National Bank's own "Матеріал" filter offers -- an early run
 # left them and nothing since has revisited an already-filled column
-# (docs/09-data-migration.md). Most
+# (docs/data-model.md, "Data origins"). Most
 # already spell a code exactly (`_composition_of` resolves those on its own);
 # these are the ones that do not.
 LEGACY_RAW_ALIASES: dict[str, str] = {

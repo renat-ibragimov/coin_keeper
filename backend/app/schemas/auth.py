@@ -1,4 +1,4 @@
-"""Request and response bodies for /auth (docs/03-api-contract.md)."""
+"""Request and response bodies for /auth (docs/api.md)."""
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ class RegisterRequest(CamelModel):
     password: str | None = None
     display_name: str | None = Field(default=None, max_length=200)
     # Honeypot: invisible to people, filled in by simple bots. A filled value
-    # gets the same 202 as success and creates nothing. docs/07-auth.md.
+    # gets the same 202 as success and creates nothing. docs/auth.md.
     website: str | None = Field(default=None, max_length=200)
 
 

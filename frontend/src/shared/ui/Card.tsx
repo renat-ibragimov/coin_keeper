@@ -8,7 +8,7 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
    * "raised" (the default) is a content card that sits above the page;
    * "panel" is a structural frame built into it — filters, charts, tables,
    * the dense overview columns. The two differ in surface, radius and
-   * elevation only (docs/08-ui-map.md).
+   * elevation only (docs/ui.md).
    */
   variant?: 'raised' | 'panel';
   children: ReactNode;

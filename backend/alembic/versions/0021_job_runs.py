@@ -11,7 +11,7 @@ parser already uses ('ok', 'partial', 'failed'); only 'running' is ours.
 
 `stats` keeps the counters as the job reported them, without this schema
 having to know what a given job counts. `details` stays empty on a good run:
-per docs/13-admin.md the report is one line unless something went wrong.
+per docs/admin.md the report is one line unless something went wrong.
 
 Revision ID: 0021
 Revises: 0020

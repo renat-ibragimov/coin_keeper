@@ -55,7 +55,7 @@
   opacity: 0.6;
 }
 
-/* A crisp ring with an offset, not a glow (docs/08-ui-map.md). */
+/* A crisp ring with an offset, not a glow (docs/ui.md). */
 .trigger:focus-visible,
 .triggerOpen {
   outline: 2px solid var(--color-focus-ring);

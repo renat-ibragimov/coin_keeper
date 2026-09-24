@@ -11,7 +11,7 @@ export interface DenominatedItem {
  * The same shape as `coinMaterial`, and for the same reason — the dictionary
  * is seeded from what the catalogue actually holds, so for most issuers it
  * says nothing and the collector's own words are all there is
- * (docs/04-business-rules.md, §14).
+ * (docs/business-rules.md, §14).
  */
 export function coinDenomination(item: DenominatedItem): string | null {
   const label = item.denomination?.label.trim();

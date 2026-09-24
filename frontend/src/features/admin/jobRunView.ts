@@ -6,7 +6,7 @@ import { isStale, runDuration } from './api';
 
 /**
  * A run stuck open reads as trouble, not as work in progress: with no watchdog
- * yet, this colour is the whole alarm (docs/13-admin.md, 2.7).
+ * yet, this colour is the whole alarm (docs/admin.md, 2.7).
  */
 export function statusTone(run: JobRunOut): 'neutral' | 'success' | 'warning' | 'danger' {
   if (run.status === 'ok') return 'success';

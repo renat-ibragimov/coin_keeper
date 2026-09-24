@@ -43,7 +43,7 @@ function numberOrUndefined(raw: string): number | undefined {
 
 /**
  * Composite "period" filter — one dropdown, same trigger/menu chrome as
- * `Select`/`MultiSelect` (docs/08-ui-map.md): the panel holds a mode list
+ * `Select`/`MultiSelect` (docs/ui.md): the panel holds a mode list
  * (exact year / year range / full date range) and, below it, the field(s)
  * that mode needs. Switching modes keeps the other modes' own values in
  * `value` untouched — only the active mode's fields render, so an
@@ -272,7 +272,7 @@ export function PeriodFilter({
                   {/* A wrapping div, not a className on Input itself: Input's
                    * className lands on the <input>, one level below the box
                    * that actually needs the min-width — the flex item
-                   * `.fields` sizes as its row (docs/08-ui-map.md). Plain
+                   * `.fields` sizes as its row (docs/ui.md). Plain
                    * text, not the native `<input type="date">` these used to
                    * be: its own calendar and placeholder followed the
                    * browser's language, not the app's uk/en toggle, and no

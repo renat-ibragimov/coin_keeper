@@ -1,7 +1,7 @@
-"""Initial schema — the whole model from docs/02-data-model.md.
+"""Initial schema — the whole model from docs/data-model.md.
 
 Includes tables the MVP does not use yet, on purpose: creating them now means
-later stages add features instead of rewriting migrations (docs/01-scope-mvp.md).
+later stages add features instead of rewriting migrations (docs/scope.md).
 
 Revision ID: 0001
 Revises:
@@ -240,7 +240,7 @@ def upgrade() -> None:
         sa.Column("notes", sa.Text(), nullable=True),
         sa.Column("source_key", sa.Text(), nullable=True),
         # CASCADE, not SET NULL: deleting a user must not promote their personal
-        # items into the shared catalog. docs/02-data-model.md.
+        # items into the shared catalog. docs/data-model.md.
         sa.Column(
             "created_by",
             sa.BigInteger(),
@@ -281,7 +281,7 @@ def upgrade() -> None:
         postgresql_where=sa.text("is_archived"),
     )
     # Uniqueness of source_key: global for shared rows, per owner for personal
-    # ones. Archived rows are deliberately NOT excluded (docs/02-data-model.md).
+    # ones. Archived rows are deliberately NOT excluded (docs/data-model.md).
     op.create_index(
         "catalog_items_source_key_shared_idx",
         "catalog_items",
@@ -345,7 +345,7 @@ def upgrade() -> None:
         ),
         # NO ACTION, not RESTRICT: this key is a backstop, the rule itself lives
         # in the service layer, and NO ACTION keeps the option of deferring the
-        # check. docs/02-data-model.md.
+        # check. docs/data-model.md.
         sa.Column(
             "catalog_item_id",
             sa.BigInteger(),
@@ -515,7 +515,7 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("role", _enum("media_role"), nullable=False),
-        # Provenance drives visibility. docs/06-media-storage.md.
+        # Provenance drives visibility. docs/media.md.
         sa.Column("source", _enum("media_source"), nullable=False, server_default="user_upload"),
         sa.Column("license", sa.Text(), nullable=True),
         sa.Column("attribution", sa.Text(), nullable=True),
@@ -598,7 +598,7 @@ def upgrade() -> None:
             nullable=True,
         ),
         # SET NULL is only a backstop; the service layer deletes the
-        # coin_purchase expense explicitly. docs/04-business-rules.md, rule 10.
+        # coin_purchase expense explicitly. docs/business-rules.md, rule 10.
         sa.Column(
             "collection_item_id",
             sa.BigInteger(),
@@ -818,7 +818,7 @@ def upgrade() -> None:
             sa.ForeignKey("users.id", ondelete="CASCADE", name="fk_refresh_tokens_user_id"),
             nullable=False,
         ),
-        # sha256 of the token, never the token itself. docs/07-auth.md.
+        # sha256 of the token, never the token itself. docs/auth.md.
         sa.Column("token_hash", sa.Text(), nullable=False, unique=True),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("revoked_at", sa.DateTime(timezone=True), nullable=True),

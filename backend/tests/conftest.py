@@ -41,7 +41,7 @@ ADMIN_URL_ENV = "TEST_POSTGRES_ADMIN_URL"
 DEFAULT_ADMIN_URL = "postgresql+asyncpg://coinkeeper:devpass@localhost:5432/postgres"
 DEFAULT_REDIS_URL = "redis://localhost:6379/15"
 
-# The shared secret a scheduled job reports with (docs/13-admin.md).
+# The shared secret a scheduled job reports with (docs/admin.md).
 JOB_TOKEN = "test-job-token-not-used-anywhere-else"
 # What telegram would put in X-Telegram-Bot-Api-Secret-Token.
 WEBHOOK_SECRET = "test-webhook-secret-not-used-anywhere-else"

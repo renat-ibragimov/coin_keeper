@@ -124,7 +124,7 @@ async def test_progress_lists_every_series_with_its_summary(
 async def test_storefront_hides_series_of_deactivated_country(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/04-business-rules.md, §13: a series of a deactivated country
+    """docs/business-rules.md, §13: a series of a deactivated country
     disappears from listings unless the user already owns something in it."""
     refs = ctx.refs
     await set_country_active(db_session, refs.usa, active=False)
@@ -163,7 +163,7 @@ async def test_storefront_hides_series_of_deactivated_country(
 async def test_series_of_an_unconfirmed_country_still_shows(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/04-business-rules.md, §13a: the `catalog_confirmed` gate is
+    """docs/business-rules.md, §13a: the `catalog_confirmed` gate is
     `GET /catalog`-only. The series screens are about the user's own
     collection, so an unconfirmed country's series still shows there when
     the user actually owns something in it (owner's call, 2026-09-12)."""
@@ -188,7 +188,7 @@ async def test_series_of_an_unconfirmed_country_still_shows(
 async def test_scope_catalog_is_the_confirmed_gate_for_the_series_filter(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:
-    """docs/04-business-rules.md, §13a: `GET /series?scope=catalog` backs the
+    """docs/business-rules.md, §13a: `GET /series?scope=catalog` backs the
     catalog's own series filter — unlike the default `scope=mine`, an owned
     instance does not let an unconfirmed country's series through."""
     refs = ctx.refs

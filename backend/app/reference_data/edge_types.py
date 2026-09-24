@@ -3,7 +3,7 @@
 Seeded from what the confirmed (Ukrainian) catalogue actually contains: five
 values, carried over from the legacy collection as bare English codes
 (`reeded`, `plain_incuse_lettering`, ...) with no dictionary behind them at
-all until now (docs/04-business-rules.md, rule 14).
+all until now (docs/business-rules.md, rule 14).
 """
 
 from __future__ import annotations
@@ -30,9 +30,9 @@ EDGE_TYPES: tuple[EdgeTypeSeed, ...] = (
 
 EDGE_TYPE_CODES = frozenset(edge_type.code for edge_type in EDGE_TYPES)
 
-# The legacy collection's own raw values, each already a valid code above —
+# The imported collection's own raw values, each already a valid code above —
 # no phrase parsing needed, unlike materials, because every known raw value
-# already is a code (docs/09-data-migration.md).
+# already is a code (docs/data-model.md, "Data origins").
 LEGACY_ALIASES: dict[str, str] = {code: code for code in EDGE_TYPE_CODES}
 
 

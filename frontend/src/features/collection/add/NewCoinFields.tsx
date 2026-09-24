@@ -26,7 +26,7 @@ interface NewCoinFieldsProps {
   errors: CoinFieldErrors;
   onChange: (key: keyof CoinFields, value: string) => void;
   /** Local preview URLs of the photos picked for the coin that is about to be
-   *  created — there is no server side yet to hold them (docs/06-media-storage.md:
+   *  created — there is no server side yet to hold them (docs/media.md:
    *  the upload happens after the purchase itself is saved). */
   photos?: Partial<Record<CoinSide, string | null>>;
   onPickPhoto?: (side: CoinSide) => void;
@@ -182,7 +182,7 @@ export function NewCoinFields({
         />
         {/* The denominations dictionary is seeded from what the catalogue
             holds, so for most issuers it offers nothing — which is why this
-            is a combobox and not a select (docs/04-business-rules.md, §14). */}
+            is a combobox and not a select (docs/business-rules.md, §14). */}
         <Combobox
           label={t('add.denomination')}
           placeholder={t('add.denominationPlaceholder')}
@@ -196,7 +196,7 @@ export function NewCoinFields({
 
       <FormRow>
         {/* Picking an existing series links to the shared record — only an
-            admin creates those (docs/04-business-rules.md, rule 2). A name
+            admin creates those (docs/business-rules.md, rule 2). A name
             typed instead is kept as text: it shows on the card and counts
             towards nothing, which is what the hint says. */}
         <Combobox
@@ -346,7 +346,7 @@ export function NewCoinFields({
           />
         </FormRow>
         {/* The three parts the catalogue's own descriptions are split into
-            (docs/02-data-model.md) — the coin itself, then each side. */}
+            (docs/data-model.md) — the coin itself, then each side. */}
         <Textarea
           label={t('add.description')}
           hint={t('add.descriptionHint')}

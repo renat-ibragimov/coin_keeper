@@ -47,7 +47,7 @@ interface CoinCardProps {
   backTo?: string;
   /**
    * Series id lookup by display name. `CatalogListItem` only carries the
-   * series' name (already resolved to the interface locale, docs/03-api-contract.md),
+   * series' name (already resolved to the interface locale, docs/api.md),
    * not its id — the caller builds this from the series list it already
    * fetches for the filters panel, so the series line can link to the full
    * series page without a new request or a made-up field. Absent (or no
@@ -61,7 +61,7 @@ interface CoinCardProps {
  * grid, used identically by the catalog, a series and the missing-coins
  * list — same image treatment, same fixed-height title, same collection
  * state footer, so all three never drift apart into subtly different cards
- * again (docs/08-ui-map.md).
+ * again (docs/ui.md).
  */
 export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinCardProps) {
   const { t, i18n } = useTranslation();
@@ -104,7 +104,7 @@ export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinC
          * grid differ in price mostly by what they are made of. The material
          * sits right of the face value, shortened to two words so it never
          * takes the whole line; either half may be missing — the record
-         * simply says nothing (docs/08-ui-map.md). */}
+         * simply says nothing (docs/ui.md). */}
         {denomination || material ? (
           <div className={styles.specs}>
             <span className={styles.denomination}>{denomination ?? ''}</span>
@@ -116,7 +116,7 @@ export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinC
           </div>
         ) : null}
         {/* Fixed two-line window (CSS): every card's meta line starts at the
-         * same height regardless of title length (docs/08-ui-map.md). */}
+         * same height regardless of title length (docs/ui.md). */}
         <h3 className={styles.title} title={title}>
           <Link to={cardUrl} className={`${styles.titleLink} ${styles.titleLinkStretched}`}>
             {title}
@@ -143,7 +143,7 @@ export function CoinCard({ item, backTo, seriesIdByName, review = false }: CoinC
         ) : null}
         {/* No negative "missing" badge: the footer below already says it —
          * the gold CTA for a coin that's missing, the green row for one
-         * that isn't (docs/08-ui-map.md). */}
+         * that isn't (docs/ui.md). */}
       </div>
       {user && !review ? (
         <div className={styles.footer}>

@@ -1,5 +1,5 @@
 # Production topology. Database, cache and object storage stay inside the
-# docker network: no host ports (docs/10-infra.md).
+# docker network: no host ports (docs/infra.md).
 name: coinkeeper
 
 services:
@@ -87,7 +87,7 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    # Migrations run before traffic is accepted (docs/10-infra.md).
+    # Migrations run before traffic is accepted (docs/infra.md).
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"

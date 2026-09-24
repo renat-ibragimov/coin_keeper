@@ -2,7 +2,7 @@
 
 A catalog_items row belongs to one of two layers, decided by created_by:
 NULL is a shared record (admin and system jobs only), a value is the author's
-personal item. See docs/04-business-rules.md, rule 2.
+personal item. See docs/business-rules.md, rule 2.
 """
 
 from __future__ import annotations
@@ -50,14 +50,14 @@ class Country(Base):
     endonym, `name_uk` and `name_en` are the translations. `is_active` decides
     whether the country appears on the storefront (chips, the default shared
     catalogue); the personal-item form offers all of them regardless
-    (docs/04-business-rules.md).
+    (docs/business-rules.md).
 
     `catalog_confirmed` is a harder, separate gate: whether this country's
     catalogue is considered built out and fit to browse as *the* catalogue at
     all. Unlike `is_active` it has no escape hatch for an owned or personal
     item — a country stays out of every catalogue listing until someone
     flips this, however many personal positions or instances a user holds
-    against it (docs/04-business-rules.md, §13a).
+    against it (docs/business-rules.md, §13a).
     """
 
     __tablename__ = "countries"
@@ -141,7 +141,7 @@ class EdgeType(Base):
     (`reeded`, `plain`), `name_uk`/`name_en` the two locales the interface
     shows. No `name_original` slot — an edge type is universal numismatic
     vocabulary, not something owned by one issuer's language
-    (docs/04-business-rules.md, rule 14).
+    (docs/business-rules.md, rule 14).
     """
 
     __tablename__ = "edge_types"
@@ -209,12 +209,12 @@ class CatalogItem(Base):
     series_id: Mapped[int | None] = mapped_column(ForeignKey("coin_series.id", ondelete="SET NULL"))
     # Display only, unlike series_id: completeness, the series screens and the
     # series filter are all counted on the shared record an admin creates
-    # (docs/04-business-rules.md, rule 2). A typed-in name shows on the card
+    # (docs/business-rules.md, rule 2). A typed-in name shows on the card
     # and takes part in none of that.
     series_text: Mapped[str | None] = mapped_column(Text)
     # The bare (non-packaged) catalog item this one is a souvenir-packaging
     # variant of, when coin-parser's weight/diameter match found one
-    # (docs/04-business-rules.md). Not surfaced anywhere yet.
+    # (docs/business-rules.md). Not surfaced anywhere yet.
     packaging_of_id: Mapped[int | None] = mapped_column(
         ForeignKey("catalog_items.id", ondelete="SET NULL")
     )
@@ -223,13 +223,13 @@ class CatalogItem(Base):
     )
     # The same dictionary-or-own-words split as composition_id/material: a
     # face value the denominations table has no row for (an Austrian 5 euro,
-    # say) is kept as the collector typed it (docs/04-business-rules.md, §14).
+    # say) is kept as the collector typed it (docs/business-rules.md, §14).
     denomination_text: Mapped[str | None] = mapped_column(Text)
     collection_group: Mapped[CollectionGroup] = mapped_column(collection_group_enum, nullable=False)
     subtype: Mapped[str | None] = mapped_column(Text)
     # Three language slots. title_original is the issuer's own wording in
     # original_lang and is never translated; the other two are translations and
-    # each says where it came from (docs/02-data-model.md).
+    # each says where it came from (docs/data-model.md).
     title_original: Mapped[str] = mapped_column(Text, nullable=False)
     original_lang: Mapped[str] = mapped_column(Text, nullable=False, server_default="uk")
     title_uk: Mapped[str | None] = mapped_column(Text)
@@ -244,7 +244,7 @@ class CatalogItem(Base):
         ForeignKey("materials.id", ondelete="SET NULL")
     )
     # What the composition parser could not read, kept verbatim rather than
-    # guessed at (docs/09-data-migration.md).
+    # guessed at (docs/data-model.md, "Data origins").
     material: Mapped[str | None] = mapped_column(Text)
     metal_kind: Mapped[MetalKind] = mapped_column(
         metal_kind_enum,
@@ -274,13 +274,13 @@ class CatalogItem(Base):
     catalog_numista: Mapped[str | None] = mapped_column(Text)
     # A number whose catalogue nobody recorded — what a collector entering a
     # coin by hand has. Last in the chain the card reads, so a named number
-    # always wins (docs/02-data-model.md).
+    # always wins (docs/data-model.md).
     catalog_number: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
     # Filled by the coin-collector parser, and by hand on a personal item
     # entered through the "Додати" form. NULL means untouched; once set, the
     # inner shape is fixed — both locales, all three parts, `null` where
-    # there is no text (docs/02-data-model.md).
+    # there is no text (docs/data-model.md).
     descriptions: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     artists: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     # Names of the fields a human has corrected. A catalogue loader leaves
@@ -288,7 +288,7 @@ class CatalogItem(Base):
     edited_fields: Mapped[list[str] | None] = mapped_column(JSONB)
     source_key: Mapped[str | None] = mapped_column(Text)
     # CASCADE, not SET NULL: deleting a user must not silently promote their
-    # personal items into the shared catalog. See docs/02-data-model.md.
+    # personal items into the shared catalog. See docs/data-model.md.
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
     # Where an imported record sits before it is published. Drafts are visible
     # only to administrators and enter the storefront after explicit approval.
@@ -360,7 +360,7 @@ class CatalogItem(Base):
 
 
 class CatalogVariant(Base):
-    """Created now, unused in the MVP (docs/01-scope-mvp.md)."""
+    """Created now, unused in the MVP (docs/scope.md)."""
 
     __tablename__ = "catalog_variants"
 

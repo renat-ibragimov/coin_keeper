@@ -1,4 +1,4 @@
-"""Storage keys for the three sizes of one image (docs/06-media-storage.md).
+"""Storage keys for the three sizes of one image (docs/media.md).
 
     catalog/{catalog_item_id}/{role}/{name}_300.webp
     catalog/{catalog_item_id}/{role}/{name}_600.webp

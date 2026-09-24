@@ -3,8 +3,8 @@
 The legacy database carries an unknown share of parser garbage (glued numbers,
 years instead of prices, metal value instead of coin value). The migration
 keeps every snapshot — the history is worth having — but flags the ones that
-fail the checks in docs/05-integrations.md so they stay out of collection value
-calculations. See docs/09-data-migration.md.
+fail the checks in docs/integrations.md so they stay out of collection value
+calculations. See docs/data-model.md, "Data origins".
 
 Revision ID: 0002
 Revises: 0001

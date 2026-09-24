@@ -38,7 +38,7 @@ interface CoinPickerProps {
  * A coin's name with live suggestions, optionally narrowed to one country.
  *
  * The purchase branch asks for the country first, and the order is the point
- * (docs/08-ui-map.md): a name means nothing on its own — half the world has
+ * (docs/ui.md): a name means nothing on its own — half the world has
  * a coin called "10" — and the country is also what the new personal item
  * will be filed under. Pointing an expense at a coin needs none of that:
  * there the collector types the name of a coin they already own, so the
@@ -63,7 +63,7 @@ export function CoinPicker({
   useDismissable(listOpen, () => setListOpen(false), { inside: [root], routeChange: false });
 
   // Every issuer there has ever been, not just the storefront's active ones:
-  // a personal item may be a coin of any of them (docs/04-business-rules.md).
+  // a personal item may be a coin of any of them (docs/business-rules.md).
   const countriesQuery = useQuery({
     queryKey: ['countries', 'all'],
     queryFn: () => fetchCountries('all'),

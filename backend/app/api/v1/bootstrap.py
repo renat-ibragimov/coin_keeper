@@ -1,4 +1,4 @@
-"""GET /bootstrap (docs/03-api-contract.md)."""
+"""GET /bootstrap (docs/api.md)."""
 
 from __future__ import annotations
 

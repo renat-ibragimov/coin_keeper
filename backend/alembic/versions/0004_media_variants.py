@@ -1,6 +1,6 @@
 """Record which sizes of an image are stored.
 
-An image is kept at 300, 600 and 1200 px (docs/06-media-storage.md): a listing,
+An image is kept at 300, 600 and 1200 px (docs/media.md): a listing,
 a card and the lightbox each want a different one, and one file for all three
 either wastes bandwidth or blurs the lightbox. `storage_key` and
 `thumbnail_key` can name two of them, not three, so the set of keys goes into

@@ -1,4 +1,4 @@
-"""The promote_admin script (docs/09-data-migration.md)."""
+"""The promote_admin script (docs/auth.md)."""
 
 from __future__ import annotations
 

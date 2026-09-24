@@ -28,7 +28,7 @@ class MarketPriceSnapshot(Base):
     """Append-only price history.
 
     created_by decides visibility: NULL is a central job snapshot visible to
-    everyone, a value is the author's own. See docs/04-business-rules.md, rule 7.
+    everyone, a value is the author's own. See docs/business-rules.md, rule 7.
     """
 
     __tablename__ = "market_price_snapshots"
@@ -45,9 +45,9 @@ class MarketPriceSnapshot(Base):
     source_url: Mapped[str | None] = mapped_column(Text)
     raw_payload: Mapped[dict[str, object] | None] = mapped_column(JSONB)
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
-    # Set by the legacy migration for snapshots that fail the price checks.
+    # Set by the initial data import for snapshots that fail the price checks.
     # They stay in the history but are excluded from collection value.
-    # See docs/09-data-migration.md and docs/05-integrations.md.
+    # See docs/data-model.md ("Data origins") and docs/integrations.md.
     is_suspect: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )

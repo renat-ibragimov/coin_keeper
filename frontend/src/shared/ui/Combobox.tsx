@@ -44,7 +44,7 @@ interface ComboboxProps extends Omit<
 
 /**
  * A themed `<input>` with a dropdown of suggestions attached — the field the
- * year filters use (docs/08-ui-map.md): typing is always free, the list
+ * year filters use (docs/ui.md): typing is always free, the list
  * beneath it (styled like `Select`'s own menu) is just a faster way to pick
  * a common value. Unlike `Select`, there is no "selected option": the
  * field's value is whatever text is in it, matched against the list or not.
@@ -78,7 +78,7 @@ export function Combobox({
   // The value the field held the moment the dropdown was (re)opened: until
   // the owner actually types something new, the list shows everything
   // rather than just what happens to prefix-match an already-picked value
-  // (docs/08-ui-map.md) -- otherwise reopening a field that already holds
+  // (docs/ui.md) -- otherwise reopening a field that already holds
   // "В дорозі" hides every other option, "Вдома" included, which reads as
   // "the other locations vanished" rather than "this is just a filter".
   // State, not a ref: filtered below must actually recompute when this
@@ -192,7 +192,7 @@ export function Combobox({
           // The field's own suggestion list already is the autocomplete;
           // the browser's native one only adds unrelated text it remembers
           // from other sites' forms sharing no real relation to this field
-          // (docs/08-ui-map.md).
+          // (docs/ui.md).
           autoComplete="off"
           value={value}
           disabled={disabled}

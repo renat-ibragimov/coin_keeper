@@ -1,4 +1,4 @@
-"""Admin section endpoints (docs/13-admin.md).
+"""Admin section endpoints (docs/admin.md).
 
 Everything here is behind the admin role. Reading job runs is the first thing
 it gives: the nightly price run used to be visible only in a log file on the
@@ -257,7 +257,7 @@ async def create_telegram_link(
     session: DbSession, user: AdminUser, settings: AppSettings
 ) -> TelegramLinkOut:
     """A one-time code wrapped in a t.me link. Pressing Start in that chat is
-    what actually connects it (docs/13-admin.md, 2.5)."""
+    what actually connects it (docs/admin.md, 2.5)."""
     try:
         url, expires_at = await TelegramLinkService(session, settings).create_link(user)
     except BotNotConfiguredError as exc:

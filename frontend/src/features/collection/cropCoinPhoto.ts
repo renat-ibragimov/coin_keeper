@@ -10,7 +10,7 @@ import { isLikelyBlurry } from './blurCheck';
 const MAX_SIDE = 1600;
 const QUALITY = 0.95;
 /** Small enough to analyse without noticeable delay, large enough that the
- *  Laplacian response still means something (docs/06-media-storage.md). */
+ *  Laplacian response still means something (docs/media.md). */
 const BLUR_CHECK_SIDE = 256;
 
 export function cropToBlob(src: string, area: Area, rotation: number): Promise<Blob> {

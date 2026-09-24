@@ -3,7 +3,7 @@
 Creating an instance also creates a coin_purchase expense for
 price x quantity with the NBU rate on the purchase date; updating recomputes
 that expense, deleting removes it — always in the same transaction
-(docs/04-business-rules.md, rules 4, 6 and 10).
+(docs/business-rules.md, rules 4, 6 and 10).
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def _denomination_label(
     denomination: Denomination | None, item: CatalogItem, locale: str
 ) -> str | None:
     """The dictionary label, or what the owner typed on a personal item when
-    their country has no denominations at all (docs/04-business-rules.md, §14)."""
+    their country has no denominations at all (docs/business-rules.md, §14)."""
     if denomination is not None:
         return render_label(denomination.value, denomination.unit, locale)
     text = (item.denomination_text or "").strip()
@@ -192,7 +192,7 @@ class CollectionService:
 
     async def summary(self, filters: CollectionFilters) -> CollectionSummaryOut:
         """The "Мої монети" KPI tiles for the filters currently applied
-        (docs/08-ui-map.md)."""
+        (docs/ui.md)."""
         data = await self._repo.summary(filters)
         return CollectionSummaryOut(
             collection_items=data.collection_items,
@@ -229,7 +229,7 @@ class CollectionService:
         return await self._get_out(item_id)
 
     async def create(self, payload: CollectionItemCreate) -> CollectionItemOut:
-        """The purchase transaction (docs/04-business-rules.md, rule 4).
+        """The purchase transaction (docs/business-rules.md, rule 4).
 
         With `newCatalogItem` it grows a third write — the personal catalog
         item itself — and with `extraExpenses` one more per supporting
@@ -353,7 +353,7 @@ class CollectionService:
     async def _images_for(self, item_ids: list[int]) -> dict[int, CatalogImages]:
         """The listing's thumbnail: any of the owner's own purchases of the
         item may carry the photo, since a position is not any one instance
-        (docs/06-media-storage.md)."""
+        (docs/media.md)."""
         return await images_by_catalog_item(self._media, self._urls, item_ids)
 
     async def _instance_images(
@@ -402,7 +402,7 @@ class CollectionService:
         Linked to both the coin and this exact purchase (`collection_item_id`),
         same as `coin_purchase` — the same catalog item bought more than once
         would otherwise make it impossible to tell which delivery belongs to
-        which purchase (docs/04-business-rules.md, rule 4). Unlike
+        which purchase (docs/business-rules.md, rule 4). Unlike
         `coin_purchase`, the service never deletes this expense when the
         instance goes away; `collection_item_id`'s `ON DELETE SET NULL` detaches
         it on its own, and the expense stays in the money journal — the money
