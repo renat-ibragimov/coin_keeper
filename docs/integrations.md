@@ -1,440 +1,255 @@
-# 05. Внешние интеграции
+# External integrations
 
-Четыре источника:
+Where outside data comes from, who fetches it, and the rules it must pass before it
+reaches the database.
 
-| Источник | Что даёт | Роль |
-|---|---|---|
-| НБУ, API курсов | курсы валют | системный, ежедневно |
-| НБУ, каталог нумизматической продукции | **общий каталог по Украине**, официальные фото | системный, ежедневно (через coin-parser) |
-| UA-Coins | цены по украинским монетам | системный, ежедневно |
-| uCoin.net | импорт **личных** позиций пользователя | по запросу пользователя |
+## Who does what
 
-Ключевое разделение: общий каталог и его цены наполняют **только системные фоновые задачи**
-по официальным и надёжным источникам. uCoin остаётся источником пользовательского импорта
-и общего каталога не касается (`business-rules.md`, BR-2).
+Scheduled scraping does **not** run in this repository. It lives in the sibling
+repository **`coin-parser`** (`collector/`), runs on the server's crontab
+(`coin-parser/deploy/crontab`) in its own containers
+(`deploy/docker-compose.collector.yml`), writes straight into this project's Postgres and
+MinIO, and reports every run to this API (`admin.md`, "Job runs").
+
+| Source | Gives | Job (`coin-parser`) | Schedule (UTC) | Writes |
+|---|---|---|---|---|
+| NBU rates API | USD/EUR → UAH rates | `update-rates` (`collector/rates/`) | every 5 h, `:25` | `exchange_rates` |
+| NBU numismatic catalog | new Ukrainian issues, official names, photos, specs | `nbu-catalog-sync` (`collector/countries/ua/catalog_sync.py`) | daily 10:40 | `catalog_items` (drafts), `media_files`, MinIO |
+| UA-Coins (ua-coins.info) | daily market prices of Ukrainian coins | `update-prices` (`collector/countries/ua/update_prices.py`) | daily 07:10 | `market_price_snapshots` |
+| uCoin.net | user import of personal positions | — not implemented, deferred (`product.md`, "Out of scope") | — | — |
+
+The server's cron has no timezone support, so the hours are written in UTC by hand;
+the reasoning for each hour is in the crontab comments.
+
+What this repository does with that data:
+
+- reads `exchange_rates` through `RateRepository` (`app/repositories/rates.py`) —
+  the "last rate on or before the date" rule is here, not in the parser
+  (`business-rules.md`, BR-6);
+- reads `market_price_snapshots` for prices and collection value
+  (`business-rules.md`, BR-7);
+- shows drafts from the NBU sync to admins for review (`admin.md`, "Draft review");
+- records job runs and alerts in Telegram (`admin.md`).
+
+The shared catalog and its prices are filled **only** by these jobs and by admins.
+User actions never add shared records (`business-rules.md`, BR-2).
 
 ---
 
-## 1. НБУ — курсы валют
-
-Самая простая и надёжная интеграция. Работала без нареканий.
-
-**Реализовано, 2026-09-13 — не в этом репозитории.** Клиент и запись живут в
-`collector/rates/` отдельного репозитория `coin-parser` (`~/coin-parser` на сервере),
-по тому же принципу, что уже применён к ценам UA-Coins (раздел ниже): парсеры — там,
-`coin_keeper` только читает `exchange_rates`. Здесь описание остаётся как справка по
-самому источнику и правилам, но HTTP-клиент и апсерт ищите в `coin-parser`, не здесь.
-
-**Эндпоинт:**
+## NBU — exchange rates
 
 ```
-GET https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json
-GET https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json&date=YYYYMMDD
 GET https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json&start=YYYYMMDD&end=YYYYMMDD&valcode=USD&sort=exchangedate&order=desc
 ```
 
-Ответ — массив объектов, нужны поля `cc` (код валюты), `rate`, `exchangedate`
-(в формате `DD.MM.YYYY`, конвертировать в ISO). `rate` парсится как `Decimal` прямо из
-текста JSON (`json.loads(..., parse_float=Decimal)`), не через `float` — иначе теряется
-точность, нужная для `numeric(14,6)`.
+- Only `USD` and `EUR`. One range request per currency per run, regardless of the
+  window size.
+- `rate` is parsed as `Decimal` straight from the JSON text
+  (`json.loads(..., parse_float=Decimal)`), never through `float`.
+  `exchangedate` (`DD.MM.YYYY`) is converted to ISO.
+- Upsert: `INSERT ... ON CONFLICT (currency_code, effective_date, source) DO UPDATE` —
+  the latest NBU answer always wins.
+- Default window: the last 14 days, so a missed run heals on the next one. A backfill
+  from any date is a manual run with `--start` / `--end`.
 
-Берём только `USD` и `EUR`.
-
-**Правила:**
-
-- Курс на дату хранится в `exchange_rates` (`coin_keeper`, читает `RateRepository`).
-- Если на дату курса нет (выходной, праздник) — берётся последний опубликованный **до**
-  этой даты (`RateRepository.rate_on`, не логика парсера).
-- `coin-parser` пишет диапазонным запросом, по одному вызову на валюту, независимо от
-  ширины окна — досинхронизация недостающих дат легаси по одной дате за запрос (тысячи
-  вызовов для 17 лет истории) была ровно той проблемой, которую диапазонный запрос решает.
-- Запись — `INSERT ... ON CONFLICT (currency_code, effective_date, source) DO UPDATE`:
-  свежий ответ НБУ всегда побеждает то, что уже лежало (включая мигрированные легаси-курсы —
-  это был кэш того же API, не независимый источник, доверия не больше).
-- Прод-крон `python -m collector rates` каждые 5 часов, окно по умолчанию — последние 14
-  дней (самолечение пропущенного прогона). Разовый бэкофилл с самой ранней даты, что
-  отдаёт НБУ, — `--start`/`--end`, вручную после деплоя шага.
-
-Документация: https://bank.gov.ua/ua/open-data/api-dev
+API docs: https://bank.gov.ua/ua/open-data/api-dev
 
 ---
 
-## 2. uCoin.net — импорт личных позиций пользователя
+## NBU — numismatic catalog
 
-Самый сложный источник и единственный, который работает по запросу пользователя, а не по
-расписанию.
+**The canonical source of the shared catalog for Ukraine.** Plain HTML, no JavaScript,
+no Cloudflare — parsed with `httpx` + `selectolax`.
 
-**Роль изменилась относительно legacy.** В десктопной версии uCoin был основным источником
-каталога — оттуда пришли все 3063 позиции. В веб-версии он **не является источником общего
-каталога**: любой импорт с uCoin создаёт только **личные** позиции того пользователя, который
-его запустил (`business-rules.md`, BR-3). Причины две:
+### The source
 
-- права на данные и фотографии uCoin нам не принадлежат (`media.md`);
-- Cloudflare делает серверный обход по расписанию неработоспособным (см. ниже).
-
-Каноническим источником по Украине вместо uCoin стал каталог НБУ — раздел 3.
-
-### Два пути импорта
-
-**A. Excel-выгрузка.** Зарегистрированный пользователь uCoin выгружает свою коллекцию в `.xlsx`.
-Так пришли 2824 из 3063 позиций. Формат — лист `Collection`, колонки по позиции:
-
-| Колонка | Поле |
-|---|---|
-| 1 | страна |
-| 2 | серия |
-| 4 | номинал |
-| 5 | год |
-| 6 | разновидность |
-| 7 | название |
-| 10 | рыночная цена |
-| 11 | каталожный номер |
-
-Строка пропускается, если пусты страна, номинал или год. Разбор — `openpyxl`.
-
-**B. Скрейпинг сайта.** По URL монеты или раздела каталога. Так пришли 239 позиций.
-
-### Почему нужен headless-браузер
-
-uCoin отдаёт содержимое через JavaScript и стоит за Cloudflare. Обычный HTTP-запрос получает
-заглушку. В legacy это решалось скрытым окном Electron, которое рендерило страницу и снимало
-данные из DOM.
-
-**В Python — Playwright с Chromium.** Простой `requests`/`httpx` не подойдёт.
-
-Логика legacy, которую надо воспроизвести:
-
-1. Загрузить страницу с обычным браузерным User-Agent.
-2. Снять данные из DOM (см. ниже).
-3. Если в тексте страницы есть `just a moment` / `enable javascript` / `cloudflare` —
-   подождать 1,5 с и повторить, до 45 секунд.
-4. Если не пробилось — вернуть ошибку с предложением пройти проверку вручную.
-
-Legacy показывал пользователю окно браузера для ручного прохождения Cloudflare
-(`openUcoinSession`, `openUcoinUnblock`, `resetUcoinSession`). **В серверной версии этот
-путь недоступен** — пользователь не видит браузер на сервере.
-
-**Отсюда решение, зафиксированное окончательно: планового серверного обхода uCoin нет.**
-Не «по возможности откажемся», а норма архитектуры. Скрейпинг uCoin запускается только
-пользователем, по конкретному URL, и наполняет только его личные позиции.
-
-Для единичных запросов пользователя проверка Cloudflare чаще всего проходится ожиданием
-(шаг 3 выше). Если не пробилось — возвращаем понятную ошибку и предлагаем путь A. Вариант
-с передачей пользовательских cookies uCoin оставляем на потом: он ближе всего к legacy, но
-требует хранить чужие сессионные данные. Резидентный прокси — дорого и проблему не решает.
-
-**Путь A (Excel) — основной и надёжный, путь B — вспомогательный.**
-Это меняет приоритеты по сравнению с legacy, где скрейпинг считался равноправным.
-
-### Что снимается со страницы
-
-Из `extractPage`:
-
-- `info` — все строки таблиц вида `ключ: значение` (характеристики монеты)
-- `priceText` — первый текстовый узел, целиком совпадающий с `^\d[\d\s.,]*\s*(₴|грн\.?|UAH)$`
-  и не содержащий `=` или `x`
-- `heading` — `<h1>` или текст вида `Название, ГГГГ`
-- `images` — все `<img>` с абсолютным `src`, `alt`, натуральными размерами
-- `coinLinks` — `a[href*="/coin/"]`
-- `pageLinks` — ссылки пагинации внутри `/catalog/`
-
-Аверс и реверс выбираются по `alt` (`obverse|аверс`, `reverse|реверс`), при отсутствии —
-по порядку и размеру изображений.
-
-### Нормализация URL
-
-```
-canonicalUrl:  протокол → https, hostname → uk.ucoin.net, якорь убирается
-sourceKeyFor:  hostname → ru.ucoin.net, ключ = ucoin:<hostname><pathname>[?tid=<tid>]
-```
-
-Разные языковые поддомены uCoin — одна и та же монета. Без нормализации получаются дубли.
-
-### Обход разделов
-
-Собрать ссылки со всех страниц пагинации, затем обойти монеты. Между запросами
-**пауза 450 мс** — сохранить обязательно, это защита и от блокировки, и от нагрузки на
-чужой сервер. При переносе на сервер паузу имеет смысл увеличить.
-
-Прогресс сохраняется в `ucoin_catalog_sources`: `last_scanned / inserted / updated / skipped`.
-
----
-
-## 3. НБУ — каталог нумизматической продукции
-
-**Канонический источник общего каталога по Украине.** Официальный сайт Национального банка,
-раздел нумизматической продукции (`bank.gov.ua`, `numismatic-products`).
-
-Отдельного API у раздела нет — страницы отдаются обычным HTML, без JavaScript и без
-Cloudflare. Парсится так же, как UA-Coins: `httpx` + `selectolax`. Playwright здесь не
-нужен.
-
-**Как устроен каталог (проверено разведкой 2026-09-03, см. раздел 8).** Страница
-`/ua/uah/numismatic-products/souvenier-coins` — это форма поиска; сами результаты отдаёт
-один POST-эндпоинт:
+The search results come from one POST endpoint:
 
 ```
 POST https://bank.gov.ua/ua/component/source/searchSouvenierCoinResult
      page=1&perPage=100&category[]=Coin
 ```
 
-`perPage` принимает 5/10/25/100; фильтры `serie[]`, `metal[]`, `nominal[]`, `quality[]`,
-`from`/`to` (дата `ДД.ММ.ГГГГ`, минимум `07.05.1995`), `search`. **Пустые значения
-фильтров ломают запрос (404)** — отправлять только те, что реально используются.
-`category[]=Coin` даёт 1048 карточек (11 страниц), `Souvenir` — 92 (ролики, буклеты).
+- `perPage` accepts 5/10/25/100. Filters: `serie[]`, `metal[]`, `nominal[]`,
+  `quality[]`, `from`/`to` (`DD.MM.YYYY`, minimum `07.05.1995`), `search`.
+  **Empty filter values break the request (404)** — send only filters in use.
+- There are no per-coin pages: each listing card carries the title, series tag,
+  denomination, issue date, material, mintage (`announced/actual`), artists, weight,
+  diameter, quality, edge and description.
+- The card id is in the preview path (`/media/coins/{id}/avers.jpg`); the letter code is
+  in the full-size file path (`/files/coins_images/{code}a.png|{code}r.png`, 1600×1600
+  PNG). Previews are ~200 px.
+- Since 2022, base-metal coins are listed only as "… у сувенірному пакованні" — there's
+  no separate card for the plain coin, so that card *is* the coin. Pairs of plain and
+  packaged cards are linked by `packaging_of_id` (`business-rules.md`, BR-15).
 
-Отдельных страниц монет нет: каждая карточка листинга уже содержит всё — название,
-серию (тег), «Номінал», «Дата введення в обіг» (или «Дата випуску»), «Матеріал»,
-«Тираж (оголошений/фактичний), шт.» вида `2500/2500`, художника, скульптора, массу,
-диаметр, категорию качества, гурт и описание. Идентификатор карточки — `id` в пути
-превью (`/media/coins/{id}/avers.jpg`), буквенный код — в пути полноразмерного файла.
+### The daily sync (`nbu-catalog-sync`)
 
-Изображения: превью `/media/coins/{id}/avers.jpg|revers.jpg` (около 200 px, ~60 КБ) и
-полноразмерные `/files/coins_images/{code}a.png|{code}r.png` (1600×1600 PNG, 3–4 МБ);
-`{code}a0.png` — дополнительный ракурс, `{code}u.pdf` — буклет, есть не у всех.
+A shallow check, then deep work only when something is new:
 
-### Что берём
+1. Fetch the 25 most recent coin cards.
+2. Compare their `nbu:<id>` source keys with `catalog_items.source_key`. Nothing new →
+   done.
+3. For each new id: find its official series, parse that whole series, match it to
+   UA-Coins, fetch prices and photos, and process photos (background removal, sizes —
+   `media.md`).
+4. A card enters the catalog only if both obverse and reverse passed photo review;
+   otherwise it becomes a warning in the run report.
+5. Upload media to MinIO (`media_files.source = 'nbu'`, stored, not hotlinked) and insert
+   the card as a **draft** (`status = 'draft'`, `created_by = NULL`), then load its
+   prices. An admin publishes or rejects the draft (`admin.md`, "Draft review").
 
-- официальное название выпуска на украинском → `title_uk`;
-- официальные изображения аверса и реверса;
-- номинал, год, металл, проба, вес, диаметр, гурт;
-- тираж — объявленный и фактический;
-- серия и дата ввода в обращение.
+Report stats: `scanned`, `known`, `new`, `drafted`, `uploaded`, `warnings`.
 
-### Задача обхода
+### Loader rules (`load_cards.py`)
 
-Системная фоновая задача (`nbu-catalog-sync`), **раз в сутки**, живёт в отдельном
-репозитории `coin-parser` (`collector/countries/ua/catalog_sync.py`), а не в бэкенде
-coin_keeper — см. `coin-parser/docs/00_spec.md`. Новые выпуски подхватываются автоматически:
-НБУ публикует их в этом же разделе.
+Shared by the daily sync and manual series loads:
 
-Алгоритм:
+- Matching is by `source_key` (`nbu:<id>`).
+- On update, source-owned columns (titles and their `*_source`, denomination, dates,
+  mintage, material, weight, diameter, edge, quality, descriptions, artists) are
+  rewritten from the source — **except** fields listed in the record's
+  `edited_fields`.
+- **Known gap:** nothing in this app writes `edited_fields` yet. An admin edit through
+  `PATCH /catalog/{id}` sets `*_source = 'manual'` on titles, but the loader doesn't
+  check `*_source`, so re-loading that series overwrites the edit (`backlog.md`).
+- Never written: catalog numbers, `notes`, `subtype`, `status` of an existing row, and
+  the archive columns. `collection_group`, `country_id` and `created_by` are set only on
+  insert.
+- Official Ukrainian titles are stored with `*_source = 'official'`.
 
-1. Обойти разделы каталога, собрать список выпусков.
-2. Сопоставить с **активными** позициями общего каталога по ключу
-   **номинал + год + название** (нормализация названия — та же, что у UA-Coins ниже).
-   Архивные из сопоставления исключаются: разархивирование — решение человека, а не задачи.
-3. **Совпало** → обогатить запись по правилу `COALESCE(новое, старое)`: заполняются только
-   пустые поля, уже заполненное не затирается. Исключение — `title_uk` и официальные фото:
-   они замещают данные из uCoin, потому что это первоисточник.
-4. **Не совпало** → добавить как **чернетку** (`status = 'draft'`, `created_by = NULL`),
-   а не сразу в активную вітрину. Публикует или відхиляє чернетку admin через
-   `/admin/proposals` (`api.md`, `admin.md`) — задача сама ничего не
-   публикует наперёд (рішення власника, ревью запроваджено 2026-09-22).
+### The sync never deletes and never archives
 
-Изображения скачиваются к себе (`media_files.source = 'nbu'`, `storage_key`), а не
-хотлинкуются. Они публичные и постепенно вытесняют uCoin-фото украинской части каталога —
-см. `media.md`.
+The loader doesn't write archive columns at all. Discontinued issues stay as they are;
+archiving is an admin action (`business-rules.md`, BR-10). Probable duplicates are not
+detected automatically — admins close them by archiving with a "duplicate" reason.
 
-### Задача никогда не удаляет записи
+### Scope
 
-Это правило без исключений. Позиция, ранее заведённая из каталога НБУ, могла разойтись по
-чужим коллекциям — удалить её значит разрушить чужие данные.
+Ukraine only. US and USSR records in the shared catalog come from the initial seed
+(`data-model.md`, "Data origins") and are maintained by admins by hand; those countries
+are `catalog_confirmed = false` (`business-rules.md`, BR-13a).
 
-Если ранее созданная из НБУ позиция **исчезла из официального каталога** или выпуск отменён,
-задача её **архивирует**: `is_archived = true`, `archive_reason = 'снята с выпуска НБУ'`
-(`business-rules.md`, BR-10). Экземпляры, покупки и история цен владельцев при этом
-сохраняются полностью.
-
-Архивирует задача только записи, которые сама и создала (по `source_key` с признаком НБУ).
-Позиции из мигрированной базы владельца и заведённые администратором вручную она не трогает:
-их отсутствие на сайте НБУ ничего не доказывает. Раздел покрывает выпуски с 1995 года
-полностью (по годам 1995–2018 его счёт совпадает с ua-coins и Википедией один в один), но
-с 2022 года недорогоцінні монеты в нём числятся только как «… у сувенірному пакованні» —
-отдельной записи «голой» монеты нет, и конвейер должен считать такую карточку самой монетой.
-
-Обратной операции у задачи нет: разархивировать может только администратор. Если позиция
-вернулась на сайт, она попадёт в отчёт как «архивная запись снова найдена в источнике»,
-и решение принимает человек.
-
-### Отчёт задачи
-
-По итогам обхода задача пишет отчёт, а не молча правит базу:
-
-```
-scanned      — сколько выпусков разобрано на сайте
-matched      — сопоставлено с активными позициями
-enriched     — реально обогащено (заполнены пустые поля, заменены фото)
-inserted     — добавлено новых системных записей
-archived     — архивировано как снятое с выпуска, с перечнем id и названий
-duplicates   — вероятные дубликаты: кандидаты на ручную архивацию админом
-warnings[]   — неразобранные страницы, спорные сопоставления
-```
-
-**Вероятные дубликаты** — отдельная строка отчёта, не автоматическое действие. Если один
-выпуск с сайта уверенно сопоставился с двумя и более позициями каталога, это почти наверняка
-дубликат, накопленный за время импортов из uCoin. Задача их не сливает и не архивирует сама:
-слияние с перепривязкой экземпляров отложено на после MVP (`scope.md`), а до тех пор
-администратор решает вручную и закрывает лишнюю позицию архивацией с причиной `'дубликат'`.
-
-### Границы
-
-Раздел покрывает только Украину. США и СССР в общем каталоге — наследие мигрированной базы
-владельца, пополняются администратором вручную. Numista и uCoin источниками общего каталога
-не являются.
-
-Документация раздела: https://bank.gov.ua/ua/numismatic-products
+Source: https://bank.gov.ua/ua/numismatic-products
 
 ---
 
-## 4. UA-Coins — цены по украинским монетам
+## UA-Coins — market prices
 
-**Источник цен общего каталога.** Обычный HTML без JavaScript, парсится напрямую
-(`httpx` + `selectolax`), Cloudflare нет — поэтому именно он, а не uCoin, годится для
-планового серверного обхода.
+**The price source of the shared catalog.** Plain HTML without Cloudflare, so it's fit
+for scheduled scraping. The site doesn't answer from some networks outside Ukraine; for
+local investigation use Wayback Machine copies (`web.archive.org`), which can lag the
+live site by weeks.
 
-**Но сайт не отвечает из-за пределов Украины** (разведка 2026-09-03: TCP-таймаут с машины
-разработчика и с американского fetch-сервиса, при этом DNS отдаёт и IPv4, и IPv6). Это
-означает, что с сервера в Hetzner он, скорее всего, тоже недоступен, — **проверить первым
-делом при боевом прогоне разведки**. Пока это не проверено, планировать суточную задачу по
-ua-coins нельзя; запасной путь — копии в Wayback Machine (`web.archive.org`), которые
-разведка использует как fallback и которые для страницы `/ua/catalog/all/all` отстают
-от сайта на недели.
+### Useful pages
 
-Полезные страницы (URL подтверждены):
-
-| Страница | URL | Что даёт |
+| Page | URL | Gives |
 |---|---|---|
-| весь каталог одной таблицей | `/ua/catalog/all/all` | 1060 строк, все годы — один запрос вместо тридцати |
-| годовой каталог | `/ua/catalog/all/{год}` | те же строки за год; есть `?sort=` |
-| то же по-русски | `/catalog/all/all`, `/catalog/all/{год}` | **русские названия с теми же id** — ключ к нашим `title_original` |
-| серии со счётчиками | `/en/categories/all`, `/ua/categories/all` | 38 серий: всего / недорогоцінні / дорогоцінні / суммарный тираж |
-| страница монеты | `/ua/list/{id}-{slug}` | русское название под заголовком, таблица «Дата / Номінал / Метал / Маса / Діаметр / Тираж / Ціна НБУ», серия, цена дня |
-| план выпуска НБУ | `/ua/nbu-plan-list` | по годам 2017–2026 |
+| whole catalog | `/ua/catalog/all/all` | ~1060 rows, all years, one request |
+| catalog by year | `/ua/catalog/all/{year}` | same rows for one year |
+| same in Russian | `/catalog/all/all`, `/catalog/all/{year}` | Russian names with the same ids |
+| series | `/ua/categories/all`, `/en/categories/all` | 38 series with counts and total mintage |
+| coin page | `/ua/list/{id}-{slug}` | specs table, series, today's price |
+| NBU release plan | `/ua/nbu-plan-list` | by year |
 
-Строка таблицы (`td[data-title]`): «Дата» (`дд.мм.гггг`, в новой вёрстке внутри
-`span.desktop`), «Номінал» (`5 грн.`, `200000 крб.`), «Тираж тис.» — в тысячах, вида `75/50`
-(объявленный/фактический), «Назва» со ссылкой `/ua/list/{id}-{slug}`, «Вартість дд.мм.гггг»
-(число с тонкими пробелами, стрелка тренда или «немає даних»). Серии и металла в таблице
-нет — только на странице монеты и на странице серий. В таблицу входят и наборы, и монеты
-в сувенирной упаковке отдельными строками.
+A table row (`td[data-title]`): "Дата" (`dd.mm.yyyy`), "Номінал" (`5 грн.`,
+`200000 крб.`), "Тираж тис." in thousands as `announced/actual`, "Назва" linking to
+`/ua/list/{id}-{slug}`, "Вартість dd.mm.yyyy" (number with thin spaces, trend arrow, or
+"немає даних" = no quote). Series and metal are only on coin and series pages. Sets and
+souvenir-packaged coins appear as separate rows.
 
-Изображения: `/images/coins/{id}_obverse.jpg` и `_reverse.jpg` (старый вариант, 5–60 КБ,
-есть у всех), `/images/coins/small|middle|big/{id}_{side}.webp` и `big/{id}_{side}.png`
-(у новых выпусков; наличие у старых — проверить живым прогоном, из-за недоступности сайта
-разведка это не подтвердила).
+### The daily job (`update-prices`)
 
-### Центральная суточная задача
+1. **Scope comes from the database:** active shared `catalog_items` with
+   `source_key LIKE 'nbu:%'` whose series is in `coin-parser`'s finished list
+   (`db_map.json`, `completed`). A series joins that list by hand, after it's loaded
+   and verified — quoting a coin through an unverified link is how a price lands on the
+   wrong coin.
+2. Download the yearly tables for the years those coins were issued (±1) — one request
+   per year, up to 3 attempts.
+3. Each coin finds its row **by the UA-Coins id** stored in `price_source_links`. Nothing
+   is re-matched by title at night: matching is a one-time, reviewed decision.
+4. Quotes go into `market_price_snapshots` with `created_by = NULL` (visible to
+   everyone), through the same batch insert as manual price loads, so reruns collapse
+   instead of duplicating.
 
-Системная фоновая задача (`update-prices`) обновляет цены **активных** позиций общего
-каталога раз в сутки. Живёт, как и курсы валют выше, в `coin-parser`
-(`collector/countries/ua/update_prices.py`), не в этом репозитории. Снимки пишутся с
-`created_by = NULL` и видны всем (`business-rules.md`, BR-7).
-
-Архивные позиции задача пропускает: их история цен замораживается на момент архивации.
-Разархивированная позиция вернётся в очередь сама, отдельного действия не требует.
-
-Обход идёт порциями, с паузой между запросами и честным User-Agent. Полный проход за раз не
-обязателен: очередь строится по давности последнего снимка, позиции без цены — первыми.
-
-Цены личных позиций центральная задача **не трогает** — их обновляет владелец по требованию,
-тем же парсером, снимками с `created_by = <пользователь>`.
-
-### Режимы разбора страницы
-
-Два режима:
-
-**A. Сохранённая ссылка.** Если у позиции `source_url` содержит `ua-coins.info` — грузим
-страницу и берём цену с неё.
-
-**B. Поиск по годовому каталогу.** `https://www.ua-coins.info/ua/catalog/all/{год}`,
-дальше построчный разбор таблицы:
-
-- ячейка `data-title="Назва"` → ссылка и название
-- ячейка `data-title="Номінал"` → номинал
-
-Совпадение по названию — после нормализации: нижний регистр (`uk-UA`), NFKD, удаление
-`’'`"«»()[]{}.,:;!?–—-`, схлопывание пробелов. Считается совпавшим, если строки равны или
-одна начинается с другой плюс пробел.
-
-Номинал сравнивается как число (первое число в строке, запятая → точка).
-
-Если точного совпадения по названию, году и номиналу нет — `not-found`, ничего не пишем.
-
-User-Agent в legacy: `CoinKeeper/0.1 personal collection`. Оставить честный
-идентифицирующий UA.
+Archived records are out of scope, so their price history freezes; an unarchived
+record re-enters on its own. The downloaded HTML is kept on the server for a few days
+for investigation. Exit codes: `0` ok, `1` partial, `2` nothing done.
 
 ---
 
-## 5. Numista
+## Price validation
 
-В ТЗ значился основным источником цен для всех стран кроме Украины. **Так и не заработал** —
-требует персонального API-ключа, без него запросы не принимаются. В базе нет ни одной цены
-из Numista.
+A price is validated **before** it's written. A price that fails is not written to
+`market_price_snapshots`; it's reported with the source's raw text instead.
 
-В MVP не делаем. Если понадобится — ключ получает каждый пользователь сам и вносит
-в настройках, централизованный ключ на сервисе противоречит их условиям.
+What `coin-parser` enforces today:
 
-Документация: https://en.numista.com/api/doc/index.php
+| Check | Where | On failure |
+|---|---|---|
+| The cell parses as a number | `ua_coins.parse_price_cell` | "немає даних" or junk → no quote |
+| `price > 0` | same, and `prices._coerce_price` | no quote / series anomaly |
+| `price < 10^12` (fits `numeric(14,2)`) | `update_prices.build_rows`, `prices._coerce_price` | `no_quote:unusable` |
+| The quote belongs to this coin | matched by stored UA-Coins id, never by title | `no_link` / `no_quote:not_listed` |
 
----
+Every row keeps a `raw_payload` (date, price, source table year) and `source_url`.
 
-## 6. Валидация цены — обязательный слой
+`coin-parser` never sets `is_suspect`: the market is thin and spikes are real trades.
+`is_suspect` exists only for the seeded history (`data-model.md`, "Data origins").
 
-Главный урок legacy. Цены писались без проверки, ошибки чинились миграциями постфактум,
-итог — заведомо мусорные данные в базе.
+**When adding any new price source or write path** (manual entry, import — both
+deferred), validate on every path the same way and additionally reject:
 
-### Известные баги парсера
-
-Восстановлены по названиям миграций и бэкапов:
-
-| Симптом | След в схеме |
-|---|---|
-| Склеенные числа (`12001500` вместо `1200`) | `sanitize-ucoin-glued-prices` |
-| Год приклеился к цене (`2018450` вместо `450`) | `sanitize-ucoin-year-prefixed-prices` |
-| Вместо цены монеты — стоимость металла | `before-bad-ucoin-metal-price-fix`, `-cleanup` |
-| Отдельные позиции с явно неверной ценой | `before-ucoin-svdb-price-correction`, `before-ucoin-1914-p-cent-price-correction` |
-
-Существующий фильтр в `parsePriceUah` уже отбрасывает строки с `**`, `=`, `x` — сохранить.
-
-### Проверки перед записью
-
-Минимальный набор:
-
-1. **Диапазон.** Цена в разумных пределах (например, 1–1 000 000 грн). Ноль и отрицательные —
-   отклонять.
-2. **Не год.** Число, совпадающее с годом выпуска или лежащее в 1900–2100 при отсутствии
-   явного символа валюты, — подозрительно.
-3. **Длина.** Больше 7 цифр подряд без разделителей — почти наверняка склейка.
-4. **Отклонение от истории.** Если у позиции уже есть цены и новая отличается от медианы
-   последних снимков более чем в N раз (начать с 10) — не писать, вернуть `rejected`
-   и пометить для ручной проверки.
-5. **Валюта явно определена.** Нет `₴`/`грн`/`UAH` в исходном тексте — не цена.
-
-Проверки применяются одинаково ко всем путям записи: центральная суточная задача,
-пользовательское обновление личной позиции, ручной ввод, Excel-импорт.
-
-### Что делать с непрошедшей ценой
-
-Не писать в `market_price_snapshots`. Вернуть `status: rejected`, сохранить сырой ответ
-источника в лог (`raw_payload` у отклонённой попытки или отдельная таблица) — чтобы можно
-было разобраться, а не гадать.
-
-### Существующие данные
-
-3938 снимков цен из legacy-базы содержат неизвестную долю мусора. При миграции —
-прогнать через те же проверки и пометить подозрительные. Подробности в `09-data-migration.md`.
+- a number that looks like a year (1900–2100) or has more than 7 digits without
+  separators — typical glued-number parser bugs;
+- a value with no explicit currency marker (`₴`, `грн`, `UAH`);
+- a value more than ~10× away from the median of the item's recent snapshots — return
+  `rejected` for manual review instead of writing it.
 
 ---
 
-## 7. Общие правила для всех источников
+## uCoin.net (deferred)
 
-- Все обращения к внешним сайтам — только в фоновых задачах, никогда в HTTP-обработчике.
-- Таймаут на запрос, ограничение числа попыток, экспоненциальная задержка при ошибках.
-- Пауза между запросами к одному хосту.
-- Честный User-Agent.
-- Плановый серверный обход разрешён только для источников без Cloudflare и с приемлемыми
-  условиями использования: НБУ (курсы, каталог) и UA-Coins. Для uCoin планового обхода нет —
-  только запуск пользователем, см. раздел 2.
-- Ни один внешний источник не создаёт записей в **общем** каталоге, кроме системной задачи по
-  каталогу НБУ (раздел 3). Пользовательский импорт создаёт только личные позиции.
-- Любой ответ внешнего источника сохраняем сырым до разбора: без этого отладка невозможна.
+uCoin import of **personal positions** is post-MVP (`product.md`, "Out of scope"). Constraints any
+implementation must keep:
+
+- **Never a scheduled server-side crawl**: uCoin is behind Cloudflare and the data and
+  images aren't ours. Only a user-initiated import, filling only that user's personal
+  positions, with deduplication against the shared catalog (`business-rules.md`, BR-3).
+- Images keep `source = 'ucoin'` and are visible only to the importer (`media.md`).
+- **Excel export is the reliable path.** Sheet `Collection`; columns: 1 country,
+  2 series, 4 denomination, 5 year, 6 variety, 7 title, 10 market price, 11 catalog
+  number. Skip rows with no country, denomination or year.
+- **Page scraping needs a headless browser** (JavaScript + Cloudflare). Retry while the
+  page says "just a moment" / "enable javascript" for up to ~45 s, then fail with a
+  suggestion to use the Excel path. Keep at least 450 ms between requests.
+- Normalise URLs: language subdomains are the same coin
+  (`source_key = ucoin:<normalised host><path>[?tid=<tid>]`).
+
+## Numista (not used)
+
+Requires a personal API key per user; a service-wide key would break their terms. Not
+integrated. Docs: https://en.numista.com/api/doc/index.php
 
 ---
 
-## Построение украинского каталога (архив)
+## Rules for every external source
 
-Разведка источников и весь одноразовый конвейер, которым строился украинский каталог
-(этап 4.5, части A–D) — их код удалён из репозитория 2026-09-24, разведка и решения
-архивированы в `archive/2026-09-ukraine-pipeline-buildlog.md`. Работа над следующими
-странами каталога ведётся в отдельном репозитории `coin-parser`.
+- External sites are called only from background jobs, never inside an HTTP request
+  handler of this API.
+- Timeouts, bounded retries, a pause between requests to the same host, an honest
+  User-Agent (`coin-parser` sends `coin-collector/0.1 (personal project)`).
+- Scheduled scraping only for sources without Cloudflare and with acceptable terms: NBU
+  and UA-Coins.
+- No external source creates **shared** catalog records except the NBU catalog sync, and
+  that one creates drafts.
+- Keep the raw response next to what was parsed from it — without it, a bad value can't
+  be investigated.
+
+## Other outbound services
+
+Not data sources, listed for completeness: Google OAuth (`auth.md`), Telegram Bot API
+(`admin.md`, `telegram-support.md`), the Anthropic API for background name translation
+(`claude-haiku-4-5`, `app/services/translation.py`; `business-rules.md`, BR-16), SMTP
+(`infra.md`).

@@ -257,7 +257,7 @@ async def create_telegram_link(
     session: DbSession, user: AdminUser, settings: AppSettings
 ) -> TelegramLinkOut:
     """A one-time code wrapped in a t.me link. Pressing Start in that chat is
-    what actually connects it (docs/admin.md, 2.5)."""
+    what actually connects it (docs/admin.md, "Linking a chat")."""
     try:
         url, expires_at = await TelegramLinkService(session, settings).create_link(user)
     except BotNotConfiguredError as exc:

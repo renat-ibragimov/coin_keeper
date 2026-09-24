@@ -18,8 +18,8 @@ SUPPORT_TELEGRAM_SETUP_SECRET=<temporary random URL-safe secret>
 Generate both secrets independently, for example with
 `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 
-Deploy the API so migration `0023` and the new variables are active, then run
-inside the API container:
+Deploy the API with these variables (and `PUBLIC_BASE_URL`) set, then register the
+webhook from inside the API container:
 
 ```bash
 python scripts/configure_support_telegram.py
@@ -39,9 +39,13 @@ secret and repeat `/setup` in the new group.
 
 ## Conversation lifecycle
 
-- An authenticated site user receives a one-time `t.me` deep link. It links
-  the support chat to the site account and source page.
-- A guest is identified only by Telegram id/name/username.
+- An authenticated site user gets a one-time `t.me` deep link
+  (`POST /support/telegram/link`, 15-minute lifetime). It links the support chat to
+  the site account, the page they came from, and their interface locale; later
+  tickets from the same chat keep that link.
+- A guest gets the plain bot link (`GET /support/telegram`).
+- A guest is identified only by Telegram id/name/username; replies default to
+  Ukrainian.
 - The first message creates a ticket and a forum topic. Text, photos,
   documents, video, audio, voice messages and stickers are copied without
   downloading them to application storage.
@@ -50,6 +54,15 @@ secret and repeat `/setup` in the new group.
 - `Закрити звернення` closes the ticket and topic. The user's next message
   opens a new ticket.
 
-The webhook checks Telegram's `X-Telegram-Bot-Api-Secret-Token`. Updates from
-other groups are ignored; only the group registered with `/setup` can send
-answers or close tickets.
+The webhook (`POST /support/telegram/webhook`) checks Telegram's
+`X-Telegram-Bot-Api-Secret-Token`. Updates from other groups are ignored; only the
+group registered with `/setup` can send answers or close tickets. If the bot isn't
+configured, the link endpoints return `503`.
+
+## Code
+
+`app/api/v1/support.py`, `app/services/support.py` (conversation logic),
+`app/core/support_telegram.py` (Bot API transport), `app/repositories/support.py`.
+The bot's own short replies (welcome, received, closed) and the "Закрити звернення"
+button live in code in Ukrainian and English — like the admin bot (`admin.md`,
+"Message language"), it has no localization files.

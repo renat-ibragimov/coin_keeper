@@ -119,7 +119,7 @@ export interface paths {
         /**
          * Create Telegram Link
          * @description A one-time code wrapped in a t.me link. Pressing Start in that chat is
-         *     what actually connects it (docs/admin.md, 2.5).
+         *     what actually connects it (docs/admin.md, "Linking a chat").
          */
         post: operations["create_telegram_link_api_v1_admin_telegram_link_post"];
         delete?: never;

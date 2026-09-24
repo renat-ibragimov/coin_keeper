@@ -1,4 +1,4 @@
-"""Telegram notice when a new user's account becomes real (docs/admin.md, part 3).
+"""Telegram notice when a new user's account becomes real (docs/admin.md, "Users").
 
 Fired at verification, not at registration: an unconfirmed or bot-filled
 address never reaches a linked admin chat, only a person who finished signing

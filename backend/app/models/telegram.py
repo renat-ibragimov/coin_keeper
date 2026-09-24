@@ -1,4 +1,4 @@
-"""Who the admin bot talks to (docs/admin.md, 2.5)."""
+"""Who the admin bot talks to (docs/admin.md, "Linking a chat")."""
 
 from __future__ import annotations
 

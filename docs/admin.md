@@ -1,358 +1,191 @@
-# 13. Админка
+# Admin section
 
-Рабочий документ раздела `/admin`: решения, объём, состояние работ и находки.
-Ведётся по ходу дела — правится тем же набором коммитов, что и код
-(`CLAUDE.md`, «Доки живут вместе с кодом»).
+The `/admin` area and everything behind it: visibility of scheduled jobs, the admin
+Telegram bot, the watchdog, review of new catalog drafts, and user management. Only users
+with `role = 'admin'` see it (`require_admin`, `app/api/deps.py`). Sections are cited from
+code by name, e.g. `docs/admin.md, "Watchdog"`.
 
-Начат 2026-09-10 по решению владельца: админка поднимается **до** контрольной точки
-«демо», потому что ночной крон цен уже работает и полностью невидим, а правка каталога
-сегодня делается SQL-ом на боевой машине.
+## Screen
 
----
+`/admin` has three tabs, selected by `?section=`:
 
-## 1. Зачем
+| Tab | `section` | Frontend | Backend |
+|---|---|---|---|
+| Фонові задачі | `jobs` (default) | `AdminPage.tsx`, `JobRunDialog.tsx`, `TelegramCard.tsx` | `GET /admin/jobs*`, `/admin/telegram*` |
+| Користувачі | `users` | `UsersSection.tsx` | `GET /admin/users`, `PATCH /admin/users/{id}/role` |
+| Пропозиції монет | `proposals` | `ProposalsSection.tsx`, `ProposalEditor.tsx`, `ProposalActions.tsx` | `/admin/proposals*` |
 
-Четыре задачи, все — из реальной работы, а не из общего представления о том, что
-«в приложении должна быть админка»:
-
-1. **Видеть, что фоновые задачи отработали.** Суточное обновление цен уже идёт кроном,
-   его единственный след — текстовый файл на сервере, в который никто не смотрит.
-2. **Ревью новых монет до попадания в каталог.** Недельное обновление каталога ещё не
-   написано; когда появится — новая монета должна сначала показаться человеку.
-3. **Мониторинг пользователей.** Знать о регистрации, выдавать роль без ssh.
-4. **Правка любой записи каталога** из интерфейса — вынесена из MVP решением владельца
-   2026-09-23 (см. «Часть 2» ниже); список из четырёх задач оставлен как есть — это
-   исходное обоснование раздела, а не текущий состав MVP.
+Endpoint contracts: `api.md`.
 
 ---
 
-## 2. Принятые решения
+## Job runs
 
-Развилки, закрытые в обсуждении 2026-09-10. Пересматриваются только с новой причиной.
+Scheduled jobs run in `coin-parser`, not here (`integrations.md`). Each run reports to
+this API, which records it and notifies Telegram — one place, at the moment it happens,
+with nothing polling.
 
-### 2.1. Черновик живёт в каталоге со статусом, а не в отдельной очереди
+### Reporting API
 
-Непубликованная запись — обычная строка `catalog_items` со `status = 'draft'`. Витрина
-показывает только `active`.
+- `POST /internal/job-runs` opens a run (`status = 'running'`) before the work;
+  `PATCH /internal/job-runs/{id}` closes it with the outcome.
+- Authenticated by the shared secret in `X-Job-Token` (`JOB_REPORT_TOKEN`), compared in
+  constant time. Unset secret → `503` (endpoint disabled); wrong token → `401`. The
+  caller is a container on the same Docker network, not a user.
+- On the `coin-parser` side (`collector/core/job_report.py`) every reporting failure is
+  logged and swallowed: an unreachable API never changes the outcome of a run.
 
-Почему так, а не отдельной таблицей-очередью с JSON-снимком: очередь заставила бы
-продублировать модель монеты, завести второй путь для фото и превратить «принять» в
-копирование записи со всеми связями. При статусе правка черновика — это существующий
-`PATCH /catalog/{id}`, фото уже лежат в MinIO, публикация — смена одного поля. Главное
-следствие: **ревью новых монет и правка каталога — один и тот же экран** с разным
-фильтром, а не две разработки.
+### `job_runs`
 
-Отклонённое не удаляется, а архивируется с причиной — общее правило проекта.
+One row per run: `job`, `status` (`running | ok | partial | failed`), start and finish
+times (`finished_at IS NULL` exactly while `running`), `stats` (the job's own counters,
+JSONB, stored verbatim), a one-line `summary`, `details` (only when not `ok`) and
+`exit_code`. Admins read it with `GET /admin/jobs` (filter by job; the response lists
+known job names) and `GET /admin/jobs/{id}`.
 
-### 2.2. Фото в ревью на этом шаге не трогаем
+### Reading the counters
 
-Админ видит готовую карточку с теми фото, которые выбрал парсер, и правит все остальные
-поля. Ни загрузки своего файла, ни выбора из кандидатов парсера в этой итерации нет:
-загрузка тянет за собой кусок этапа 6, а выбор из кандидатов — доступ к staging парсера,
-который живёт в другом репозитории и не виден API.
+A good run is one line; details appear only when something went wrong, with a few
+examples rather than the full log. For `update-prices`:
 
-### 2.3. В телеграм шлёт бэкенд coin_keeper, а не парсер
+- `no_quote` and `no_link` are normal — UA-Coins doesn't quote every coin every day.
+  They're stated, never flagged.
+- `errors` counts yearly pages that failed to download, not problem coins.
+- `inserted = 0` is not a failure.
+- The real signal is the status / exit code (`0` ok, `1` partial, `2` nothing done).
+- `matched = inserted + corrected + dup`: recent days stay open to correction because
+  UA-Coins may still serve yesterday's column in the morning.
 
-Один отправитель на все уведомления — прогоны задач, регистрации, будущие поводы.
-Парсер только пишет исход прогона в базу.
-
-Пишем сразу **админского бота**, а не разовый отправитель: отдельный модуль уведомлений,
-реестр получателей, свой формат сообщений. Работает он на этом шаге в одну сторону — от
-нас в чат; приём команд появится позже и ляжет в готовую структуру, а не будет
-переписыванием.
-
-**Посторонний к боту подключиться не должен.** Найти бота по имени и написать ему может
-кто угодно — это свойство телеграма, отменить его нельзя. Отменяется другое: бот
-разговаривает только со своими. Меры (`3.1`): получатели — закрытый список chat_id,
-всё, что пришло не от них, молча игнорируется (не отвечаем даже отказом, чтобы не
-подтверждать, что бот жив); в BotFather выключены группы и inline, включён privacy mode; токен
-живёт только в `SERVER_ENV` и в секрете GitHub; когда дойдёт до приёма команд — вебхук с
-`secret_token`, проверяемым до любой обработки.
-
-### 2.4. Отчёт короткий, подробности — только когда плохо
-
-Нормальный прогон — одна фраза: страна, сколько серий и монет, что обновилось, всё
-хорошо. Развёрнутое описание появляется, только если что-то не так: что именно, сколько
-записей задето, первые несколько примеров. Ночной лог — около трёхсот строк на монету, в
-базу и в сообщение он целиком не едет.
-
-
-### 2.5. Привязка телеграма — кнопкой в админке, а не chat_id в конфиге
-
-Решение владельца 2026-09-10, взамен списка chat_id в переменных окружения.
-
-Как это работает: админ жмёт «Підключити Telegram» → бэкенд выдаёт одноразовый код и
-ссылку `t.me/<бот>?start=<код>` → админ нажимает Start → бот получает `/start <код>`,
-сверяет его и запоминает chat_id за этим админом. Отвязка — кнопкой оттуда же.
-
-**Следствие: вебхук нужен сразу.** Принять `/start` иначе нельзя. Альтернатива —
-опрашивать `getUpdates` тридцать секунд после нажатия кнопки — обходится без публичного
-роута, но требует живого процесса и исключает вебхук в дальнейшем (в телеграме это
-взаимоисключающие режимы). Берём вебхук: один роут сейчас, дешёвые команды потом.
-
-**Защита от посторонних от этого только выигрывает** по сравнению с конфигом:
-получателем можно стать исключительно по одноразовому коду, выданному вошедшему
-администратору. Нажать Start у бота может кто угодно — без валидного кода вебхук молча
-ничего не делает. Плюс меры из 2.3: секретный путь, `secret_token` в заголовке,
-проверяемый до любой обработки, ответ `200` всегда (иначе телеграм копит повторы),
-обработка только `/start <код>` — прочие апдейты игнорируются.
-
-Одноразовые коды не пишем заново: `auth_tokens` уже хранит хэш, срок и `used_at` для
-подтверждения почты и сброса пароля — добавляем третий вид `telegram_link`.
-
-### 2.6. Язык сообщений бота — украинский
-
-Решение владельца 2026-09-10. Бот не входит в интерфейс приложения и своих локалей не
-имеет, поэтому строки живут прямо в модуле уведомлений, а не в файлах локализации —
-это единственное место в проекте, где пользовательский текст лежит в коде, и оно
-украиноязычное.
-
-### 2.7. Сторож — код готов, выкатка и крон за владельцем (2026-09-23)
-
-`backend/scripts/watchdog.py`: для каждой из трёх известных задач (`update-prices`,
-`update-rates`, `nbu-catalog-sync`) смотрит время последнего прогона в `job_runs`
-(`JobRunRepository.list_runs`, любой статус, включая зависший `running`) и сравнивает с
-ожидаемым интервалом (`EXPECTED_INTERVALS`, привязан к реальному расписанию в
-`coin-parser/deploy/crontab` — суточные плюс запас на опоздание, раз в 5 часов плюс два часа
-запаса). Просрочка или полное отсутствие прогона — одно сообщение в телеграм со всеми
-просроченными задачами сразу (`watchdog_message`); всё в порядке — тишина, тот же принцип,
-что и у отчёта о прогоне. Отправка идёт тем же `broadcast_admin_message`, что и остальные
-уведомления бота (переименован из `notify_job_run` — теперь используется не только для
-прогонов). Тесты — `tests/test_watchdog.py`, 5 случаев (тихо, никогда не запускалась,
-просрочена по времени, без привязанного чата, зависший `running`).
-
-Выкатка не нужна отдельным деплоем: скрипт живёт в образе `api`, который уже деплоится.
-Нужен только второй крон на сервере — `docs/2026-09-23-owner-commands.md`.
-
-### 2.8. Доступ бота проверяется при каждом запросе
-
-Бот принимает команды только в личном чате самого отправителя. Группы, каналы,
-сообщения от ботов и неизвестные команды игнорируются. Посторонний, нашедший имя
-бота, не получает ни отчётов, ни ответа на `/last` или `/start` без действующего кода.
-
-При привязке, `/last` и подборе получателей рассылки требуется действующий admin:
-аккаунт активен, почта подтверждена. Снятие роли или отключение аккаунта прекращает
-доступ. Отключение Telegram аннулирует также неиспользованные коды привязки.
-Код блокируется в транзакции при использовании, чтобы два запроса не использовали
-одну ссылку одновременно. Ссылку привязки нельзя передавать посторонним — это секрет
-для подключения чата.
-
+The UI highlights a run stuck in `running` for more than 6 hours (`STALE_AFTER_MS`,
+`frontend/src/features/admin/api.ts`) — longer than any real run, shorter than the gap
+between two runs.
 
 ---
 
-## 3. Что уже есть (разведка 2026-09-10)
+## Admin Telegram bot
 
-Проверено в коде и на боевой машине; на это опирается план.
+The backend is the only sender of admin notifications (job runs, new users, watchdog
+alarms); `coin-parser` only reports runs to the API. Code: `app/core/telegram/`
+(transport over the Bot API, a console backend when no token is configured — nothing
+reaches a chat locally or in tests), `app/services/telegram.py`,
+`app/api/v1/telegram.py`. Config: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`,
+`TELEGRAM_WEBHOOK_SECRET` (`infra.md`). The public support bot is a separate bot
+(`telegram-support.md`).
 
-**В схеме основного репозитория:**
+Notifications go out as a background task after the response, so a job never waits on
+Telegram. Chat ids are read inside the request, before the session closes.
 
-- `catalog_items.status` — `TEXT NOT NULL DEFAULT 'active'`,
-  `CHECK (status IN ('draft', 'active', 'rejected'))`. Есть с миграции `0001`, **никем не
-  читается и не пишется**. Черновикам миграция не нужна.
-- `catalog_items.edited_fields` — JSONB, «имена полей, которые исправил человек, чтобы
-  загрузчик каталога их не трогал». Тоже пустой задел, ровно под админ-редактор.
-- `audit_log` — таблица есть, пустая, никто не пишет.
-- `storefront_visible()` (`app/repositories/catalog.py:117`) — единый предикат витринной
-  видимости, переиспользуется сериями и дашбордом. Фильтр черновиков добавляется сюда,
-  в одно место.
-- `require_admin` (`app/api/deps.py:122`); админ уже может править общий каталог,
-  архивировать, создавать серии. Админский `PATCH /catalog/{id}` сам ставит
-  `*_source = 'manual'`, и конвейер такие поля больше не перетирает.
+### Linking a chat
 
-**На сервере:**
+No chat ids in config. An admin presses "Підключити Telegram" on `/admin` →
+`POST /admin/telegram/link` returns a one-time code and a link
+`t.me/<bot>?start=<code>` → the admin presses Start → the webhook receives
+`/start <code>`, checks it and stores the chat id for that admin in
+`telegram_recipients`. The card polls until the link lands. `DELETE /admin/telegram`
+unlinks and also voids unused codes.
 
-- `coin-parser` — **отдельный репозиторий** (`~/coin-parser`, свой compose и Dockerfile),
-  ходит в ту же базу coinkeeper по docker-сети, credentials берёт из
-  `~/coinkeeper/.env`. Всё, что мы просим у парсера, — правка в другом репозитории.
-- Крон: `15 3 * * * ~/coin-parser/deploy/run-update-prices.sh >> ~/logs/update-prices.log`.
-  Время серверное, не UTC; `03:15` выбрано намеренно в стороне от начала часа.
-- Скрипт уже отдаёт осмысленный код возврата: `0` — норма, `1` — частично, `2` — ничего
-  не сделано.
-- Последняя строка прогона — готовая машиночитаемая сводка (`UpdatePricesSummary`,
-  `collector/countries/ua/update_prices.py`), одни и те же ключи в одном и том же порядке
-  при любом исходе:
-  `update-prices ok series=8 scope=325 years=34 matched=321 inserted=321 corrected=0 dup=0 no_quote=4 no_link=0 errors=0`.
-  То есть счётчики для `job_runs` уже посчитаны, их осталось записать. Рядом в сводке
-  живут `warnings`, `pruned`, `years_failed`, `committed` и `error` — это и есть
-  «подробности при не-`ok`».
-- `summary.status_word()` отдаёт ровно `ok | partial | failed` — совпадает с нашими
-  статусами, маппинг придумывать не нужно; `running` добавляем мы.
-- **Как читать счётчики, чтобы не поднимать ложную тревогу:**
-  `errors` — это число годовых страниц, не скачавшихся ночью, а не число проблемных
-  монет; `no_quote` и `no_link` — обычное дело (ua-coins не котирует каждую монету
-  каждый день) и плохим прогон не делают; `inserted = 0` тоже не сбой, это прямо
-  оговорено в коде. Единственный признак беды — код возврата.
-- В `docs/00_spec.md` парсера уже записан принцип «самоотчёт и стоп на аномалии»:
-  сомнительные данные не пишутся молча.
-- Новые записи парсер сейчас создаёт **без** указания `status`, то есть сразу `active`.
-  Недельному обновлению каталога придётся писать `draft` явно — см. часть 4.
+- Codes reuse `auth_tokens` (hash, expiry, `used_at`) with kind `telegram_link`;
+  lifetime 15 minutes (`telegram_link_ttl_minutes`).
+- A code is locked in a transaction when used, so one link can't be consumed twice.
+- The link is a secret: anyone holding it can attach their chat.
 
----
+### Access rules
 
-## 4. Состояние работ
+Anyone can find a bot by name and write to it; the bot talks only to its own admins.
 
-Порядок: сначала видимость крона (он работает каждую ночь и горит), затем редактор
-каталога (он же фундамент ревью), потом пользователи (дёшево, отправитель к тому моменту
-готов), последним — ревью.
+- The webhook checks `X-Telegram-Bot-Api-Secret-Token` before parsing anything: wrong
+  secret → `403`, secret not configured → `404`, as if the route didn't exist.
+- The reply is always `200` otherwise — a non-200 makes Telegram retry for hours.
+- Only private chats are served. Groups, channels, messages from bots and unknown
+  commands are ignored silently (no refusal message that would confirm the bot is
+  alive).
+- Only `/start <code>` and `/last` (the latest run) are acted on.
+- Linking, `/last` and broadcast recipients all require a **current** admin: account
+  active, email verified, role still `admin`. Losing the role or the account stops
+  delivery.
+- In BotFather: groups and inline mode off, privacy mode on.
 
-### Часть 1. Видимость фоновых задач — код готов, выкатка за владельцем
+### Message language
 
-- [x] Миграция `0021`: таблица `job_runs` (задача, статус `running|ok|partial|failed`,
-      начало, конец, счётчики JSONB, короткая сводка, подробности только при не-`ok`,
-      код возврата), приём отчёта `POST /internal/job-runs` и `PATCH .../{id}` по
-      `X-Job-Token`, 11 тестов (`data-model.md`, `api.md`, `infra.md`)
-- [x] `coin-parser` отчитывается о прогоне (коммит `ca23199` в том репозитории):
-      открытие перед работой, закрытие с итогом после, общий модуль
-      `collector/core/job_report.py` — недельному каталогу он подойдёт как есть.
-      Недоступный API стоит строчки в логе и не меняет исход прогона
-- [x] `GET /admin/jobs` (фильтр по задаче, список известных имён в ответе) и
-      `GET /admin/jobs/{id}` под ролью admin, 6 тестов (`api.md`)
-- [x] Экран `/admin` (раздел «Фонові задачі»): список прогонов, фильтр по задаче,
-      карточка прогона модалкой, подсветка зависших в `running` дольше шести часов,
-      строки локализации uk/en, 5 тестов (`ui.md`)
-- [x] Модуль админского бота (`app/core/telegram/`): транспорт `sendMessage` через Bot
-      API, консольный бэкенд без токена (локально и в тестах в чат не уйдёт ничего),
-      украинские тексты в `messages.py`
-- [x] Привязка кнопкой (2.5): вид токена `telegram_link` в `auth_tokens`, таблица
-      `telegram_recipients` (миграция `0022`), `POST /admin/telegram/link` со ссылкой
-      `t.me/<бот>?start=<код>`, вебхук с проверкой `secret_token`, `DELETE /admin/telegram`
-- [x] Команда `/last` — последний прогон в ответ
-- [x] Защита от посторонних (2.3, 2.5): без валидного кода `/start` молча ничего не
-      делает, `/last` отвечает только подключённым чатам, код одноразовый и живёт 15
-      минут, при снятой роли admin не срабатывает; чужой `secret_token` — `403`,
-      незаданный секрет — `404`, как будто маршрута нет
-- [x] Уведомление по завершению прогона — короткое, подробности только при не-`ok`;
-      уходит фоновой задачей после ответа отчитавшейся задаче
-- [x] Карточка «Сповіщення в Telegram» на `/admin`: подключение, ожидание нажатия
-      Start опросом, отключение
-- [ ] **Выкатка — за владельцем:** BotFather, четыре переменные в `.env` и в секрете
-      GitHub, пуш, `setWebhook`, пересборка контейнера коллектора, проверка.
-      Команды по шагам — `docs/2026-09-10-owner-commands.md`
-- [x] Тесты: 11 на приём отчёта, 6 на чтение в админке, 12 на бота, 8 на экране
-
-### Часть 2. Редактор каталога — вынесена из MVP (решение владельца 2026-09-23)
-
-Основной путь появления и правки записей общего каталога — ревью черновиков (часть 4,
-готова). Точечная правка уже опубликованных записей сейчас не нужна; задача перенесена в
-`11-roadmap.md`, раздел «После MVP». Ревизия 2026-09-23 зафиксировала фактическое
-состояние на момент переноса — ничего из списка ниже не сделано:
-
-- [ ] Ревизия `PATCH /catalog/{id}`: все ли поля карточки правятся (базовый `PATCH` есть
-      и технически пускает admin на общие карточки, но без остального из списка)
-- [ ] Админская правка пишет `edited_fields` — чтобы загрузчик каталога их не перетирал
-- [ ] Админская правка пишет `audit_log`
-- [ ] Экран `/admin/catalog`: поиск, список, форма правки со всеми полями и локалями
-- [ ] Архивация и возврат из архива с причиной прямо из экрана
-- [ ] Тесты
-
-### Часть 3. Пользователи — готово в основном (ревизия 2026-09-23)
-
-- [x] `GET /admin/users`: кто, когда зарегистрировался, подтверждён ли адрес, сколько
-      экземпляров — `UsersSection.tsx`
-- [x] Выдача и снятие роли вместо `promote_admin.py` по ssh —
-      `PATCH /admin/users/{id}/role`
-- [x] Предохранители: не снять роль с себя, не оставить систему без единого админа —
-      `services/admin_users.py`
-- [x] Уведомление о регистрации — готово (2026-09-23). Срабатывает не на сам
-      `POST /auth/register` (незавершённая или ботом заполненная попытка не должна
-      будить чат), а в момент, когда аккаунт реально становится активным:
-      `AuthService.verify_email` (email-флоу) и ветка создания нового пользователя
-      в `google_auth.py: callback` (Google-флоу с `google_controls_email=True`, где
-      активация происходит сразу, без `verify_email`). Сообщение — `🆕 Новий
-      користувач: <email>`, тем же `broadcast_admin_message`, что и у прогонов.
-      Тесты — `tests/test_new_user_notification.py`, 4 случая (email-флоу,
-      Google-флоу, без привязанного чата, голая регистрация без подтверждения
-      никого не будит)
-
-### Текущий каркас интерфейса
-
-В разделе `/admin` навигация разделена на три подменю: «Фонові задачі» (журнал
-прогонов и Telegram-оповещения), «Користувачі» и «Пропозиції монет». Последний
-раздел пока показывает пустое состояние и не имеет API: позже туда попадут
-предложения от парсера и пользователей.
-
-### Часть 4. Ревью новых монет
-
-- [x] `status` читается в `storefront_visible()` и в публичных выборках каталога
-- [x] Черновик виден только админу; прямая карточка черновика обычному пользователю — 404
-- [x] Публикация: `draft → active`; отклонение — `rejected` + архивация с причиной
-- [x] Экран очереди ревью: список черновиков, переход к карточке, публикация и отклонение
-- [x] Суточное обновление первых 25 карточек НБУ создаёт записи со `status = 'draft'`
-- [x] Backend-тесты видимости, публикации и отклонения
-
-Редактирование всех полей уже опубликованной карточки осталось бы частью общего
-редактора каталога (часть 2), если тот когда-нибудь понадобится — он вынесен из MVP
-(решение владельца 2026-09-23, см. выше). Очередь ревью само по себе этот редактор не
-дублирует и не заменяет.
+Bot messages are Ukrainian and live in `app/core/telegram/messages.py`, not in the
+frontend localization files: the bot is not part of the app's interface and has no
+locale. This is the one place where user-facing text sits in code (the Ruff exception is
+in `backend/pyproject.toml`).
 
 ---
 
-## 5. Чего в этом объёме нет
+## Watchdog
 
-Осознанно отложено, чтобы не растить раздел бесконечно:
+`backend/scripts/watchdog.py` catches a job that **didn't run at all**, which the job
+itself can't report. For each known job it reads the latest run in `job_runs` (any
+status, including a hung `running`) and compares its age with `EXPECTED_INTERVALS`:
 
-- загрузка своих фотографий и замена фото из админки (этап 6);
-- команда «запусти сейчас»: это запуск чужого контейнера с другой машины, отдельный
-  разговор про права. Маршрутизация команд и `/last` — в части 1 (2.5);
-- сторож «прогон ожидался, но не пришёл» — отдельный cron, следующая задача (2.7);
-- impersonation с аудит-логом (`backlog.md`, после MVP);
-- слияние дубликатов общего каталога и повышение личной позиции в общую
-  (`backlog.md`, после MVP);
-- управление активностью стран (сейчас `UPDATE` руками; Украина включена, СССР и США нет);
-- физическое удаление записи общего каталога — редкая операция «прибраться за опечаткой»,
-  в интерфейсе её нет вовсе (`ui.md`).
+| Job | Schedule | Alarm after |
+|---|---|---|
+| `update-prices` | daily 07:10 UTC | 26 h |
+| `update-rates` | every 5 h at `:25` | 7 h |
+| `nbu-catalog-sync` | daily 10:40 UTC | 26 h |
 
----
+Anything overdue or never run → one Telegram message listing all of them
+(`watchdog_message`); all fresh → silence. The intervals must follow
+`coin-parser/deploy/crontab`.
 
-## 6. Открытые вопросы
+It's a cron entry, not a queued task: the script ships in the `api` image and cron runs
+`docker compose exec -T api python scripts/watchdog.py` every 6 hours (the line lives in
+`coin-parser/deploy/crontab`). There is no ARQ worker in the project, and the watchdog
+wouldn't move to one if there were.
 
-- **Чем запускать сторожа — решено и написано (2026-09-23).** ARQ переехал после MVP
-  целиком, по необходимости (решение владельца 2026-09-15, `docs/HANDOFF.md`, §3) —
-  вопрос «поднять ARQ раньше» больше не открыт. Сторож — вторым кроном, дёргающим
-  `docker compose exec api python scripts/watchdog.py`, без пометки «времянка»: на ARQ
-  он не переедет, даже когда ARQ появится в проекте для чего-то другого (2.7).
-- **Известное ограничение:** если сервер лежит целиком, молчат и парсер, и сторож.
-  Внешний аптайм-монитор в этот объём не входит.
-- **Привязка и язык уже реализованы:** chat_id хранятся в БД за аккаунтом
-  администратора; сообщения бота — украинские.
+**Limitation:** if the whole server is down, both the jobs and the watchdog are silent.
+External uptime monitoring is not set up.
 
 ---
 
-## 7. Журнал находок
+## Draft review
 
-Сюда пишем то, что выяснилось по ходу и меняет план.
+New shared records from the NBU sync arrive as drafts; an admin decides.
 
-- **2026-09-10.** `catalog_items.status` и `edited_fields` уже в схеме с `0001` и никем не
-  используются — часть 4 обходится без миграции, часть 2 получает готовое место для
-  пометки ручных правок.
-- **2026-09-10.** Парсер уже считает все счётчики прогона и отдаёт их одной строкой;
-  задача части 1 — не «собрать статистику», а «записать посчитанное в базу».
-- **2026-09-10.** В сводке появился `corrected` (коммит `cba72ea` в `coin-parser`: цены
-  последней недели остаются открытыми на исправление, потому что ua-coins утром ещё
-  отдаёт вчерашнюю колонку). Инвариант сводки поэтому стал
-  `matched = inserted + corrected + dup` — по коду `_insert`, где
-  `duplicates = 1 - inserted - updated`. Докстринг `summary_line()` всё ещё говорит
-  `matched = inserted + dup`: строку в парсере надо поправить, `job_runs` считаем по
-  фактическому инварианту.
-- **2026-09-10.** Решение по сторожу пересмотрено в тот же день: сначала он был в части 1,
-  затем убран до появления брокера (2.7).
-- **2026-09-10.** Отказ от сторожа оставил бэкенд без повода узнать о завершившемся
-  прогоне: периодических задач нет, а значит некому и отправить сообщение. Поэтому
-  парсер не пишет в `job_runs` напрямую, а **отправляет отчёт в API** (открытие в начале,
-  закрытие в конце) — запись и уведомление происходят в одном месте и в момент события.
-  Токен для этого кладём в `~/coinkeeper/.env`, который парсер и так читает ради
-  доступа к базе; API виден ему изнутри docker-сети. Недоступный API даёт предупреждение
-  в лог, но не меняет исход прогона: журналирование не роняет саму задачу.
-- **2026-09-10.** Одноразовые коды привязки телеграма ложатся на существующие
-  `auth_tokens` (хэш, срок, `used_at`) — нужен лишь третий вид в enum. Осторожно с
-  миграцией: `ALTER TYPE ... ADD VALUE` нельзя выполнять в одной транзакции с
-  использованием нового значения.
+- A draft is an ordinary `catalog_items` row with `status = 'draft'` — not a separate
+  queue table. Editing it is the normal card editing path, its photos are already in
+  MinIO, and publishing flips one field.
+- Drafts are invisible to non-admins: storefront, search, completeness; a direct card
+  returns `404`. The filter lives with `storefront_visible()` (`business-rules.md`,
+  BR-2).
+- `GET /admin/proposals`, `GET /admin/proposals/{id}` — the queue and one draft.
+- `PUT` / `DELETE /admin/proposals/{id}/photos/{role}` — replace or remove the parser's
+  obverse/reverse (JPEG/PNG/WebP up to 12 MB; stored with `source = 'manual'`).
+- `POST /admin/proposals/{id}/approve` — `draft → active`.
+- `POST /admin/proposals/{id}/reject` with a reason — `status = 'rejected'` plus archiving
+  with that reason. Rejected drafts are never deleted.
+- Both actions are written to `audit_log`; acting on a non-draft returns `409`.
 
-- **2026-09-15.** Ветка объединена с актуальным main. Невыпущенные миграции админки
-  перенесены на `0021 → 0022` после `0020`; существующие ревизии main не менялись.
-  Доступ к Telegram проверяется по актуальным правам, группы закрыты на уровне кода.
-- **Проверки интеграции:** полный backend-набор — 701 тест; после добавления проверок
-  истёкших/заменённых ссылок и отправителя — 31 тест Telegram и миграций отдельно.
-  Ruff, mypy, frontend-тесты, ESLint, Prettier, TypeScript и production build проходят.
-  Проверен переход с базы 0020 с сохранением пользователя; чистая база проверяется
-  общими фикстурами backend-тестов. Проверки на боевом сервере ещё не выполнялись.
+The Telegram message for an `nbu-catalog-sync` run with new drafts links to
+`/admin?section=proposals`.
+
+---
+
+## Users
+
+- `GET /admin/users` — email, display name, role, active, email verified, registration
+  date, number of coins, plus a summary.
+- `PATCH /admin/users/{id}/role` — grant or revoke `admin`. Guards
+  (`services/admin_users.py`): an admin can't demote themselves, and the last admin
+  can't be demoted. Role changes go to `audit_log`.
+- The first admin is bootstrapped over SSH with `backend/scripts/promote_admin.py`
+  (`auth.md`).
+- **New-user notice:** "🆕 Новий користувач: <email>" is sent when an account becomes
+  real, not on `POST /auth/register` — so unfinished or bot-filled sign-ups don't wake
+  the chat. Triggers: `AuthService.verify_email`, and new-user creation in the Google
+  callback when Google vouches for the email (`auth.md`).
+
+---
+
+## Not in scope
+
+- Editing already published shared records from `/admin` (with `edited_fields`, audit
+  and all locales) — deferred (`backlog.md`). Admins can call `PATCH /catalog/{id}`
+  directly; see `integrations.md`, "Loader rules", for why such edits can be lost.
+- Running a job on demand from the admin UI or the bot.
+- Impersonation, merging duplicates, promoting a personal position to shared
+  (`backlog.md`).
+- Toggling country visibility (`is_active`, `catalog_confirmed`) — done by SQL.
+- Physical deletion of shared records — API only, no UI (`business-rules.md`, BR-10).

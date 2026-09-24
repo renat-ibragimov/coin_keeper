@@ -2,7 +2,7 @@
 
 Ukrainian, and the only user-facing wording in the codebase that does not live
 in the frontend locale files: the bot is not part of the application interface
-and has no locale of its own (docs/admin.md, 2.6).
+and has no locale of its own (docs/admin.md, "Message language").
 
 A good run is one short paragraph; the reasoning is in 2.4 -- the nightly log
 is three hundred lines long and nobody wants it in a chat. Only a run that
@@ -69,7 +69,7 @@ def _price_run_lines(stats: dict[str, Any]) -> list[str]:
 
     no_quote and no_link are ordinary: ua-coins does not quote every coin every
     day. Neither belongs in an alarm, so they are stated, not flagged
-    (docs/admin.md, section 3).
+    (docs/admin.md, "Reading the counters").
     """
     lines: list[str] = []
     scope, series = _int(stats, "scope"), _int(stats, "series")
@@ -149,7 +149,7 @@ def new_user_message(email: str) -> str:
 
 
 def watchdog_message(stale: list[tuple[str, datetime | None]]) -> str:
-    """One alert for every job that has gone quiet (docs/admin.md, 2.7).
+    """One alert for every job that has gone quiet (docs/admin.md, "Watchdog").
 
     A job with no run at all reads "ще жодного разу" rather than a made-up
     date -- that is the exact case the watchdog exists to catch.

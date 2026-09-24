@@ -1,7 +1,7 @@
 """The bot's webhook: the one public endpoint nobody signs in to.
 
 Telegram posts every update here. Three things keep it safe (docs/admin.md,
-2.5): the secret in X-Telegram-Bot-Api-Secret-Token is checked before anything
+"Access rules"): the secret in X-Telegram-Bot-Api-Secret-Token is checked before anything
 is parsed, only `/start <code>` and `/last` are acted on at all, and the reply
 is always 200 -- a non-200 makes telegram retry the same update for hours.
 """

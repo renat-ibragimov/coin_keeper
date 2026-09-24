@@ -155,7 +155,7 @@ async def test_admin_title_edit_sets_manual_source_and_validates_nonempty(
 ) -> None:
     """PATCH-ing a shared record's names is an admin operation, and whatever
     it writes is provenance 'manual', never the pipeline's 'official' or
-    'llm' (docs/data-model.md; docs/integrations.md, part C).
+    'llm' (docs/data-model.md; docs/integrations.md, "Loader rules").
     """
     refs = ctx.refs
     shared = await make_catalog_item(

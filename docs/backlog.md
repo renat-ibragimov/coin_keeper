@@ -18,8 +18,10 @@ Mostly server state rather than repository code.
       `pg_restore --list`).
 - [ ] **Restore check.** No restore script or test. A backup counts once it has been
       restored and record counts compared.
-- [ ] **Watchdog cron.** `backend/scripts/watchdog.py` is ready (`admin.md`); the server
-      crontab entry isn't installed.
+- [ ] **Watchdog cron.** The entry is in `coin-parser/deploy/crontab`; confirm it's
+      installed on the server (`crontab -l`), then close this item (`admin.md`, "Watchdog").
+- [ ] **External uptime monitoring.** If the whole server is down, jobs and the watchdog go
+      silent together; nothing outside the server notices.
 - [ ] **Real email.** Set up the SMTP provider (Resend), SPF/DKIM/DMARC in Cloudflare,
       `MAIL_BACKEND=smtp` on the server (`infra.md`). Required before strangers sign up.
 - [ ] **Ukrainian emails.** Verification and reset emails are English only
@@ -90,6 +92,13 @@ Mostly server state rather than repository code.
 - [ ] **Design pass.** A general visual review of all screens.
 
 ## Data and sources
+
+- [ ] **Admin edits of shared records get overwritten.** Nothing in this app writes
+      `catalog_items.edited_fields`, and the `coin-parser` loader rewrites source-owned
+      columns (titles and their `*_source` → `official`) on the next load of the series.
+      An admin `PATCH /catalog/{id}` is lost then. Fix: record edited fields on admin
+      PATCH, or make the loader respect `*_source = 'manual'` (`integrations.md`,
+      "Loader rules").
 
 - [ ] **Model/migration drift.** `ix_auth_identities_user_id` (0024) and
       `ix_support_messages_ticket_id` (0023) exist in the database but not in the models;
