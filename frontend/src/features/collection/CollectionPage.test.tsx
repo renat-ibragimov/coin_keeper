@@ -162,7 +162,7 @@ describe('CollectionPage', () => {
     mockCommonQueries(true);
     renderPage();
 
-    expect(await screen.findByText('У колекції ще немає монет')).toBeInTheDocument();
+    expect(await screen.findByText('Ваші монети поруч')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
       'href',
       '/catalog',

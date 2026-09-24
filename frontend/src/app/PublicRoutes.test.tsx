@@ -43,13 +43,13 @@ describe('public routes', () => {
         </AuthDialogContext.Provider>
       </MemoryRouter>,
     );
-    expect(screen.getByText('Колекція поки порожня')).toBeInTheDocument();
+    expect(screen.getByText('Ваш огляд у цифрах')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Увійти' })).toBeInTheDocument();
   });
   it.each([
-    ['coins', 'У колекції ще немає монет'],
-    ['completeness', 'Тут поки порожньо'],
-    ['money', 'Фінансової історії поки немає'],
+    ['coins', 'Ваші монети поруч'],
+    ['completeness', 'Від першої до повної'],
+    ['money', 'Усі витрати на місці'],
   ] as const)('shows the %s guest section with a login action', (section, title) => {
     auth.user = null;
     render(

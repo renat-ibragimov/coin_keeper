@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import onboardingStyles from '@/features/collection/onboarding/CollectionOnboarding.module.css';
+import { CollectionOnboarding } from '@/features/collection/onboarding/CollectionOnboarding';
 import { fetchCountries } from '@/features/catalog/api';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { ApiError } from '@/shared/api/client';
@@ -122,7 +124,7 @@ export function CompletenessListPage() {
   const nothingFound = summaryQuery.data && !noRowsAtAll && !noneStarted && rows.length === 0;
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${collectionEmpty ? onboardingStyles.page : ''}`}>
       <PageHeader
         align="center"
         title={t('completeness.title')}
@@ -130,11 +132,8 @@ export function CompletenessListPage() {
       />
 
       {collectionEmpty ? (
-        <EmptyState
-          variant="card"
-          icon={<Layers strokeWidth={1.75} />}
-          title={t('completeness.emptyCollectionTitle')}
-          description={t('completeness.emptyCollectionText')}
+        <CollectionOnboarding
+          section="completeness"
           actions={
             <>
               <Link to="/catalog">

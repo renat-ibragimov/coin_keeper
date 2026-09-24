@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, LayoutDashboard } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 
+import onboardingStyles from '@/features/collection/onboarding/CollectionOnboarding.module.css';
+import { CollectionOnboarding } from '@/features/collection/onboarding/CollectionOnboarding';
 import { ApiError } from '@/shared/api/client';
 import type { BootstrapOut, BreakdownEntry, ExchangeRateOut } from '@/shared/api/types';
 import {
@@ -15,15 +17,7 @@ import {
   formatSignedUah,
   formatUah,
 } from '@/shared/lib/format';
-import {
-  Button,
-  Card,
-  EmptyState,
-  ErrorState,
-  PageHeader,
-  ProgressRing,
-  Skeleton,
-} from '@/shared/ui';
+import { Button, Card, ErrorState, PageHeader, ProgressRing, Skeleton } from '@/shared/ui';
 
 import { fetchBootstrap } from './api';
 import { CollectionSummaryTiles } from './CollectionSummaryTiles';
@@ -51,7 +45,7 @@ export function DashboardPage() {
   const data = query.data;
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${data.dashboard.isEmpty ? onboardingStyles.page : ''}`}>
       <PageHeader align="center" title={t('dashboard.title')} subtitle={t('dashboard.subtitle')} />
 
       {data.dashboard.isEmpty ? (
@@ -59,11 +53,8 @@ export function DashboardPage() {
         // the empty state alone needs the same header-to-card gap as every
         // other cabinet page, so it makes up the difference itself.
         <div className={styles.emptyStateGap}>
-          <EmptyState
-            variant="card"
-            icon={<LayoutDashboard strokeWidth={1.75} />}
-            title={t('dashboard.emptyTitle')}
-            description={t('dashboard.emptyText')}
+          <CollectionOnboarding
+            section="dashboard"
             actions={
               <>
                 <Link to="/catalog">

@@ -1,57 +1,42 @@
-import { Coins, Layers, LayoutDashboard, Wallet } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
+import onboardingStyles from '@/features/collection/onboarding/CollectionOnboarding.module.css';
 import { useAuthDialog } from '@/features/auth/authDialogContext';
-import { Button, EmptyState, PageHeader } from '@/shared/ui';
+import { Button, PageHeader } from '@/shared/ui';
 import styles from './GuestCollectionPage.module.css';
 
-type Section = 'dashboard' | 'coins' | 'completeness' | 'money';
+import { CollectionOnboarding } from '../onboarding/CollectionOnboarding';
+import type { CollectionSection } from '../onboarding/CollectionOnboarding';
 
 const sections = {
   dashboard: {
     heading: 'dashboard.title',
     subtitle: 'dashboard.subtitle',
-    title: 'dashboard.emptyTitle',
-    description: 'dashboard.emptyText',
-    icon: LayoutDashboard,
   },
   coins: {
     heading: 'collection.title',
     subtitle: 'collection.subtitle',
-    title: 'collection.emptyTitle',
-    description: 'collection.emptyText',
-    icon: Coins,
   },
   completeness: {
     heading: 'completeness.title',
     subtitle: 'completeness.subtitle',
-    title: 'completeness.emptyCollectionTitle',
-    description: 'completeness.emptyCollectionText',
-    icon: Layers,
   },
   money: {
     heading: 'expenses.title',
     subtitle: 'expenses.subtitle',
-    title: 'expenses.emptyCollectionTitle',
-    description: 'expenses.emptyCollectionText',
-    icon: Wallet,
   },
 } as const;
 
-export function GuestCollectionPage({ section = 'dashboard' }: { section?: Section }) {
+export function GuestCollectionPage({ section = 'dashboard' }: { section?: CollectionSection }) {
   const { t } = useTranslation();
   const openAuth = useAuthDialog();
   const content = sections[section];
-  const Icon = content.icon;
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${onboardingStyles.page}`}>
       <PageHeader align="center" title={t(content.heading)} subtitle={t(content.subtitle)} />
-      <EmptyState
-        variant="card"
-        icon={<Icon strokeWidth={1.75} />}
-        title={t(content.title)}
-        description={t(content.description)}
+      <CollectionOnboarding
+        section={section}
         actions={<Button onClick={() => openAuth()}>{t('guest.login')}</Button>}
       />
     </div>

@@ -1,9 +1,11 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { Coins, SearchX, X } from 'lucide-react';
+import { SearchX, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useSearchParams } from 'react-router-dom';
 
+import onboardingStyles from '@/features/collection/onboarding/CollectionOnboarding.module.css';
+import { CollectionOnboarding } from '@/features/collection/onboarding/CollectionOnboarding';
 import { fetchBootstrap } from '@/features/dashboard/api';
 import { CollectionSummaryTiles } from '@/features/dashboard/CollectionSummaryTiles';
 import { ApiError } from '@/shared/api/client';
@@ -301,7 +303,7 @@ export function CollectionPage() {
   );
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${collectionEmpty ? onboardingStyles.page : ''}`}>
       <PageHeader
         align="center"
         title={t('collection.title')}
@@ -318,11 +320,8 @@ export function CollectionPage() {
       />
 
       {collectionEmpty ? (
-        <EmptyState
-          variant="card"
-          icon={<Coins strokeWidth={1.75} />}
-          title={t('collection.emptyTitle')}
-          description={t('collection.emptyText')}
+        <CollectionOnboarding
+          section="coins"
           actions={
             <>
               <Link to="/catalog">

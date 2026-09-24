@@ -88,7 +88,7 @@ describe('DashboardPage', () => {
     vi.mocked(fetchBootstrap).mockResolvedValue(makeBootstrap({ isEmpty: true }));
     renderPage();
 
-    expect(await screen.findByText('Колекція поки порожня')).toBeInTheDocument();
+    expect(await screen.findByText('Ваш огляд у цифрах')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
       'href',
       '/catalog',

@@ -790,5 +790,93 @@
     "trackFinance": "Track collection spending and value",
     "createCollection": "Create a collection",
     "estimatedValue": "Estimated value"
+  },
+  "onboarding": {
+    "example": "Example",
+    "navigation": "Section introduction",
+    "previous": "Previous example",
+    "next": "Next example",
+    "goTo": "Show example {{number}}",
+    "position": "Example {{number}} of {{total}}",
+    "seriesName": "Flora and fauna",
+    "anotherSeries": "Sports",
+    "ownedCount": "{{owned}} of {{total}}",
+    "remaining": "Still to find: {{count}}",
+    "remainingLabel": "Still to collect",
+    "coinCount": "{{count}} coins",
+    "availablePrices": "An estimate based on available prices. Some coins may be unpriced.",
+    "love": "The Power of Love",
+    "lesya": "Lesya Ukrainka",
+    "specimen": "Specimen {{number}}",
+    "storage": "Album · slot 12",
+    "chartDescription": "Example spending from March to June: 4,320, 1,920, 280 and 4,530 hryvnias.",
+    "dashboard": {
+      "heading": "Your collection at a glance",
+      "slides": [
+        {
+          "title": "The whole picture",
+          "text": "Specimen count, total spending and current valuation — see the key figures together on one screen."
+        },
+        {
+          "title": "Spending and current value",
+          "text": "Compare what you spent with the current coin valuations. The difference shows how your collection’s value has changed."
+        },
+        {
+          "title": "The series you collect",
+          "text": "See progress and missing coin counts for the series you have started. Open a series to explore its details."
+        }
+      ]
+    },
+    "coins": {
+      "heading": "Your coins, together",
+      "slides": [
+        {
+          "title": "Cards or a table",
+          "text": "Browse coins with photos or compare them in a table. Multiple specimens of the same issue stay grouped together."
+        },
+        {
+          "title": "Find the right coin",
+          "text": "Search by name, apply filters and choose a sort order. Collection totals update for the coins you select."
+        },
+        {
+          "title": "Every specimen has a story",
+          "text": "Keep the purchase price and date, grade, storage location and notes for each individual specimen."
+        }
+      ]
+    },
+    "completeness": {
+      "heading": "From first coin to full set",
+      "slides": [
+        {
+          "title": "Choose what you collect",
+          "text": "Group coins by series, year, denomination, material, edge or quality. Narrow the selection by country and metal."
+        },
+        {
+          "title": "Progress in every group",
+          "text": "See how many distinct coins you own and how many are missing. Duplicate specimens do not increase completeness."
+        },
+        {
+          "title": "Plan your next addition",
+          "text": "Open a group to browse missing coins and see an estimated cost to complete it, based on available valuations."
+        }
+      ]
+    },
+    "money": {
+      "heading": "Every expense accounted for",
+      "slides": [
+        {
+          "title": "Coins and related expenses",
+          "text": "Purchases appear in the journal automatically. Add shipping, albums and other costs with a coin or separately."
+        },
+        {
+          "title": "Spending over time",
+          "text": "Choose one, three or six months, a year, or custom dates. The period changes the chart; overall totals stay the same."
+        },
+        {
+          "title": "A clear spending journal",
+          "text": "Filter entries by category to see dates, descriptions and amounts. The journal category does not change the chart."
+        }
+      ]
+    }
   }
 }

@@ -227,7 +227,7 @@ describe('CompletenessListPage', () => {
     vi.mocked(fetchCountries).mockResolvedValue([]);
     renderPage();
 
-    expect(await screen.findByText('Тут поки порожньо')).toBeInTheDocument();
+    expect(await screen.findByText('Від першої до повної')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
       'href',
       '/catalog',

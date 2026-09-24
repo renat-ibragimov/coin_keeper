@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 
+import onboardingStyles from '@/features/collection/onboarding/CollectionOnboarding.module.css';
+import { CollectionOnboarding } from '@/features/collection/onboarding/CollectionOnboarding';
 import { fetchCurrencies } from '@/features/catalog/api';
 import { DeleteInstanceDialog } from '@/features/collection/DeleteInstanceDialog';
 import { fetchBootstrap } from '@/features/dashboard/api';
@@ -205,7 +207,7 @@ export function ExpensesPage() {
       : null;
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${collectionEmpty ? onboardingStyles.page : ''}`}>
       <PageHeader
         align="center"
         title={t('expenses.title')}
@@ -220,11 +222,8 @@ export function ExpensesPage() {
       />
 
       {collectionEmpty ? (
-        <EmptyState
-          variant="card"
-          icon={<Wallet strokeWidth={1.75} />}
-          title={t('expenses.emptyCollectionTitle')}
-          description={t('expenses.emptyCollectionText')}
+        <CollectionOnboarding
+          section="money"
           actions={
             <>
               <Link to="/catalog">

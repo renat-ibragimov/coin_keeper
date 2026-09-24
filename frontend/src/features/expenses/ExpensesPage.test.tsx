@@ -203,7 +203,7 @@ describe('ExpensesPage', () => {
     vi.mocked(fetchCurrencies).mockResolvedValue([]);
     renderPage();
 
-    expect(await screen.findByText('Фінансової історії поки немає')).toBeInTheDocument();
+    expect(await screen.findByText('Усі витрати на місці')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Перейти до каталогу' })).toHaveAttribute(
       'href',
       '/catalog',
@@ -215,7 +215,9 @@ describe('ExpensesPage', () => {
     expect(screen.queryByText('Імпортувати з uCoin')).toBeNull();
     // No header action, zero-value KPI tiles, charts or category chips above the empty state.
     expect(screen.queryByRole('button', { name: /Додати витрату/ })).toBeNull();
-    expect(screen.queryByText('Разом на хобі')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Усі витрати на місці' })).toHaveTextContent(
+      'Приклад',
+    );
     expect(screen.queryByText('Витрати за період')).toBeNull();
     expect(screen.queryByText('Усі категорії')).toBeNull();
   });
