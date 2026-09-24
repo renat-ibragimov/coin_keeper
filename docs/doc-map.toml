@@ -132,6 +132,11 @@ paths = []
 note = "a user-visible capability added or removed (not path-checked)"
 
 [[rule]]
+doc = "docs/decisions.md"
+paths = []
+note = "a settled decision changed or an open question answered (not path-checked)"
+
+[[rule]]
 doc = "docs/backlog.md"
 paths = []
 note = "a backlog item done or found done — remove it (not path-checked)"

@@ -109,9 +109,13 @@ Mostly server state rather than repository code.
       PATCH, or make the loader respect `*_source = 'manual'` (`integrations.md`,
       "Loader rules").
 
-- [ ] **Model/migration drift.** `ix_auth_identities_user_id` (0024) and
-      `ix_support_messages_ticket_id` (0023) exist in the database but not in the models;
-      autogenerate would propose dropping them. Declare them in the models.
+- [ ] **Model/migration drift.** `uv run alembic check` reports ~175 differences: every
+      id/FK is `BIGINT` in the database but `Integer` in the models (126 type changes, 46
+      identity defaults), and three indexes exist only in migrations
+      (`catalog_items_search_idx`, `ix_auth_identities_user_id`,
+      `ix_support_messages_ticket_id`). Harmless at runtime, but autogenerate is unusable
+      and `alembic check` can't guard new migrations. Declare `BigInteger` and the indexes
+      in the models until `alembic check` is clean.
 - [ ] **Unused columns.** `user_settings.display_currency` is always `UAH`, nothing
       writes `catalog_items.edited_fields`. Drop them or put them to use.
 

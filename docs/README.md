@@ -20,6 +20,7 @@ system, in English. History lives in git, not here. Rules for agents and contrib
 | [telegram-support.md](telegram-support.md) | Public support bot | support bot changes |
 | [infra.md](infra.md) | Servers, Compose, Caddy, CI/CD, mail, backups | deploy or server changes |
 | [development.md](development.md) | Local setup, tests, CI checks | your first change |
+| [decisions.md](decisions.md) | Why things are the way they are; open owner questions | changing an established rule |
 | [backlog.md](backlog.md) | Open issues and deferred work | picking the next task |
 
 ## Which document to update
@@ -44,6 +45,7 @@ The mapping lives in [`doc-map.toml`](doc-map.toml); the table below is generate
 | compose, Caddyfile, workflows, `.env.example`, `core/config.py`, Dockerfile, prerender | `infra.md` |
 | dev tooling, git hooks, test setup, Vite config | `development.md` |
 | a user-visible capability added or removed (not path-checked) | `product.md` |
+| a settled decision changed or an open question answered (not path-checked) | `decisions.md` |
 | a backlog item done or found done — remove it (not path-checked) | `backlog.md` |
 <!-- doc-map:end -->
 
