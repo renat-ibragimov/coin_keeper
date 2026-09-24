@@ -1,11 +1,12 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { fetchCountries, fetchSeries, PAGE_SIZE } from '@/features/catalog/api';
 import { CoinCard } from '@/features/catalog/CoinCard';
 import { ApiError } from '@/shared/api/client';
+import type { MetalKind } from '@/shared/api/types';
 import { formatPercent, formatUah } from '@/shared/lib/format';
 import {
   Button,
@@ -13,19 +14,29 @@ import {
   ErrorState,
   PageHeader,
   Pagination,
+  Select,
   Skeleton,
   StatTile,
+  Tabs,
 } from '@/shared/ui';
 
 import { fetchCompletenessGroup, fetchCompletenessItems } from './api';
 import type { GroupSelector } from './api';
+import { parseCountryId, parseMetalKind } from './filters';
 import { groupLabel, parseGroupBy } from './groupBy';
+import { MetalKindSelect } from './MetalKindSelect';
 import styles from './CompletenessDetailPage.module.css';
+
+// Whether the item grid narrows to what's collected -- the detail screen's
+// own filter, independent of the list's "Мої"/"Усі" scope tab (which decides
+// which whole GROUPS the list shows, meaningless once one group is open).
+type ItemsScope = 'mine' | 'all';
 
 export function CompletenessDetailPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { groupBy: groupByParam, value: valueParam } = useParams();
+  const [params, setParams] = useSearchParams();
   const groupBy = parseGroupBy(groupByParam);
   const unassigned = valueParam === 'none';
   const numericValue = Number.parseInt(valueParam ?? '', 10);
@@ -37,6 +48,33 @@ export function CompletenessDetailPage() {
       : { value: numericValue };
   const [page, setPage] = useState(1);
 
+  const countryId = parseCountryId(params.get('countryId'));
+  const metalKind = parseMetalKind(params.get('metalKind'));
+  const itemsScope: ItemsScope = params.get('owned') === 'true' ? 'mine' : 'all';
+  const owned = itemsScope === 'mine' ? true : undefined;
+
+  const update = (changes: {
+    countryId?: number;
+    metalKind?: MetalKind | null;
+    itemsScope?: ItemsScope;
+  }) => {
+    const next = new URLSearchParams(params);
+    if ('countryId' in changes) {
+      if (changes.countryId) next.set('countryId', String(changes.countryId));
+      else next.delete('countryId');
+    }
+    if ('metalKind' in changes) {
+      if (changes.metalKind) next.set('metalKind', changes.metalKind);
+      else next.delete('metalKind');
+    }
+    if (changes.itemsScope) {
+      if (changes.itemsScope === 'all') next.delete('owned');
+      else next.set('owned', 'true');
+    }
+    setParams(next, { replace: true });
+    setPage(1);
+  };
+
   // Every series' id, for `CoinCard`'s own series link -- a group of any
   // dimension (year, denomination, material) can mix coins from several
   // series, so this isn't limited to `groupBy === 'series'`.
@@ -46,14 +84,22 @@ export function CompletenessDetailPage() {
   });
   const countriesQuery = useQuery({ queryKey: ['countries'], queryFn: () => fetchCountries() });
   const groupQuery = useQuery({
-    queryKey: ['completeness', 'group', groupBy, valueParam],
-    queryFn: () => fetchCompletenessGroup(groupBy, selector as GroupSelector, undefined),
+    queryKey: ['completeness', 'group', groupBy, valueParam, countryId, metalKind],
+    queryFn: () => fetchCompletenessGroup(groupBy, selector as GroupSelector, countryId, metalKind),
     enabled: selector !== undefined,
   });
   const itemsQuery = useQuery({
-    queryKey: ['completeness', 'items', groupBy, valueParam, page],
+    queryKey: ['completeness', 'items', groupBy, valueParam, countryId, metalKind, owned, page],
     queryFn: () =>
-      fetchCompletenessItems(groupBy, selector as GroupSelector, undefined, page, PAGE_SIZE),
+      fetchCompletenessItems(
+        groupBy,
+        selector as GroupSelector,
+        countryId,
+        metalKind,
+        owned,
+        page,
+        PAGE_SIZE,
+      ),
     enabled: selector !== undefined,
     placeholderData: keepPreviousData,
   });
@@ -87,7 +133,8 @@ export function CompletenessDetailPage() {
 
   const items = itemsQuery.data;
   const pageCount = Math.max(1, Math.ceil((items?.total ?? 0) / PAGE_SIZE));
-  const backTo = `/collection/completeness/${groupBy}/${valueParam ?? ''}`;
+  const search = params.toString();
+  const backTo = `/collection/completeness/${groupBy}/${valueParam ?? ''}${search ? `?${search}` : ''}`;
 
   return (
     <div className={styles.page}>
@@ -156,6 +203,30 @@ export function CompletenessDetailPage() {
           Array.from({ length: 4 }, (_, index) => <Skeleton key={index} height={96} />)
         )}
       </section>
+
+      <div className={styles.toolbar}>
+        <Select
+          aria-label={t('catalog.country')}
+          value={countryId ?? ''}
+          onChange={(event) => update({ countryId: Number(event.target.value) || undefined })}
+        >
+          <option value="">{t('catalog.allCountries')}</option>
+          {(countriesQuery.data ?? []).map((row) => (
+            <option key={row.id} value={row.id}>
+              {row.name}
+            </option>
+          ))}
+        </Select>
+        <MetalKindSelect value={metalKind} onChange={(value) => update({ metalKind: value })} />
+        <Tabs<ItemsScope>
+          options={[
+            { value: 'mine', label: t('completeness.scopeMine') },
+            { value: 'all', label: t('completeness.scopeAll') },
+          ]}
+          value={itemsScope}
+          onChange={(value) => update({ itemsScope: value })}
+        />
+      </div>
 
       {itemsQuery.isError ? <ErrorState onRetry={() => void itemsQuery.refetch()} /> : null}
       {itemsQuery.isPending ? (

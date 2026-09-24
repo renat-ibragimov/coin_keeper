@@ -221,6 +221,7 @@ class CompletenessRepository:
         value: int | None,
         unassigned: bool,
         country_id: int | None = None,
+        metal_kind: MetalKind | None = None,
     ) -> CompletenessGroupData:
         column = GROUP_BY_COLUMNS[group_by]
         predicate = column.is_(None) if unassigned else column == value
@@ -232,6 +233,8 @@ class CompletenessRepository:
         ]
         if country_id is not None:
             active_conditions.append(CatalogItem.country_id == country_id)
+        if metal_kind is not None:
+            active_conditions.append(CatalogItem.metal_kind == metal_kind)
 
         counts = (
             await self._session.execute(
@@ -253,6 +256,8 @@ class CompletenessRepository:
         any_state_conditions: list[ColumnElement[bool]] = [self._visible(), predicate]
         if country_id is not None:
             any_state_conditions.append(CatalogItem.country_id == country_id)
+        if metal_kind is not None:
+            any_state_conditions.append(CatalogItem.metal_kind == metal_kind)
         money = (
             await self._session.execute(
                 select(

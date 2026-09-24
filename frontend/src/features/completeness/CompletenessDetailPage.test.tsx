@@ -183,7 +183,15 @@ describe('CompletenessDetailPage', () => {
   it('fetches this group only from the ungated completeness-items endpoint, never GET /catalog', async () => {
     renderPage();
     await screen.findByText('Delaware');
-    expect(fetchCompletenessItems).toHaveBeenCalledWith('series', { value: 5 }, undefined, 1, 24);
+    expect(fetchCompletenessItems).toHaveBeenCalledWith(
+      'series',
+      { value: 5 },
+      undefined,
+      undefined,
+      undefined,
+      1,
+      24,
+    );
   });
 
   it('renders a generic header and no series-only chrome for a non-series grouping', async () => {
@@ -203,7 +211,15 @@ describe('CompletenessDetailPage', () => {
     expect(await screen.findByRole('heading', { name: '2015' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Відкрити в каталозі' })).not.toBeInTheDocument();
     expect(screen.queryByText(/загального каталогу/)).not.toBeInTheDocument();
-    expect(fetchCompletenessItems).toHaveBeenCalledWith('year', { value: 2015 }, undefined, 1, 24);
+    expect(fetchCompletenessItems).toHaveBeenCalledWith(
+      'year',
+      { value: 2015 },
+      undefined,
+      undefined,
+      undefined,
+      1,
+      24,
+    );
   });
 
   it('resolves the "none" route segment to the unassigned bucket', async () => {
@@ -224,6 +240,8 @@ describe('CompletenessDetailPage', () => {
     expect(fetchCompletenessItems).toHaveBeenCalledWith(
       'material',
       { unassigned: true },
+      undefined,
+      undefined,
       undefined,
       1,
       24,

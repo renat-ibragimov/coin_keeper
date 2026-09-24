@@ -63,11 +63,16 @@ async def completeness_group(
     value: Annotated[int | None, Query()] = None,
     unassigned: Annotated[bool, Query()] = False,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
+    metal_kind: Annotated[MetalKind | None, Query(alias="metalKind")] = None,
 ) -> CompletenessGroupOut:
     _check_group_selector(value, unassigned)
     try:
         return await CompletenessService(session, user, locale).group(
-            group_by, value=value, unassigned=unassigned, country_id=country_id
+            group_by,
+            value=value,
+            unassigned=unassigned,
+            country_id=country_id,
+            metal_kind=metal_kind,
         )
     except CompletenessInvalidRequestError as exc:
         raise ProblemError(
@@ -95,6 +100,8 @@ async def completeness_items(
     value: Annotated[int | None, Query()] = None,
     unassigned: Annotated[bool, Query()] = False,
     country_id: Annotated[int | None, Query(alias="countryId")] = None,
+    metal_kind: Annotated[MetalKind | None, Query(alias="metalKind")] = None,
+    owned: Annotated[bool | None, Query()] = None,
 ) -> Page[CatalogListItem]:
     _check_group_selector(value, unassigned)
     try:
@@ -103,6 +110,8 @@ async def completeness_items(
             value=value,
             unassigned=unassigned,
             country_id=country_id,
+            metal_kind=metal_kind,
+            owned=owned,
             limit=pagination.page_size,
             offset=pagination.offset,
         )

@@ -199,6 +199,106 @@ async def test_group_own_price_snapshot_feeds_value(
     assert group_a["summary"]["currentValueUah"] == "180.00"
 
 
+async def test_group_metal_kind_filter_narrows_the_summary(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """The metalKind filter must also reach GET /completeness/group, not only
+    /summary (docs/08-ui-map.md: Комплектність carries its filters from the
+    group list into the group's own detail screen)."""
+    refs = ctx.refs
+    series = refs.fauna
+    gold = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Gold",
+        year=2020,
+        series=series,
+        metal_kind=MetalKind.PRECIOUS,
+    )
+    steel = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Steel",
+        year=2021,
+        series=series,
+        metal_kind=MetalKind.BASE,
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=gold, price="1000")
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=steel, price="5")
+
+    group = (
+        await client.get(
+            f"/api/v1/completeness/group?groupBy=series&value={series.id}&metalKind=precious",
+            headers=auth(ctx.token_a),
+        )
+    ).json()["summary"]
+    assert group["total"] == 1
+    assert group["owned"] == 1
+    assert group["purchaseTotalUah"] == "1000.00"
+
+
+async def test_items_metal_kind_and_owned_filters(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """Same two filters on GET /completeness/items: metalKind narrows the
+    dimension the same way /group and /summary do, and owned narrows the
+    grid to what the user already has (or is still missing)."""
+    refs = ctx.refs
+    series = refs.fauna
+    gold_owned = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Gold owned",
+        year=2020,
+        series=series,
+        metal_kind=MetalKind.PRECIOUS,
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Gold missing",
+        year=2021,
+        series=series,
+        metal_kind=MetalKind.PRECIOUS,
+    )
+    steel_owned = await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Steel owned",
+        year=2022,
+        series=series,
+        metal_kind=MetalKind.BASE,
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=gold_owned, price="1000")
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=steel_owned, price="5")
+    headers_a = auth(ctx.token_a)
+
+    by_metal = (
+        await client.get(
+            f"/api/v1/completeness/items?groupBy=series&value={series.id}&metalKind=precious",
+            headers=headers_a,
+        )
+    ).json()
+    assert {item["title"] for item in by_metal["items"]} == {"Gold owned", "Gold missing"}
+
+    owned_only = (
+        await client.get(
+            f"/api/v1/completeness/items?groupBy=series&value={series.id}"
+            "&metalKind=precious&owned=true",
+            headers=headers_a,
+        )
+    ).json()
+    assert {item["title"] for item in owned_only["items"]} == {"Gold owned"}
+
+    missing_only = (
+        await client.get(
+            f"/api/v1/completeness/items?groupBy=series&value={series.id}&owned=false",
+            headers=headers_a,
+        )
+    ).json()
+    assert {item["title"] for item in missing_only["items"]} == {"Gold missing"}
+
+
 async def test_items_of_an_unconfirmed_country_still_show(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:

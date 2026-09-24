@@ -86,6 +86,22 @@
   border-color: var(--color-danger);
 }
 
+/* A non-default pick, for a trigger whose own text doesn't name it (see
+ * `active` on SelectProps) -- same border/fill/text vocabulary as Tabs'
+ * .active segment (Tabs.module.css). */
+.triggerActive,
+.triggerActive:hover {
+  border-color: var(--color-accent-strong);
+  background-color: var(--color-selected);
+  color: var(--color-accent-strong);
+}
+
+:root[data-theme='dark'] .triggerActive,
+:root[data-theme='dark'] .triggerActive:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 /* The open menu is a raised card in its own right: card surface, card
  * shadow, one step of radius below the trigger's siblings. */
 .menu {

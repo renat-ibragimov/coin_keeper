@@ -24,14 +24,18 @@ export function fetchCompletenessSummary(
 }
 
 /** One group's summary, for the detail screen's header -- works from a
- *  bookmarked/shared link without fetching the whole dimension's list. */
+ *  bookmarked/shared link without fetching the whole dimension's list.
+ *  `metalKind` matches whatever the list's own filter was set to, so the
+ *  numbers on the detail screen agree with the row the user clicked
+ *  (docs/08-ui-map.md, Комплектність). */
 export function fetchCompletenessGroup(
   groupBy: CompletenessGroupBy,
   selector: GroupSelector,
   countryId: number | undefined,
+  metalKind: MetalKind | undefined,
 ): Promise<CompletenessGroup> {
   return api<CompletenessGroup>(
-    `/completeness/group${toQuery({ groupBy, countryId, ...selectorQuery(selector) })}`,
+    `/completeness/group${toQuery({ groupBy, countryId, metalKind, ...selectorQuery(selector) })}`,
   );
 }
 
@@ -39,11 +43,15 @@ export function fetchCompletenessGroup(
  *  country's catalog_confirmed (docs/04-business-rules.md §13a). Deliberately
  *  not `fetchCatalog(...)`: that's the catalogue browse experience's harder
  *  gate, which hides a user's own coins of a country the catalogue project
- *  hasn't confirmed yet. */
+ *  hasn't confirmed yet. `owned` is the detail screen's own filter (narrows
+ *  the grid to what's collected or to what's missing), independent of the
+ *  list's scope tab, which has no meaning once a single group is open. */
 export function fetchCompletenessItems(
   groupBy: CompletenessGroupBy,
   selector: GroupSelector,
   countryId: number | undefined,
+  metalKind: MetalKind | undefined,
+  owned: boolean | undefined,
   page: number,
   pageSize: number,
 ): Promise<CatalogPage> {
@@ -51,6 +59,8 @@ export function fetchCompletenessItems(
     `/completeness/items${toQuery({
       groupBy,
       countryId,
+      metalKind,
+      owned,
       page,
       pageSize,
       ...selectorQuery(selector),

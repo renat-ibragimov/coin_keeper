@@ -22,26 +22,21 @@ import {
 } from '@/shared/ui';
 
 import { fetchCompletenessSummary } from './api';
+import { detailFilterQuery, parseCountryId, parseMetalKind } from './filters';
 import { groupByOptions, groupLabel, groupRouteValue, parseGroupBy } from './groupBy';
 import type { CompletenessGroupBy } from './groupBy';
+import { MetalKindSelect } from './MetalKindSelect';
 import { sortGroups } from './sort';
 import type { CompletenessSort } from './sort';
 import styles from './CompletenessListPage.module.css';
 
 type CompletenessScope = 'mine' | 'all';
 
-// Only these two are ever a filterable choice -- 'unknown' is a display/
-// groupBy bucket elsewhere (groupBy.ts), never something a user picks
-// (same whitelist as the catalog's own metal-kind filter, useCatalogFilters.ts).
-function parseMetalKind(value: string | null): MetalKind | undefined {
-  return value === 'precious' || value === 'base' ? value : undefined;
-}
-
 export function CompletenessListPage() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const [params, setParams] = useSearchParams();
-  const countryId = Number.parseInt(params.get('countryId') ?? '', 10) || undefined;
+  const countryId = parseCountryId(params.get('countryId'));
   const metalKind = parseMetalKind(params.get('metalKind'));
   const groupBy: CompletenessGroupBy = parseGroupBy(params.get('groupBy'));
   const sort: CompletenessSort = params.get('sort') === 'value' ? 'value' : 'completion';
@@ -116,6 +111,11 @@ export function CompletenessListPage() {
     );
   }, [scopedRows, debouncedSearch, groupBy, t]);
 
+  const detailQuery = useMemo(
+    () => detailFilterQuery(countryId, metalKind),
+    [countryId, metalKind],
+  );
+
   const noRowsAtAll = summaryQuery.data && allRows.length === 0;
   const noneStarted =
     summaryQuery.data && !noRowsAtAll && scope === 'mine' && scopedRows.length === 0;
@@ -179,18 +179,10 @@ export function CompletenessListPage() {
                 value={groupBy}
                 onChange={(value) => update({ groupBy: value })}
               />
-              <Select
-                aria-label={t('catalog.metalKind')}
-                triggerLabel={t('catalog.metalKind')}
-                value={metalKind ?? ''}
-                onChange={(event) =>
-                  update({ metalKind: (event.target.value as MetalKind) || null })
-                }
-              >
-                <option value="">{t('catalog.all')}</option>
-                <option value="precious">{t('catalog.metalPrecious')}</option>
-                <option value="base">{t('catalog.metalBase')}</option>
-              </Select>
+              <MetalKindSelect
+                value={metalKind}
+                onChange={(value) => update({ metalKind: value })}
+              />
               <Tabs<CompletenessScope>
                 options={[
                   { value: 'mine', label: t('completeness.scopeMine') },
@@ -270,7 +262,7 @@ export function CompletenessListPage() {
                   </ProgressRing>
                   <div className={styles.rowBody}>
                     <Link
-                      to={`/collection/completeness/${groupBy}/${groupRouteValue(row)}`}
+                      to={`/collection/completeness/${groupBy}/${groupRouteValue(row)}${detailQuery ? `?${detailQuery}` : ''}`}
                       className={styles.name}
                     >
                       {groupLabel(t, groupBy, row)}

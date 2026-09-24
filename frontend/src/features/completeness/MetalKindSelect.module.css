@@ -1,0 +1,16 @@
+/* The trigger swaps its text for the pick ("Дорогоцінні" / "Недорогоцінні"),
+ * both shorter than the filter's own name -- stacking the name underneath,
+ * invisible, on the same grid cell reserves its width so the toolbar never
+ * narrows and re-wraps when a pick is made. */
+.label {
+  display: grid;
+  align-items: center;
+}
+
+.label > * {
+  grid-area: 1 / 1;
+}
+
+.labelGhost {
+  visibility: hidden;
+}

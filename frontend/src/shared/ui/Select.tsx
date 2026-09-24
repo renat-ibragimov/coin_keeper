@@ -32,6 +32,10 @@ interface SelectProps {
    *  metal-kind filter, docs/08-ui-map.md: owner's call, 2026-09-23, also
    *  keeps the trigger's width constant across every option). */
   triggerLabel?: ReactNode;
+  /** Highlights the trigger as carrying a non-default pick, for a filter
+   *  whose triggerLabel doesn't otherwise change with the selection
+   *  (Комплектність's metal-kind filter, docs/08-ui-map.md). */
+  active?: boolean;
   children: ReactNode;
 }
 
@@ -74,6 +78,7 @@ export function Select({
   searchPlaceholder,
   centerLabel,
   triggerLabel,
+  active: isActive,
   children,
   ...rest
 }: SelectProps) {
@@ -227,6 +232,7 @@ export function Select({
             styles.trigger,
             error ? styles.invalid : '',
             open ? styles.triggerOpen : '',
+            isActive ? styles.triggerActive : '',
             className ?? '',
           ]
             .filter(Boolean)

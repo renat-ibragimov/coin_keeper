@@ -82,10 +82,15 @@ class CompletenessService:
         value: int | None,
         unassigned: bool,
         country_id: int | None,
+        metal_kind: MetalKind | None = None,
     ) -> CompletenessGroupOut:
         self._check_unassigned(group_by, unassigned)
         data = await self._repo.one(
-            group_by, value=value, unassigned=unassigned, country_id=country_id
+            group_by,
+            value=value,
+            unassigned=unassigned,
+            country_id=country_id,
+            metal_kind=metal_kind,
         )
         if data.total == 0:
             raise CompletenessNotFoundError
@@ -102,6 +107,8 @@ class CompletenessService:
         value: int | None,
         unassigned: bool,
         country_id: int | None,
+        metal_kind: MetalKind | None,
+        owned: bool | None,
         limit: int,
         offset: int,
     ) -> tuple[list[CatalogListItem], int]:
@@ -109,6 +116,10 @@ class CompletenessService:
         filters = CatalogFilters(sort="year", order="asc")
         if country_id is not None:
             filters.country_ids = [country_id]
+        if metal_kind is not None:
+            filters.metal_kinds = [metal_kind]
+        if owned is not None:
+            filters.owned = owned
         if group_by == "series":
             filters.series_id_is_null = unassigned
             if not unassigned:
