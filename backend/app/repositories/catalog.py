@@ -544,8 +544,8 @@ class CatalogRepository:
         link we want. The NBU keeps a card id instead, and no clickable URL is
         built from that, so an NBU row deliberately yields nothing: it is
         ranked above the rest only to outvote the leftover uCoin rows, which
-        are legacy and half of them carry the wrong source label. No link beats
-        a uCoin link.
+        came with the initial data import, half of them with the wrong source
+        label. No link beats a uCoin link.
         """
         return (
             select(case((PriceSourceLink.source == "NBU", None), else_=PriceSourceLink.external_id))
@@ -598,7 +598,7 @@ class CatalogRepository:
         }
         columns = by_sort.get(filters.sort, by_sort["title"])
         ordering: list[Any] = [direction(column) for column in columns]
-        # Stable tiebreakers, mirroring the legacy default listing order.
+        # Stable tiebreakers so equal keys never reorder between pages.
         if filters.sort == "country":
             ordering += [CatalogItem.issue_year.desc(), _display_title(self._locale)]
         ordering.append(CatalogItem.id)

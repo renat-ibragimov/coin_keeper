@@ -1,7 +1,6 @@
 """Dashboard and finance aggregates for GET /bootstrap.
 
-The formulas come from the legacy desktop app's getDashboardSnapshot/
-getFinanceSummary, with the multi-user filters applied:
+The formulas are BR-5, BR-8 and BR-9 with the multi-user filters applied:
 owner_id on personal tables, the visibility filter on catalog and snapshots,
 active-only completeness (docs/business-rules.md, BR-5, BR-8 and BR-9), and
 storefront visibility on every catalog-wide aggregate (BR-13). Unlike
