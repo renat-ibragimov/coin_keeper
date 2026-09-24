@@ -2,8 +2,7 @@
 name: sync-docs
 description: >
   Audit docs/ against code changes since each document was last updated and
-  propose patches. Use when asked to sync, audit or check the docs ("sync the
-  docs", "are the docs up to date", "что поменялось в доках"), before a release,
+  propose patches. Use when asked to sync, audit or check the docs, before a release,
   or after a series of commits that used the "Docs: not needed" trailer.
 ---
 

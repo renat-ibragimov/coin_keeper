@@ -41,6 +41,7 @@ docs/                specs; start at docs/README.md
 tools/docs_check.py  docs consistency checks (commit-msg hook, CI)
 .githooks/           git hooks; enable with `git config core.hooksPath .githooks`
 .agents/skills/      skills shared by Codex and Claude (.claude/skills links here)
+.claude/agents/      Claude Code subagents — thin wrappers over the skills
 backend/app/
   api/v1/            routes — thin, no business logic, no visibility filters
   services/          business logic
@@ -123,6 +124,70 @@ Every `media_files` row has a `source` that drives visibility (`docs/media.md`):
   when the API container starts — **a pushed migration changes the production database**.
 - No scheduled crawling of uCoin (Cloudflare, someone else's data).
 
+## Coding behavior
+
+### Think before coding
+Before implementing anything:
+- State assumptions explicitly. If uncertain, ask — do not guess and proceed.
+- If multiple interpretations exist, present them. Do not pick silently.
+- If something is unclear, stop. Name what is confusing. Ask for clarification.
+- If a simpler approach exists, say so and push back.
+
+### Simplicity first
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that was not requested.
+- If 200 lines could be 50, rewrite it.
+
+### Surgical changes
+- Do not "improve" adjacent code, comments, or formatting.
+- Do not refactor things that are not broken.
+- Match existing style, even if you would do it differently.
+- If you notice unrelated dead code, mention it — do not delete it.
+- Every changed line must trace directly to the user's request.
+
+### Goal-driven execution
+For any task that changes more than 2 files or contains more than one logical unit of
+change — before writing any code:
+1. Read all affected files.
+2. Output a numbered step-by-step plan where each step is one logical unit of change
+   (one validator, one method, one migration, one screen).
+3. Stop and wait for explicit approval before implementing step 1.
+4. After completing each step, stop again and wait for approval before proceeding to the
+   next step.
+
+For simple isolated changes (single file, clear scope) — proceed directly without a plan.
+
+## Permissions
+
+You may freely use read-only operations (grep, cat, find, ls, read, `git log/diff/show`,
+running tests and linters) without asking for approval.
+
+You must ALWAYS stop and wait for explicit approval before:
+- modifying any existing file;
+- creating any new file;
+- running any command that writes to disk outside the scratch/test areas;
+- running any command that affects a database or Redis;
+- committing or pushing — every time; approval for one commit doesn't cover the next;
+- anything on the server (`ssh`, `scp`, production SQL) — see the `prod-ops` skill.
+
+## Skills and roles
+
+Procedures live in `.agents/skills/<name>/SKILL.md`, shared by every tool; read the
+matching one before starting that kind of work. In Claude Code the three roles also
+exist as subagents (`.claude/agents/`) with their own context and read-only tools.
+
+| Skill | Use for | Claude subagent |
+|---|---|---|
+| `architecture-audit` | read-only audit: data layers, DB performance, transactions, security | `architect` |
+| `review` | reviewing a diff against project rules before commit/merge | `reviewer` |
+| `debug` | bug → reproduction → proven cause → minimal fix + regression test | `debugger` |
+| `migration` | any schema or data change through Alembic | |
+| `add-endpoint` | a route, response field, filter or feature across layers | |
+| `prod-ops` | anything on the server or against the production database | |
+| `deploy-watch` | following a push through CI and deploy, health check | |
+| `sync-docs` | auditing docs against code changed since each doc's last update | |
+
 ## Language rules
 
 - **Everything in the repository is English**: identifiers, comments, docstrings, logs,
@@ -149,11 +214,8 @@ Every `media_files` row has a `source` that drives visibility (`docs/media.md`):
   updating its citations; `python3 tools/docs_check.py refs` finds broken ones.
 - **Audit on request** with the `sync-docs` skill (`.agents/skills/sync-docs/SKILL.md`):
   it compares code changed since each document's last update against the document.
-- **Scoped work.** Change only what the task needs; mention unrelated problems instead of
-  fixing them silently. In a multi-task session run the tests for the current task, and
-  the full suite plus doc sync once at the end.
-- **Commits and pushes need explicit approval, every time.** Approval for one commit
-  doesn't carry over to the next, especially for anything with a migration (see above).
+- **Tests in multi-task sessions.** Run the tests for the current task as you go, and
+  the full suite plus the docs checks once at the end.
 - **The repository is public.** Never commit `.env`, dumps, `*.db`, keys, or real
   collection photos. Check `git status` before every commit.
 - **`docs/current_ref/` is scratch.** The owner drops screenshots there for one
