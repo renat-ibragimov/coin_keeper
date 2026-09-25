@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import anyio
 import anyio.to_thread
 import jwt
 from argon2 import PasswordHasher
@@ -31,6 +32,19 @@ TOKEN_BYTES = 32
 PASSWORD_MAX_LENGTH = 256
 
 _dummy_hash: str | None = None
+
+# Each argon2 hash or check allocates 64 MiB. Without a cap a burst of sign-ins
+# fills the default 40-thread pool (~2.5 GiB per worker) and starves every
+# other thread-pool job; a few at a time keeps memory bounded.
+ARGON2_CONCURRENCY = 3
+_argon2_limiter: anyio.CapacityLimiter | None = None
+
+
+def _argon2_slots() -> anyio.CapacityLimiter:
+    global _argon2_limiter
+    if _argon2_limiter is None:
+        _argon2_limiter = anyio.CapacityLimiter(ARGON2_CONCURRENCY)
+    return _argon2_limiter
 
 
 class InvalidTokenError(Exception):
@@ -56,7 +70,7 @@ def password_needs_rehash(password_hash: str) -> bool:
 async def hash_password_async(password: str) -> str:
     """argon2 is ~50 ms of CPU: off the event loop, so a burst of sign-ins
     doesn't stall every other request on the worker."""
-    return await anyio.to_thread.run_sync(hash_password, password)
+    return await anyio.to_thread.run_sync(hash_password, password, limiter=_argon2_slots())
 
 
 async def verify_password_async(password: str, password_hash: str | None) -> bool:
@@ -67,9 +81,13 @@ async def verify_password_async(password: str, password_hash: str | None) -> boo
     if password_hash is None:
         if _dummy_hash is None:
             _dummy_hash = await hash_password_async(secrets.token_urlsafe(TOKEN_BYTES))
-        await anyio.to_thread.run_sync(verify_password, password, _dummy_hash)
+        await anyio.to_thread.run_sync(
+            verify_password, password, _dummy_hash, limiter=_argon2_slots()
+        )
         return False
-    return await anyio.to_thread.run_sync(verify_password, password, password_hash)
+    return await anyio.to_thread.run_sync(
+        verify_password, password, password_hash, limiter=_argon2_slots()
+    )
 
 
 def generate_token() -> str:

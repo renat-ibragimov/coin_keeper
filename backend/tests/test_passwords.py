@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import threading
+import time
 
 import pytest
 from argon2 import PasswordHasher
@@ -226,3 +228,24 @@ async def test_password_changes_are_audited(
         .all()
     )
     assert sorted(actions) == ["password.changed", "password.reset"]
+
+
+async def test_password_hashing_runs_a_few_at_a_time(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each argon2 run takes 64 MiB; a burst must not run them all at once."""
+    running = 0
+    peak = 0
+    lock = threading.Lock()
+
+    def slow_verify(password: str, password_hash: str) -> bool:
+        nonlocal running, peak
+        with lock:
+            running += 1
+            peak = max(peak, running)
+        time.sleep(0.05)
+        with lock:
+            running -= 1
+        return False
+
+    monkeypatch.setattr(security, "verify_password", slow_verify)
+    await asyncio.gather(*(security.verify_password_async("x", "stored-hash") for _ in range(12)))
+    assert peak <= security.ARGON2_CONCURRENCY

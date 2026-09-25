@@ -30,8 +30,9 @@ respects it too.
 - At least 10 characters (`password_min_length`), at most 256. One validation for every
   path that sets a password — verification, reset, change, set — with no relaxed variant
   anywhere. Sign-in accepts up to 1024, which only bounds the work handed to argon2.
-- Hashing and checking run off the event loop (~50 ms of CPU each), so a burst of
-  sign-ins doesn't stall other requests.
+- Hashing and checking run off the event loop (~50 ms of CPU and 64 MiB each), at most
+  three at a time per worker, so a burst of sign-ins neither stalls other requests nor
+  runs the server out of memory.
 - Sign-in without an account, or for an account without a password, still runs one
   check against a stand-in hash, so the answer time doesn't reveal which addresses
   exist.
