@@ -85,8 +85,10 @@ GET    /auth/google/callback     ?state&code&error                    → 303 to
 - **Tokens.** `tokens = {accessToken, expiresIn}`. The refresh token is **never** in a
   body: login, verify, refresh and the Google callback set it as an httpOnly, Secure,
   SameSite=Lax cookie scoped to `/api/v1/auth`; `/auth/refresh` and `/auth/logout` read
-  it from there and take no body. Refresh rotates the cookie; an invalid one is cleared
-  (`401 invalid-refresh-token`).
+  it from there and take no body. Refresh rotates the cookie; a cookie rotated less than
+  30 s ago gets the same new one again, and a stale or revoked one is cleared
+  (`401 invalid-refresh-token`). Logout ends only the presenting device's session
+  (`auth.md`, "Sessions").
 - **`user`** (`UserOut`): `id, email, displayName, role, locale, emailVerified,
   hasPassword, googleLinked, avatarUrl`. `avatarUrl` is a signed short-lived URL or
   `null`, never a storage key (`media.md`), built in one place so it's identical here and
@@ -106,7 +108,7 @@ GET    /auth/google/callback     ?state&code&error                    → 303 to
   success every session is revoked and the cookie cleared. `/auth/set-password` when a
   password already exists → `409 password-already-set` (it's for Google-only accounts).
 - **Rate limits** (per IP and per email where there is one): login 5 / 15 min (reset on
-  success), register 3/h, forgot-password 3/h, resend 3/h, reset 5/h, refresh 30/h,
+  success), register 3/h, forgot-password 3/h, resend 3/h, reset 5/h, refresh 600/h,
   Google start 10/h → `429 rate-limit-exceeded` with `Retry-After`. Rationale: `auth.md`.
 - **Avatar.** `PUT /auth/me/avatar` takes the image as the whole body, no multipart:
   JPEG, PNG or WebP, ≤ 12 MB, ≤ 4000 px wide, else `422 invalid-image` (an oversized

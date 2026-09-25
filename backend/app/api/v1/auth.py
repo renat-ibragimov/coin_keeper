@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, BackgroundTasks, Request, Response, status
 
 from app.api.deps import (
@@ -68,7 +70,9 @@ def _set_refresh_cookie(response: Response, session: IssuedSession, settings: Se
     response.set_cookie(
         settings.refresh_cookie_name,
         session.refresh_token,
-        max_age=settings.refresh_token_ttl_days * 24 * 3600,
+        # The token's own expiry: a successor handed out again within the
+        # grace window keeps the lifetime it was created with.
+        max_age=max(0, int((session.refresh_expires_at - datetime.now(UTC)).total_seconds())),
         httponly=True,
         secure=settings.cookie_secure,
         samesite="lax",

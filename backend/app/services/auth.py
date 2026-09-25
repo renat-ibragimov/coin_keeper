@@ -18,13 +18,14 @@ from app.core.config import Settings
 from app.core.mail import MailBackend, password_reset_email, verification_email
 from app.core.security import (
     create_access_token,
+    derive_successor_token,
     generate_token,
     hash_password,
     hash_token,
     verify_password,
 )
-from app.models import User
-from app.models.enums import AuthTokenKind, UserRole
+from app.models import AuditLog, RefreshToken, User
+from app.models.enums import AuthTokenKind, RefreshRevokeReason, UserRole
 from app.repositories.users import (
     AuthTokenRepository,
     RefreshTokenRepository,
@@ -217,46 +218,100 @@ class AuthService:
     async def refresh_session(
         self, *, refresh_token: str, user_agent: str | None, ip: str | None
     ) -> IssuedSession:
-        """Rotate a refresh token, revoking the one presented."""
-        record = await self._refresh.get_by_hash(hash_token(refresh_token))
+        """Rotate a refresh token within its family (docs/auth.md, "Sessions").
+
+        The row is locked, so concurrent refreshes with the same token run one
+        after another. A live token rotates into its deterministic successor.
+        A token rotated less than the grace window ago gets that same successor
+        back — a lost response or a second tab, not theft. A rotated token
+        replayed later revokes its family only; other sign-ins survive.
+        """
+        now = datetime.now(UTC)
+        record = await self._refresh.get_by_hash(hash_token(refresh_token), for_update=True)
         if record is None:
             raise InvalidOrExpiredTokenError
+        successor_raw = derive_successor_token(refresh_token)
 
-        if record.revoked_at is not None:
-            # Reuse of a revoked token means it leaked: drop every session.
-            await self._refresh.revoke_all_for_user(record.user_id)
-            # Committed here, before raising. The request fails with an
-            # exception, and the session dependency rolls back on the way out —
-            # which would silently undo the revocation and leave the leaked
-            # session working. This side effect has to outlive the error.
-            await self._session.commit()
-            logger.warning(
-                "refresh token reuse detected, revoked all sessions for user %s",
-                record.user_id,
+        if record.revoked_at is None:
+            if record.expires_at <= now:
+                raise InvalidOrExpiredTokenError
+            user = await self._active_user(record.user_id)
+            await self._refresh.revoke(record, RefreshRevokeReason.ROTATED)
+            return await self._issue_session(
+                user, user_agent=user_agent, ip=ip, parent=record, raw_refresh=successor_raw
             )
+
+        if record.revoke_reason != RefreshRevokeReason.ROTATED:
+            # Logged out, password changed, family already revoked: just dead.
             raise InvalidOrExpiredTokenError
 
-        if record.expires_at <= datetime.now(UTC):
-            raise InvalidOrExpiredTokenError
+        grace = timedelta(seconds=self._settings.refresh_reuse_grace_seconds)
+        if now - record.revoked_at <= grace:
+            successor = await self._refresh.get_by_hash(hash_token(successor_raw), for_update=True)
+            if (
+                successor is not None
+                and successor.revoked_at is None
+                and successor.expires_at > now
+            ):
+                user = await self._active_user(record.user_id)
+                return IssuedSession(
+                    user=user,
+                    access_token=create_access_token(user.id),
+                    expires_in=self._settings.access_token_ttl_minutes * 60,
+                    refresh_token=successor_raw,
+                    refresh_expires_at=successor.expires_at,
+                )
 
-        user = await self._users.get_by_id(record.user_id)
-        if user is None or not user.is_active:
-            raise InvalidOrExpiredTokenError
-
-        await self._refresh.revoke(record)
-        return await self._issue_session(user, user_agent=user_agent, ip=ip)
+        # A rotated token came back too late, or after its successor moved on:
+        # it leaked. End this sign-in, not the user's other devices.
+        await self._refresh.revoke_family(record.family_id, RefreshRevokeReason.REUSE)
+        self._session.add(
+            AuditLog(
+                user_id=record.user_id,
+                action="session.refresh_reuse",
+                entity_type="refresh_token_family",
+                entity_id=str(record.family_id),
+                details={"ip": ip, "user_agent": user_agent},
+            )
+        )
+        # Committed here, before raising. The request fails with an exception,
+        # and the session dependency rolls back on the way out — which would
+        # silently undo the revocation and leave the leaked session working.
+        await self._session.commit()
+        logger.warning(
+            "refresh token reuse detected, revoked family %s of user %s",
+            record.family_id,
+            record.user_id,
+        )
+        raise InvalidOrExpiredTokenError
 
     async def logout(self, refresh_token: str | None) -> None:
+        """Ends this sign-in only: the whole family, whichever of its tokens
+        the browser still holds."""
         if not refresh_token:
             return
         record = await self._refresh.get_by_hash(hash_token(refresh_token))
-        if record is not None and record.revoked_at is None:
-            await self._refresh.revoke(record)
+        if record is not None:
+            await self._refresh.revoke_family(record.family_id, RefreshRevokeReason.LOGOUT)
+
+    async def _active_user(self, user_id: int) -> User:
+        user = await self._users.get_by_id(user_id)
+        if user is None or not user.is_active:
+            raise InvalidOrExpiredTokenError
+        return user
 
     async def _issue_session(
-        self, user: User, *, user_agent: str | None, ip: str | None
+        self,
+        user: User,
+        *,
+        user_agent: str | None,
+        ip: str | None,
+        parent: RefreshToken | None = None,
+        raw_refresh: str | None = None,
     ) -> IssuedSession:
-        raw_refresh = generate_token()
+        """A new sign-in (no `parent`) starts a family with a random token; a
+        rotation continues the parent's family with its derived successor."""
+        raw_refresh = raw_refresh or generate_token()
         expires_at = datetime.now(UTC) + timedelta(days=self._settings.refresh_token_ttl_days)
         await self._refresh.add(
             user_id=user.id,
@@ -264,6 +319,7 @@ class AuthService:
             expires_at=expires_at,
             user_agent=user_agent,
             ip=ip,
+            parent=parent,
         )
         return IssuedSession(
             user=user,
@@ -313,7 +369,7 @@ class AuthService:
         await self._auth_tokens.mark_used(record)
         user.password_hash = hash_password(new_password)
         # A reset implies the account may have been compromised.
-        await self._refresh.revoke_all_for_user(user.id)
+        await self._refresh.revoke_all_for_user(user.id, RefreshRevokeReason.PASSWORD_RESET)
         await self._session.flush()
 
     async def change_password(
@@ -323,7 +379,7 @@ class AuthService:
             raise InvalidCredentialsError
         self._validate_password(new_password)
         user.password_hash = hash_password(new_password)
-        await self._refresh.revoke_all_for_user(user.id)
+        await self._refresh.revoke_all_for_user(user.id, RefreshRevokeReason.PASSWORD_CHANGE)
         await self._session.flush()
 
     async def set_password(self, *, user: User, new_password: str) -> None:

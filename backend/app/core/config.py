@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     allow_registration: bool = Field(default=True, alias="ALLOW_REGISTRATION")
     access_token_ttl_minutes: int = 15
     refresh_token_ttl_days: int = 30
+    # A just-rotated refresh token replayed within this window gets the same
+    # successor back instead of counting as theft (docs/auth.md, "Sessions").
+    refresh_reuse_grace_seconds: int = 30
     email_verify_ttl_hours: int = 24
     password_reset_ttl_hours: int = 1
     password_min_length: int = 10

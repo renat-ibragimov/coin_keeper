@@ -47,10 +47,26 @@ git — docs, code, tests or example commands. Use placeholders (`<owner-email>`
 - The refresh token travels **only** in the cookie: `/auth/refresh` and `/auth/logout`
   have no body. It's never readable from JavaScript and never lands in logs.
 - Refresh tokens are stored as **sha256** in `refresh_tokens` (with `user_agent`, `ip`,
-  `expires_at`, `revoked_at`) and can be revoked.
-- **Rotation:** every refresh revokes the old token and issues a new one. Presenting an
-  already revoked token means it leaked → **all** of the user's sessions are revoked.
-- Password reset and password change also revoke all of the user's refresh tokens.
+  `expires_at`, `revoked_at`, `revoke_reason`) and can be revoked.
+- **Families.** Every sign-in (password, email verification, Google) starts a family
+  (`family_id`); rotation keeps it. A family is one device's session.
+- **Rotation:** every refresh revokes the presented token (`rotated`) and issues its
+  successor, derived from it with an HMAC keyed off `JWT_SECRET` — the same token
+  always has the same successor. The token row is locked (`SELECT … FOR UPDATE`), so
+  concurrent refreshes with one cookie run one after another and never fork a family.
+- **Grace window** (`refresh_reuse_grace_seconds`, 30 s): a token rotated less than
+  30 s ago that comes back gets its still-live successor again — a lost response on a
+  phone, a reload mid-refresh, a second tab.
+- **Reuse detection:** a `rotated` token presented after the window, or after its
+  successor has itself rotated, means it leaked → **that family** is revoked (`reuse`),
+  the event is written to `audit_log` (`session.refresh_reuse`), and the user's other
+  devices stay signed in (RFC 9700, section 4.14.2). A token ended any other way
+  (logout, password change) is just a `401`.
+- **Sign-out** revokes the whole family of the presented token, and only it.
+- Password reset and password change revoke every family of the user.
+- `session_started_at` (sign-in time, carried through rotation) and `persistent`
+  ("remember me") are stored per token for session-lifetime rules; nothing reads them
+  yet.
 - The signing secret comes from the environment.
 
 ## One-time tokens: email verification and password reset
@@ -104,7 +120,7 @@ normal; exceeding a limit returns `429` with `Retry-After`.
 |---|---|---|
 | `POST /auth/login` | 5 / 15 min | IP and email; both reset on success |
 | `POST /auth/register` | 3 / h | IP and email |
-| `POST /auth/refresh` | 30 / h | IP |
+| `POST /auth/refresh` | 600 / h | IP — a load backstop: tokens can't be guessed, and every page load of a remembered session refreshes |
 | `POST /auth/forgot-password` | 3 / h | IP and email |
 | `POST /auth/resend-verification` | 3 / h | IP and email |
 | `POST /auth/reset-password` | 5 / h | IP |

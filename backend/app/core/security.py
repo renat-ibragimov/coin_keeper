@@ -7,7 +7,9 @@ database.
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import secrets
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -47,6 +49,21 @@ def password_needs_rehash(password_hash: str) -> bool:
 def generate_token() -> str:
     """A fresh opaque token: refresh tokens and one-time email tokens alike."""
     return secrets.token_urlsafe(TOKEN_BYTES)
+
+
+def derive_successor_token(token: str) -> str:
+    """The refresh token that replaces `token` on rotation.
+
+    Deterministic, so a retried or concurrent refresh with the same token gets
+    the same successor instead of a second live one (docs/auth.md,
+    "Sessions"). Keyed by a subkey of JWT_SECRET: knowing a token's sha256 from
+    the database is not enough to derive its successor.
+    """
+    key = hmac.new(
+        get_settings().jwt_secret.encode("utf-8"), b"refresh-successor-v1", hashlib.sha256
+    ).digest()
+    digest = hmac.new(key, token.encode("utf-8"), hashlib.sha256).digest()
+    return base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")
 
 
 def hash_token(token: str) -> str:

@@ -43,7 +43,10 @@ HOUR = 3600
 
 LOGIN = RateLimit("login", limit=5, window_seconds=15 * 60)
 REGISTER = RateLimit("register", limit=3, window_seconds=HOUR)
-REFRESH = RateLimit("refresh", limit=30, window_seconds=HOUR)
+# A load backstop only: refresh tokens are 256-bit and can't be guessed, while
+# every page load of a remembered session refreshes — shared IPs (a household,
+# mobile CGNAT) must not sign each other out (docs/auth.md).
+REFRESH = RateLimit("refresh", limit=600, window_seconds=HOUR)
 FORGOT_PASSWORD = RateLimit("forgot_password", limit=3, window_seconds=HOUR)
 RESEND_VERIFICATION = RateLimit("resend_verification", limit=3, window_seconds=HOUR)
 RESET_PASSWORD = RateLimit("reset_password", limit=5, window_seconds=HOUR)
