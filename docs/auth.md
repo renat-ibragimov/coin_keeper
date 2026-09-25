@@ -305,6 +305,21 @@ admin  plus: shared-catalog maintenance (archive, drafts review), users and role
   The email is always an argument — never hardcoded. New admins register through the
   normal form first, which doubles as a check of the new-user path.
 
+## Security events
+
+Changes to how an account signs in go to `audit_log` (`entity_type = 'user'`), for the
+owner to review after a suspected compromise:
+
+| `action` | When |
+|---|---|
+| `password.changed` / `password.reset` / `password.set` | settings change, reset by link, first password on a Google-only account |
+| `google.linked` | Google linked from settings |
+| `session.refresh_reuse` | a rotated refresh token replayed; its family was revoked (`entity_type = 'refresh_token_family'`) |
+
+Failed sign-ins are not logged per attempt — rate limits cover them, and the log would
+fill with other people's addresses. Uvicorn's access log drops the query string of
+`/auth/google/callback`, which carries the one-time authorization code.
+
 ## Security baseline
 
 - HTTPS everywhere with HSTS; certificates by Caddy (`infra.md`).

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
@@ -32,6 +33,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings.log_level)
+    if settings.mail_backend == "console" and not settings.public_base_url.startswith(
+        ("http://localhost", "http://127.0.0.1", "http://testserver")
+    ):
+        # The console backend prints verification and reset links, which sign
+        # people in, straight into the log (docs/infra.md, "Mail").
+        logging.getLogger("app").warning(
+            "MAIL_BACKEND=console outside local development: sign-in links go to the log"
+        )
 
     app = FastAPI(
         title="CoinKeeper API",

@@ -9,7 +9,7 @@ from app.api.deps import AppSettings, ClientIp, CurrentUser, DbSession, Mail, Te
 from app.api.errors import ProblemError
 from app.api.v1.auth import _enforce, _set_refresh_cookie
 from app.core import rate_limit
-from app.models import User
+from app.models import AuditLog, User
 from app.models.enums import UserRole
 from app.repositories.users import AuthIdentityRepository, UserRepository
 from app.services.auth import AuthService
@@ -126,6 +126,14 @@ async def callback(
         else:
             if existing_identity is None:
                 await identities.link_google(user, subject=claims.subject, email=claims.email)
+                session.add(
+                    AuditLog(
+                        user_id=user.id,
+                        action="google.linked",
+                        entity_type="user",
+                        entity_id=str(user.id),
+                    )
+                )
             destination = "/google-complete?mode=link&google=linked"
         response = _return_to_app(settings, destination)
         _clear_state_cookie(response, settings)

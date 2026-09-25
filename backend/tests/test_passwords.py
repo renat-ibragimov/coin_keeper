@@ -7,13 +7,13 @@ import threading
 import pytest
 from argon2 import PasswordHasher
 from httpx import AsyncClient
-from sqlalchemy import update
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.mail.base import EmailMessage
 from app.core.mail.console import ConsoleMailBackend
-from app.models import User
+from app.models import AuditLog, User
 from app.repositories.users import UserRepository
 from tests.helpers import PASSWORD, extract_token, register_and_verify, unique_email
 
@@ -200,3 +200,29 @@ async def test_a_mail_failure_answers_like_a_missing_account(
     existing = await client.post("/api/v1/auth/forgot-password", json={"email": email})
     missing = await client.post("/api/v1/auth/forgot-password", json={"email": unique_email()})
     assert existing.status_code == missing.status_code == 202
+
+
+async def test_password_changes_are_audited(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list[EmailMessage]
+) -> None:
+    email, token = await register_and_verify(client, mail_outbox)
+    changed = await client.post(
+        "/api/v1/auth/change-password",
+        json={"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert changed.status_code == 204
+    await client.post("/api/v1/auth/forgot-password", json={"email": email})
+    await client.post(
+        "/api/v1/auth/reset-password",
+        json={"token": extract_token(mail_outbox), "newPassword": PASSWORD},
+    )
+
+    user = await UserRepository(db_session).get_by_email(email)
+    assert user is not None
+    actions = (
+        (await db_session.execute(select(AuditLog.action).where(AuditLog.user_id == user.id)))
+        .scalars()
+        .all()
+    )
+    assert sorted(actions) == ["password.changed", "password.reset"]

@@ -396,6 +396,7 @@ class AuthService:
 
         await self._auth_tokens.mark_used(record)
         user.password_hash = await hash_password_async(new_password)
+        self._audit(user, "password.reset")
         # A reset implies the account may have been compromised.
         await self._refresh.revoke_all_for_user(user.id, RefreshRevokeReason.PASSWORD_RESET)
         await self._session.flush()
@@ -407,6 +408,7 @@ class AuthService:
             raise InvalidCredentialsError
         self._validate_password(new_password)
         user.password_hash = await hash_password_async(new_password)
+        self._audit(user, "password.changed")
         await self._refresh.revoke_all_for_user(user.id, RefreshRevokeReason.PASSWORD_CHANGE)
         await self._session.flush()
 
@@ -416,7 +418,15 @@ class AuthService:
             raise InvalidCredentialsError
         self._validate_password(new_password)
         user.password_hash = await hash_password_async(new_password)
+        self._audit(user, "password.set")
         await self._session.flush()
+
+    def _audit(self, user: User, action: str) -> None:
+        """A change to how the account signs in, kept for the owner to review
+        after a compromise (docs/auth.md, "Security events")."""
+        self._session.add(
+            AuditLog(user_id=user.id, action=action, entity_type="user", entity_id=str(user.id))
+        )
 
     async def update_profile(
         self, *, user: User, display_name: str | None, locale: str | None

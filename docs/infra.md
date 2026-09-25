@@ -97,7 +97,8 @@ Notes:
 
 Only the transport changes; registration and password reset run the same code in both
 modes. Tests always run with `console`. `MAIL_BACKEND=smtp` without `SMTP_HOST` fails
-at startup.
+at startup; `console` with a non-local `PUBLIC_BASE_URL` logs a warning at startup, since
+its links sign people in.
 
 **Provider: Resend over SMTP** (`smtp.resend.com:587`, user `resend`, password = API
 key, STARTTLS). No own mail server — deliverability from a single VPS is poor. Setup:

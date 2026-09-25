@@ -11,11 +11,13 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from httpx import AsyncClient
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.mail.base import EmailMessage
 from app.core.rate_limit import get_redis
+from app.models import AuditLog
 from app.repositories.users import AuthIdentityRepository, UserRepository
 from app.services import google_auth as google_module
 from app.services.google_auth import GoogleClaims, GoogleOAuth, GoogleOAuthError, PendingFlow
@@ -176,6 +178,10 @@ async def test_matching_email_requires_explicit_link_to_existing_user(
     profile = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"})
     assert profile.json()["id"] == original.id
     assert profile.json()["googleLinked"] is True
+    events = await db_session.execute(
+        select(AuditLog.action).where(AuditLog.user_id == original.id)
+    )
+    assert "google.linked" in events.scalars().all()
 
 
 async def test_google_callback_rejects_state_from_another_browser(
