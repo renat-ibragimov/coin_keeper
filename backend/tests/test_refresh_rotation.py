@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+import jwt
 from httpx import AsyncClient, Response
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
@@ -206,3 +207,49 @@ async def test_concurrent_refreshes_share_one_successor(engine: AsyncEngine) -> 
         async with factory() as session:
             await session.execute(delete(User).where(User.id == user_id))
             await session.commit()
+
+
+async def test_signing_out_ends_the_access_token_at_once(
+    client: AsyncClient, mail_outbox: list[EmailMessage]
+) -> None:
+    """An access token belongs to its sign-in: after logout it stops working
+    immediately instead of living out its 15 minutes."""
+    _, token = await register_and_verify(client, mail_outbox)
+    headers = {"Authorization": f"Bearer {token}"}
+    assert (await client.get("/api/v1/auth/me", headers=headers)).status_code == 200
+
+    assert (await client.post("/api/v1/auth/logout")).status_code == 204
+    assert (await client.get("/api/v1/auth/me", headers=headers)).status_code == 401
+
+
+async def test_a_password_change_ends_other_devices_access_tokens(
+    client: AsyncClient, mail_outbox: list[EmailMessage]
+) -> None:
+    email, laptop_token = await register_and_verify(client, mail_outbox)
+    client.cookies.clear()
+    login = await client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
+    phone_token = login.json()["tokens"]["accessToken"]
+
+    changed = await client.post(
+        "/api/v1/auth/change-password",
+        json={"currentPassword": PASSWORD, "newPassword": "another-long-password"},
+        headers={"Authorization": f"Bearer {phone_token}"},
+    )
+    assert changed.status_code == 204
+    laptop = await client.get(
+        "/api/v1/auth/me", headers={"Authorization": f"Bearer {laptop_token}"}
+    )
+    assert laptop.status_code == 401
+
+
+async def test_an_access_token_without_a_session_is_refused(
+    client: AsyncClient, mail_outbox: list[EmailMessage]
+) -> None:
+    """Tokens issued before sessions were carried (or forged without one) are
+    refused; the client refreshes and gets one that carries it."""
+    _, token = await register_and_verify(client, mail_outbox)
+    claims = jwt.decode(token, options={"verify_signature": False})
+    del claims["sid"]
+    legacy = jwt.encode(claims, get_settings().jwt_secret, algorithm="HS256")
+    response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {legacy}"})
+    assert response.status_code == 401

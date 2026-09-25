@@ -268,7 +268,7 @@ class AuthService:
                 user = await self._active_user(record.user_id)
                 return IssuedSession(
                     user=user,
-                    access_token=create_access_token(user.id),
+                    access_token=create_access_token(user.id, session_id=successor.family_id),
                     expires_in=self._settings.access_token_ttl_minutes * 60,
                     refresh_token=successor_raw,
                     refresh_expires_at=successor.expires_at,
@@ -325,7 +325,7 @@ class AuthService:
         rotation continues the parent's family with its derived successor."""
         raw_refresh = raw_refresh or generate_token()
         expires_at = datetime.now(UTC) + timedelta(days=self._settings.refresh_token_ttl_days)
-        await self._refresh.add(
+        token = await self._refresh.add(
             user_id=user.id,
             token_hash=hash_token(raw_refresh),
             expires_at=expires_at,
@@ -335,7 +335,7 @@ class AuthService:
         )
         return IssuedSession(
             user=user,
-            access_token=create_access_token(user.id),
+            access_token=create_access_token(user.id, session_id=token.family_id),
             expires_in=self._settings.access_token_ttl_minutes * 60,
             refresh_token=raw_refresh,
             refresh_expires_at=expires_at,

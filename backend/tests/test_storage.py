@@ -14,7 +14,7 @@ def _settings(**overrides: str) -> Settings:
     values: dict[str, str] = {
         "DATABASE_URL": "postgresql+asyncpg://u:p@localhost/db",
         "REDIS_URL": "redis://localhost:6379/0",
-        "JWT_SECRET": "secret",
+        "JWT_SECRET": "storage-test-secret-not-used-anywhere-else",
         "PUBLIC_BASE_URL": "http://testserver",
         "S3_ENDPOINT": "http://minio:9000",
         "S3_ACCESS_KEY": "minioadmin",

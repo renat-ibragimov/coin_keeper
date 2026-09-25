@@ -70,11 +70,18 @@ git — docs, code, tests or example commands. Use placeholders (`<owner-email>`
   devices stay signed in (RFC 9700, section 4.14.2). A token ended any other way
   (logout, password change) is just a `401`.
 - **Sign-out** revokes the whole family of the presented token, and only it.
+- **Access tokens belong to their sign-in.** The JWT carries `sid` (the family id), and
+  every authorised request checks that the family still holds a live refresh token. So
+  sign-out, a password change or a detected replay ends that sign-in's access tokens at
+  once, not after their 15 minutes. A token without `sid` is refused; the client just
+  refreshes. `exp`, `iat`, `sub` and `sid` are required claims.
 - Password reset and password change revoke every family of the user.
 - `session_started_at` (sign-in time, carried through rotation) and `persistent`
   ("remember me") are stored per token for session-lifetime rules; nothing reads them
   yet.
-- The signing secret comes from the environment.
+- The signing secret comes from the environment and must be at least 32 characters; the
+  API refuses to start otherwise (a short HS256 secret can be brute-forced offline from
+  any user's own token).
 
 ## One-time tokens: email verification and password reset
 

@@ -11,6 +11,8 @@ import base64
 import hashlib
 import hmac
 import secrets
+import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -95,12 +97,25 @@ def hash_token(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def create_access_token(user_id: int, *, expires_in: timedelta | None = None) -> str:
+@dataclass(frozen=True, slots=True)
+class AccessClaims:
+    user_id: int
+    # The refresh-token family (one sign-in) this access token belongs to.
+    session_id: uuid.UUID
+
+
+def create_access_token(
+    user_id: int, *, session_id: uuid.UUID, expires_in: timedelta | None = None
+) -> str:
+    """`sid` ties the token to its sign-in: once that sign-in ends (logout,
+    password change, a detected replay) the token stops working at once
+    instead of living out its 15 minutes (docs/auth.md, "Sessions")."""
     settings = get_settings()
     ttl = expires_in or timedelta(minutes=settings.access_token_ttl_minutes)
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(user_id),
+        "sid": str(session_id),
         "iat": int(now.timestamp()),
         "exp": int((now + ttl).timestamp()),
         "typ": "access",
@@ -108,11 +123,16 @@ def create_access_token(user_id: int, *, expires_in: timedelta | None = None) ->
     return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
 
 
-def decode_access_token(token: str) -> int:
-    """Return the user id carried by a valid access token."""
+def decode_access_token(token: str) -> AccessClaims:
+    """The user and sign-in a valid access token carries."""
     settings = get_settings()
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.jwt_secret,
+            algorithms=[ALGORITHM],
+            options={"require": ["exp", "iat", "sub", "sid"]},
+        )
     except jwt.PyJWTError as exc:
         raise InvalidTokenError(str(exc)) from exc
     if payload.get("typ") != "access":
@@ -120,4 +140,8 @@ def decode_access_token(token: str) -> int:
     subject = payload.get("sub")
     if not isinstance(subject, str) or not subject.isdigit():
         raise InvalidTokenError("malformed subject")
-    return int(subject)
+    try:
+        session_id = uuid.UUID(str(payload["sid"]))
+    except ValueError as exc:
+        raise InvalidTokenError("malformed session") from exc
+    return AccessClaims(user_id=int(subject), session_id=session_id)

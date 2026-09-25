@@ -93,6 +93,11 @@ class Settings(BaseSettings):
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     def model_post_init(self, _context: object) -> None:
+        # HS256 with a short secret can be brute-forced offline from any
+        # user's own access token (docs/auth.md, "Sessions").
+        if len(self.jwt_secret) < 32:
+            msg = "JWT_SECRET must be at least 32 characters"
+            raise ValueError(msg)
         if self.mail_backend == "smtp" and not self.smtp_host:
             msg = "MAIL_BACKEND=smtp requires SMTP_HOST to be set"
             raise ValueError(msg)

@@ -127,6 +127,21 @@ class RefreshTokenRepository:
         result = await self._session.execute(query)
         return result.scalar_one_or_none()
 
+    async def family_is_live(self, family_id: uuid.UUID, user_id: int) -> bool:
+        """Whether this sign-in still holds a usable refresh token: the check
+        behind every access token (docs/auth.md, "Sessions")."""
+        result = await self._session.execute(
+            select(RefreshToken.id)
+            .where(
+                RefreshToken.family_id == family_id,
+                RefreshToken.user_id == user_id,
+                RefreshToken.revoked_at.is_(None),
+                RefreshToken.expires_at > datetime.now(UTC),
+            )
+            .limit(1)
+        )
+        return result.first() is not None
+
     async def revoke(self, token: RefreshToken, reason: RefreshRevokeReason) -> None:
         token.revoked_at = datetime.now(UTC)
         token.revoke_reason = reason

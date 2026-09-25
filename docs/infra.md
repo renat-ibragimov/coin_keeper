@@ -63,7 +63,7 @@ settings class is `backend/app/core/config.py`.
 | `DATABASE_URL`, `POSTGRES_USER/PASSWORD/DB` | app connection; container init |
 | `REDIS_URL` | rate limits |
 | `S3_ENDPOINT`, `S3_PUBLIC_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY`, `S3_SECRET_KEY` | image storage |
-| `JWT_SECRET`, `COOKIE_SECURE`, `ALLOW_REGISTRATION` | auth (`auth.md`); `JWT_SECRET` also keys refresh-token successors |
+| `JWT_SECRET`, `COOKIE_SECURE`, `ALLOW_REGISTRATION` | auth (`auth.md`); `JWT_SECRET` (≥ 32 characters, or the API won't start) also keys refresh-token successors |
 | `DOMAIN`, `PUBLIC_BASE_URL`, `CORS_ORIGINS` | public origin, links in emails, CORS |
 | `MAIL_BACKEND`, `SMTP_*` | mail, see "Mail" |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in; both empty hides the button |

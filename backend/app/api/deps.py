@@ -19,7 +19,7 @@ from app.core.telegram import TelegramSender, get_telegram_sender
 from app.db.session import get_db_session
 from app.models import User
 from app.models.enums import UserRole
-from app.repositories.users import UserRepository
+from app.repositories.users import RefreshTokenRepository, UserRepository
 from app.services.auth import AuthService
 from app.services.avatars import AvatarService
 from app.services.collection_photos import CollectionPhotoService
@@ -96,7 +96,7 @@ async def get_optional_current_user(
     if credentials is None:
         return None
     try:
-        user_id = decode_access_token(credentials.credentials)
+        claims = decode_access_token(credentials.credentials)
     except InvalidTokenError as exc:
         raise ProblemError(
             status.HTTP_401_UNAUTHORIZED,
@@ -106,8 +106,10 @@ async def get_optional_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
-    user = await UserRepository(session).get_by_id(user_id)
-    if user is None:
+    user = await UserRepository(session).get_by_id(claims.user_id)
+    if user is None or not await RefreshTokenRepository(session).family_is_live(
+        claims.session_id, claims.user_id
+    ):
         raise ProblemError(
             status.HTTP_401_UNAUTHORIZED,
             "invalid-access-token",
