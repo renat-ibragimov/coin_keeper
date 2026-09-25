@@ -242,6 +242,8 @@ frontend/dist/
 frontend/.vite/
 # Temporary standalone landing handoff for the designer.
 /bakost-landing.html
+# Temporary working copy of an architecture audit, discussed item by item
+/architecture-audit.md
 # Scratch folders with visual references for the current session, not a project artifact
 frontend/current_ref/
 docs/current_ref/
