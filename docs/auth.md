@@ -27,8 +27,15 @@ respects it too.
 ## Passwords
 
 - Hashing: **argon2id** (`argon2-cffi`), `app/core/security.py`.
-- At least 10 characters (`password_min_length`). One validation for every path that
-  sets a password — verification, reset, change, set — with no relaxed variant anywhere.
+- At least 10 characters (`password_min_length`), at most 256. One validation for every
+  path that sets a password — verification, reset, change, set — with no relaxed variant
+  anywhere. Sign-in accepts up to 1024, which only bounds the work handed to argon2.
+- Hashing and checking run off the event loop (~50 ms of CPU each), so a burst of
+  sign-ins doesn't stall other requests.
+- Sign-in without an account, or for an account without a password, still runs one
+  check against a stand-in hash, so the answer time doesn't reveal which addresses
+  exist.
+- A hash made with older argon2 parameters is upgraded on the next successful sign-in.
 - `password_hash` never leaves the database: not logged, not serialized, not returned.
 - `password_hash` is `NULL` for an account without a password (Google-only). Password
   sign-in is impossible until the user sets one in settings.

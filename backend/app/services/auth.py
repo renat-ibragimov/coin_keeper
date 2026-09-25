@@ -20,9 +20,10 @@ from app.core.security import (
     create_access_token,
     derive_successor_token,
     generate_token,
-    hash_password,
+    hash_password_async,
     hash_token,
-    verify_password,
+    password_needs_rehash,
+    verify_password_async,
 )
 from app.models import AuditLog, RefreshToken, User
 from app.models.enums import AuthTokenKind, RefreshRevokeReason, UserRole
@@ -177,7 +178,7 @@ class AuthService:
         if new_password is None:
             raise PasswordRequiredError
         self._validate_password(new_password)
-        user.password_hash = hash_password(new_password)
+        user.password_hash = await hash_password_async(new_password)
         if not user.email_verified:
             # Whatever Google identity an unconfirmed account carries was never
             # proven to belong to this mailbox's owner. They can link their own
@@ -196,12 +197,13 @@ class AuthService:
         self, *, email: str, password: str, user_agent: str | None, ip: str | None
     ) -> IssuedSession:
         user = await self._users.get_by_email(email)
-        if (
-            user is None
-            or user.password_hash is None
-            or not verify_password(password, user.password_hash)
-        ):
+        password_hash = user.password_hash if user is not None else None
+        if not await verify_password_async(password, password_hash) or user is None:
             raise InvalidCredentialsError
+        assert user.password_hash is not None
+        if password_needs_rehash(user.password_hash):
+            # argon2 parameters changed since this hash was made.
+            user.password_hash = await hash_password_async(password)
 
         # Only past this point do we say anything specific: whoever knows the
         # password already knows the account exists, so telling them to confirm
@@ -368,7 +370,7 @@ class AuthService:
             raise InvalidOrExpiredTokenError
 
         await self._auth_tokens.mark_used(record)
-        user.password_hash = hash_password(new_password)
+        user.password_hash = await hash_password_async(new_password)
         # A reset implies the account may have been compromised.
         await self._refresh.revoke_all_for_user(user.id, RefreshRevokeReason.PASSWORD_RESET)
         await self._session.flush()
@@ -376,10 +378,10 @@ class AuthService:
     async def change_password(
         self, *, user: User, current_password: str, new_password: str
     ) -> None:
-        if user.password_hash is None or not verify_password(current_password, user.password_hash):
+        if not await verify_password_async(current_password, user.password_hash):
             raise InvalidCredentialsError
         self._validate_password(new_password)
-        user.password_hash = hash_password(new_password)
+        user.password_hash = await hash_password_async(new_password)
         await self._refresh.revoke_all_for_user(user.id, RefreshRevokeReason.PASSWORD_CHANGE)
         await self._session.flush()
 
@@ -388,7 +390,7 @@ class AuthService:
         if user.password_hash is not None:
             raise InvalidCredentialsError
         self._validate_password(new_password)
-        user.password_hash = hash_password(new_password)
+        user.password_hash = await hash_password_async(new_password)
         await self._session.flush()
 
     async def update_profile(

@@ -12,6 +12,7 @@ export function PasswordInput(props: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
   return (
     <Input
+      maxLength={256}
       {...props}
       type={visible ? 'text' : 'password'}
       trailing={

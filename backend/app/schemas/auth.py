@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import EmailStr, Field
 
+from app.core.security import PASSWORD_MAX_LENGTH
 from app.schemas.base import CamelModel
 
 Locale = Literal["uk", "en"]
@@ -23,7 +24,9 @@ class RegisterRequest(CamelModel):
 
 class LoginRequest(CamelModel):
     email: EmailStr
-    password: str = Field(min_length=1)
+    # Wider than PASSWORD_MAX_LENGTH: passwords set before that cap existed
+    # must still sign in; this only bounds the work argon2 is handed.
+    password: str = Field(min_length=1, max_length=1024)
 
 
 class EmailOnlyRequest(CamelModel):
@@ -32,21 +35,21 @@ class EmailOnlyRequest(CamelModel):
 
 class VerifyEmailRequest(CamelModel):
     token: str = Field(min_length=1, max_length=512)
-    new_password: str | None = None
+    new_password: str | None = Field(default=None, max_length=PASSWORD_MAX_LENGTH)
 
 
 class ResetPasswordRequest(CamelModel):
     token: str = Field(min_length=1, max_length=512)
-    new_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
 class ChangePasswordRequest(CamelModel):
-    current_password: str = Field(min_length=1)
-    new_password: str = Field(min_length=1)
+    current_password: str = Field(min_length=1, max_length=1024)
+    new_password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
 class SetPasswordRequest(CamelModel):
-    new_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
 
 
 class UpdateMeRequest(CamelModel):

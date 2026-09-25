@@ -2,9 +2,18 @@
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+import threading
 
+import pytest
+from argon2 import PasswordHasher
+from httpx import AsyncClient
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core import security
 from app.core.mail.base import EmailMessage
+from app.models import User
+from app.repositories.users import UserRepository
 from tests.helpers import PASSWORD, extract_token, register_and_verify, unique_email
 
 NEW_PASSWORD = "another-long-password"
@@ -122,3 +131,55 @@ async def test_change_password(client: AsyncClient, mail_outbox: list[EmailMessa
     assert (
         await client.post("/api/v1/auth/login", json={"email": email, "password": NEW_PASSWORD})
     ).status_code == 200
+
+
+async def test_a_missing_account_costs_a_password_check_too(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """No account, or one without a password, must not answer faster than a
+    wrong password: the check runs against a stand-in hash."""
+    checks: list[str] = []
+    real_verify = security.verify_password
+
+    def counting_verify(password: str, password_hash: str) -> bool:
+        checks.append(threading.current_thread().name)
+        return real_verify(password, password_hash)
+
+    monkeypatch.setattr(security, "verify_password", counting_verify)
+    response = await client.post(
+        "/api/v1/auth/login", json={"email": unique_email(), "password": "whatever-it-is"}
+    )
+    assert response.status_code == 401
+    assert len(checks) == 1
+    # And off the event loop: argon2 must not stall other requests.
+    assert checks[0] != threading.main_thread().name
+
+
+async def test_an_outdated_hash_is_upgraded_on_sign_in(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list[EmailMessage]
+) -> None:
+    email, _ = await register_and_verify(client, mail_outbox)
+    weak = PasswordHasher(time_cost=1, memory_cost=8192, parallelism=1).hash(PASSWORD)
+    await db_session.execute(update(User).where(User.email == email).values(password_hash=weak))
+    await db_session.commit()
+
+    login = await client.post("/api/v1/auth/login", json={"email": email, "password": PASSWORD})
+    assert login.status_code == 200
+
+    user = await UserRepository(db_session).get_by_email(email)
+    assert user is not None
+    await db_session.refresh(user)
+    assert user.password_hash != weak
+    assert not security.password_needs_rehash(user.password_hash)
+
+
+async def test_an_overlong_new_password_is_rejected(
+    client: AsyncClient, mail_outbox: list[EmailMessage]
+) -> None:
+    email = unique_email()
+    await client.post("/api/v1/auth/register", json={"email": email})
+    response = await client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": extract_token(mail_outbox), "newPassword": "x" * 257},
+    )
+    assert response.status_code == 422

@@ -102,7 +102,8 @@ GET    /auth/google/callback     ?state&code&error                    → 303 to
   be used to probe addresses.
 - **Errors.** Login: `401 invalid-credentials`, `403 email-not-verified`,
   `403 account-disabled`. Tokens in links: `400 invalid-verification-token`,
-  `400 invalid-reset-token`. Passwords: `422 weak-password`.
+  `400 invalid-reset-token`. Passwords: `422 weak-password` (under 10 characters); over
+  256 characters is a plain `422` validation error.
   `/auth/change-password` with a wrong current password → `400 invalid-credentials`; on
   success every session is revoked and the cookie cleared. `/auth/set-password` when a
   password already exists → `409 password-already-set` (it's for Google-only accounts).
