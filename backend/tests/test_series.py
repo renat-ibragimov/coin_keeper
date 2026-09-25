@@ -121,6 +121,33 @@ async def test_progress_lists_every_series_with_its_summary(
     assert refs.fauna.name_original not in {row["series"]["name"] for row in other_country}
 
 
+async def test_progress_does_not_count_a_draft(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """Drafts stay out of completeness until an admin publishes them (BR-2)."""
+    refs = ctx.refs
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Опублікована", year=2024, series=refs.fauna
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Чернетка",
+        year=2024,
+        series=refs.fauna,
+        status="draft",
+    )
+
+    progress = (
+        await client.get(
+            f"/api/v1/series/summary?countryId={refs.ukraine.id}", headers=auth(ctx.token_a)
+        )
+    ).json()
+    by_name = {row["series"]["name"]: row["summary"] for row in progress}
+    assert by_name[refs.fauna.name_original]["total"] == 1
+    assert by_name[refs.fauna.name_original]["unpricedMissing"] == 1
+
+
 async def test_storefront_hides_series_of_deactivated_country(
     client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
 ) -> None:

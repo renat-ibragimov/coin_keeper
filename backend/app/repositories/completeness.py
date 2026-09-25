@@ -32,7 +32,7 @@ from app.models import (
 )
 from app.models.enums import MetalKind
 from app.reference_data.denominations import render_label
-from app.repositories.catalog import has_visible_price, latest_price_uah_for
+from app.repositories.catalog import has_visible_price, latest_price_uah_for, storefront_visible
 from app.repositories.series import SeriesRepository
 
 CompletenessGroupBy = Literal["series", "year", "denomination", "material", "edge", "quality"]
@@ -95,6 +95,7 @@ class CompletenessRepository:
         active_conditions: list[ColumnElement[bool]] = [
             self._visible(),
             not_(CatalogItem.is_archived),
+            storefront_visible(self._user_id, require_confirmed=False, collected_series=True),
         ]
         if country_id is not None:
             active_conditions.append(CatalogItem.country_id == country_id)
@@ -229,6 +230,7 @@ class CompletenessRepository:
         active_conditions: list[ColumnElement[bool]] = [
             self._visible(),
             not_(CatalogItem.is_archived),
+            storefront_visible(self._user_id, require_confirmed=False, collected_series=True),
             predicate,
         ]
         if country_id is not None:

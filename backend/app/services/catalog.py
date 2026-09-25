@@ -243,13 +243,15 @@ class CatalogService:
         offset: int,
         require_confirmed: bool = True,
         apply_storefront: bool = True,
+        collected_series: bool = False,
     ) -> tuple[list[CatalogListItem], int]:
         """`require_confirmed=False` is for a caller about the user's own
         collection rather than the catalogue browse experience (a series
         screen) -- never from a request filter, see storefront_visible()
         (app/repositories/catalog.py, docs/business-rules.md, BR-13a).
         `apply_storefront=False` goes one further and is the typeahead's
-        alone: see the same function's docstring."""
+        alone: see the same function's docstring. `collected_series=True` is
+        the completeness tiles' alone, matching their counts."""
         settings = await self._users.get_settings(self._user.id)
         filters.show_packaging_variants = settings is None or settings.show_packaging_variants
         page = await self._repo.list_items(
@@ -258,6 +260,7 @@ class CatalogService:
             offset=offset,
             require_confirmed=require_confirmed,
             apply_storefront=apply_storefront,
+            collected_series=collected_series,
         )
         images = await self._images_for([row.item.id for row in page.rows])
         items = [

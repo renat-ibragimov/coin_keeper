@@ -25,6 +25,7 @@ from tests.seed import (
     make_series,
     promote_to_admin,
     seed_reference,
+    set_country_active,
     set_country_catalog_confirmed,
     user_id_by_email,
 )
@@ -558,3 +559,206 @@ async def test_group_value_must_be_an_integer(client: AsyncClient, ctx: SimpleNa
         "/api/v1/completeness/group?groupBy=series&value=not-a-number", headers=auth(ctx.token_a)
     )
     assert response.status_code == 422
+
+
+async def test_a_draft_counts_nowhere_until_it_is_published(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """A draft from the NBU sync is invisible to completeness (BR-2): the
+    fraction must count exactly the tiles the grid shows."""
+    refs = ctx.refs
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Опублікована", year=2024, series=refs.fauna
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Чернетка",
+        year=2024,
+        series=refs.fauna,
+        status="draft",
+    )
+    headers = auth(ctx.token_a)
+
+    summary = (
+        await client.get(
+            f"/api/v1/completeness/summary?groupBy=series&countryId={refs.ukraine.id}",
+            headers=headers,
+        )
+    ).json()
+    by_value = {row["value"]: row["summary"] for row in summary}
+    assert by_value[refs.fauna.id]["total"] == 1
+
+    group = (
+        await client.get(
+            f"/api/v1/completeness/group?groupBy=series&value={refs.fauna.id}", headers=headers
+        )
+    ).json()
+    assert group["summary"]["total"] == 1
+    assert group["summary"]["unpricedMissing"] == 1
+
+    items = (
+        await client.get(
+            f"/api/v1/completeness/items?groupBy=series&value={refs.fauna.id}", headers=headers
+        )
+    ).json()
+    assert [row["title"] for row in items["items"]] == ["Опублікована"]
+
+
+async def test_an_inactive_country_counts_only_what_the_user_owns(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """With no country picked, a shared record of an inactive country is not
+    part of anyone's completeness unless they hold a coin of it (BR-13)."""
+    refs = ctx.refs
+    await set_country_active(db_session, refs.usa, active=False)
+    await make_catalog_item(db_session, country=refs.ukraine, title="Україна", year=1999)
+    owned_usa = await make_catalog_item(db_session, country=refs.usa, title="Delaware", year=1999)
+    await make_catalog_item(db_session, country=refs.usa, title="Pennsylvania", year=1999)
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=owned_usa, price="10")
+    headers = auth(ctx.token_a)
+
+    summary = (
+        await client.get("/api/v1/completeness/summary?groupBy=year", headers=headers)
+    ).json()
+    by_value = {row["value"]: row["summary"] for row in summary}
+    assert by_value[1999]["total"] == 2
+    assert by_value[1999]["owned"] == 1
+
+    group = (
+        await client.get("/api/v1/completeness/group?groupBy=year&value=1999", headers=headers)
+    ).json()
+    assert group["summary"]["total"] == 2
+
+    items = (
+        await client.get("/api/v1/completeness/items?groupBy=year&value=1999", headers=headers)
+    ).json()
+    assert sorted(row["title"] for row in items["items"]) == ["Delaware", "Україна"]
+
+
+async def test_personal_positions_count_like_shared_ones(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """A collector's own coin that the catalogue lacks counts for its author,
+    whatever its country, and for nobody else (BR-2)."""
+    refs = ctx.refs
+    await set_country_active(db_session, refs.usa, active=False)
+    await make_catalog_item(
+        db_session, country=refs.ukraine, title="Спільна", year=2001, series=refs.fauna
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Моя особиста",
+        year=2001,
+        series=refs.fauna,
+        created_by=ctx.id_a,
+    )
+    await make_catalog_item(
+        db_session, country=refs.usa, title="My own quarter", year=2001, created_by=ctx.id_a
+    )
+    await make_catalog_item(
+        db_session,
+        country=refs.ukraine,
+        title="Чужа особиста",
+        year=2001,
+        series=refs.fauna,
+        created_by=ctx.id_b,
+    )
+    headers = auth(ctx.token_a)
+
+    by_series = {
+        row["value"]: row["summary"]
+        for row in (
+            await client.get(
+                f"/api/v1/completeness/summary?groupBy=series&countryId={refs.ukraine.id}",
+                headers=headers,
+            )
+        ).json()
+    }
+    assert by_series[refs.fauna.id]["total"] == 2
+
+    by_year = {
+        row["value"]: row["summary"]
+        for row in (
+            await client.get("/api/v1/completeness/summary?groupBy=year", headers=headers)
+        ).json()
+    }
+    assert by_year[2001]["total"] == 3
+
+    items = (
+        await client.get("/api/v1/completeness/items?groupBy=year&value=2001", headers=headers)
+    ).json()
+    assert sorted(row["title"] for row in items["items"]) == [
+        "My own quarter",
+        "Моя особиста",
+        "Спільна",
+    ]
+
+
+async def test_a_collected_series_of_an_inactive_country_counts_whole(
+    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+) -> None:
+    """Once the user holds a coin of a series, its missing coins count and show
+    even when the series' country is inactive — completeness is there to say
+    what is missing (BR-13). A user with nothing from the series sees none of it."""
+    refs = ctx.refs
+    await set_country_active(db_session, refs.usa, active=False)
+    series_usa = await make_series(db_session, country=refs.usa, name="Standing Liberty")
+    quarter = await make_catalog_item(
+        db_session, country=refs.usa, title="Quarter", year=1920, series=series_usa
+    )
+    await make_catalog_item(
+        db_session, country=refs.usa, title="Dime", year=1921, series=series_usa
+    )
+    await add_collection_item(db_session, owner_id=ctx.id_a, item=quarter, price="10")
+    headers_a = auth(ctx.token_a)
+    headers_b = auth(ctx.token_b)
+
+    summary = (
+        await client.get(
+            f"/api/v1/completeness/summary?groupBy=series&countryId={refs.usa.id}",
+            headers=headers_a,
+        )
+    ).json()
+    by_value = {row["value"]: row["summary"] for row in summary}
+    assert by_value[series_usa.id]["total"] == 2
+    assert by_value[series_usa.id]["owned"] == 1
+
+    group = (
+        await client.get(
+            f"/api/v1/completeness/group?groupBy=series&value={series_usa.id}", headers=headers_a
+        )
+    ).json()
+    assert group["summary"]["total"] == 2
+    assert group["summary"]["missing"] == 1
+
+    items = (
+        await client.get(
+            f"/api/v1/completeness/items?groupBy=series&value={series_usa.id}", headers=headers_a
+        )
+    ).json()
+    assert [row["title"] for row in items["items"]] == ["Quarter", "Dime"]
+
+    by_year = {
+        row["value"]: row["summary"]
+        for row in (
+            await client.get("/api/v1/completeness/summary?groupBy=year", headers=headers_a)
+        ).json()
+    }
+    assert by_year[1921]["total"] == 1
+    assert by_year[1921]["owned"] == 0
+
+    items_b = (
+        await client.get(
+            f"/api/v1/completeness/items?groupBy=series&value={series_usa.id}", headers=headers_b
+        )
+    ).json()
+    assert items_b["total"] == 0
+    by_year_b = {
+        row["value"]
+        for row in (
+            await client.get("/api/v1/completeness/summary?groupBy=year", headers=headers_b)
+        ).json()
+    }
+    assert 1921 not in by_year_b

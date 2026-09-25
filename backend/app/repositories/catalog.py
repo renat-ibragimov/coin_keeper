@@ -36,6 +36,7 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import aliased
 
 from app.core.locale import DEFAULT_LOCALE, LOCALE_UK
 from app.models import (
@@ -148,7 +149,9 @@ def _search_vector() -> ColumnElement[Any]:
     return func.to_tsvector("simple", joined)
 
 
-def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> ColumnElement[bool]:
+def storefront_visible(
+    user_id: int, *, require_confirmed: bool = True, collected_series: bool = False
+) -> ColumnElement[bool]:
     """Storefront visibility for a shared catalog record (docs/business-rules.md, BR-13 and BR-13a).
 
     A record shows when its country is active, when it is the user's own
@@ -175,13 +178,18 @@ def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> Colum
     shared record means the collector enters a personal duplicate of a coin
     the catalogue already holds (owner's call, 2026-09-14).
 
+    `collected_series` (completeness only) widens the rule to a whole series
+    the user collects: once they hold one coin of a series, its other coins
+    show too, even from an inactive country, so completeness can say what is
+    missing (owner's call, 2026-09-25). Counts and tiles pass it alike.
+
     Self-contained EXISTS checks so the caller need not join Country: reused
     verbatim by the series and dashboard repositories. Each subquery pins its
     correlation to CatalogItem alone — the dashboard's breakdown queries join
     Country and CollectionItem directly, and without this SQLAlchemy
     auto-correlates those same tables out of these subqueries entirely.
     """
-    visible = or_(
+    branches: list[ColumnElement[bool]] = [
         exists(
             select(Country.id)
             .where(Country.id == CatalogItem.country_id, Country.is_active)
@@ -196,7 +204,21 @@ def storefront_visible(user_id: int, *, require_confirmed: bool = True) -> Colum
             )
             .correlate(CatalogItem)
         ),
-    )
+    ]
+    if collected_series:
+        sibling = aliased(CatalogItem)
+        branches.append(
+            exists(
+                select(CollectionItem.id)
+                .join(sibling, sibling.id == CollectionItem.catalog_item_id)
+                .where(
+                    sibling.series_id == CatalogItem.series_id,
+                    CollectionItem.owner_id == user_id,
+                )
+                .correlate(CatalogItem)
+            )
+        )
+    visible = or_(*branches)
     visible = and_(CatalogItem.status == "active", visible)
     if not require_confirmed:
         return visible
@@ -386,6 +408,7 @@ class CatalogRepository:
         *,
         require_confirmed: bool = True,
         apply_storefront: bool = True,
+        collected_series: bool = False,
     ) -> list[ColumnElement[bool]]:
         conditions: list[ColumnElement[bool]] = [
             self._visible(),
@@ -393,7 +416,11 @@ class CatalogRepository:
         ]
         if apply_storefront:
             conditions.append(
-                storefront_visible(self._user_id, require_confirmed=require_confirmed)
+                storefront_visible(
+                    self._user_id,
+                    require_confirmed=require_confirmed,
+                    collected_series=collected_series,
+                )
             )
         if filters.scope == "shared":
             conditions.append(CatalogItem.created_by.is_(None))
@@ -612,9 +639,13 @@ class CatalogRepository:
         offset: int,
         require_confirmed: bool = True,
         apply_storefront: bool = True,
+        collected_series: bool = False,
     ) -> CatalogPage:
         conditions = self._filter_conditions(
-            filters, require_confirmed=require_confirmed, apply_storefront=apply_storefront
+            filters,
+            require_confirmed=require_confirmed,
+            apply_storefront=apply_storefront,
+            collected_series=collected_series,
         )
 
         count_query = (

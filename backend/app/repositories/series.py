@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.locale import DEFAULT_LOCALE
 from app.models import CatalogItem, CoinSeries, CollectionItem, Country
-from app.repositories.catalog import has_visible_price, latest_price_uah_for
+from app.repositories.catalog import has_visible_price, latest_price_uah_for, storefront_visible
 from app.repositories.localization import localized
 
 
@@ -132,6 +132,7 @@ class SeriesRepository:
             CatalogItem.series_id == series_id,
             self._visible(),
             not_(CatalogItem.is_archived),
+            storefront_visible(self._user_id, require_confirmed=False, collected_series=True),
         ]
 
         # Completeness: both sides of the fraction over active visible items.

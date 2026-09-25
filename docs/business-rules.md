@@ -356,6 +356,14 @@ A catalog record is visible in listings and aggregates if **any** holds:
 A series is visible if its country is active **or** the user owns an item in it (no
 personal layer for series, so point 2 doesn't apply).
 
+**Completeness adds a fourth point:** a record also counts when the user owns at least
+one collection item of **the same series**. A series the user collects is counted and
+shown whole — its missing coins included — even from an inactive country; that's what
+completeness is for. Drafts, other users' personal positions and records outside any
+collected series stay out. `storefront_visible(..., collected_series=True)` applies it
+to the counts (`/completeness/*`, `/series/summary`) and the tiles alike, so they always
+match.
+
 One predicate implements it — `storefront_visible()` in `app/repositories/catalog.py`,
 `series_storefront_visible()` in `app/repositories/series.py` — used by `GET /catalog`
 (list and `total`), the "missing" listing and the missing budget, `GET /series*`,

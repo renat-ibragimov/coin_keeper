@@ -143,7 +143,7 @@ class CompletenessService:
             if not unassigned:
                 filters.quality_type_ids = [value] if value is not None else []
         return await CatalogService(self._session, self._user, self._locale).list_catalog(
-            filters, limit=limit, offset=offset, require_confirmed=False
+            filters, limit=limit, offset=offset, require_confirmed=False, collected_series=True
         )
 
     def _group_out(

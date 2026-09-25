@@ -626,9 +626,10 @@ CompletenessGroupOut = {groupBy, value, unassigned, label, countryId, descriptio
                                   purchaseTotalUah, currentValueUah, unpricedMissing}}
 ```
 
-- Completeness by any catalog dimension (BR-5). Numerator and denominator count active
-  items visible to the user; money counts all the user's instances, including those of
-  archived items (BR-5, BR-10).
+- Completeness by any catalog dimension (BR-5). Numerator and denominator count
+  published, non-archived items under the storefront rule plus whole collected series
+  (BR-13) — exactly the items `/completeness/items` returns; money counts all the
+  user's instances, including those of archived items (BR-5, BR-10).
 - A group is addressed by exactly one of `value=<id>` (for `year`, the year itself) or
   `unassigned=true` (the "no value" bucket: the column `IS NULL`). Both →
   `422 completeness-ambiguous-group`; neither → `422 completeness-missing-group`.
