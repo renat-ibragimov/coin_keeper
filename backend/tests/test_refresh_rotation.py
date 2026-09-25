@@ -235,7 +235,7 @@ async def test_a_password_change_ends_other_devices_access_tokens(
         json={"currentPassword": PASSWORD, "newPassword": "another-long-password"},
         headers={"Authorization": f"Bearer {phone_token}"},
     )
-    assert changed.status_code == 204
+    assert changed.status_code == 200
     laptop = await client.get(
         "/api/v1/auth/me", headers={"Authorization": f"Bearer {laptop_token}"}
     )

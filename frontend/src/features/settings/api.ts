@@ -1,5 +1,5 @@
 import { api } from '@/shared/api/client';
-import type { SettingsOut, UserOut } from '@/shared/api/types';
+import type { SessionOut, SettingsOut, UserOut } from '@/shared/api/types';
 
 export function updateProfile(body: {
   displayName?: string | null;
@@ -30,8 +30,9 @@ export function deleteAvatar(): Promise<UserOut> {
   return api<UserOut>('/auth/me/avatar', { method: 'DELETE' });
 }
 
-export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  return api<void>('/auth/change-password', {
+/** Ends every other sign-in; this device continues on the session returned. */
+export function changePassword(currentPassword: string, newPassword: string): Promise<SessionOut> {
+  return api<SessionOut>('/auth/change-password', {
     method: 'POST',
     body: { currentPassword, newPassword },
   });

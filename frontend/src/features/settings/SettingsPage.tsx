@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth/useAuth';
 import { deleteStorageLocation, fetchStorageLocations } from '@/features/collection/api';
 import { GRADES } from '@/features/collection/grades';
 import { fetchBootstrap } from '@/features/dashboard/api';
+import type { SessionOut } from '@/shared/api/types';
 import { setLocale } from '@/shared/i18n';
 import type { Locale } from '@/shared/i18n';
 import { useStoredViewMode } from '@/shared/lib/useStoredViewMode';
@@ -36,7 +37,7 @@ import styles from './SettingsPage.module.css';
 
 export function SettingsPage() {
   const { t } = useTranslation();
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, acceptSession } = useAuth();
   const { preference, setPreference } = useTheme();
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -94,10 +95,17 @@ export function SettingsPage() {
     onError: () => toast.show(t('errors.generic')),
   });
   const passwordMutation = useMutation({
-    mutationFn: ({ current, next }: { current: string; next: string }) =>
+    mutationFn: ({
+      current,
+      next,
+    }: {
+      current: string;
+      next: string;
+    }): Promise<SessionOut | void> =>
       user?.hasPassword === false ? setPassword(next) : changePassword(current, next),
-    onSuccess: () => {
-      if (user?.hasPassword === false) updateUser({ ...user, hasPassword: true });
+    onSuccess: (session) => {
+      if (session) acceptSession(session);
+      else if (user?.hasPassword === false) updateUser({ ...user, hasPassword: true });
       toast.show(t('settings.passwordChanged'));
     },
   });

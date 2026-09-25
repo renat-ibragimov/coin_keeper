@@ -402,15 +402,24 @@ class AuthService:
         await self._session.flush()
 
     async def change_password(
-        self, *, user: User, current_password: str, new_password: str
-    ) -> None:
+        self,
+        *,
+        user: User,
+        current_password: str,
+        new_password: str,
+        user_agent: str | None,
+        ip: str | None,
+    ) -> IssuedSession:
+        """Ends every sign-in — whoever else may know the old password — and
+        starts a fresh one for the device that made the change, so it isn't
+        thrown out right after a successful action."""
         if not await verify_password_async(current_password, user.password_hash):
             raise InvalidCredentialsError
         self._validate_password(new_password)
         user.password_hash = await hash_password_async(new_password)
         self._audit(user, "password.changed")
         await self._refresh.revoke_all_for_user(user.id, RefreshRevokeReason.PASSWORD_CHANGE)
-        await self._session.flush()
+        return await self._issue_session(user, user_agent=user_agent, ip=ip)
 
     async def set_password(self, *, user: User, new_password: str) -> None:
         """Add a password to a verified Google-only account, without another user."""

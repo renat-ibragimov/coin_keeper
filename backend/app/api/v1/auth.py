@@ -350,19 +350,23 @@ async def delete_avatar(user: CurrentUser, service: AvatarServiceDep) -> UserOut
     return user_out(await service.remove_avatar(user=user))
 
 
-@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/change-password")
 async def change_password(
     payload: ChangePasswordRequest,
     response: Response,
     user: CurrentUser,
     service: AuthServiceDep,
     settings: AppSettings,
-) -> None:
+    ip: ClientIp,
+    agent: UserAgent,
+) -> SessionOut:
     try:
-        await service.change_password(
+        session = await service.change_password(
             user=user,
             current_password=payload.current_password,
             new_password=payload.new_password,
+            user_agent=agent,
+            ip=ip,
         )
     except InvalidCredentialsError as exc:
         raise ProblemError(
@@ -373,8 +377,9 @@ async def change_password(
         ) from exc
     except WeakPasswordError as exc:
         raise _weak_password_problem(exc) from exc
-    # Every session was revoked, including this one.
-    _clear_refresh_cookie(response, settings)
+    # Every other sign-in was revoked; this device continues on a new one.
+    _set_refresh_cookie(response, session, settings)
+    return _session_payload(session)
 
 
 @router.post("/set-password", status_code=status.HTTP_204_NO_CONTENT)

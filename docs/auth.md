@@ -76,7 +76,9 @@ git — docs, code, tests or example commands. Use placeholders (`<owner-email>`
   sign-out, a password change or a detected replay ends that sign-in's access tokens at
   once, not after their 15 minutes. A token without `sid` is refused; the client just
   refreshes. `exp`, `iat`, `sub` and `sid` are required claims.
-- Password reset and password change revoke every family of the user.
+- Password reset and password change revoke every family of the user. A change then
+  starts a new family for the device that made it, so it stays signed in; every other
+  device has to sign in with the new password.
 - `session_started_at` (sign-in time, carried through rotation) and `persistent`
   ("remember me") are stored per token for session-lifetime rules; nothing reads them
   yet.

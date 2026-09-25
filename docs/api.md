@@ -105,7 +105,8 @@ GET    /auth/google/callback     ?state&code&error                    → 303 to
   `400 invalid-reset-token`. Passwords: `422 weak-password` (under 10 characters); over
   256 characters is a plain `422` validation error.
   `/auth/change-password` with a wrong current password → `400 invalid-credentials`; on
-  success every session is revoked and the cookie cleared. `/auth/set-password` when a
+  success every session is revoked and the calling device gets a new one: `200` with
+  `{user, tokens}` and a new refresh cookie. `/auth/set-password` when a
   password already exists → `409 password-already-set` (it's for Google-only accounts).
 - **Rate limits** (per IP and per email where there is one): login 5 / 15 min per email
   (reset on success) and 20 / 15 min per IP (never reset), register 3/h, forgot-password 3/h, resend 3/h, reset 5/h, refresh 600/h,

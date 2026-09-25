@@ -127,10 +127,13 @@ async def test_change_password(client: AsyncClient, mail_outbox: list[EmailMessa
         json={"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD},
         headers=auth,
     )
-    assert changed.status_code == 204
+    assert changed.status_code == 200
 
-    # Sessions were revoked along with the change.
-    assert (await client.post("/api/v1/auth/refresh")).status_code == 401
+    # The old sign-in is over, the device that changed it goes on with a new one.
+    assert (await client.get("/api/v1/auth/me", headers=auth)).status_code == 401
+    fresh = {"Authorization": f"Bearer {changed.json()['tokens']['accessToken']}"}
+    assert (await client.get("/api/v1/auth/me", headers=fresh)).status_code == 200
+    assert (await client.post("/api/v1/auth/refresh")).status_code == 200
     assert (
         await client.post("/api/v1/auth/login", json={"email": email, "password": NEW_PASSWORD})
     ).status_code == 200
@@ -213,7 +216,7 @@ async def test_password_changes_are_audited(
         json={"currentPassword": PASSWORD, "newPassword": NEW_PASSWORD},
         headers={"Authorization": f"Bearer {token}"},
     )
-    assert changed.status_code == 204
+    assert changed.status_code == 200
     await client.post("/api/v1/auth/forgot-password", json={"email": email})
     await client.post(
         "/api/v1/auth/reset-password",
