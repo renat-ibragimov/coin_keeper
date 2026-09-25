@@ -1,4 +1,4 @@
-import { api } from '@/shared/api/client';
+import { api, withRefreshLock } from '@/shared/api/client';
 import type { SessionOut, UserOut } from '@/shared/api/types';
 
 export function login(email: string, password: string): Promise<SessionOut> {
@@ -42,7 +42,7 @@ export function resetPassword(token: string, newPassword: string): Promise<void>
 }
 
 export function logout(): Promise<void> {
-  return api<void>('/auth/logout', { method: 'POST', auth: false });
+  return withRefreshLock(() => api<void>('/auth/logout', { method: 'POST', auth: false }));
 }
 
 export function me(): Promise<UserOut> {

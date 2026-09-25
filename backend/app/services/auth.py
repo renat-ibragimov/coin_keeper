@@ -274,6 +274,11 @@ class AuthService:
                     refresh_expires_at=successor.expires_at,
                 )
 
+        if not await self._refresh.family_is_live(record.family_id, record.user_id):
+            # The sign-in already ended (sign-out, a password change, an earlier
+            # replay): nothing left to protect, and no alarm for a stale cookie.
+            raise InvalidOrExpiredTokenError
+
         # A rotated token came back too late, or after its successor moved on:
         # it leaked. End this sign-in, not the user's other devices.
         await self._refresh.revoke_family(record.family_id, RefreshRevokeReason.REUSE)

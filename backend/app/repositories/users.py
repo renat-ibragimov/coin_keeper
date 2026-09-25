@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import ColumnElement, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuthIdentity, AuthToken, RefreshToken, User, UserSettings
@@ -127,6 +127,16 @@ class RefreshTokenRepository:
         result = await self._session.execute(query)
         return result.scalar_one_or_none()
 
+    async def _lock_live(self, scope: ColumnElement[bool]) -> None:
+        """Wait for any refresh rotating one of these tokens to commit. The
+        UPDATE that follows is a new statement with a fresh snapshot, so it
+        also sees — and revokes — the successor that refresh just inserted."""
+        await self._session.execute(
+            select(RefreshToken.id)
+            .where(scope, RefreshToken.revoked_at.is_(None))
+            .with_for_update()
+        )
+
     async def family_is_live(self, family_id: uuid.UUID, user_id: int) -> bool:
         """Whether this sign-in still holds a usable refresh token: the check
         behind every access token (docs/auth.md, "Sessions")."""
@@ -149,6 +159,7 @@ class RefreshTokenRepository:
 
     async def revoke_family(self, family_id: uuid.UUID, reason: RefreshRevokeReason) -> None:
         """Ends one sign-in: logout, or a proven replay of a rotated token."""
+        await self._lock_live(RefreshToken.family_id == family_id)
         await self._session.execute(
             update(RefreshToken)
             .where(RefreshToken.family_id == family_id, RefreshToken.revoked_at.is_(None))
@@ -158,6 +169,7 @@ class RefreshTokenRepository:
 
     async def revoke_all_for_user(self, user_id: int, reason: RefreshRevokeReason) -> None:
         """Ends every sign-in of the user: password change or reset."""
+        await self._lock_live(RefreshToken.user_id == user_id)
         await self._session.execute(
             update(RefreshToken)
             .where(RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None))

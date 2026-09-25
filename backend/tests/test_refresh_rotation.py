@@ -16,6 +16,7 @@ from app.core.mail.base import EmailMessage
 from app.core.mail.console import ConsoleMailBackend
 from app.core.security import generate_token, hash_token
 from app.models import AuditLog, RefreshToken, User
+from app.models.enums import RefreshRevokeReason
 from app.repositories.users import RefreshTokenRepository
 from app.services.auth import AuthService
 from tests.helpers import PASSWORD, register_and_verify, unique_email
@@ -253,3 +254,101 @@ async def test_an_access_token_without_a_session_is_refused(
     legacy = jwt.encode(claims, get_settings().jwt_secret, algorithm="HS256")
     response = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {legacy}"})
     assert response.status_code == 401
+
+
+async def test_a_dead_cookie_raises_the_alarm_once(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list[EmailMessage]
+) -> None:
+    """After a replay ends the sign-in, the same stale cookie coming back on
+    every page load is just a 401 — and the browser is told to drop it."""
+    await register_and_verify(client, mail_outbox)
+    old = client.cookies[REFRESH_COOKIE]
+    await _refresh_with(client, old)
+    await _age_rotation(db_session, old, seconds=60)
+
+    first = await _refresh_with(client, old)
+    second = await _refresh_with(client, old)
+    assert first.status_code == second.status_code == 401
+    assert await _reuse_events(db_session) == 1
+    assert REFRESH_COOKIE in second.headers["set-cookie"]
+    assert "max-age=0" in second.headers["set-cookie"].lower()
+
+
+async def test_a_replay_after_sign_out_is_no_alarm(
+    client: AsyncClient, db_session: AsyncSession, mail_outbox: list[EmailMessage]
+) -> None:
+    """Tab A signs out while tab B replays a token rotated a moment ago: the
+    sign-in is simply over, nobody stole anything."""
+    await register_and_verify(client, mail_outbox)
+    old = client.cookies[REFRESH_COOKIE]
+    current = (await _refresh_with(client, old)).cookies[REFRESH_COOKIE]
+
+    client.cookies.clear()
+    await client.post("/api/v1/auth/logout", headers={"Cookie": f"{REFRESH_COOKIE}={current}"})
+
+    assert (await _refresh_with(client, old)).status_code == 401
+    assert await _reuse_events(db_session) == 0
+
+
+async def test_a_password_change_racing_a_refresh_leaves_nothing_alive(
+    engine: AsyncEngine,
+) -> None:
+    """A refresh holds the lock on T1 and inserts T2 while the password change
+    waits. Once the refresh commits, the change must revoke T2 as well —
+    otherwise a thief racing the owner's change keeps a live session."""
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+    raw = generate_token()
+    async with factory() as session:
+        user = User(email=unique_email(), email_verified=True, is_active=True)
+        session.add(user)
+        await session.flush()
+        await RefreshTokenRepository(session).add(
+            user_id=user.id,
+            token_hash=hash_token(raw),
+            expires_at=datetime.now(UTC) + timedelta(days=1),
+            user_agent=None,
+            ip=None,
+        )
+        await session.commit()
+        user_id = user.id
+
+    try:
+        async with factory() as refreshing, factory() as changing:
+            tokens = RefreshTokenRepository(refreshing)
+            first = await tokens.get_by_hash(hash_token(raw), for_update=True)
+            assert first is not None
+            await tokens.add(
+                user_id=user_id,
+                token_hash=hash_token(generate_token()),
+                expires_at=datetime.now(UTC) + timedelta(days=1),
+                user_agent=None,
+                ip=None,
+                parent=first,
+            )
+            await tokens.revoke(first, RefreshRevokeReason.ROTATED)
+
+            async def change() -> None:
+                await RefreshTokenRepository(changing).revoke_all_for_user(
+                    user_id, RefreshRevokeReason.PASSWORD_CHANGE
+                )
+                await changing.commit()
+
+            waiting = asyncio.create_task(change())
+            await asyncio.sleep(0.3)
+            assert not waiting.done()
+            await refreshing.commit()
+            await waiting
+
+        async with factory() as session:
+            live = (
+                await session.execute(
+                    select(func.count(RefreshToken.id)).where(
+                        RefreshToken.user_id == user_id, RefreshToken.revoked_at.is_(None)
+                    )
+                )
+            ).scalar_one()
+        assert live == 0
+    finally:
+        async with factory() as session:
+            await session.execute(delete(User).where(User.id == user_id))
+            await session.commit()

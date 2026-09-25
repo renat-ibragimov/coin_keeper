@@ -104,6 +104,8 @@ async function rawRequest(path: string, options: RequestOptions, token: string |
 
 /** Pause before the one retry of a refresh that failed in transit. */
 export const REFRESH_RETRY_DELAY_MS = 1000;
+/** A refresh holds the cross-tab lock; a stalled one must not hold it for minutes. */
+export const REFRESH_TIMEOUT_MS = 15000;
 
 /**
  * One refresh round trip, retried once on a network error or a 5xx. The
@@ -116,6 +118,7 @@ async function requestRefresh(): Promise<Response> {
     fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
+      signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS),
     });
   const retryLater = async () => {
     await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_DELAY_MS));
@@ -131,11 +134,12 @@ async function requestRefresh(): Promise<Response> {
 }
 
 /**
- * Tabs share one refresh cookie, so their refreshes run one at a time: each
- * sends the cookie the previous one set. Browsers without the Web Locks API
- * fall back to the server's grace window.
+ * Tabs share one refresh cookie, so their refreshes — and sign-out — run one
+ * at a time: each sends the cookie the previous one set, and a sign-out never
+ * lands in the middle of a refresh that would hand the cookie back. Browsers
+ * without the Web Locks API fall back to the server's grace window.
  */
-function withRefreshLock(work: () => Promise<Response>): Promise<Response> {
+export function withRefreshLock<T>(work: () => Promise<T>): Promise<T> {
   const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
   return locks ? locks.request('ck-refresh', work) : work();
 }

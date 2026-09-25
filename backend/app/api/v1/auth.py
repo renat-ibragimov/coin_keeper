@@ -255,12 +255,16 @@ async def refresh(
     try:
         session = await service.refresh_session(refresh_token=token, user_agent=agent, ip=ip)
     except InvalidOrExpiredTokenError as exc:
-        _clear_refresh_cookie(response, settings)
+        # On the error path only the exception's headers reach the browser;
+        # the injected `response` is dropped, so the deletion travels here.
+        cleared = Response()
+        _clear_refresh_cookie(cleared, settings)
         raise ProblemError(
             status.HTTP_401_UNAUTHORIZED,
             "invalid-refresh-token",
             "Not authenticated",
             "The session has expired. Sign in again.",
+            headers={"set-cookie": cleared.headers["set-cookie"]},
         ) from exc
     _set_refresh_cookie(response, session, settings)
     return _session_payload(session)

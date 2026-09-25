@@ -168,6 +168,13 @@ describe('api client', () => {
     expect(request).toHaveBeenCalledWith('ck-refresh', expect.any(Function));
   });
 
+  it('gives a refresh a deadline, so a stalled one cannot hold the tab lock', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { tokens: { accessToken: 'fresh' } }));
+    await tryRefresh();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+  });
+
   it('does not resurrect a session when refresh finishes after logout', async () => {
     setAccessToken('old');
     let finish!: (response: Response) => void;

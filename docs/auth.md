@@ -69,7 +69,11 @@ git — docs, code, tests or example commands. Use placeholders (`<owner-email>`
   successor has itself rotated, means it leaked → **that family** is revoked (`reuse`),
   the event is written to `audit_log` (`session.refresh_reuse`), and the user's other
   devices stay signed in (RFC 9700, section 4.14.2). A token ended any other way
-  (logout, password change) is just a `401`.
+  (logout, password change), or one whose family is already fully revoked, is just a
+  `401` — a stale cookie coming back is not a new alarm. A failed refresh deletes the
+  cookie in its `401`.
+- Revoking a family or all of a user's tokens first locks their live rows, so a refresh
+  rotating one of them at that moment finishes first and its successor is revoked too.
 - **Sign-out** revokes the whole family of the presented token, and only it.
 - **Access tokens belong to their sign-in.** The JWT carries `sid` (the family id), and
   every authorised request checks that the family still holds a live refresh token. So
@@ -221,7 +225,9 @@ on one origin.
   refreshes run one at a time under the Web Locks API (`ck-refresh`), so each tab sends
   the cookie the previous one set; browsers without it rely on the server's grace window.
   A refresh that fails with a network error or a 5xx is retried once after 1 s — inside
-  the grace window if the server had already rotated the cookie.
+  the grace window if the server had already rotated the cookie. Each refresh gives up
+  after 15 s, so a stalled one can't hold the lock for minutes. Sign-out takes the same
+  lock, so it never lands in the middle of a refresh that would hand the cookie back.
 - The Google sign-in popup never refreshes on its own start-up; only the opener does.
 - A voluntary sign-out is broadcast on `BroadcastChannel('ck-auth')`; the viewer's other
   tabs close their session too.
