@@ -86,3 +86,16 @@ class AuthTokenKind(enum.StrEnum):
     EMAIL_VERIFY = "email_verify"
     PASSWORD_RESET = "password_reset"  # noqa: S105 - token kind, not a secret
     TELEGRAM_LINK = "telegram_link"
+
+
+class RefreshRevokeReason(enum.StrEnum):
+    """Why a refresh token stopped working (docs/auth.md). Stored as text with a
+    CHECK, not a native enum. Only a replay of a `rotated` token is evidence of
+    theft; every other reason is a plain 401."""
+
+    ROTATED = "rotated"
+    LOGOUT = "logout"
+    REUSE = "reuse"
+    PASSWORD_CHANGE = "password_change"  # noqa: S105 - revoke reason, not a secret
+    PASSWORD_RESET = "password_reset"  # noqa: S105 - revoke reason, not a secret
+    LOGOUT_ALL = "logout_all"

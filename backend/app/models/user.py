@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import uuid
 from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     DateTime,
     ForeignKey,
     Index,
@@ -14,8 +16,10 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    func,
+    text,
 )
-from sqlalchemy.dialects.postgresql import CITEXT, ENUM, INET, JSONB
+from sqlalchemy.dialects.postgresql import CITEXT, ENUM, INET, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, created_at_column, updated_at_column
@@ -97,11 +101,40 @@ class RefreshToken(Base):
     token_hash: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # RefreshRevokeReason; set together with revoked_at.
+    revoke_reason: Mapped[str | None] = mapped_column(Text)
+    # One family per sign-in; rotation keeps it. A proven replay revokes the
+    # family, never the user's other devices (docs/auth.md, "Sessions").
+    family_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, server_default=text("gen_random_uuid()")
+    )
+    parent_id: Mapped[int | None] = mapped_column(
+        ForeignKey("refresh_tokens.id", ondelete="SET NULL")
+    )
+    # When the family's sign-in happened, carried through rotation.
+    session_started_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    # "Remember me" at sign-in, carried through rotation.
+    persistent: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     user_agent: Mapped[str | None] = mapped_column(Text)
     ip: Mapped[str | None] = mapped_column(INET)
     created_at: Mapped[datetime] = created_at_column()
 
-    __table_args__ = (Index("ix_refresh_tokens_user_id", "user_id"),)
+    __table_args__ = (
+        CheckConstraint(
+            "revoke_reason IS NULL OR revoke_reason IN "
+            "('rotated', 'logout', 'reuse', 'password_change', 'password_reset', 'logout_all')",
+            name="revoke_reason_valid",
+        ),
+        Index("ix_refresh_tokens_user_id", "user_id"),
+        Index("ix_refresh_tokens_family_id", "family_id"),
+        Index(
+            "ix_refresh_tokens_user_id_active",
+            "user_id",
+            postgresql_where=text("revoked_at IS NULL"),
+        ),
+    )
 
 
 class AuthToken(Base):

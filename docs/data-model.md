@@ -129,11 +129,20 @@ A provider subject identifies the account even if the email changes later.
 
 ### refresh_tokens, auth_tokens
 
-Both store the sha256 of a token, never the token.
+Both store the sha256 of a token, never the token. A refresh token's family is one
+sign-in; rotation, the grace window and family-scoped revocation are in `auth.md`,
+"Sessions". Migration `0027` retired every token that existed before families
+(`logout_all`).
 
 ```
 refresh_tokens: id, user_id FK users CASCADE, token_hash UNIQUE, expires_at,
-                revoked_at, user_agent, ip inet, created_at
+                revoked_at, revoke_reason CHECK (rotated | logout | reuse |
+                password_change | password_reset | logout_all),
+                family_id uuid, parent_id FK refresh_tokens SET NULL,
+                session_started_at, persistent bool DEFAULT true,
+                user_agent, ip inet, created_at;
+                INDEX (user_id), INDEX (family_id),
+                INDEX (user_id) WHERE revoked_at IS NULL
 auth_tokens:    id, user_id FK users CASCADE, kind auth_token_kind, token_hash UNIQUE,
                 expires_at, used_at, created_at; INDEX (user_id, kind)
 ```
