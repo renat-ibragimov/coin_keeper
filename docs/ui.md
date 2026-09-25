@@ -64,9 +64,10 @@ Retired paths redirect and keep the query string:
   and nothing is created. Login errors never reveal whether an address exists; the reset
   request answers the same either way.
 - **Email links** (`/verify-email`, `/reset-password`) and `/google-complete` keep their
-  own addresses and use a compact screen with a way back to the site. Google sign-in runs
-  in a separate window; its errors and "check your email" come back into the dialog of
-  the original tab.
+  own addresses and use a compact screen with a way back to the site. `/verify-email`
+  always asks for a new password. Google sign-in runs in a separate window; its errors
+  and notices (an existing account to link, an address Google doesn't vouch for) come
+  back into the dialog of the original tab.
 - **Sign-out.** Public pages and the four collection root sections keep their address
   and switch to the guest view. Add/edit pages go to `/collection/coins`, the
   completeness detail to `/collection/completeness`, settings and admin to `/`. The auth

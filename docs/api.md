@@ -95,8 +95,7 @@ GET    /auth/google/callback     ?state&code&error                    → 303 to
   in `/bootstrap`.
 - **Registration** answers `202` whether or not the address is taken, and creates no
   tokens: the account is inactive until the email is confirmed. The password is chosen at
-  `/auth/verify-email` (`422 password-required` if missing, except for Google-created
-  accounts). A legacy `password` field in `/auth/register` is accepted and ignored.
+  `/auth/verify-email` (`422 password-required` if missing — always). A legacy `password` field in `/auth/register` is accepted and ignored.
   `website` is a honeypot: filled → the same `202`, nothing created.
   `ALLOW_REGISTRATION=false` → `403 registration-closed`.
 - **Always 202:** `/auth/resend-verification` and `/auth/forgot-password`, so they can't
@@ -121,8 +120,8 @@ GET    /auth/google/callback     ?state&code&error                    → 303 to
   google-already-linked`. The callback redirects back to the app:
   `/google-complete` after a successful sign-in (the frontend then calls `/auth/refresh`),
   `/google-complete?mode=link&google=linked|conflict|error` for linking,
-  `/login?google=error|link-required|registration-closed` and
-  `/check-email?google=verify` otherwise. A Google sign-in for an email that already has
+  `/login?google=error|link-required|registration-closed|email-unconfirmed` otherwise
+  (`email-unconfirmed`: an address outside Gmail and Workspace, `auth.md`). A Google sign-in for an email that already has
   an account doesn't merge silently — the user signs in the existing way and links from
   settings. Flow and conflict rules: `auth.md`.
 

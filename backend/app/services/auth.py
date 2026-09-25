@@ -27,6 +27,7 @@ from app.core.security import (
 from app.models import AuditLog, RefreshToken, User
 from app.models.enums import AuthTokenKind, RefreshRevokeReason, UserRole
 from app.repositories.users import (
+    AuthIdentityRepository,
     AuthTokenRepository,
     RefreshTokenRepository,
     UserRepository,
@@ -155,9 +156,6 @@ class AuthService:
         # If delivery fails, the inactive account remains and the user can resend.
         await self._session.commit()
         url = f"{self._settings.public_base_url}/verify-email?token={quote(raw)}"
-        await self._session.refresh(user, ["identities"])
-        if user.google_linked:
-            url += "&google=1"
         await self._mail.send(
             verification_email(user.email, url, self._settings.email_verify_ttl_hours)
         )
@@ -174,14 +172,17 @@ class AuthService:
         if user is None:
             raise InvalidOrExpiredTokenError
 
-        if new_password is None and not user.google_linked:
+        # Confirming the mailbox always means choosing a password here: no
+        # Google identity can stand in for it (docs/auth.md, "Google sign-in").
+        if new_password is None:
             raise PasswordRequiredError
-        if new_password is not None:
-            self._validate_password(new_password)
-            user.password_hash = hash_password(new_password)
-        else:
-            # A legacy pending Google account must not retain an unverified password.
-            user.password_hash = None
+        self._validate_password(new_password)
+        user.password_hash = hash_password(new_password)
+        if not user.email_verified:
+            # Whatever Google identity an unconfirmed account carries was never
+            # proven to belong to this mailbox's owner. They can link their own
+            # Google in settings afterwards.
+            await AuthIdentityRepository(self._session).unlink_all(user)
 
         await self._auth_tokens.mark_used(record)
         user.email_verified = True

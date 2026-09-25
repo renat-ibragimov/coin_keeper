@@ -21,7 +21,7 @@ export function resendVerification(email: string): Promise<void> {
   return api<void>('/auth/resend-verification', { method: 'POST', body: { email }, auth: false });
 }
 
-export function verifyEmail(token: string, newPassword?: string): Promise<SessionOut> {
+export function verifyEmail(token: string, newPassword: string): Promise<SessionOut> {
   return api<SessionOut>('/auth/verify-email', {
     method: 'POST',
     body: { token, newPassword },

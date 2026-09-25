@@ -133,12 +133,8 @@ async def callback(
 
     if existing_identity is not None:
         user = await users.get_by_id(existing_identity.user_id)
-        if user is None:
+        if user is None or not user.is_active or not user.email_verified:
             destination = "/login?google=error"
-        elif not user.is_active or not user.email_verified:
-            if not user.email_verified:
-                await AuthService(session, settings, mail).resend_verification(user.email)
-            destination = "/check-email?google=verify"
         else:
             auth = AuthService(session, settings, mail)
             issued = await auth.issue_session_for_user(user, user_agent=agent, ip=ip)
@@ -152,29 +148,30 @@ async def callback(
             destination = "/login?google=link-required"
         elif not settings.allow_registration:
             destination = "/login?google=registration-closed"
+        elif not claims.google_controls_email:
+            # Outside Gmail and Workspace, Google checked the address once and
+            # no longer vouches for it: no account is created from it. The user
+            # registers by email and links Google in settings (docs/auth.md).
+            destination = "/login?google=email-unconfirmed"
         else:
             user = User(
                 email=claims.email,
                 password_hash=None,
                 display_name=claims.name,
                 role=UserRole.USER,
-                is_active=claims.google_controls_email,
-                email_verified=claims.google_controls_email,
+                is_active=True,
+                email_verified=True,
             )
             await users.add(user)
             await identities.link_google(user, subject=claims.subject, email=claims.email)
-            if not claims.google_controls_email:
-                await AuthService(session, settings, mail).resend_verification(user.email)
-                destination = "/check-email?google=verify"
-            else:
-                issued = await AuthService(session, settings, mail).issue_session_for_user(
-                    user, user_agent=agent, ip=ip
-                )
-                response = _return_to_app(settings, "/google-complete")
-                _set_refresh_cookie(response, issued, settings)
-                _clear_state_cookie(response, settings)
-                await queue_new_user_notification(background, session, sender, user.email)
-                return response
+            issued = await AuthService(session, settings, mail).issue_session_for_user(
+                user, user_agent=agent, ip=ip
+            )
+            response = _return_to_app(settings, "/google-complete")
+            _set_refresh_cookie(response, issued, settings)
+            _clear_state_cookie(response, settings)
+            await queue_new_user_notification(background, session, sender, user.email)
+            return response
 
     response = _return_to_app(settings, destination)
     _clear_state_cookie(response, settings)

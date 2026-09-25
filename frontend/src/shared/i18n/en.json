@@ -112,7 +112,7 @@
     "continueWithGoogle": "Continue with Google",
     "googleError": "Google sign-in could not be completed. Try again.",
     "googleLinkRequired": "This email already has an account. Sign in with your password, then connect Google in Settings. Your collection will stay in the same account.",
-    "googleCheckEmail": "Check the email address on your Google account for a confirmation link. Once confirmed, you can sign in with Google.",
+    "googleEmailUnconfirmed": "Google doesn't confirm this address. Sign up with email and password, then link Google in settings.",
     "registerTitle": "Sign up",
     "registerSubtitle": "Enter your email. You will choose a password after confirming it.",
     "displayName": "Name",

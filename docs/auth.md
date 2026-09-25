@@ -89,6 +89,9 @@ token exists only in the email.
   the address exists — the forms can't be used to probe for accounts.
 - **No password before verification.** Registering again with an unverified address just
   sends a new link; only the mailbox owner chooses the password, when using it.
+  Confirming an address **always** requires choosing a password — no Google identity
+  stands in for it — and drops any Google identity the unconfirmed account carried: it
+  was never proven to belong to this mailbox's owner.
 - Registering again with an already verified address (including a Google-created one)
   also answers `202` but creates nothing and sends nothing. The register screen explains
   the options generically: sign in with Google and add a password in settings, or reset
@@ -152,9 +155,16 @@ identity per user.
 **Resolution rules:**
 
 - A known `sub` signs into its linked account, even if the Google email changed.
-- A new `sub` with a free email creates a user. For `@gmail.com` and Google Workspace
-  (`hd` claim) addresses Google's verification is accepted and the user is signed in
-  immediately; any other domain gets our own verification email first.
+- A new `sub` with a free email creates a user only for `@gmail.com` and Google Workspace
+  (`hd` claim) addresses: Google controls those mailboxes, so its verification is
+  accepted and the user is signed in immediately.
+- **Any other address creates nothing** (`/login?google=email-unconfirmed`). Google
+  checked it once, when the Google account was made, and doesn't vouch that the same
+  person still owns the mailbox — a former employee or the previous owner of a
+  re-registered domain may still hold that Google account. Creating a pending account
+  with that Google already attached would hand them the real owner's account once the
+  owner confirmed the address. Such a user registers by email and links Google from
+  settings, where linking requires a live session.
 - A new `sub` whose email is already taken **creates nothing and links nothing**
   (`/login?google=link-required`). The user signs in the usual way and starts linking
   from settings. Linking requires a live session, the Google flow in the same browser,

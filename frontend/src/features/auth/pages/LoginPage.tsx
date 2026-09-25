@@ -71,6 +71,8 @@ export function LoginForm({
       <form className={styles.form} onSubmit={(event) => void submit(event)}>
         {googleResult === 'link-required' ? (
           <div className={styles.formInfo}>{t('auth.googleLinkRequired')}</div>
+        ) : googleResult === 'email-unconfirmed' ? (
+          <div className={styles.formInfo}>{t('auth.googleEmailUnconfirmed')}</div>
         ) : googleResult ? (
           <div className={styles.formError}>{t('auth.googleError')}</div>
         ) : null}

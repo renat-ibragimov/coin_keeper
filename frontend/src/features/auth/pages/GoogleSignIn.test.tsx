@@ -68,7 +68,7 @@ describe('GoogleSignIn', () => {
   });
   it.each([
     ['login', 'link-required'],
-    ['check-email', 'verify'],
+    ['login', 'email-unconfirmed'],
   ])('returns OAuth %s results to the original dialog', async (mode, google) => {
     const popupStorage = new Map<string, string>();
     const popup = {

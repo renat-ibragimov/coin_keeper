@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuthIdentity, AuthToken, RefreshToken, User, UserSettings
@@ -80,6 +80,11 @@ class AuthIdentityRepository:
         await self._session.flush()
         await self._session.refresh(user, ["identities"])
         return identity
+
+    async def unlink_all(self, user: User) -> None:
+        await self._session.execute(delete(AuthIdentity).where(AuthIdentity.user_id == user.id))
+        await self._session.flush()
+        await self._session.refresh(user, ["identities"])
 
 
 class RefreshTokenRepository:

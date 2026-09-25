@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
@@ -18,29 +18,16 @@ export function VerifyEmailPage() {
   const { t } = useTranslation();
   const [params] = useState(() => new URLSearchParams(window.location.search));
   const token = params.get('token');
-  const google = params.get('google') === '1';
   const { acceptSession } = useAuth();
   const navigate = useNavigate();
-  const [state, setState] = useState<VerifyState>(
-    token ? (google ? 'pending' : 'form') : 'missing-token',
-  );
+  const [state, setState] = useState<VerifyState>(token ? 'form' : 'missing-token');
   const [password, setPassword] = useState('');
   const [repeat, setRepeat] = useState('');
   const [message, setMessage] = useState<string | null>(null);
-  const started = useRef(false);
 
   useEffect(() => {
     window.history.replaceState(window.history.state, '', window.location.pathname);
-    if (!google || !token || started.current) return;
-    started.current = true;
-    void authApi.verifyEmail(token).then(
-      (session) => {
-        acceptSession(session);
-        setState('success');
-      },
-      () => setState('error'),
-    );
-  }, [token, google, acceptSession]);
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();

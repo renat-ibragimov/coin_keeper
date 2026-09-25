@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.mail.base import EmailMessage
 from app.core.rate_limit import get_redis
-from app.repositories.users import UserRepository
+from app.repositories.users import AuthIdentityRepository, UserRepository
 from app.services import google_auth as google_module
 from app.services.google_auth import GoogleClaims, GoogleOAuth, GoogleOAuthError, PendingFlow
 from tests.helpers import PASSWORD, extract_token, register_and_verify, unique_email
@@ -191,9 +191,17 @@ async def test_google_callback_rejects_state_from_another_browser(
     assert callback.headers["location"].endswith("/login?google=error")
 
 
-async def test_external_google_email_still_needs_our_email_verification(
-    client: AsyncClient, mail_outbox: list[EmailMessage], monkeypatch: pytest.MonkeyPatch
+async def test_google_without_a_google_owned_email_creates_nothing(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mail_outbox: list[EmailMessage],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Outside Gmail and Workspace, Google only once checked the address and no
+    longer vouches for it. Creating a pending account with that Google already
+    attached let a former owner of the mailbox keep a way in once the real
+    owner confirmed the address; such a user registers by email and links
+    Google in settings instead (docs/auth.md, "Google sign-in")."""
     enable_google(monkeypatch)
     email = unique_email()
     google_claims(monkeypatch, email, "google-sub-external", controls_email=False)
@@ -202,16 +210,45 @@ async def test_external_google_email_still_needs_our_email_verification(
         "/api/v1/auth/google/callback",
         params={"state": oauth_state(start.headers["location"]), "code": "test-code"},
     )
-    assert callback.headers["location"].endswith("/check-email?google=verify")
-    assert mail_outbox[-1].to == email
-    assert "&google=1" in mail_outbox[-1].body
-    assert (await client.post("/api/v1/auth/refresh")).status_code == 401
-    confirmed = await client.post(
+    assert callback.headers["location"].endswith("/login?google=email-unconfirmed")
+    assert await UserRepository(db_session).get_by_email(email) is None
+    assert mail_outbox == []
+
+
+async def test_confirming_an_address_always_needs_a_password(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mail_outbox: list[EmailMessage],
+) -> None:
+    """Even for an unconfirmed account that somehow carries a Google identity,
+    the link never signs anyone in without the mailbox owner choosing a
+    password — and it no longer hints at a password-free path."""
+    email = unique_email()
+    assert (await client.post("/api/v1/auth/register", json={"email": email})).status_code == 202
+    user = await UserRepository(db_session).get_by_email(email)
+    assert user is not None
+    await AuthIdentityRepository(db_session).link_google(
+        user, subject="google-sub-pending", email=email
+    )
+    await db_session.commit()
+
+    assert (
+        await client.post("/api/v1/auth/resend-verification", json={"email": email})
+    ).status_code == 202
+    assert "google=1" not in mail_outbox[-1].body
+
+    missing = await client.post(
         "/api/v1/auth/verify-email", json={"token": extract_token(mail_outbox)}
     )
+    assert missing.status_code == 422
+    assert missing.json()["type"].endswith("password-required")
+
+    confirmed = await client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": extract_token(mail_outbox), "newPassword": PASSWORD},
+    )
     assert confirmed.status_code == 200
-    assert confirmed.json()["user"]["googleLinked"] is True
-    assert confirmed.json()["user"]["hasPassword"] is False
+    assert confirmed.json()["user"]["googleLinked"] is False
 
 
 async def test_link_rejects_different_google_email(

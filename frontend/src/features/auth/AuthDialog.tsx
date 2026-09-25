@@ -179,11 +179,9 @@ export function AuthDialogProvider({ children }: { children: ReactNode }) {
           ) : dialog?.mode === 'check-email' ? (
             <div className={styles.centered}>
               <p className={styles.subtitle}>
-                {dialog.google === 'verify'
-                  ? t('auth.googleCheckEmail')
-                  : dialog.email
-                    ? t('auth.checkEmailText', { email: dialog.email })
-                    : t('auth.checkEmailGeneric')}
+                {dialog.email
+                  ? t('auth.checkEmailText', { email: dialog.email })
+                  : t('auth.checkEmailGeneric')}
               </p>
               {sentAgain ? <div className={styles.formInfo}>{t('auth.resendDone')}</div> : null}
               {dialog.email ? (
