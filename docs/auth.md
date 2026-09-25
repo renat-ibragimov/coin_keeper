@@ -117,11 +117,12 @@ sorting by price/purchase) return `422`. Everything else requires sign-in.
 ## Rate limits
 
 Fixed windows in Redis (`app/core/rate_limit.py`). Several scopes per endpoint are
-normal; exceeding a limit returns `429` with `Retry-After`.
+normal; exceeding a limit returns `429` with `Retry-After`. A counter and its expiry are
+set in one transaction, so no counter can outlive its window.
 
 | Endpoint | Limit | Scope |
 |---|---|---|
-| `POST /auth/login` | 5 / 15 min | IP and email; both reset on success |
+| `POST /auth/login` | 5 / 15 min per email, 20 / 15 min per IP | a success resets the email counter only — signing into one's own account must not buy more guesses at others from the same IP |
 | `POST /auth/register` | 3 / h | IP and email |
 | `POST /auth/refresh` | 600 / h | IP — a load backstop: tokens can't be guessed, and every page load of a remembered session refreshes |
 | `POST /auth/forgot-password` | 3 / h | IP and email |
@@ -129,6 +130,10 @@ normal; exceeding a limit returns `429` with `Retry-After`.
 | `POST /auth/reset-password` | 5 / h | IP |
 | Google `start` / `link/start` | 10 / h | IP |
 | Guest catalog listing / search / reference | 300 / 90 / 300 per min | IP (signed-in users are not limited) |
+
+Accepted risk: five wrong passwords every 15 minutes keep one address out of password
+sign-in (Google sign-in and password reset still work). Closing it needs a CAPTCHA or
+similar, not a tighter limit.
 
 ### Registration honeypot
 

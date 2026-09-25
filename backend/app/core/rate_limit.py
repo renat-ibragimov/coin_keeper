@@ -41,7 +41,11 @@ class RateLimit:
 
 HOUR = 3600
 
-LOGIN = RateLimit("login", limit=5, window_seconds=15 * 60)
+# Per address: guessing one account's password. Per IP: wider, so people
+# behind one router don't lock each other out, and never reset by a
+# successful login (docs/auth.md, "Rate limits").
+LOGIN_EMAIL = RateLimit("login", limit=5, window_seconds=15 * 60)
+LOGIN_IP = RateLimit("login_ip", limit=20, window_seconds=15 * 60)
 REGISTER = RateLimit("register", limit=3, window_seconds=HOUR)
 # A load backstop only: refresh tokens are 256-bit and can't be guessed, while
 # every page load of a remembered session refreshes — shared IPs (a household,
@@ -71,13 +75,16 @@ async def hit(limit: RateLimit, scope: str) -> None:
     `scope` is what the limit is applied to: an IP address, an email address or
     a user id. Several scopes per endpoint are normal, see docs/auth.md.
     """
-    redis = get_redis()
     key = f"rl:{limit.name}:{scope}"
-    count = await redis.incr(key)
-    if count == 1:
-        await redis.expire(key, limit.window_seconds)
+    # One transaction: the counter and its expiry are set together, so a crash
+    # can't leave a key that never expires. NX keeps a running window as is
+    # and gives one back to a key that somehow lost it.
+    async with get_redis().pipeline(transaction=True) as pipe:
+        pipe.incr(key)
+        pipe.expire(key, limit.window_seconds, nx=True)
+        pipe.ttl(key)
+        count, _, ttl = await pipe.execute()
     if count > limit.limit:
-        ttl = await redis.ttl(key)
         raise RateLimitExceededError(max(ttl, 1))
 
 

@@ -198,8 +198,8 @@ async def login(
     agent: UserAgent,
 ) -> SessionOut:
     email_scope = payload.email.lower()
-    await _enforce(rate_limit.LOGIN, ip)
-    await _enforce(rate_limit.LOGIN, email_scope)
+    await _enforce(rate_limit.LOGIN_IP, ip)
+    await _enforce(rate_limit.LOGIN_EMAIL, email_scope)
     try:
         session = await service.login(
             email=payload.email, password=payload.password, user_agent=agent, ip=ip
@@ -226,8 +226,9 @@ async def login(
             "This account is disabled.",
         ) from exc
 
-    await rate_limit.reset(rate_limit.LOGIN, email_scope)
-    await rate_limit.reset(rate_limit.LOGIN, ip)
+    # Only the address: a success says nothing about other accounts guessed
+    # from the same IP.
+    await rate_limit.reset(rate_limit.LOGIN_EMAIL, email_scope)
     _set_refresh_cookie(response, session, settings)
     return _session_payload(session)
 

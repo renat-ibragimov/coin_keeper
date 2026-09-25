@@ -106,8 +106,8 @@ GET    /auth/google/callback     ?state&code&error                    → 303 to
   `/auth/change-password` with a wrong current password → `400 invalid-credentials`; on
   success every session is revoked and the cookie cleared. `/auth/set-password` when a
   password already exists → `409 password-already-set` (it's for Google-only accounts).
-- **Rate limits** (per IP and per email where there is one): login 5 / 15 min (reset on
-  success), register 3/h, forgot-password 3/h, resend 3/h, reset 5/h, refresh 600/h,
+- **Rate limits** (per IP and per email where there is one): login 5 / 15 min per email
+  (reset on success) and 20 / 15 min per IP (never reset), register 3/h, forgot-password 3/h, resend 3/h, reset 5/h, refresh 600/h,
   Google start 10/h → `429 rate-limit-exceeded` with `Retry-After`. Rationale: `auth.md`.
 - **Avatar.** `PUT /auth/me/avatar` takes the image as the whole body, no multipart:
   JPEG, PNG or WebP, ≤ 12 MB, ≤ 4000 px wide, else `422 invalid-image` (an oversized
