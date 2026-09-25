@@ -348,7 +348,7 @@ async def test_purchase_is_committed_before_the_translation_task_runs(
 
     assert created.status_code == 201, created.text
     assert "background" in events
-    assert "commit" not in events[events.index("background") :]
+    assert events == ["commit", "background"]
 
 
 async def test_a_failing_translation_task_does_not_undo_the_purchase(

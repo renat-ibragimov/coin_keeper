@@ -83,9 +83,10 @@ git — docs, code, tests or example commands. Use placeholders (`<owner-email>`
 - Password reset and password change revoke every family of the user. A change then
   starts a new family for the device that made it, so it stays signed in; every other
   device has to sign in with the new password.
-- `session_started_at` (sign-in time, carried through rotation) and `persistent`
-  ("remember me") are stored per token for session-lifetime rules; nothing reads them
-  yet.
+- `session_started_at` (sign-in time, carried through rotation) and `persistent` are
+  stored per token for session-lifetime rules that don't exist yet: nothing reads them,
+  and `persistent` is always `true` until "remember me" reaches the server
+  (`backlog.md`).
 - The signing secret comes from the environment and must be at least 32 characters; the
   API refuses to start otherwise (a short HS256 secret can be brute-forced offline from
   any user's own token).
@@ -110,8 +111,9 @@ token exists only in the email.
   mail failure is logged, not raised. Otherwise the SMTP round trip — made only when the
   address has an account — or a `500` from a mail outage would give that away.
 - `/auth/register`, `/auth/forgot-password` and `/auth/resend-verification` answer the
-  same whether or not the address exists — in body, status and time — so the forms
-  can't be used to probe for accounts.
+  same whether or not the address exists — in body and status, and neither branch waits
+  for mail — so the forms can't be used to probe for accounts. The existing-address
+  branch still writes a token row, a difference of milliseconds behind a 3 / h limit.
 - **No password before verification.** Registering again with an unverified address just
   sends a new link; only the mailbox owner chooses the password, when using it.
   Confirming an address **always** requires choosing a password — no Google identity
