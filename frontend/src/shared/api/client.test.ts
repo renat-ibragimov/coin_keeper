@@ -1,6 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api, ApiError, getAccessToken, setAccessToken, toQuery, tryRefresh } from './client';
+import {
+  api,
+  ApiError,
+  getAccessToken,
+  REFRESH_RETRY_DELAY_MS,
+  setAccessToken,
+  toQuery,
+  tryRefresh,
+} from './client';
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -102,11 +110,63 @@ describe('api client', () => {
       setAccessToken('stale');
       fetchMock
         .mockResolvedValueOnce(jsonResponse(401, {}))
+        .mockResolvedValueOnce(jsonResponse(status, {}))
         .mockResolvedValueOnce(jsonResponse(status, {}));
-      await expect(api('/collection')).rejects.toMatchObject({ status: 401 });
+      vi.useFakeTimers();
+      try {
+        const pending = expect(api('/collection')).rejects.toMatchObject({ status: 401 });
+        await vi.advanceTimersByTimeAsync(REFRESH_RETRY_DELAY_MS);
+        await pending;
+      } finally {
+        vi.useRealTimers();
+      }
       expect(getAccessToken()).toBe('stale');
     },
   );
+
+  it('retries a refresh once when the answer was lost on the way', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock
+        .mockRejectedValueOnce(new TypeError('network down'))
+        .mockResolvedValueOnce(jsonResponse(200, { tokens: { accessToken: 'fresh' } }));
+
+      const pending = tryRefresh();
+      await vi.advanceTimersByTimeAsync(REFRESH_RETRY_DELAY_MS);
+
+      expect(await pending).toBe(true);
+      expect(getAccessToken()).toBe('fresh');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a refresh once on a server error, and no more', async () => {
+    vi.useFakeTimers();
+    try {
+      fetchMock
+        .mockResolvedValueOnce(jsonResponse(502, {}))
+        .mockResolvedValueOnce(jsonResponse(502, {}));
+
+      const pending = tryRefresh();
+      await vi.advanceTimersByTimeAsync(REFRESH_RETRY_DELAY_MS);
+
+      expect(await pending).toBe(false);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('refreshes under a lock shared by every tab', async () => {
+    const request = vi.fn((_name: string, work: () => Promise<Response>) => work());
+    vi.stubGlobal('navigator', { ...navigator, locks: { request } });
+    fetchMock.mockResolvedValueOnce(jsonResponse(200, { tokens: { accessToken: 'fresh' } }));
+
+    expect(await tryRefresh()).toBe(true);
+    expect(request).toHaveBeenCalledWith('ck-refresh', expect.any(Function));
+  });
 
   it('does not resurrect a session when refresh finishes after logout', async () => {
     setAccessToken('old');

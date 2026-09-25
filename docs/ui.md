@@ -70,7 +70,8 @@ Retired paths redirect and keep the query string:
 - **Sign-out.** Public pages and the four collection root sections keep their address
   and switch to the guest view. Add/edit pages go to `/collection/coins`, the
   completeness detail to `/collection/completeness`, settings and admin to `/`. The auth
-  dialog does not open after a voluntary sign-out.
+  dialog does not open after a voluntary sign-out. Signing out in one tab signs out the
+  viewer's other open tabs too, the same way.
 - **Session expiry** switches the UI to guest mode and offers to sign in again with an
   explanation.
 - **Form drafts.** Unsaved add/edit forms for purchases and expenses are kept in memory

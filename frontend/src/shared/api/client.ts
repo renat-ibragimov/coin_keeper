@@ -102,6 +102,44 @@ async function rawRequest(path: string, options: RequestOptions, token: string |
   return fetch(`${API_BASE}${path}`, init);
 }
 
+/** Pause before the one retry of a refresh that failed in transit. */
+export const REFRESH_RETRY_DELAY_MS = 1000;
+
+/**
+ * One refresh round trip, retried once on a network error or a 5xx. The
+ * server may already have rotated the cookie when the answer got lost; the
+ * retry lands inside its grace window and gets the same new token
+ * (docs/auth.md, "Sessions").
+ */
+async function requestRefresh(): Promise<Response> {
+  const send = () =>
+    fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+  const retryLater = async () => {
+    await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_DELAY_MS));
+    return send();
+  };
+  let response: Response;
+  try {
+    response = await send();
+  } catch {
+    return retryLater();
+  }
+  return response.status >= 500 ? retryLater() : response;
+}
+
+/**
+ * Tabs share one refresh cookie, so their refreshes run one at a time: each
+ * sends the cookie the previous one set. Browsers without the Web Locks API
+ * fall back to the server's grace window.
+ */
+function withRefreshLock(work: () => Promise<Response>): Promise<Response> {
+  const locks = typeof navigator === 'undefined' ? undefined : navigator.locks;
+  return locks ? locks.request('ck-refresh', work) : work();
+}
+
 /** Deduplicated refresh: concurrent 401s share one attempt. */
 let refreshInFlight: Promise<boolean> | null = null;
 
@@ -109,10 +147,7 @@ export async function tryRefresh(): Promise<boolean> {
   const version = sessionVersion;
   refreshInFlight ??= (async () => {
     try {
-      const response = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const response = await withRefreshLock(requestRefresh);
       if (version !== sessionVersion) return false;
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) setAccessToken(null);

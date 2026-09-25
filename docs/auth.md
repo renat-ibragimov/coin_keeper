@@ -181,6 +181,14 @@ on one origin.
 - A definitive auth failure clears user state and the query cache; a transient
   network/server error during refresh does not sign the user out. Late refresh responses
   and private responses from an ended session never restore it.
+- **Refresh coordination.** Concurrent 401s in a tab share one refresh. Across tabs,
+  refreshes run one at a time under the Web Locks API (`ck-refresh`), so each tab sends
+  the cookie the previous one set; browsers without it rely on the server's grace window.
+  A refresh that fails with a network error or a 5xx is retried once after 1 s — inside
+  the grace window if the server had already rotated the cookie.
+- The Google sign-in popup never refreshes on its own start-up; only the opener does.
+- A voluntary sign-out is broadcast on `BroadcastChannel('ck-auth')`; the viewer's other
+  tabs close their session too.
 - After a session expires, the user can sign in again and continue an unsaved purchase or
   expense form: drafts are kept in the tab's memory for the same account and cleared on
   voluntary sign-out or when a different account signs in. A reload discards them.

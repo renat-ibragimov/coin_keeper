@@ -12,10 +12,25 @@ import type { SessionOut, UserOut } from '@/shared/api/types';
 
 import * as authApi from './api';
 import { AuthContext } from './authContext';
+import { GOOGLE_POPUP_FLOW_KEY } from './googlePopup';
 import { setDraftOwner, retainSessionDrafts } from './sessionDrafts';
 import { saveAuthReturn } from './authReturn';
 
 const REMEMBER_KEY = 'ck-remember';
+/** Tells the viewer's other tabs about a voluntary sign-out. */
+const AUTH_CHANNEL = 'ck-auth';
+
+/**
+ * The Google popup mounts the whole app but only reports back to its opener;
+ * a refresh of its own would race the opener's with the same cookie.
+ */
+function insideGooglePopup(): boolean {
+  try {
+    return sessionStorage.getItem(GOOGLE_POPUP_FLOW_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
 
 function rememberedSession(): boolean {
   try {
@@ -70,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (rememberedSession() && (await tryRefresh()) && getAccessToken()) {
+      if (!insideGooglePopup() && rememberedSession() && (await tryRefresh()) && getAccessToken()) {
         try {
           const profile = await authApi.me();
           if (!cancelled) {
@@ -116,7 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [acceptSession],
   );
 
-  const signOut = useCallback(async () => {
+  /** Everything a voluntary sign-out clears in a tab, whichever tab started it. */
+  const closeLocalSession = useCallback(() => {
     signingOut.current = true;
     currentUser.current = null;
     setDraftOwner(null);
@@ -130,6 +146,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null);
     setUser(null);
     setSessionEnd('signed-out');
+  }, []);
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+    const channel = new BroadcastChannel(AUTH_CHANNEL);
+    channel.onmessage = (event: MessageEvent<{ type?: string }>) => {
+      if (event.data?.type !== 'signed-out' || !currentUser.current) return;
+      closeLocalSession();
+      signingOut.current = false;
+    };
+    return () => channel.close();
+  }, [closeLocalSession]);
+
+  const signOut = useCallback(async () => {
+    closeLocalSession();
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel(AUTH_CHANNEL);
+      channel.postMessage({ type: 'signed-out' });
+      channel.close();
+    }
     try {
       await authApi.logout();
     } catch (error) {
@@ -138,7 +174,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       signingOut.current = false;
     }
-  }, []);
+  }, [closeLocalSession]);
 
   const updateUser = useCallback((profile: UserOut) => {
     currentUser.current = profile;
