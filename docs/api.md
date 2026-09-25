@@ -516,8 +516,8 @@ created in **one transaction** (BR-2, BR-4).
 Rates, currency and storage location are resolved **before** the first insert, and bad
 references (`countryId`, `seriesId`, `denominationId`, `compositionId`, `edgeTypeId`,
 `qualityTypeId`) → `422 invalid-reference` before anything is written, so a rejected
-purchase never leaves an orphan position. The transaction is committed explicitly
-inside the request, before the translation task is scheduled (BR-4).
+purchase never leaves an orphan position. The transaction commits before the response
+is sent and before the translation task runs (BR-4).
 
 ### Supporting expenses in a purchase
 

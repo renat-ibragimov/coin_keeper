@@ -246,10 +246,6 @@ class CollectionService:
             await self._resolve_rate(extra.currency, payload.purchase_date)
             for extra in payload.extra_expenses
         ]
-        # Resolved before the coin, not after: a storage location the owner
-        # has not used before is created *and committed* on the spot
-        # (app/repositories/storage_locations.py), and that commit must not
-        # land in the middle of this transaction's own writes.
         storage_location_id = await self._storage_locations.resolve(payload.storage_location)
 
         if payload.new_catalog_item is not None:
@@ -281,14 +277,6 @@ class CollectionService:
         for extra, extra_rate in zip(payload.extra_expenses, extra_rates, strict=True):
             self._session.add(self._build_extra_expense(extra, extra_rate, instance))
         await self._session.flush()
-        if payload.new_catalog_item is not None:
-            # All three rows at once, here rather than at the end of the
-            # request: FastAPI runs BackgroundTasks *before* the request's own
-            # commit (proved the hard way on storage locations, 2026-09-13),
-            # and the translation task opens a session of its own — it would
-            # find no such coin. Atomicity is untouched: this is still one
-            # commit for the item, the instance and the expense together.
-            await self._session.commit()
         return await self._get_out(instance.id)
 
     async def update(self, item_id: int, payload: CollectionItemUpdate) -> CollectionItemOut:

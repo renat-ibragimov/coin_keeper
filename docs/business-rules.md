@@ -107,11 +107,11 @@ before the first insert, so a rejected purchase leaves nothing behind. Never spl
 into two requests (`POST /catalog` then `POST /collection`) — a failure of the second
 would leave junk in the user's catalog.
 
-**Commit before background work.** FastAPI runs `BackgroundTasks` while sending the
-response, *before* the request-scoped session commits in dependency cleanup. The
-background title translation opens its own session, so `CollectionService.create`
-commits the whole transaction explicitly before the route schedules the task (see
-BR-16 for the same issue with storage locations).
+**Commit before background work.** The request session is a function-scoped
+dependency (`DbSession` in `app/api/deps.py`): it commits when the route returns,
+before the response is sent and before any `BackgroundTasks` run. The background title
+translation opens its own session and always finds the committed rows, and a failing
+background task can't roll the purchase back.
 
 ### Supporting expenses
 
@@ -468,11 +468,9 @@ A dictionary (`storage_locations`, `data-model.md`), not free text on
   schedule a `BackgroundTasks` job that detects the language via the Anthropic API and
   fills the other slot (`llm`). Every early exit of that job is logged (no API key, row
   vanished, no tool-use in the reply, API error).
-- **Commit before the background job.** Because FastAPI commits the request session
-  *after* background tasks start (BR-4), `StorageLocationRepository.add()` commits right
-  after `flush()`. That's safe: at that moment nothing else is pending in the session.
-  In `CollectionService.create` the location is therefore resolved **first**, before the
-  catalog item insert, so its early commit never splits the purchase transaction.
+- **Commit before the background job.** A new location is committed together with the
+  rest of the request, before the translation job starts (BR-4); a purchase that fails
+  after the location was resolved leaves no location behind.
 - **Delete own, not the preset.** `DELETE /collection/storage-locations?name=` returns
   `403` for the preset and `404` for a name this owner can't see — including someone
   else's, so their existence isn't revealed. Purchases that used a deleted location keep

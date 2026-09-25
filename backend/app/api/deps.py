@@ -26,7 +26,7 @@ from app.services.collection_photos import CollectionPhotoService
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-DbSession = Annotated[AsyncSession, Depends(get_db_session)]
+DbSession = Annotated[AsyncSession, Depends(get_db_session, scope="function")]
 AppSettings = Annotated[Settings, Depends(get_settings)]
 Mail = Annotated[MailBackend, Depends(get_mail_backend)]
 Telegram = Annotated[TelegramSender, Depends(get_telegram_sender)]

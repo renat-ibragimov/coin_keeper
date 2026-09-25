@@ -46,18 +46,6 @@ class StorageLocationRepository:
     async def add(self, location: StorageLocation) -> StorageLocation:
         self._session.add(location)
         await self._session.flush()
-        # Committed here, not left for the request's own end-of-request
-        # commit: FastAPI runs BackgroundTasks as part of sending the
-        # response, which happens BEFORE request-scoped dependencies (this
-        # session included) run their post-yield cleanup -- see
-        # app.db.session.get_db_session. translate_in_background opens its
-        # own session moments later and needs this row to already be
-        # durably visible, not still pending in this one (incident
-        # 2026-09-13: every location created this way came back
-        # untranslated, with "vanished before translation ran" in the logs
-        # -- confirmed by reproducing locally with commit/background-task
-        # timestamps logged side by side).
-        await self._session.commit()
         return location
 
     async def delete(self, location: StorageLocation) -> None:

@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
 from app.core.mail.base import EmailMessage
-from app.models import StorageLocation
+from app.models import CollectionItem, StorageLocation
 from app.models.enums import TranslationSource
-from app.repositories.storage_locations import StorageLocationRepository
+from app.services import storage_locations as storage_locations_service
 from app.services.storage_locations import apply_translation
 from app.services.translation import TranslationResult
 from tests.helpers import register_and_verify
@@ -306,30 +306,74 @@ def test_apply_translation_fills_both_slots_for_a_third_language() -> None:
     assert location.name_en_source == TranslationSource.LLM
 
 
-async def test_add_commits_immediately_so_a_background_task_can_see_it(
-    db_session: AsyncSession, ctx: SimpleNamespace
-) -> None:
-    """FastAPI runs BackgroundTasks as part of sending the response -- before
-    this request's own end-of-request commit, not after (confirmed 2026-09-13
-    by logging commit and background-task timestamps side by side against a
-    live server: every location created this way came back untranslated,
-    "vanished before translation ran" in the logs, because
-    translate_in_background's separate session opened before this one had
-    committed). add() must commit the row itself rather than leaving it for
-    that later commit."""
-    commit_spy = AsyncMock(wraps=db_session.commit)
-    db_session.commit = commit_spy  # type: ignore[method-assign]
+def _purchase_with_new_location(item_id: int) -> dict[str, object]:
+    return {
+        "catalogItemId": item_id,
+        "quantity": 1,
+        "price": "10.00",
+        "currency": "UAH",
+        "purchaseDate": "2024-01-01",
+        "storageLocation": "У сейфі на дачі",
+    }
 
-    repo = StorageLocationRepository(db_session, owner_id=ctx.id_a)
-    await repo.add(
-        StorageLocation(
-            owner_id=ctx.id_a,
-            name_original="Тестове місце",
-            name_uk="Тестове місце",
-            name_uk_source=TranslationSource.MANUAL,
-            name_en="Тестове місце",
-            name_en_source=TranslationSource.MANUAL,
-        )
+
+async def test_purchase_is_committed_before_the_translation_task_runs(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    ctx: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The client gets its 201 and uploads photos right away, while the
+    translation task can take as long as the model does: the purchase must be
+    durable before either happens, not after the task."""
+    events: list[str] = []
+    commit = db_session.commit
+
+    async def recording_commit() -> None:
+        events.append("commit")
+        await commit()
+
+    async def fake_translate(location_id: int) -> None:
+        events.append("background")
+
+    monkeypatch.setattr(db_session, "commit", recording_commit)
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "test-key")
+    monkeypatch.setattr(storage_locations_service, "translate_in_background", fake_translate)
+
+    created = await client.post(
+        "/api/v1/collection",
+        json=_purchase_with_new_location(ctx.item_id),
+        headers=auth(ctx.token_a),
     )
 
-    commit_spy.assert_awaited_once()
+    assert created.status_code == 201, created.text
+    assert "background" in events
+    assert "commit" not in events[events.index("background") :]
+
+
+async def test_a_failing_translation_task_does_not_undo_the_purchase(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    ctx: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """translate_in_background re-raises unexpected errors; the owner already
+    has "purchase created" on screen, so the purchase must survive it."""
+
+    async def failing_translate(location_id: int) -> None:
+        raise RuntimeError("translation blew up")
+
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "test-key")
+    monkeypatch.setattr(storage_locations_service, "translate_in_background", failing_translate)
+
+    with pytest.raises(RuntimeError, match="translation blew up"):
+        await client.post(
+            "/api/v1/collection",
+            json=_purchase_with_new_location(ctx.item_id),
+            headers=auth(ctx.token_a),
+        )
+
+    owned = await db_session.execute(
+        select(func.count(CollectionItem.id)).where(CollectionItem.owner_id == ctx.id_a)
+    )
+    assert owned.scalar_one() == 1

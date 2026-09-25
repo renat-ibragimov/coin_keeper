@@ -12,13 +12,13 @@ from __future__ import annotations
 from datetime import date
 from types import SimpleNamespace
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1 import collection as collection_routes
 from app.core.mail.base import EmailMessage
 from app.models import CatalogItem, CollectionItem, Expense, Material
 from app.models.enums import ExpenseCategory, TranslationSource
@@ -253,14 +253,25 @@ async def test_new_coin_is_invisible_to_other_users(
 
 
 async def test_the_whole_transaction_commits_before_the_background_task_runs(
-    client: AsyncClient, db_session: AsyncSession, ctx: SimpleNamespace
+    client: AsyncClient,
+    db_session: AsyncSession,
+    ctx: SimpleNamespace,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """FastAPI runs BackgroundTasks before this request's own end-of-request
-    commit (the lesson storage locations paid for on 2026-09-13), and the
-    translation task opens a session of its own — an uncommitted coin is a
-    coin it cannot see. One commit, all three rows."""
-    commit_spy = AsyncMock(wraps=db_session.commit)
-    db_session.commit = commit_spy  # type: ignore[method-assign]
+    """The translation task opens a session of its own — an uncommitted coin
+    is a coin it cannot see. One commit, all three rows, before the task."""
+    events: list[str] = []
+    commit = db_session.commit
+
+    async def recording_commit() -> None:
+        events.append("commit")
+        await commit()
+
+    async def fake_translate(item_id: int) -> None:
+        events.append("background")
+
+    monkeypatch.setattr(db_session, "commit", recording_commit)
+    monkeypatch.setattr(collection_routes, "translate_title_in_background", fake_translate)
 
     response = await client.post(
         "/api/v1/collection",
@@ -268,7 +279,7 @@ async def test_the_whole_transaction_commits_before_the_background_task_runs(
         headers=auth(ctx.token_a),
     )
     assert response.status_code == 201, response.text
-    commit_spy.assert_awaited()
+    assert events == ["commit", "background"]
 
 
 async def test_a_purchase_of_a_known_coin_still_takes_the_plain_path(
