@@ -92,8 +92,12 @@ token exists only in the email.
 - At least 32 random bytes (`secrets.token_urlsafe`).
 - The transaction holding the new token commits **before** the email is sent. If mail
   fails, the inactive account stays and the user can request a resend.
-- `/auth/forgot-password` and `/auth/resend-verification` answer the same whether or not
-  the address exists — the forms can't be used to probe for accounts.
+- Verification and reset emails go out **after the response** (`BackgroundTasks`), and a
+  mail failure is logged, not raised. Otherwise the SMTP round trip — made only when the
+  address has an account — or a `500` from a mail outage would give that away.
+- `/auth/register`, `/auth/forgot-password` and `/auth/resend-verification` answer the
+  same whether or not the address exists — in body, status and time — so the forms
+  can't be used to probe for accounts.
 - **No password before verification.** Registering again with an unverified address just
   sends a new link; only the mailbox owner chooses the password, when using it.
   Confirming an address **always** requires choosing a password — no Google identity

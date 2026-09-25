@@ -12,10 +12,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from urllib.parse import quote
 
+from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.mail import MailBackend, password_reset_email, verification_email
+from app.core.mail.base import EmailMessage
 from app.core.security import (
     create_access_token,
     derive_successor_token,
@@ -81,10 +83,17 @@ class IssuedSession:
 
 
 class AuthService:
-    def __init__(self, session: AsyncSession, settings: Settings, mail: MailBackend) -> None:
+    def __init__(
+        self,
+        session: AsyncSession,
+        settings: Settings,
+        mail: MailBackend,
+        background: BackgroundTasks | None = None,
+    ) -> None:
         self._session = session
         self._settings = settings
         self._mail = mail
+        self._background = background
         self._users = UserRepository(session)
         self._refresh = RefreshTokenRepository(session)
         self._auth_tokens = AuthTokenRepository(session)
@@ -157,7 +166,7 @@ class AuthService:
         # If delivery fails, the inactive account remains and the user can resend.
         await self._session.commit()
         url = f"{self._settings.public_base_url}/verify-email?token={quote(raw)}"
-        await self._mail.send(
+        await self._deliver(
             verification_email(user.email, url, self._settings.email_verify_ttl_hours)
         )
 
@@ -354,9 +363,25 @@ class AuthService:
         )
         await self._session.commit()
         url = f"{self._settings.public_base_url}/reset-password?token={quote(raw)}"
-        await self._mail.send(
+        await self._deliver(
             password_reset_email(user.email, url, self._settings.password_reset_ttl_hours)
         )
+
+    async def _deliver(self, message: EmailMessage) -> None:
+        """Send after the response, never inside it: an SMTP round trip only on
+        the "account exists" branch would tell a stranger which addresses are
+        registered, by time or by a 500 when mail fails (docs/auth.md)."""
+        if self._background is None:
+            await self._send_logged(message)
+        else:
+            self._background.add_task(self._send_logged, message)
+
+    async def _send_logged(self, message: EmailMessage) -> None:
+        try:
+            await self._mail.send(message)
+        except Exception:
+            # The token is already committed; the user can ask for a resend.
+            logger.exception("sending %r failed", message.subject)
 
     async def reset_password(self, *, token: str, new_password: str) -> None:
         self._validate_password(new_password)

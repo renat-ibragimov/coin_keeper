@@ -29,8 +29,9 @@ async def test_failed_delivery_keeps_account_available_for_resend(
 
     email = unique_email()
     service = AuthService(db_session, get_settings(), FailingMail())
-    with pytest.raises(OSError, match="SMTP unavailable"):
-        await service.register(email=email, password=PASSWORD, display_name=None, honeypot=None)
+    # Logged, not raised: the answer must look the same whether or not mail
+    # went out (docs/auth.md).
+    await service.register(email=email, password=PASSWORD, display_name=None, honeypot=None)
 
     user = await UserRepository(db_session).get_by_email(email)
     assert user is not None

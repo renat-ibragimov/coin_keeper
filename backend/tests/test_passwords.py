@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core import security
 from app.core.mail.base import EmailMessage
+from app.core.mail.console import ConsoleMailBackend
 from app.models import User
 from app.repositories.users import UserRepository
 from tests.helpers import PASSWORD, extract_token, register_and_verify, unique_email
@@ -183,3 +184,19 @@ async def test_an_overlong_new_password_is_rejected(
         json={"token": extract_token(mail_outbox), "newPassword": "x" * 257},
     )
     assert response.status_code == 422
+
+
+async def test_a_mail_failure_answers_like_a_missing_account(
+    client: AsyncClient, mail_outbox: list[EmailMessage], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Mail goes out after the response: a failing mail server must not turn
+    "this address has an account" into a 500 the other branch never gives."""
+    email, _ = await register_and_verify(client, mail_outbox)
+
+    async def broken_send(self: object, message: EmailMessage) -> None:
+        raise ConnectionError("smtp down")
+
+    monkeypatch.setattr(ConsoleMailBackend, "send", broken_send)
+    existing = await client.post("/api/v1/auth/forgot-password", json={"email": email})
+    missing = await client.post("/api/v1/auth/forgot-password", json={"email": unique_email()})
+    assert existing.status_code == missing.status_code == 202

@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from typing import Annotated
 
-from fastapi import Depends, Header, Query, Request, status
+from fastapi import BackgroundTasks, Depends, Header, Query, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,8 +33,10 @@ Telegram = Annotated[TelegramSender, Depends(get_telegram_sender)]
 SupportTelegram = Annotated[SupportTelegramClient, Depends(get_support_telegram_client)]
 
 
-def get_auth_service(session: DbSession, settings: AppSettings, mail: Mail) -> AuthService:
-    return AuthService(session, settings, mail)
+def get_auth_service(
+    session: DbSession, settings: AppSettings, mail: Mail, background: BackgroundTasks
+) -> AuthService:
+    return AuthService(session, settings, mail, background)
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
