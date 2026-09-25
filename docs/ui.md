@@ -466,7 +466,10 @@ are edited and deleted on the coin card.
 - **Filters:** see "Filter panels".
 - **KPI tiles** (`CollectionSummaryTiles`, shared with the overview): coins in
   collection, total spent, current value, difference — from `GET /collection/summary`
-  with the page's filters, so without filters they equal the overview.
+  with the page's filters. Spent is money on the coins in the collection, not on the
+  hobby, so it can be lower than the overview's. With `includeSupportingExpenses` off,
+  spent and difference use coin prices only and the "incl. related" line is hidden;
+  the overview always counts everything.
 - **Tile** (`PositionCard`): a large obverse (unlike the catalog's pair), grade badge
   (one grade, several joined with " · ", none → no badge), quantity, spent, current value
   (or "no price"), last purchase, and a "new release" badge for an issue date within the

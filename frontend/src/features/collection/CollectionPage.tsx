@@ -336,7 +336,10 @@ export function CollectionPage() {
       ) : (
         <>
           {summaryQuery.data ? (
-            <CollectionSummaryTiles data={summaryQuery.data} />
+            <CollectionSummaryTiles
+              data={summaryQuery.data}
+              includeSupportingExpenses={includeSupportingExpenses}
+            />
           ) : (
             <section className={styles.tiles} aria-label={t('dashboard.tilesLabel')}>
               {Array.from({ length: 4 }, (_, index) => (

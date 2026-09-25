@@ -8,12 +8,13 @@ import { StatTile } from '@/shared/ui';
 import { valueDelta } from './finance';
 import styles from './CollectionSummaryTiles.module.css';
 
-/** The five fields these tiles need — satisfied structurally by both the
+/** The six fields these tiles need — satisfied structurally by both the
  *  unfiltered `BootstrapOut['dashboard']` (Огляд) and the filtered
  *  `CollectionSummary` (Мої монети, scoped to the page's own filters). */
 export interface CollectionSummaryTilesData {
   collectionItems: number;
   completedItems: number;
+  coinSpendUah: string;
   totalSpendUah: string;
   relatedSpendUah: string;
   marketValueUah: string;
@@ -21,6 +22,9 @@ export interface CollectionSummaryTilesData {
 
 interface CollectionSummaryTilesProps {
   data: CollectionSummaryTilesData;
+  /** settings.includeSupportingExpenses (BR-4). Only Мої монети passes it:
+   *  Огляд is everything spent on the hobby, supporting expenses always in. */
+  includeSupportingExpenses?: boolean;
 }
 
 /**
@@ -28,11 +32,15 @@ interface CollectionSummaryTilesProps {
  * to its own filters, or lack of them) -- one row, one set of numbers,
  * everywhere it appears (owner's call, 2026-09-23).
  */
-export function CollectionSummaryTiles({ data }: CollectionSummaryTilesProps) {
+export function CollectionSummaryTiles({
+  data,
+  includeSupportingExpenses = true,
+}: CollectionSummaryTilesProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const location = useLocation();
-  const delta = valueDelta(data.totalSpendUah, data.marketValueUah);
+  const spendUah = includeSupportingExpenses ? data.totalSpendUah : data.coinSpendUah;
+  const delta = valueDelta(spendUah, data.marketValueUah);
   const deltaTone = delta.diffUah > 0 ? 'success' : delta.diffUah < 0 ? 'danger' : 'neutral';
   // On Мої монети itself this tile links to the page it's already on --
   // carry the current filters along so the click is a harmless no-op
@@ -57,10 +65,14 @@ export function CollectionSummaryTiles({ data }: CollectionSummaryTilesProps) {
         <StatTile
           icon={<Wallet strokeWidth={1.75} />}
           label={t('dashboard.spentTotal')}
-          value={formatUah(data.totalSpendUah, locale)}
-          hint={t('dashboard.tileSpentHint', {
-            amount: formatUah(data.relatedSpendUah, locale),
-          })}
+          value={formatUah(spendUah, locale)}
+          hint={
+            includeSupportingExpenses
+              ? t('dashboard.tileSpentHint', {
+                  amount: formatUah(data.relatedSpendUah, locale),
+                })
+              : undefined
+          }
         />
       </Link>
       <Link to="/collection/money" className={styles.tileLink}>

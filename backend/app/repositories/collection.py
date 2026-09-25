@@ -302,9 +302,9 @@ class CollectionRepository:
     async def summary(self, filters: CollectionFilters) -> CollectionSummaryData:
         """The KPI tiles on "Мої монети" (docs/ui.md), scoped to the
         page's own filters — the same conditions `list_positions` uses, just
-        aggregated instead of paginated. With no filters at all these
-        conditions match the whole collection, so the numbers agree with
-        `GET /bootstrap`'s unfiltered dashboard snapshot."""
+        aggregated instead of paginated. Spend counts only expenses linked to
+        a coin the owner holds, so it can be lower than `GET /bootstrap`'s,
+        which counts every expense (docs/api.md)."""
         conditions = self._position_filter_conditions(filters)
 
         collection_items = (

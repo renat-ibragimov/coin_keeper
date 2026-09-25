@@ -136,6 +136,8 @@ without a rate rejects the whole purchase.
 (default `true`): when on, the headline cost on the coin card and the base for value
 change is `purchaseTotalUah + supportingExpensesUah`, with a note of how much of it is
 extras; when off, the headline is `purchaseTotalUah` and extras are shown separately.
+The same goes for the "Мої монети" positions and KPI tiles (spent and difference); the
+overview's tiles ignore the setting — they are everything spent on the hobby.
 The API always returns both sums unchanged — the setting only affects how the frontend
 combines and labels them.
 

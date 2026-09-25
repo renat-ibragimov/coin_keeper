@@ -175,7 +175,7 @@ Partial update: only the fields sent are changed. `locale` is changed through
 | `catalogViewMode`, `collectionViewMode` | `cards \| table`, `cards` | the frontend keeps a localStorage copy only as a cache |
 | `secondaryCurrency` | `USD \| EUR`, `USD` | which already-computed conversion to show next to UAH (BR-6) |
 | `defaultStorageLocation` | name or `null` | resolved by name through get-or-create (BR-16); `""`/`null` clears it |
-| `includeSupportingExpenses` | bool, `true` | whether the coin card adds supporting expenses to "bought for" (BR-4) |
+| `includeSupportingExpenses` | bool, `true` | whether the coin card, the "Мої монети" positions and tiles add supporting expenses to what was spent (BR-4) |
 
 `SettingsOut` also carries `locale` and `displayCurrency`.
 
@@ -440,7 +440,9 @@ no nulls), `thumbnailUrl`.
 
 `GET /collection/summary` (same filters, no paging) → `{collectionItems,
 completedItems, coinSpendUah, relatedSpendUah, totalSpendUah, marketValueUah}` — the
-"Мої монети" tiles; without filters the numbers match `/bootstrap`.
+"Мої монети" tiles. Spend counts only expenses linked to a coin the user currently
+owns, so even without filters it can be lower than `/bootstrap`, which counts every
+expense (albums, expenses with no coin, supporting expenses of deleted purchases).
 
 ### Buying a coin
 
